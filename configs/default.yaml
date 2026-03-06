@@ -1,0 +1,54 @@
+project:
+  random_seed: 42
+
+dataset:
+  source: fresh_retailnet
+  hf_dataset_id: Dingdong-Inc/FreshRetailNet-50K
+  splits:
+    train: data/train.parquet
+    eval: data/eval.parquet
+  local_cache_dir: data/raw/fresh_retailnet
+  processed_panel_path: data/processed/fresh_retailnet_train.parquet
+  use_local_cache: true
+  refresh_processed_cache: false
+  top_n_series: 100
+  min_history_days: 70
+  max_rows: null
+  horizon: 7
+  use_eval_as_holdout: false
+
+preprocessing:
+  drop_negative_sales: true
+  fill_missing_values: true
+
+features:
+  lags: [1, 7, 14, 28]
+  rolling_windows: [7, 28]
+  include_static_ids: true
+  include_weather_lags: true
+  include_discount_lags: true
+  include_stockout_lags: true
+
+validation:
+  initial_train_days: 56
+  n_folds: 3
+  fold_size_days: 7
+  retrain_each_fold: true
+
+models:
+  point_model: auto_boosting
+  quantiles: [0.1, 0.5, 0.9]
+  seasonal_period: 7
+  n_estimators: 200
+  learning_rate: 0.05
+  max_depth: 6
+
+inventory:
+  overstock_cost: 1.0
+  stockout_cost: 4.0
+  clip_negative_orders: true
+
+reporting:
+  output_dir: reports
+  run_name: fresh_retailnet_v1
+  make_plots: true

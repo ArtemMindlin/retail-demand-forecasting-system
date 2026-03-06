@@ -1,0 +1,176 @@
+# Diseno experimental
+
+## Definicion del problema
+
+El problema se formula como forecasting de demanda para decision de inventario en retail fresco. La salida del sistema no se evaluara solo por precision predictiva, sino por su capacidad para inducir decisiones con menor coste operativo esperado.
+
+En la v1, cada observacion representa una fecha de decision para una serie `store_id x product_id`. El objetivo es predecir la demanda observada acumulada durante el horizonte de lead time.
+
+## Unidad de prediccion
+
+- Serie: `store_id x product_id`
+- Contexto jerarquico adicional: `city_id` y categorias de producto
+- Frecuencia: diaria
+
+## Horizonte temporal
+
+- Horizonte por defecto: 7 dias
+- Interpretacion: demanda acumulada desde el dia de decision hasta el final del lead time
+- Motivo: mejor alineacion entre forecast y cantidad a pedir en una politica newsvendor simple
+
+## Variable objetivo
+
+Target v1:
+
+- suma de `sale_amount` observada a lo largo del horizonte `h`
+
+Motivo:
+
+- conecta de forma natural forecast y decision de inventario;
+- evita una narrativa demasiado estrecha de prediccion `t+1`;
+- deja preparada la extension a politicas base-stock o reorder-point.
+
+## Features
+
+### Historicas
+
+- lags de demanda
+- rolling mean y rolling sum de demanda
+- lags de stockout hours
+- lags de descuento
+- lags meteorologicos
+
+### Calendario y contexto conocido ex ante
+
+- dia de la semana
+- dia del mes
+- mes
+- semana del ano
+- indicador de fin de semana
+- holiday flag
+- activity flag
+
+### Identificadores estaticos
+
+- `city_id`
+- `store_id`
+- `product_id`
+- niveles jerarquicos de categoria
+
+## Politica anti-leakage
+
+1. No se usara validacion aleatoria.
+2. Todas las features historicas se construyen con `shift` positivo, por lo que solo consumen informacion anterior a la fecha de decision.
+3. Variables que no son claramente conocidas ex ante, como weather realizado o stock status, entran solo en forma lagged.
+4. El conjunto de entrenamiento de cada fold excluye observaciones cuyo target use dias posteriores al inicio del fold de validacion.
+
+## Estrategia de validacion temporal
+
+Se utilizara walk-forward con ventana expansiva:
+
+- `initial_train_days = 56`
+- `fold_size_days = 7`
+- `n_folds = 3`
+
+Cada fold produce:
+
+- entrenamiento con toda la historia util hasta el corte temporal permitido;
+- validacion en el siguiente bloque temporal;
+- reentrenamiento completo antes de cada fold si asi lo indica la configuracion.
+
+## Modelos incluidos
+
+### Baseline
+
+- `seasonal naive`
+
+Justificacion:
+
+- baseline interpretable y muy competitivo en series retail;
+- referencia minima necesaria para un TFG serio;
+- ayuda a separar valor real frente a complejidad gratuita.
+
+### Modelo avanzado v1
+
+- boosting global sobre panel temporal
+
+Justificacion:
+
+- explota informacion cruzada entre series;
+- soporta mezcla de lags, calendario y covariables;
+- permite una ruta razonable hacia forecasting cuantílico si el backend lo soporta.
+
+Backends:
+
+- prioridad: LightGBM
+- alternativa: XGBoost para punto + cuantiles con fallback
+- fallback universal: scikit-learn
+
+## Metricas predictivas
+
+- MAE
+- RMSE
+
+Estas metricas se reportan como diagnostico de ajuste, no como criterio unico de seleccion.
+
+## Metricas probabilisticas
+
+- pinball loss para cuantiles `0.1`, `0.5`, `0.9`
+- cobertura del intervalo `[0.1, 0.9]` cuando este disponible
+
+Estas metricas se usan para estudiar calibracion operacional aproximada y calidad de la incertidumbre reportada.
+
+## Metricas economicas
+
+- unidades de sobrestock
+- unidades de rotura
+- coste de sobrestock
+- coste de rotura
+- coste total operativo
+
+La v1 usa una estructura de costes configurable:
+
+- `c_over`: penalizacion por exceso
+- `c_under`: penalizacion por rotura
+
+La decision de pedido sigue:
+
+- `critical fractile = c_under / (c_under + c_over)`
+
+## Escenarios con y sin drift
+
+La v1 no incluye aun un detector formal de drift, pero si prepara dos tipos de analisis:
+
+1. comparacion fold a fold para observar degradacion temporal;
+2. segmentacion por intensidad de stockout como proxy de cambio de regimen operativo.
+
+En una fase posterior se anadiran detectores explicitos y politicas de reentrenamiento adaptativo.
+
+## Estrategia de reentrenamiento
+
+Por defecto:
+
+- reentrenamiento en cada fold con ventana expansiva
+
+Motivo:
+
+- replica una practica razonable para sistemas operativos en series temporales;
+- reduce riesgo de sesgo por usar un modelo congelado demasiado tiempo;
+- sirve como base para comparar mas adelante reentrenamiento fijo vs adaptativo.
+
+## Criterios de comparacion final
+
+El ranking principal se establece por:
+
+1. coste total operativo
+2. pinball loss y cobertura, cuando existan cuantiles
+3. MAE y RMSE como soporte diagnostico
+
+La conclusion experimental buscara identificar no solo que modelo predice mejor, sino que sistema toma mejores decisiones y bajo que condiciones.
+
+## Limitaciones explicitadas
+
+- la demanda observada puede infraestimar demanda real en presencia de stockouts;
+- el dataset trabaja con demanda normalizada;
+- la v1 no modela aun demanda censurada ni lead times variables;
+- la evaluacion economica es de una sola etapa, no una simulacion completa multi-periodo.
