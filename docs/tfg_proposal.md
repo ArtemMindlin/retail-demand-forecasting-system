@@ -2,7 +2,7 @@
 
 ## Titulo tentativo
 
-Diseno y evaluacion de un sistema de forecasting probabilistico para decisiones de inventario en retail bajo incertidumbre, stockouts y concept drift.
+Diseño y evaluación de un sistema de forecasting probabilistico para decisiones de inventario en retail bajo incertidumbre, stockouts y concept drift.
 
 ## Problema
 
