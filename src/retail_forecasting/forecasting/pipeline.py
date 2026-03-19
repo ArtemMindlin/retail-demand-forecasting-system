@@ -16,6 +16,18 @@ from retail_forecasting.utils.io import quantile_column_name
 
 
 def run_experiment(settings: Settings) -> RunArtifacts:
+    """Run the end-to-end experiment from configured data sources.
+
+    Args:
+        settings: Fully resolved experiment settings.
+
+    Returns:
+        The generated run artifacts, including predictions and summaries.
+
+    Notes:
+        The current implementation supports only the FreshRetailNet dataset and
+        does not wire the official eval split into the pipeline.
+    """
     if settings.dataset.source != "fresh_retailnet":
         raise ValueError(
             f"Unsupported dataset source '{settings.dataset.source}'. "
@@ -36,6 +48,15 @@ def run_experiment(settings: Settings) -> RunArtifacts:
 
 
 def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArtifacts:
+    """Run the full backtesting pipeline from an in-memory panel.
+
+    Args:
+        panel: Prepared daily panel to backtest.
+        settings: Fully resolved experiment settings.
+
+    Returns:
+        The generated run artifacts, including metrics, costs, and reports.
+    """
     prepared_panel = label_stockout_regime(panel)
     supervised_frame, feature_columns = build_supervised_frame(
         panel=prepared_panel,
@@ -119,6 +140,17 @@ def _build_baseline_predictions(
     fold_id: int,
     settings: Settings,
 ) -> pd.DataFrame:
+    """Build baseline forecasts and attach inventory costs for one fold.
+
+    Args:
+        validation_frame: Validation rows for the current fold.
+        baseline_model: Fitted seasonal naive model.
+        fold_id: Fold identifier used in reporting.
+        settings: Fully resolved experiment settings.
+
+    Returns:
+        A prediction frame with baseline forecasts and cost columns.
+    """
     prediction_frame = validation_frame.loc[
         :,
         ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"],
@@ -144,6 +176,18 @@ def _build_boosting_predictions(
     fold_id: int,
     settings: Settings,
 ) -> pd.DataFrame:
+    """Build boosting forecasts, quantiles, and inventory costs for one fold.
+
+    Args:
+        validation_frame: Validation rows for the current fold.
+        feature_columns: Feature columns used by the model.
+        model: Fitted boosting model.
+        fold_id: Fold identifier used in reporting.
+        settings: Fully resolved experiment settings.
+
+    Returns:
+        A prediction frame with point forecasts, quantiles, and cost columns.
+    """
     prediction_frame = validation_frame.loc[
         :,
         ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"],

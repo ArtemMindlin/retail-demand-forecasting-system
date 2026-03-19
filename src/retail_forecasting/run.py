@@ -8,6 +8,11 @@ from retail_forecasting.forecasting.pipeline import run_experiment
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line interface for running the pipeline.
+
+    Returns:
+        The configured argument parser for experiment execution.
+    """
     parser = argparse.ArgumentParser(
         description="Run the retail demand forecasting experiment pipeline.",
     )
@@ -25,6 +30,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """Parse CLI arguments and execute the configured experiment run.
+
+    Returns:
+        None.
+
+    Notes:
+        The reporting output directory can be overridden from the command line
+        without modifying the YAML configuration.
+    """
     args = build_parser().parse_args()
     settings = load_config(args.config)
     if args.output_dir is not None:

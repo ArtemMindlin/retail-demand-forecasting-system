@@ -33,10 +33,28 @@ RAW_COLUMNS = [
 
 
 def build_hf_uri(dataset_id: str, split_path: str) -> str:
+    """Build the Hugging Face parquet URI for a dataset split.
+
+    Args:
+        dataset_id: Hugging Face dataset identifier.
+        split_path: Relative parquet path for the target split.
+
+    Returns:
+        The fully qualified ``hf://`` URI.
+    """
     return f"hf://datasets/{dataset_id}/{split_path}"
 
 
 def processed_panel_path(dataset_config: DatasetConfig, split: str) -> Path:
+    """Resolve the processed panel path for a dataset split.
+
+    Args:
+        dataset_config: Dataset-level configuration values.
+        split: Dataset split name.
+
+    Returns:
+        The output path used for the processed panel of the split.
+    """
     base_path = dataset_config.processed_panel_path
     if split == "train":
         return base_path
@@ -48,6 +66,20 @@ def load_raw_split(
     split: str = "train",
     columns: list[str] | None = None,
 ) -> pd.DataFrame:
+    """Load a raw dataset split from local cache or Hugging Face.
+
+    Args:
+        dataset_config: Dataset-level configuration values.
+        split: Dataset split to load.
+        columns: Optional subset of columns to read.
+
+    Returns:
+        The raw split as a DataFrame.
+
+    Notes:
+        The function prefers a cached local parquet file when enabled and
+        available. Remote reads use the configured Hugging Face dataset URI.
+    """
     selected_columns = columns or RAW_COLUMNS
     split_path = dataset_config.splits[split]
     cache_dir = ensure_directory(dataset_config.local_cache_dir)
@@ -73,6 +105,20 @@ def prepare_daily_panel(
     dataset_config: DatasetConfig,
     preprocessing_config: PreprocessingConfig,
 ) -> pd.DataFrame:
+    """Clean and filter the raw split into the daily modeling panel.
+
+    Args:
+        frame: Raw split loaded from parquet.
+        dataset_config: Dataset-level configuration values.
+        preprocessing_config: Preprocessing controls for filtering and filling.
+
+    Returns:
+        A cleaned daily panel ready for feature engineering.
+
+    Notes:
+        The panel is filtered to sufficiently long series and optionally reduced
+        to the top series by observed demand volume.
+    """
     panel = frame.copy()
     panel = panel.rename(
         columns={
@@ -134,6 +180,20 @@ def load_prepared_panel(
     preprocessing_config: PreprocessingConfig,
     split: str = "train",
 ) -> pd.DataFrame:
+    """Load or build the processed panel for a dataset split.
+
+    Args:
+        dataset_config: Dataset-level configuration values.
+        preprocessing_config: Preprocessing controls for panel preparation.
+        split: Dataset split to materialize.
+
+    Returns:
+        The processed panel as a DataFrame.
+
+    Notes:
+        When a processed parquet already exists and refresh is disabled, the
+        cached panel is returned without rebuilding it.
+    """
     target_path = processed_panel_path(dataset_config, split)
     ensure_directory(target_path.parent)
 
