@@ -191,8 +191,7 @@ def load_prepared_panel(
         The processed panel as a DataFrame.
 
     Notes:
-        When a processed parquet already exists and refresh is disabled, the
-        cached panel is returned without rebuilding it.
+        When a processed parquet already exists and refresh is disabled, the cached panel is returned without rebuilding it.
     """
     target_path = processed_panel_path(dataset_config, split)
     ensure_directory(target_path.parent)

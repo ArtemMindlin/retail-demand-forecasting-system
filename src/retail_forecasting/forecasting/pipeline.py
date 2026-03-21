@@ -25,8 +25,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         The generated run artifacts, including predictions and summaries.
 
     Notes:
-        The current implementation supports only the FreshRetailNet dataset and
-        does not wire the official eval split into the pipeline.
+        The current implementation supports only the FreshRetailNet dataset and does not wire the official eval split into the pipeline.
     """
     if settings.dataset.source != "fresh_retailnet":
         raise ValueError(
