@@ -10,6 +10,20 @@ def build_supervised_frame(
     feature_config: FeatureConfig,
     horizon: int,
 ) -> tuple[pd.DataFrame, list[str]]:
+    """Build the supervised modeling frame and feature list from a panel.
+
+    Args:
+        panel: Prepared daily panel with one row per series and date.
+        feature_config: Feature engineering configuration.
+        horizon: Forecast horizon expressed in days.
+
+    Returns:
+        A tuple containing the supervised frame and the ordered feature column
+        names used for modeling.
+
+    Notes:
+        Historical features are built with positive lags so they only use past information relative to each forecast origin.
+    """
     frame = panel.copy().sort_values(["series_id", "date"]).reset_index(drop=True)
     grouped = frame.groupby("series_id", sort=False)
 
@@ -32,12 +46,14 @@ def build_supervised_frame(
         ]
     )
 
+    # Demand lags: these features store past observed demand values for each series.
     demand_series = grouped["observed_demand"]
     for lag in sorted(set(feature_config.lags)):
         column = f"demand_lag_{lag}"
         frame[column] = demand_series.shift(lag)
         feature_columns.append(column)
 
+    # Rolling window features: these summarize recent observed demand over a window of past days for each series.
     for window in sorted(set(feature_config.rolling_windows)):
         mean_column = f"demand_roll_mean_{window}"
         sum_column = f"demand_roll_sum_{window}"
@@ -55,7 +71,7 @@ def build_supervised_frame(
         feature_columns.extend([mean_column, sum_column, std_column])
 
     if feature_config.include_discount_lags:
-        for lag in sorted(set(feature_config.lags)):
+         for lag in sorted(set(feature_config.lags)):
             column = f"discount_lag_{lag}"
             frame[column] = grouped["discount"].shift(lag)
             feature_columns.append(column)
@@ -108,5 +124,14 @@ def build_supervised_frame(
 
 
 def _build_target(series_group: pd.core.groupby.SeriesGroupBy, horizon: int) -> pd.Series:
+    """Aggregate future demand over the configured forecast horizon.
+
+    Args:
+        series_group: Grouped demand series by ``series_id``.
+        horizon: Forecast horizon expressed in days.
+
+    Returns:
+        A Series containing lead-time demand targets for each row.
+    """
     future_terms = [series_group.shift(-offset) for offset in range(horizon)]
     return pd.concat(future_terms, axis=1).sum(axis=1, min_count=horizon)
