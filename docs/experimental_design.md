@@ -87,7 +87,6 @@ Cada fold produce:
 Justificacion:
 
 - baseline interpretable y muy competitivo en series retail;
-- referencia minima necesaria para un TFG serio;
 - ayuda a separar valor real frente a complejidad gratuita.
 
 ### Modelo avanzado v1
