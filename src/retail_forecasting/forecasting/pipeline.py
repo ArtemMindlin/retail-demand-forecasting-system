@@ -32,6 +32,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
             f"Unsupported dataset source '{settings.dataset.source}'. "
             "The current v1 implementation supports only 'fresh_retailnet'."
         )
+
     if settings.dataset.use_eval_as_holdout:
         raise NotImplementedError(
             "The official eval split is not wired into the v1 pipeline because its temporal "

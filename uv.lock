@@ -972,6 +972,11 @@ ml = [
     { name = "xgboost" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fsspec", specifier = ">=2024.6.1" },
@@ -987,6 +992,9 @@ requires-dist = [
     { name = "xgboost", marker = "extra == 'ml'", specifier = ">=2.1.0" },
 ]
 provides-extras = ["dev", "ml"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.0.2" }]
 
 [[package]]
 name = "rich"
