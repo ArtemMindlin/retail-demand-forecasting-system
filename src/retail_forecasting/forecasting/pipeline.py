@@ -39,11 +39,14 @@ def run_experiment(settings: Settings) -> RunArtifacts:
             "semantics must be verified before using it as an external holdout."
         )
 
+    # Panel loading
     prepared_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
         split="train",
     )
+
+    # Actual experiment execution
     return run_experiment_from_frame(prepared_panel, settings)
 
 
@@ -63,6 +66,8 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
         feature_config=settings.features,
         horizon=settings.dataset.horizon,
     )
+
+    # Build walk-forward folds
     folds = build_walk_forward_folds(
         panel=prepared_panel,
         validation_config=settings.validation,
@@ -77,6 +82,7 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
     boosting_model: AutoBoostingModel | None = None
 
     for fold in folds:
+        # Prepare training and validation frames for the current fold. If either frame is empty, skip to the next fold.
         train_mask = supervised_frame["date"] <= fold.train_end_date
         validation_mask = (
             (supervised_frame["date"] >= fold.validation_start_date)
@@ -87,6 +93,7 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
         if train_frame.empty or validation_frame.empty:
             continue
 
+        # Build baseline predictions for the current folds.
         baseline_predictions = _build_baseline_predictions(
             validation_frame=validation_frame,
             baseline_model=baseline_model,
@@ -95,6 +102,7 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
         )
         fold_predictions.append(baseline_predictions)
 
+        # For boosting models, we optionally retrain for each fold based on settings.
         if boosting_model is None or settings.validation.retrain_each_fold:
             boosting_model = AutoBoostingModel(
                 quantiles=settings.models.quantiles,

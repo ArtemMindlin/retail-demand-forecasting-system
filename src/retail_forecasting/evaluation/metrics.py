@@ -60,34 +60,36 @@ def _build_metric_record(
         "rmse": float(math.sqrt(np.square(errors).mean())),
     }
 
-    quantile_columns = sorted(
-        [
-            column
-            for column in predictions.columns
-            if column.startswith("q_") and predictions[column].notna().any()
-        ]
-    )
-    for column in quantile_columns:
-        quantile = float(column.replace("q_", "").replace("_", "."))
+    quantile_pairs = _find_quantile_columns(predictions)
+    for quantile, column in quantile_pairs:
         record[f"pinball_{column}"] = float(
             pinball_loss(predictions["y_true"], predictions[column], quantile)
         )
 
-    lower = "q_0_1"
-    upper = "q_0_9"
-    if (
-        lower in predictions.columns
-        and upper in predictions.columns
-        and predictions[lower].notna().any()
-        and predictions[upper].notna().any()
-    ):
-        record["coverage_q_0_1_q_0_9"] = float(
-            ((predictions["y_true"] >= predictions[lower]) & (predictions["y_true"] <= predictions[upper])).mean()
+    if len(quantile_pairs) >= 2:
+        _, lower_column = quantile_pairs[0]
+        _, upper_column = quantile_pairs[-1]
+        record[f"coverage_{lower_column}_{upper_column}"] = float(
+            (
+                (predictions["y_true"] >= predictions[lower_column])
+                & (predictions["y_true"] <= predictions[upper_column])
+            ).mean()
         )
-    else:
-        record["coverage_q_0_1_q_0_9"] = np.nan
 
     return record
+
+
+def _find_quantile_columns(predictions: pd.DataFrame) -> list[tuple[float, str]]:
+    quantile_pairs = [
+        (_parse_quantile_column(column), column)
+        for column in predictions.columns
+        if column.startswith("q_") and predictions[column].notna().any()
+    ]
+    return sorted(quantile_pairs, key=lambda item: item[0])
+
+
+def _parse_quantile_column(column: str) -> float:
+    return float(column.replace("q_", "").replace("_", "."))
 
 
 def pinball_loss(actual: pd.Series, predicted: pd.Series, quantile: float) -> float:

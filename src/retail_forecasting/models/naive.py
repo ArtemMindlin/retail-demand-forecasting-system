@@ -24,6 +24,7 @@ class SeasonalNaiveModel:
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
         predictions = []
         for row in frame.itertuples(index=False):
+            # The seasonal naive prediction is computed by summing the observed demand from the most recent seasonal periods, which are determined by the seasonal period and the forecast horizon. If there is insufficient historical data for a series, the prediction defaults to zero.
             series_history = self.history_.get_group(row.series_id)
             history = series_history.loc[series_history["date"] < row.date]
             history_by_date = history.set_index("date")["observed_demand"]

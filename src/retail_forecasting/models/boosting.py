@@ -35,10 +35,16 @@ class AutoBoostingModel:
     backend_name: str = field(init=False, default="unknown")
 
     def fit(self, features: pd.DataFrame, target: pd.Series) -> "AutoBoostingModel":
+        # Build the main point model. This model is used to produce a single prediction per row.
         self.point_model_ = self._build_point_model()
+
+        # Fit the point model to the data.
         self.point_model_.fit(features, target)
 
+        # Create a dictionary to store one fitted model per quantile level.
         self.quantile_models_: dict[float, object] = {}
+
+        # Loop over the requested quantiles.
         for quantile in sorted(set(self.quantiles)):
             quantile_model = self._build_quantile_model(quantile)
             quantile_model.fit(features, target)
