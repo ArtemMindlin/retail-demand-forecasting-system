@@ -19,6 +19,11 @@ The most important risk is not a runtime failure. The most important risk is pro
 - Added `tests/test_temporal_leakage_contract.py`.
 - Added `tests/test_quantile_contract.py`.
 - Added `tests/test_architecture_imports.py`.
+- Added `tests/test_dataframe_contracts.py`.
+- Added `tests/test_raw_column_boundaries.py`.
+- Added `tests/test_config_contract.py`.
+- Added `tests/test_generated_artifact_boundaries.py`.
+- Documented the fast harness command in `AGENTS.md` and `README.md`.
 
 ## Current Checks
 
@@ -31,26 +36,16 @@ uv run pytest
 High-signal harness checks:
 
 ```bash
-uv run pytest tests/test_temporal_leakage_contract.py tests/test_quantile_contract.py tests/test_architecture_imports.py
+uv run pytest tests/test_architecture_imports.py tests/test_temporal_leakage_contract.py tests/test_quantile_contract.py tests/test_dataframe_contracts.py tests/test_raw_column_boundaries.py tests/test_config_contract.py tests/test_generated_artifact_boundaries.py
 ```
 
 ## Next Recommended Checks
 
-1. Add `tests/test_dataframe_contracts.py`.
+1. Keep `docs/contracts/dataframes.md` and the contract tests in sync when pipeline schemas change.
 
-   Validate prepared panel, supervised frame, prediction frame, metrics summary, and cost summary schemas against `docs/contracts/dataframes.md`.
+2. Keep the harness command documented in `AGENTS.md`, `README.md`, and this plan.
 
-2. Add `tests/test_raw_column_boundaries.py`.
-
-   Ensure raw FreshRetailNet names such as `dt`, `sale_amount`, and `stock_hour6_22_cnt` do not appear outside the data layer.
-
-3. Add `tests/test_config_contract.py`.
-
-   Validate critical defaults and guardrails such as positive costs, quantiles in `(0, 1)`, and `use_eval_as_holdout = false`.
-
-4. Document a single harness command in `README.md`.
-
-   Keep it simple for now; do not add a heavier task runner unless the project grows.
+3. Add a docs reference check if broken links or stale file references become a recurring problem.
 
 ## Open Decisions
 

@@ -82,7 +82,7 @@ El comando escribe un directorio de ejecución con timestamp dentro de `reports/
 
 Archivo principal de configuración:
 
-- [configs/default.yaml](/Users/artemmindlin/code/sandbox/retail-demand-forecasting-system/configs/default.yaml)
+- [configs/default.yaml](configs/default.yaml)
 
 Parámetros importantes:
 
@@ -137,12 +137,26 @@ Ejecuta la suite de tests con:
 uv run pytest
 ```
 
+### Harness checks
+
+Ejecuta solo los checks rápidos que protegen contratos de arquitectura, leakage temporal, cuantiles, dataframes y fronteras de columnas raw:
+
+```bash
+uv run pytest tests/test_architecture_imports.py tests/test_temporal_leakage_contract.py tests/test_quantile_contract.py tests/test_dataframe_contracts.py tests/test_raw_column_boundaries.py tests/test_config_contract.py tests/test_generated_artifact_boundaries.py
+```
+
 Los tests cubren:
 
 - límites de los splits walk-forward
 - construcción de variables temporales sin leakage futuro
 - lógica de costes newsvendor
 - ejecución end-to-end mínima con un panel sintético
+- contratos de dataframes del pipeline
+- fronteras entre capas del paquete
+- columnas de cuantiles configurables
+- aislamiento de nombres raw del dataset en la capa de datos
+- guardrails de configuración experimental
+- fronteras de artefactos generados
 
 ## Alcance Actual
 

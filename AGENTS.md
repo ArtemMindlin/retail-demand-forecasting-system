@@ -65,10 +65,13 @@ Read these first:
 
 - `docs/invariants.md`
 - `docs/contracts/dataframes.md`
+- `docs/conventions.md`
 - `docs/experimental_design.md`
 - `docs/system_design.md`
 
 Prefer small changes that preserve the pipeline contract. If a change modifies target semantics, fold semantics, dataframe schemas, or inventory policy, update docs and tests in the same change.
+
+For large changes, inspect the unstaged worktree and propose a split into two or more commits before committing. Ask for confirmation after each large project change before staging or committing.
 
 ## Commands
 
@@ -88,6 +91,12 @@ Run tests:
 
 ```bash
 uv run pytest
+```
+
+Run fast harness checks:
+
+```bash
+uv run pytest tests/test_architecture_imports.py tests/test_temporal_leakage_contract.py tests/test_quantile_contract.py tests/test_dataframe_contracts.py tests/test_raw_column_boundaries.py tests/test_config_contract.py tests/test_generated_artifact_boundaries.py
 ```
 
 Run the default experiment:
