@@ -7,8 +7,15 @@ from pathlib import Path
 PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "src" / "retail_forecasting"
 FIRST_PARTY_PREFIX = "retail_forecasting"
 
-FORBIDDEN_LAYER_IMPORTS = {
-    "config": {
+ALLOWED_LAYER_IMPORTS = {
+    "__init__": set(),
+    "config": set(),
+    "data": {"config", "utils"},
+    "drift": set(),
+    "evaluation": {"config", "utils", "visualization"},
+    "features": {"config"},
+    "forecasting": {
+        "config",
         "data",
         "drift",
         "evaluation",
@@ -16,89 +23,13 @@ FORBIDDEN_LAYER_IMPORTS = {
         "forecasting",
         "inventory",
         "models",
-        "visualization",
+        "utils",
     },
-    "data": {
-        "drift",
-        "evaluation",
-        "features",
-        "forecasting",
-        "inventory",
-        "models",
-        "visualization",
-    },
-    "drift": {
-        "data",
-        "evaluation",
-        "features",
-        "forecasting",
-        "inventory",
-        "models",
-        "visualization",
-    },
-    "evaluation": {
-        "data",
-        "drift",
-        "features",
-        "forecasting",
-        "inventory",
-        "models",
-    },
-    "features": {
-        "data",
-        "drift",
-        "evaluation",
-        "forecasting",
-        "inventory",
-        "models",
-        "visualization",
-    },
-    "inventory": {
-        "data",
-        "drift",
-        "evaluation",
-        "features",
-        "forecasting",
-        "models",
-        "visualization",
-    },
-    "models": {
-        "data",
-        "drift",
-        "evaluation",
-        "features",
-        "forecasting",
-        "inventory",
-        "visualization",
-    },
-    "run": {
-        "data",
-        "drift",
-        "evaluation",
-        "features",
-        "inventory",
-        "models",
-        "visualization",
-    },
-    "utils": {
-        "data",
-        "drift",
-        "evaluation",
-        "features",
-        "forecasting",
-        "inventory",
-        "models",
-        "visualization",
-    },
-    "visualization": {
-        "data",
-        "drift",
-        "evaluation",
-        "features",
-        "forecasting",
-        "inventory",
-        "models",
-    },
+    "inventory": {"config"},
+    "models": {"utils"},
+    "run": {"config", "forecasting"},
+    "utils": set(),
+    "visualization": {"utils"},
 }
 
 
@@ -107,14 +38,15 @@ def test_layer_imports_do_not_cross_forbidden_boundaries() -> None:
 
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
         source_layer = _source_layer(path)
-        forbidden_layers = FORBIDDEN_LAYER_IMPORTS.get(source_layer, set())
+        allowed_layers = ALLOWED_LAYER_IMPORTS[source_layer] | {source_layer}
         imported_layers = _first_party_imported_layers(path)
-        blocked_layers = sorted(imported_layers & forbidden_layers)
+        blocked_layers = sorted(imported_layers - allowed_layers)
 
         if blocked_layers:
             violations.append(
                 f"{path.relative_to(PACKAGE_ROOT)} imports forbidden layer(s): "
-                f"{', '.join(blocked_layers)}"
+                f"{', '.join(blocked_layers)}. Allowed for `{source_layer}`: "
+                f"{', '.join(sorted(allowed_layers)) or 'none'}"
             )
 
     assert violations == []

@@ -31,6 +31,8 @@ def test_pipeline_artifacts_follow_dataframe_contracts(tmp_path: Path) -> None:
         horizon=settings.dataset.horizon,
     )
     _assert_prediction_frame_contract(artifacts.predictions)
+    _assert_metrics_summary_contract(artifacts.metrics_summary)
+    _assert_fold_metrics_contract(artifacts.fold_metrics)
     _assert_cost_summary_contract(artifacts.cost_summary)
 
 
@@ -82,11 +84,43 @@ def _assert_prediction_frame_contract(predictions) -> None:
     }
 
     assert required_columns.issubset(predictions.columns)
+    assert predictions["fold_id"].notna().all()
     assert np.allclose(predictions["y_true"], predictions["target_lead_time_demand"])
     assert (predictions["order_quantity"] >= 0).all()
     assert (predictions["overstock_units"] >= 0).all()
     assert (predictions["stockout_units"] >= 0).all()
     assert (predictions["total_cost"] >= 0).all()
+    _assert_quantile_columns_are_monotonic(predictions)
+
+
+def _assert_metrics_summary_contract(metrics_summary) -> None:
+    required_columns = {
+        "model_name",
+        "backend_name",
+        "observations",
+        "mae",
+        "rmse",
+    }
+
+    assert required_columns.issubset(metrics_summary.columns)
+    assert (metrics_summary["observations"] > 0).all()
+    assert (metrics_summary["mae"] >= 0).all()
+    assert (metrics_summary["rmse"] >= 0).all()
+
+
+def _assert_fold_metrics_contract(fold_metrics) -> None:
+    required_columns = {
+        "fold_id",
+        "model_name",
+        "backend_name",
+        "observations",
+        "mae",
+        "rmse",
+    }
+
+    assert required_columns.issubset(fold_metrics.columns)
+    assert fold_metrics["fold_id"].notna().all()
+    assert (fold_metrics["observations"] > 0).all()
 
 
 def _assert_cost_summary_contract(cost_summary) -> None:
@@ -105,3 +139,23 @@ def _assert_cost_summary_contract(cost_summary) -> None:
 
     assert required_columns.issubset(cost_summary.columns)
     assert cost_summary["total_cost"].is_monotonic_increasing
+
+
+def _assert_quantile_columns_are_monotonic(predictions) -> None:
+    quantile_columns = [
+        column for column in predictions.columns if column.startswith("q_")
+    ]
+    if len(quantile_columns) < 2:
+        return
+
+    sorted_columns = sorted(quantile_columns, key=_quantile_level)
+    quantiles = predictions.loc[:, sorted_columns].dropna(how="any")
+    if quantiles.empty:
+        return
+
+    differences = np.diff(quantiles.to_numpy(dtype=float), axis=1)
+    assert (differences >= 0).all()
+
+
+def _quantile_level(column: str) -> float:
+    return float(column.replace("q_", "").replace("_", "."))
