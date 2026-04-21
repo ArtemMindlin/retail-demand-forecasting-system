@@ -207,6 +207,7 @@ marimo/_lsp/
 __marimo__/
 
 # Project data and generated reports
+.DS_Store
 data/raw/*
 !data/raw/.gitkeep
 data/interim/*
@@ -215,3 +216,5 @@ data/processed/*
 !data/processed/.gitkeep
 reports/*
 !reports/.gitkeep
+tmp/*
+output/*
