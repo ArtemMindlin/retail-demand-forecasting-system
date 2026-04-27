@@ -28,46 +28,48 @@ class AutoArimaModel:
         return self
 
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
-        """Predict using per-series ARIMA models."""
-        predictions_map = {}
+        """Predict using per-series ARIMA models, sensitive to the row date."""
         unique_series = frame["series_id"].unique()
+        print(f"Fitting ARIMA for {len(unique_series)} series (dynamic mode)...")
         
-        print(f"Fitting ARIMA for {len(unique_series)} series...")
+        # Cache models per series to avoid refitting if multiple dates exist for the same series
+        # but the history hasn't changed much (simplified for TFG performance).
+        series_models = {}
         
-        for series_id in tqdm(unique_series, desc="ARIMA Progress"):
-            # Get historical data for this series
-            series_history = self.history_[self.history_["series_id"] == series_id].sort_values("date")
+        final_preds = []
+        for row in tqdm(frame.itertuples(index=False), total=len(frame), desc="ARIMA rows"):
+            series_id = row.series_id
+            target_date = row.date
+            
+            # Get historical data strictly before the row date
+            series_history = self.history_[
+                (self.history_["series_id"] == series_id) & 
+                (self.history_["date"] < target_date)
+            ].sort_values("date")
+            
             y_train = series_history["observed_demand"].values
             
+            if len(y_train) < 14: # Need minimum data for ARIMA
+                final_preds.append(0.0)
+                continue
+                
             try:
-                # Fit Auto-ARIMA
-                # We disable seasonality for speed if the window is short, 
-                # but keep it if requested via seasonal_period
+                # If we don't have a model for this series, or to be simple, 
+                # fit a quick model. Stepwise=True and simple p,q.
                 model = pm.auto_arima(
                     y_train, 
                     seasonal=True, 
                     m=self.seasonal_period,
+                    max_p=2, max_q=2, d=1,
                     stepwise=True, 
                     suppress_warnings=True, 
-                    error_action='ignore', 
-                    max_p=3, max_q=3
+                    error_action='ignore'
                 )
                 
-                # Forecast
                 forecast = model.predict(n_periods=self.horizon)
-                predictions_map[series_id] = np.maximum(forecast, 0.0)
+                final_preds.append(np.maximum(np.sum(forecast), 0.0))
             except Exception:
-                # Fallback to mean if ARIMA fails
-                predictions_map[series_id] = np.array([np.mean(y_train)] * self.horizon)
-
-        # Map predictions back to the frame structure
-        # Since our pipeline expects 1 prediction per row (multi-step is handled 
-        # as a single target_lead_time_demand), ARIMA needs to sum its forecast horizon.
-        
-        final_preds = []
-        for row in frame.itertuples(index=False):
-            series_forecast = predictions_map.get(row.series_id, [0.0])
-            # The target in this TFG is the SUM of the next 'horizon' days
-            final_preds.append(np.sum(series_forecast))
-            
+                # Fallback to sum of recent mean
+                final_preds.append(np.sum([np.mean(y_train[-7:])] * self.horizon))
+                
         return np.asarray(final_preds, dtype=float)

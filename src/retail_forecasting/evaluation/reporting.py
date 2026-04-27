@@ -7,7 +7,6 @@ from pathlib import Path
 import pandas as pd
 
 from retail_forecasting.config import Settings, settings_to_dict
-from retail_forecasting.drift.detectors import DriftResult
 from retail_forecasting.utils.io import dataframe_to_markdown, ensure_directory, make_run_directory
 from retail_forecasting.visualization.plots import render_standard_plots
 

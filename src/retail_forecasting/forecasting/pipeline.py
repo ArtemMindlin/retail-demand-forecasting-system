@@ -8,11 +8,14 @@ from retail_forecasting.data.fresh_retailnet import load_prepared_panel
 from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.drift.detectors import PageHinkleyDetector
 from retail_forecasting.evaluation.metrics import summarize_costs, summarize_predictions
-from retail_forecasting.evaluation.sensitivity import run_sensitivity_analysis
 from retail_forecasting.evaluation.reporting import RunArtifacts, write_run_artifacts
 from retail_forecasting.features.engineering import build_supervised_frame
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
-from retail_forecasting.inventory.newsvendor import attach_inventory_costs, choose_order_quantity
+from retail_forecasting.inventory.newsvendor import (
+    attach_inventory_costs,
+    choose_order_quantity,
+    run_sensitivity_analysis,
+)
 from retail_forecasting.models.boosting import AutoBoostingModel
 from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalBoostingModel
