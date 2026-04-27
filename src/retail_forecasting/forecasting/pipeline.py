@@ -7,6 +7,7 @@ from retail_forecasting.data.fresh_retailnet import load_prepared_panel
 from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.drift.detectors import PageHinkleyDetector
 from retail_forecasting.evaluation.metrics import summarize_costs, summarize_predictions
+from retail_forecasting.evaluation.sensitivity import run_sensitivity_analysis
 from retail_forecasting.evaluation.reporting import RunArtifacts, write_run_artifacts
 from retail_forecasting.features.engineering import build_supervised_frame
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
@@ -111,8 +112,8 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
 
         # For boosting models, we optionally retrain for each fold based on settings.
         if boosting_model is None or settings.validation.retrain_each_fold:
-            # 1. Split train_frame into sub-train and calibration (last 28 days)
-            calib_days = 28
+            # 1. Split train_frame into sub-train and calibration (last 21 days)
+            calib_days = 21
             max_train_date = train_frame["date"].max()
             calib_cutoff = max_train_date - pd.Timedelta(days=calib_days)
 
@@ -172,6 +173,10 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
     predictions = pd.concat(fold_predictions, ignore_index=True)
     metrics_summary, fold_metrics = summarize_predictions(predictions)
     cost_summary = summarize_costs(predictions)
+    sensitivity_summary = run_sensitivity_analysis(
+        predictions=predictions,
+        base_inventory_config=settings.inventory,
+    )
 
     artifacts = RunArtifacts(
         prepared_panel=prepared_panel,
@@ -180,6 +185,7 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
         metrics_summary=metrics_summary,
         fold_metrics=fold_metrics,
         cost_summary=cost_summary,
+        sensitivity_summary=sensitivity_summary,
         drifts=detected_drifts,
     )
     return write_run_artifacts(artifacts, settings)

@@ -20,6 +20,7 @@ class RunArtifacts:
     metrics_summary: pd.DataFrame
     fold_metrics: pd.DataFrame
     cost_summary: pd.DataFrame
+    sensitivity_summary: Optional[pd.DataFrame] = None
     drifts: list[dict[str, Any]] = field(default_factory=list)
     run_directory: Path | None = None
 
@@ -32,6 +33,9 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
     artifacts.metrics_summary.to_csv(run_dir / "metrics_summary.csv", index=False)
     artifacts.fold_metrics.to_csv(run_dir / "fold_metrics.csv", index=False)
     artifacts.cost_summary.to_csv(run_dir / "cost_summary.csv", index=False)
+    
+    if artifacts.sensitivity_summary is not None:
+        artifacts.sensitivity_summary.to_csv(run_dir / "sensitivity_summary.csv", index=False)
 
     if settings.reporting.make_plots:
         render_standard_plots(
@@ -91,6 +95,12 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
             [f"- **ALERT**: Detected drift on `{d['date']}` (Score: `{d['score']:.2f}`, Threshold: `{d['threshold']:.2f}`)" for d in artifacts.drifts]
             if artifacts.drifts else ["- No statistically significant drift detected during this run."]
         ),
+        "",
+        "## Economic Sensitivity Analysis",
+        "",
+        "Performance under varying stockout/overstock cost ratios (Cs/Co):",
+        "",
+        dataframe_to_markdown(artifacts.sensitivity_summary) if artifacts.sensitivity_summary is not None else "_No sensitivity analysis available._",
         "",
         "## Interpretation Notes",
         "",
