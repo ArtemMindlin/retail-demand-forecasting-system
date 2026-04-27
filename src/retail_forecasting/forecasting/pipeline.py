@@ -18,7 +18,7 @@ from retail_forecasting.inventory.newsvendor import (
 )
 from retail_forecasting.models.boosting import AutoBoostingModel
 from retail_forecasting.models.catboosting import CatBoostingModel
-from retail_forecasting.models.conformal import ConformalBoostingModel
+from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.linear import RidgeBaselineModel
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.statistical import AutoArimaModel
@@ -26,16 +26,13 @@ from retail_forecasting.utils.io import quantile_column_name
 
 
 def run_experiment(settings: Settings) -> RunArtifacts:
-    """Run the end-to-end experiment from configured data sources.
+    """Run the end-to-end experiment comparing Observed vs Latent demand.
 
     Args:
         settings: Fully resolved experiment settings.
 
     Returns:
-        The generated run artifacts, including predictions and summaries.
-
-    Notes:
-        The current implementation supports only the FreshRetailNet dataset and does not wire the official eval split into the pipeline.
+        Combined artifacts for both strategies.
     """
     if settings.dataset.source != "fresh_retailnet":
         raise ValueError(
@@ -43,37 +40,61 @@ def run_experiment(settings: Settings) -> RunArtifacts:
             "The current v1 implementation supports only 'fresh_retailnet'."
         )
 
-    if settings.dataset.use_eval_as_holdout:
-        raise NotImplementedError(
-            "The official eval split is not wired into the v1 pipeline because its temporal "
-            "semantics must be verified before using it as an external holdout."
-        )
-
-    # Panel loading
-    prepared_panel = load_prepared_panel(
+    # 1. Load Original Panel
+    raw_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
         split="train",
     )
 
-    # Latent demand recovery (Censored demand treatment)
-    print("Recuperando demanda latente (Censored Demand Imputation)...")
+    # 2. Run Strategy A: Observed Demand (Baseline)
+    print("--- Running Strategy A: Observed Demand ---")
+    artifacts_obs = run_experiment_from_frame(
+        raw_panel, settings, data_strategy="Observed"
+    )
+
+    # 3. Run Strategy B: Latent Demand (Imputed)
+    print("--- Running Strategy B: Latent Demand (Imputation) ---")
     imputer = SupervisedImputer()
-    prepared_panel = imputer.impute(prepared_panel)
+    imputed_panel = imputer.impute(raw_panel)
+    artifacts_latent = run_experiment_from_frame(
+        imputed_panel, settings, data_strategy="Latent"
+    )
 
-    # Actual experiment execution
-    return run_experiment_from_frame(prepared_panel, settings)
+    # 4. Merge Artifacts
+    merged_predictions = pd.concat(
+        [artifacts_obs.predictions, artifacts_latent.predictions], ignore_index=True
+    )
+    merged_metrics, merged_folds = summarize_predictions(merged_predictions)
+    merged_costs = summarize_costs(merged_predictions)
+    merged_sens = run_sensitivity_analysis(merged_predictions, settings.inventory)
+
+    final_artifacts = RunArtifacts(
+        prepared_panel=raw_panel,
+        supervised_frame=artifacts_obs.supervised_frame,  # Reference
+        predictions=merged_predictions,
+        metrics_summary=merged_metrics,
+        fold_metrics=merged_folds,
+        cost_summary=merged_costs,
+        sensitivity_summary=merged_sens,
+        drifts=artifacts_obs.drifts,  # Use drifts from observed run as proxy
+    )
+
+    return write_run_artifacts(final_artifacts, settings)
 
 
-def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArtifacts:
+def run_experiment_from_frame(
+    panel: pd.DataFrame, settings: Settings, data_strategy: str = "Observed"
+) -> RunArtifacts:
     """Run the full backtesting pipeline from an in-memory panel.
 
     Args:
         panel: Prepared daily panel to backtest.
         settings: Fully resolved experiment settings.
+        data_strategy: Label for the data strategy (e.g. 'Observed', 'Latent').
 
     Returns:
-        The generated run artifacts, including metrics, costs, and reports.
+        The generated run artifacts.
     """
     prepared_panel = label_stockout_regime(panel)
     supervised_frame, feature_columns = build_supervised_frame(
@@ -94,18 +115,17 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
         seasonal_period=settings.models.seasonal_period,
         horizon=settings.dataset.horizon,
     ).fit(prepared_panel)
-    linear_model: RidgeBaselineModel | None = None
-    boosting_model: ConformalBoostingModel | None = None
-    cat_model: ConformalBoostingModel | None = None
-    arima_model: AutoArimaModel | None = None
-    
+    ridge_model: ConformalForecaster | None = None
+    boosting_model: ConformalForecaster | None = None
+    cat_model: ConformalForecaster | None = None
+    arima_model: ConformalForecaster | None = None
+
     # Drift detection state
     drift_detector = PageHinkleyDetector(threshold=5.0, min_instances=2)
     detected_drifts = []
 
     for fold in folds:
-
-        # Prepare training and validation frames for the current fold. If either frame is empty, skip to the next fold.
+        # Prepare training and validation frames
         train_mask = supervised_frame["date"] <= fold.train_end_date
         validation_mask = (
             (supervised_frame["date"] >= fold.validation_start_date)
@@ -116,79 +136,84 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
         if train_frame.empty or validation_frame.empty:
             continue
 
-        # Build baseline predictions for the current folds.
-        baseline_predictions = _build_baseline_predictions(
-            validation_frame=validation_frame,
-            baseline_model=baseline_model,
-            fold_id=fold.fold_id,
-            settings=settings,
-        )
-        fold_predictions.append(baseline_predictions)
+        # Calibration split for conformal methods
+        calib_days = 21
+        max_train_date = train_frame["date"].max()
+        calib_cutoff = max_train_date - pd.Timedelta(days=calib_days)
+        sub_train_frame = train_frame[train_frame["date"] <= calib_cutoff].copy()
+        calib_frame = train_frame[train_frame["date"] > calib_cutoff].copy()
+        if sub_train_frame.empty:
+            sub_train_frame = train_frame
+            calib_frame = pd.DataFrame()
 
-        # Linear model training and prediction
-        if linear_model is None or settings.validation.retrain_each_fold:
-            linear_model = RidgeBaselineModel(random_seed=settings.project.random_seed)
-            linear_model.fit(
-                train_frame.loc[:, feature_columns],
-                train_frame["target_lead_time_demand"]
+        # 1. Seasonal Naive Baseline
+        fold_predictions.append(
+            _build_baseline_predictions(
+                validation_frame=validation_frame,
+                baseline_model=baseline_model,
+                fold_id=fold.fold_id,
+                settings=settings,
+                data_strategy=data_strategy,
             )
-        linear_predictions = _build_linear_predictions(
-            validation_frame=validation_frame,
-            feature_columns=feature_columns,
-            model=linear_model,
-            fold_id=fold.fold_id,
-            settings=settings,
         )
-        fold_predictions.append(linear_predictions)
 
-        # For boosting models, we optionally retrain for each fold based on settings.
+        # 2. Ridge Regression (Linear Baseline)
+        if ridge_model is None or settings.validation.retrain_each_fold:
+            base_ridge = RidgeBaselineModel(random_seed=settings.project.random_seed)
+            base_ridge.fit(
+                sub_train_frame.loc[:, feature_columns],
+                sub_train_frame["target_lead_time_demand"],
+            )
+            ridge_model = ConformalForecaster(base_ridge)
+            if not calib_frame.empty:
+                ridge_model.calibrate(
+                    calib_frame.loc[:, feature_columns],
+                    calib_frame["target_lead_time_demand"],
+                    alpha=settings.models.quantiles[0] * 2,
+                )
+        fold_predictions.append(
+            _build_model_predictions(
+                validation_frame=validation_frame,
+                feature_columns=feature_columns,
+                model=ridge_model,
+                fold_id=fold.fold_id,
+                settings=settings,
+                data_strategy=data_strategy,
+            )
+        )
+
+        # 3. LightGBM (Boosting)
         if boosting_model is None or settings.validation.retrain_each_fold:
-            # 1. Split train_frame into sub-train and calibration (last 21 days)
-            calib_days = 21
-            max_train_date = train_frame["date"].max()
-            calib_cutoff = max_train_date - pd.Timedelta(days=calib_days)
-
-            sub_train_frame = train_frame[train_frame["date"] <= calib_cutoff].copy()
-            calib_frame = train_frame[train_frame["date"] > calib_cutoff].copy()
-
-            # Fallback if train set is too small for calibration
-            if sub_train_frame.empty:
-                sub_train_frame = train_frame
-                calib_frame = pd.DataFrame()
-
-            # 2. Fit base model
-            base_model = AutoBoostingModel(
+            base_lgb = AutoBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
                 n_estimators=settings.models.n_estimators,
                 learning_rate=settings.models.learning_rate,
                 max_depth=settings.models.max_depth,
             )
-            base_model.fit(
+            base_lgb.fit(
                 sub_train_frame.loc[:, feature_columns],
                 sub_train_frame["target_lead_time_demand"],
             )
-
-            # 3. Wrap and Calibrate
-            boosting_model = ConformalBoostingModel(base_model)
+            boosting_model = ConformalForecaster(base_lgb)
             if not calib_frame.empty:
-                # Alpha is determined by the target interval (q0.1 to q0.9 -> alpha=0.2)
-                alpha = settings.models.quantiles[0] * 2
                 boosting_model.calibrate(
                     calib_frame.loc[:, feature_columns],
                     calib_frame["target_lead_time_demand"],
-                    alpha=alpha,
+                    alpha=settings.models.quantiles[0] * 2,
                 )
-        model_predictions = _build_boosting_predictions(
-            validation_frame=validation_frame,
-            feature_columns=feature_columns,
-            model=boosting_model,
-            fold_id=fold.fold_id,
-            settings=settings,
+        fold_predictions.append(
+            _build_model_predictions(
+                validation_frame=validation_frame,
+                feature_columns=feature_columns,
+                model=boosting_model,
+                fold_id=fold.fold_id,
+                settings=settings,
+                data_strategy=data_strategy,
+            )
         )
-        fold_predictions.append(model_predictions)
 
-        # CatBoost training and prediction
+        # 4. CatBoost (Boosting)
         if cat_model is None or settings.validation.retrain_each_fold:
             base_cat = CatBoostingModel(
                 quantiles=settings.models.quantiles,
@@ -201,42 +226,54 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
                 sub_train_frame.loc[:, feature_columns],
                 sub_train_frame["target_lead_time_demand"],
             )
-            cat_model = ConformalBoostingModel(base_cat)
+            cat_model = ConformalForecaster(base_cat)
             if not calib_frame.empty:
-                alpha = settings.models.quantiles[0] * 2
                 cat_model.calibrate(
                     calib_frame.loc[:, feature_columns],
                     calib_frame["target_lead_time_demand"],
-                    alpha=alpha,
+                    alpha=settings.models.quantiles[0] * 2,
                 )
-        cat_predictions = _build_boosting_predictions(
-            validation_frame=validation_frame,
-            feature_columns=feature_columns,
-            model=cat_model,
-            fold_id=fold.fold_id,
-            settings=settings,
+        fold_predictions.append(
+            _build_model_predictions(
+                validation_frame=validation_frame,
+                feature_columns=feature_columns,
+                model=cat_model,
+                fold_id=fold.fold_id,
+                settings=settings,
+                data_strategy=data_strategy,
+            )
         )
-        fold_predictions.append(cat_predictions)
 
-        # ARIMA training and prediction (Local model)
-        if arima_model is None:
-            # We fit using the full panel history for local series lookups
-            arima_model = AutoArimaModel(
+        # 5. ARIMA (Statistical)
+        if arima_model is None or settings.validation.retrain_each_fold:
+            # Note: ARIMA fits on full panel internally, but we calibrate it
+            # on the current calibration frame for each fold.
+            base_arima = AutoArimaModel(
                 seasonal_period=settings.models.seasonal_period,
                 horizon=settings.dataset.horizon
             ).fit(prepared_panel)
-            
-        arima_predictions = _build_linear_predictions(
-            validation_frame=validation_frame,
-            feature_columns=feature_columns,
-            model=arima_model,
-            fold_id=fold.fold_id,
-            settings=settings,
+            arima_model = ConformalForecaster(base_arima)
+            if not calib_frame.empty:
+                # ARIMA predict needs the full frame for series_id context
+                arima_model.calibrate(
+                    calib_frame,
+                    calib_frame["target_lead_time_demand"],
+                    alpha=settings.models.quantiles[0] * 2,
+                )
+        fold_predictions.append(
+            _build_model_predictions(
+                validation_frame=validation_frame,
+                feature_columns=feature_columns,
+                model=arima_model,
+                fold_id=fold.fold_id,
+                settings=settings,
+                data_strategy=data_strategy,
+            )
         )
-        fold_predictions.append(arima_predictions)
-        
+
         # Update drift detector with current fold MAE
-        fold_mae = (model_predictions["y_true"] - model_predictions["y_pred"]).abs().mean()
+        # Using the main point_model (LightGBM) for drift monitoring
+        fold_mae = (fold_predictions[-3]["y_true"] - fold_predictions[-3]["y_pred"]).abs().mean()
         drift_status = drift_detector.update(fold_mae)
         if drift_status.is_drift:
             detected_drifts.append({
@@ -244,6 +281,7 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
                 "score": drift_status.score,
                 "threshold": drift_status.threshold
             })
+
 
     if not fold_predictions:
         raise ValueError("Backtest did not produce any validation predictions.")
@@ -274,6 +312,7 @@ def _build_baseline_predictions(
     baseline_model: SeasonalNaiveModel,
     fold_id: int,
     settings: Settings,
+    data_strategy: str = "Observed",
 ) -> pd.DataFrame:
     """Build baseline forecasts and attach inventory costs for one fold.
 
@@ -282,6 +321,7 @@ def _build_baseline_predictions(
         baseline_model: Fitted seasonal naive model.
         fold_id: Fold identifier used in reporting.
         settings: Fully resolved experiment settings.
+        data_strategy: Label for the data strategy used.
 
     Returns:
         A prediction frame with baseline forecasts and cost columns.
@@ -296,6 +336,7 @@ def _build_baseline_predictions(
     prediction_frame["model_name"] = baseline_model.model_name
     prediction_frame["backend_name"] = "heuristic"
     prediction_frame["fold_id"] = fold_id
+    prediction_frame["data_strategy"] = data_strategy
     prediction_frame["order_quantity"] = choose_order_quantity(
         predictions=prediction_frame,
         inventory_config=settings.inventory,
@@ -305,60 +346,15 @@ def _build_baseline_predictions(
     return attach_inventory_costs(prediction_frame, settings.inventory)
 
 
-def _build_boosting_predictions(
+def _build_model_predictions(
     validation_frame: pd.DataFrame,
     feature_columns: list[str],
-    model: AutoBoostingModel | ConformalBoostingModel,
+    model: ConformalForecaster,
     fold_id: int,
     settings: Settings,
+    data_strategy: str = "Observed",
 ) -> pd.DataFrame:
-    """Build boosting forecasts, quantiles, and inventory costs for one fold.
-
-    Args:
-        validation_frame: Validation rows for the current fold.
-        feature_columns: Feature columns used by the model.
-        model: Fitted boosting model.
-        fold_id: Fold identifier used in reporting.
-        settings: Fully resolved experiment settings.
-
-    Returns:
-        A prediction frame with point forecasts, quantiles, and cost columns.
-    """
-    cols_to_keep = ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"]
-    if "latent_demand_est" in validation_frame.columns:
-        cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
-
-    prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
-    prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
-    prediction_frame["y_pred"] = model.predict(validation_frame.loc[:, feature_columns])
-    prediction_frame["model_name"] = settings.models.point_model
-    prediction_frame["backend_name"] = model.backend_name
-    prediction_frame["fold_id"] = fold_id
-
-    quantile_predictions = model.predict_quantiles(validation_frame.loc[:, feature_columns])
-    quantile_columns = []
-    for quantile in settings.models.quantiles:
-        column = quantile_column_name(quantile)
-        prediction_frame[column] = quantile_predictions[column]
-        quantile_columns.append(column)
-
-    prediction_frame["order_quantity"] = choose_order_quantity(
-        predictions=prediction_frame,
-        inventory_config=settings.inventory,
-        quantile_columns=quantile_columns,
-        quantile_levels=settings.models.quantiles,
-    )
-    return attach_inventory_costs(prediction_frame, settings.inventory)
-
-
-def _build_linear_predictions(
-    validation_frame: pd.DataFrame,
-    feature_columns: list[str],
-    model: object,
-    fold_id: int,
-    settings: Settings,
-) -> pd.DataFrame:
-    """Build linear model forecasts and attach inventory costs for one fold."""
+    """Build model forecasts, including conformal quantiles, and attach costs."""
     cols_to_keep = ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"]
     if "latent_demand_est" in validation_frame.columns:
         cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
@@ -366,8 +362,8 @@ def _build_linear_predictions(
     prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
     
-    # Check if model is ARIMA to pass full frame with series_id
-    if hasattr(model, "model_name") and model.model_name == "auto_arima":
+    # ARIMA needs full frame for metadata context
+    if hasattr(model.base_model, "model_name") and model.base_model.model_name == "auto_arima":
         prediction_frame["y_pred"] = model.predict(validation_frame)
     else:
         prediction_frame["y_pred"] = model.predict(validation_frame.loc[:, feature_columns])
@@ -375,10 +371,25 @@ def _build_linear_predictions(
     prediction_frame["model_name"] = model.model_name
     prediction_frame["backend_name"] = model.backend_name
     prediction_frame["fold_id"] = fold_id
+    prediction_frame["data_strategy"] = data_strategy
+
+    # Add conformal quantiles
+    if hasattr(model.base_model, "model_name") and model.base_model.model_name == "auto_arima":
+        quantile_predictions = model.predict_quantiles(validation_frame)
+    else:
+        quantile_predictions = model.predict_quantiles(validation_frame.loc[:, feature_columns])
+    
+    quantile_columns = []
+    for quantile in settings.models.quantiles:
+        column = quantile_column_name(quantile)
+        if column in quantile_predictions:
+            prediction_frame[column] = quantile_predictions[column]
+            quantile_columns.append(column)
+
     prediction_frame["order_quantity"] = choose_order_quantity(
         predictions=prediction_frame,
         inventory_config=settings.inventory,
-        quantile_columns=[],
-        quantile_levels=[],
+        quantile_columns=quantile_columns,
+        quantile_levels=[float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns],
     )
     return attach_inventory_costs(prediction_frame, settings.inventory)

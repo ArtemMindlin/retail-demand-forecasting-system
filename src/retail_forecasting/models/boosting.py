@@ -32,6 +32,7 @@ class AutoBoostingModel:
     n_estimators: int
     learning_rate: float
     max_depth: int
+    model_name: str = "auto_boosting"
     backend_name: str = field(init=False, default="unknown")
 
     def fit(self, features: pd.DataFrame, target: pd.Series) -> "AutoBoostingModel":

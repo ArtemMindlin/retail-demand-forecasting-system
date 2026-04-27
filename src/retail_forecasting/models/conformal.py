@@ -2,103 +2,134 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from typing import Optional, Union
+from typing import Optional, Any, Protocol, runtime_checkable
 
-from retail_forecasting.models.boosting import AutoBoostingModel
-from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.utils.io import quantile_column_name
 
+@runtime_checkable
+class Forecaster(Protocol):
+    """Protocol for models that can be wrapped by ConformalForecaster."""
+    backend_name: str
+    model_name: str
+    def predict(self, features: Any) -> np.ndarray: ...
+    def predict_quantiles(self, features: Any) -> dict[str, np.ndarray]: ...
 
-class ConformalBoostingModel:
-    """A wrapper that provides conformal prediction guarantees.
+
+class ConformalForecaster:
+    """A universal wrapper that provides conformal prediction guarantees.
     
-    This model implements the Split Conformal Prediction method to ensure that 
-    quantile intervals have the requested coverage probability.
+    This model implements the Split Conformal Prediction method. If the base model
+    already provides quantiles, it adjusts them (widens/narrows). If the base model
+    only provides point forecasts, it builds intervals around them using the 
+    distribution of absolute residuals.
     """
     
-    def __init__(self, base_model: Union[AutoBoostingModel, CatBoostingModel]):
+    def __init__(self, base_model: Any):
         self.base_model = base_model
         self.q_hat: Optional[float] = None
         self.confidence_level: Optional[float] = None
+        self.alpha: Optional[float] = None
         
-    def fit(self, features: pd.DataFrame, target: pd.Series) -> "ConformalBoostingModel":
+    def fit(self, features: Any, target: pd.Series) -> "ConformalForecaster":
         """Fit the underlying base model."""
         self.base_model.fit(features, target)
         return self
         
-    def calibrate(self, features: pd.DataFrame, target: pd.Series, alpha: float = 0.2) -> "ConformalBoostingModel":
+    def calibrate(self, features: Any, target: pd.Series, alpha: float = 0.2) -> "ConformalForecaster":
         """Calculate the conformal correction factor (q_hat) using a calibration set.
         
         Args:
-            features: Features from a set the model hasn't seen during fit.
+            features: Features/Panel from a set the model hasn't seen during fit.
             target: True values for the calibration set.
-            alpha: Significance level (1 - alpha = desired coverage). 
-                   Default 0.2 means 80% coverage (between q_0.1 and q_0.9).
+            alpha: Significance level (1 - alpha = desired coverage).
         """
+        self.alpha = alpha
         self.confidence_level = 1 - alpha
         
-        # 1. Get base quantile predictions (e.g., q0.1 and q0.9)
-        # We assume the base model was configured with these quantiles.
-        q_low_level = alpha / 2
-        q_high_level = 1 - (alpha / 2)
-        
-        preds = self.base_model.predict_quantiles(features)
-        y_low = preds[quantile_column_name(q_low_level)]
-        y_high = preds[quantile_column_name(q_high_level)]
         y_true = target.values
         
-        # 2. Calculate conformity scores (S)
-        # S_i measures the distance to the nearest boundary. 
-        # Positive means the true value is OUTSIDE the interval.
-        # Negative means it is INSIDE.
-        scores = np.maximum(y_low - y_true, y_true - y_high)
+        # Check if base model supports quantiles
+        if hasattr(self.base_model, "predict_quantiles"):
+            q_low_level = alpha / 2
+            q_high_level = 1 - (alpha / 2)
+            
+            preds = self.base_model.predict_quantiles(features)
+            # Ensure the required quantiles exist
+            low_col = quantile_column_name(q_low_level)
+            high_col = quantile_column_name(q_high_level)
+            
+            if low_col in preds and high_col in preds:
+                y_low = preds[low_col]
+                y_high = preds[high_col]
+                # Conformity score for interval-based conformal (CQR)
+                scores = np.maximum(y_low - y_true, y_true - y_high)
+            else:
+                # Fallback to absolute residual if specific quantiles are missing
+                y_pred = self.base_model.predict(features)
+                scores = np.abs(y_true - y_pred)
+        else:
+            # Base model only has point forecasts
+            y_pred = self.base_model.predict(features)
+            scores = np.abs(y_true - y_pred)
         
-        # 3. Calculate q_hat
-        # We want the quantile (1-alpha) of the scores.
+        # Calculate q_hat (1-alpha) quantile of scores
         n = len(scores)
-        # Small sample correction: (n+1)*(1-alpha) / n
         q_level = (1 - alpha) * (1 + 1/n)
         q_level = min(max(q_level, 0.0), 1.0)
         
         self.q_hat = np.quantile(scores, q_level, method='higher')
-        
-        # Guard: If q_hat is negative, the model is already "too wide" (over-conservative).
-        # In conformal prediction we usually allow it to be negative to narrow the interval,
-        # but in this retail context, to avoid the previous coverage drop, 
-        # we will ensure we only widen if we are under-covering.
         self.q_hat = max(self.q_hat, 0.0)
 
         return self
 
-        
-    def predict(self, features: pd.DataFrame) -> np.ndarray:
+    def predict(self, features: Any) -> np.ndarray:
         """Standard point prediction from base model."""
         return self.base_model.predict(features)
         
-    def predict_quantiles(self, features: pd.DataFrame) -> dict[str, np.ndarray]:
+    def predict_quantiles(self, features: Any) -> dict[str, np.ndarray]:
         """Predict adjusted (conformalized) quantiles."""
-        raw_preds = self.base_model.predict_quantiles(features)
+        y_pred = self.base_model.predict(features)
         
-        if self.q_hat is None:
-            # If not calibrated, return raw predictions
-            return raw_preds
-            
-        adjusted_preds = {}
-        for col, values in raw_preds.items():
-            # Parse the quantile value from the column name. e.g., 'q_0_1' -> 0.1
-            quantile_str = col.replace("q_", "").replace("_", ".")
-            quantile_val = float(quantile_str)
-            
-            if quantile_val < 0.5:
-                adjusted_preds[col] = np.maximum(values - self.q_hat, 0.0)
-            elif quantile_val > 0.5:
-                adjusted_preds[col] = np.maximum(values + self.q_hat, 0.0)
-            else:
-                adjusted_preds[col] = values
+        # Determine target quantiles from alpha if set, otherwise use defaults
+        alpha = self.alpha if self.alpha is not None else 0.2
+        q_low_level = alpha / 2
+        q_high_level = 1 - (alpha / 2)
+        
+        low_col = quantile_column_name(q_low_level)
+        mid_col = quantile_column_name(0.5)
+        high_col = quantile_column_name(q_high_level)
 
-                
-        return adjusted_preds
+        if self.q_hat is None:
+            # Uncalibrated fallback: try base model quantiles or return dummy
+            if hasattr(self.base_model, "predict_quantiles"):
+                return self.base_model.predict_quantiles(features)
+            return {mid_col: y_pred}
+
+        # Check if we should adjust existing quantiles or build from scratch
+        if hasattr(self.base_model, "predict_quantiles"):
+            raw_preds = self.base_model.predict_quantiles(features)
+            adjusted_preds = {}
+            for col, values in raw_preds.items():
+                quantile_val = float(col.replace("q_", "").replace("_", "."))
+                if quantile_val < 0.5:
+                    adjusted_preds[col] = np.maximum(values - self.q_hat, 0.0)
+                elif quantile_val > 0.5:
+                    adjusted_preds[col] = np.maximum(values + self.q_hat, 0.0)
+                else:
+                    adjusted_preds[col] = values
+            return adjusted_preds
+        else:
+            # Build intervals around point forecast
+            return {
+                low_col: np.maximum(y_pred - self.q_hat, 0.0),
+                mid_col: y_pred,
+                high_col: np.maximum(y_pred + self.q_hat, 0.0)
+            }
 
     @property
     def backend_name(self) -> str:
         return f"conformal_{self.base_model.backend_name}"
+
+    @property
+    def model_name(self) -> str:
+        return self.base_model.model_name

@@ -11,7 +11,7 @@ dataset:
   processed_panel_path: data/processed/fresh_retailnet_train.parquet
   use_local_cache: true
   refresh_processed_cache: false
-  top_n_series: 300
+  top_n_series: 50
   min_history_days: 70
   max_rows: null
   horizon: 7

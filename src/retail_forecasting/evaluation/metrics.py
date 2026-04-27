@@ -10,25 +10,46 @@ def summarize_predictions(predictions: pd.DataFrame) -> tuple[pd.DataFrame, pd.D
     records = []
     fold_records = []
 
-    for keys, subset in predictions.groupby(["model_name", "backend_name"], dropna=False):
-        model_name, backend_name = keys
-        records.append(_build_metric_record(subset, model_name, backend_name))
+    group_cols = ["model_name", "backend_name"]
+    if "data_strategy" in predictions.columns:
+        group_cols.insert(0, "data_strategy")
 
-    for keys, subset in predictions.groupby(
-        ["fold_id", "model_name", "backend_name"],
-        dropna=False,
-    ):
-        fold_id, model_name, backend_name = keys
+    for keys, subset in predictions.groupby(group_cols, dropna=False):
+        if "data_strategy" in group_cols:
+            strategy, model_name, backend_name = keys
+        else:
+            model_name, backend_name = keys
+            strategy = None
+            
+        record = _build_metric_record(subset, model_name, backend_name)
+        if strategy:
+            record["data_strategy"] = strategy
+        records.append(record)
+
+    fold_group_cols = ["fold_id"] + group_cols
+    for keys, subset in predictions.groupby(fold_group_cols, dropna=False):
+        if "data_strategy" in group_cols:
+            fold_id, strategy, model_name, backend_name = keys
+        else:
+            fold_id, model_name, backend_name = keys
+            strategy = None
+            
         record = _build_metric_record(subset, model_name, backend_name)
         record["fold_id"] = fold_id
+        if strategy:
+            record["data_strategy"] = strategy
         fold_records.append(record)
 
     return pd.DataFrame(records), pd.DataFrame(fold_records)
 
 
 def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
+    group_cols = ["model_name", "backend_name"]
+    if "data_strategy" in predictions.columns:
+        group_cols.insert(0, "data_strategy")
+
     summary = (
-        predictions.groupby(["model_name", "backend_name"], dropna=False)
+        predictions.groupby(group_cols, dropna=False)
         .agg(
             observations=("y_true", "size"),
             mean_order_quantity=("order_quantity", "mean"),
