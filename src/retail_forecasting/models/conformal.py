@@ -2,20 +2,21 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from typing import Optional
+from typing import Optional, Union
 
 from retail_forecasting.models.boosting import AutoBoostingModel
+from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.utils.io import quantile_column_name
 
 
 class ConformalBoostingModel:
-    """A wrapper for AutoBoostingModel that provides conformal prediction guarantees.
+    """A wrapper that provides conformal prediction guarantees.
     
     This model implements the Split Conformal Prediction method to ensure that 
     quantile intervals have the requested coverage probability.
     """
     
-    def __init__(self, base_model: AutoBoostingModel):
+    def __init__(self, base_model: Union[AutoBoostingModel, CatBoostingModel]):
         self.base_model = base_model
         self.q_hat: Optional[float] = None
         self.confidence_level: Optional[float] = None

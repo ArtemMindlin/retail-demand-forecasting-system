@@ -14,6 +14,7 @@ from retail_forecasting.features.engineering import build_supervised_frame
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
 from retail_forecasting.inventory.newsvendor import attach_inventory_costs, choose_order_quantity
 from retail_forecasting.models.boosting import AutoBoostingModel
+from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalBoostingModel
 from retail_forecasting.models.linear import RidgeBaselineModel
 from retail_forecasting.models.naive import SeasonalNaiveModel
@@ -91,6 +92,7 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
     ).fit(prepared_panel)
     linear_model: RidgeBaselineModel | None = None
     boosting_model: ConformalBoostingModel | None = None
+    cat_model: ConformalBoostingModel | None = None
     
     # Drift detection state
     drift_detector = PageHinkleyDetector(threshold=5.0, min_instances=2)
@@ -180,6 +182,36 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
             settings=settings,
         )
         fold_predictions.append(model_predictions)
+
+        # CatBoost training and prediction
+        if cat_model is None or settings.validation.retrain_each_fold:
+            base_cat = CatBoostingModel(
+                quantiles=settings.models.quantiles,
+                random_seed=settings.project.random_seed,
+                n_estimators=settings.models.n_estimators,
+                learning_rate=settings.models.learning_rate,
+                max_depth=settings.models.max_depth,
+            )
+            base_cat.fit(
+                sub_train_frame.loc[:, feature_columns],
+                sub_train_frame["target_lead_time_demand"],
+            )
+            cat_model = ConformalBoostingModel(base_cat)
+            if not calib_frame.empty:
+                alpha = settings.models.quantiles[0] * 2
+                cat_model.calibrate(
+                    calib_frame.loc[:, feature_columns],
+                    calib_frame["target_lead_time_demand"],
+                    alpha=alpha,
+                )
+        cat_predictions = _build_boosting_predictions(
+            validation_frame=validation_frame,
+            feature_columns=feature_columns,
+            model=cat_model,
+            fold_id=fold.fold_id,
+            settings=settings,
+        )
+        fold_predictions.append(cat_predictions)
         
         # Update drift detector with current fold MAE
         fold_mae = (model_predictions["y_true"] - model_predictions["y_pred"]).abs().mean()

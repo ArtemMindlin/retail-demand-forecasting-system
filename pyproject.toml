@@ -9,6 +9,7 @@ description = "Research-oriented retail demand forecasting pipeline for inventor
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "catboost>=1.2.10",
   "fsspec>=2024.6.1",
   "huggingface-hub>=0.30.0",
   "matplotlib>=3.9.0",
