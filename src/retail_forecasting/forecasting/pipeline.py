@@ -11,6 +11,7 @@ from retail_forecasting.features.engineering import build_supervised_frame
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
 from retail_forecasting.inventory.newsvendor import attach_inventory_costs, choose_order_quantity
 from retail_forecasting.models.boosting import AutoBoostingModel
+from retail_forecasting.models.conformal import ConformalBoostingModel
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.utils.io import quantile_column_name
 
@@ -104,17 +105,42 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
 
         # For boosting models, we optionally retrain for each fold based on settings.
         if boosting_model is None or settings.validation.retrain_each_fold:
-            boosting_model = AutoBoostingModel(
+            # 1. Split train_frame into sub-train and calibration (last 28 days)
+            calib_days = 28
+            max_train_date = train_frame["date"].max()
+            calib_cutoff = max_train_date - pd.Timedelta(days=calib_days)
+
+            sub_train_frame = train_frame[train_frame["date"] <= calib_cutoff].copy()
+            calib_frame = train_frame[train_frame["date"] > calib_cutoff].copy()
+
+            # Fallback if train set is too small for calibration
+            if sub_train_frame.empty:
+                sub_train_frame = train_frame
+                calib_frame = pd.DataFrame()
+
+            # 2. Fit base model
+            base_model = AutoBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
                 n_estimators=settings.models.n_estimators,
                 learning_rate=settings.models.learning_rate,
                 max_depth=settings.models.max_depth,
             )
-            boosting_model.fit(
-                train_frame.loc[:, feature_columns],
-                train_frame["target_lead_time_demand"],
+            base_model.fit(
+                sub_train_frame.loc[:, feature_columns],
+                sub_train_frame["target_lead_time_demand"],
             )
+
+            # 3. Wrap and Calibrate
+            boosting_model = ConformalBoostingModel(base_model)
+            if not calib_frame.empty:
+                # Alpha is determined by the target interval (q0.1 to q0.9 -> alpha=0.2)
+                alpha = settings.models.quantiles[0] * 2
+                boosting_model.calibrate(
+                    calib_frame.loc[:, feature_columns],
+                    calib_frame["target_lead_time_demand"],
+                    alpha=alpha,
+                )
         model_predictions = _build_boosting_predictions(
             validation_frame=validation_frame,
             feature_columns=feature_columns,
@@ -180,7 +206,7 @@ def _build_baseline_predictions(
 def _build_boosting_predictions(
     validation_frame: pd.DataFrame,
     feature_columns: list[str],
-    model: AutoBoostingModel,
+    model: AutoBoostingModel | ConformalBoostingModel,
     fold_id: int,
     settings: Settings,
 ) -> pd.DataFrame:
