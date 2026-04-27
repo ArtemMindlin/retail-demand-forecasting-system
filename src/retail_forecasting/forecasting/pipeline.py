@@ -220,11 +220,11 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
 
         # ARIMA training and prediction (Local model)
         if arima_model is None:
-            # We fit on the initial training data available
+            # We fit using the full panel history for local series lookups
             arima_model = AutoArimaModel(
                 seasonal_period=settings.models.seasonal_period,
                 horizon=settings.dataset.horizon
-            ).fit(train_frame)
+            ).fit(prepared_panel)
             
         arima_predictions = _build_linear_predictions(
             validation_frame=validation_frame,
