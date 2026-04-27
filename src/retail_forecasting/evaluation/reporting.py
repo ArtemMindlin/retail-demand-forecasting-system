@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any, Optional
 from pathlib import Path
 
 import pandas as pd
 
 from retail_forecasting.config import Settings, settings_to_dict
+from retail_forecasting.drift.detectors import DriftResult
 from retail_forecasting.utils.io import dataframe_to_markdown, ensure_directory, make_run_directory
 from retail_forecasting.visualization.plots import render_standard_plots
 
@@ -18,6 +20,7 @@ class RunArtifacts:
     metrics_summary: pd.DataFrame
     fold_metrics: pd.DataFrame
     cost_summary: pd.DataFrame
+    drifts: list[dict[str, Any]] = field(default_factory=list)
     run_directory: Path | None = None
 
 
@@ -81,6 +84,13 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         "## Fold Diagnostics",
         "",
         dataframe_to_markdown(artifacts.fold_metrics),
+        "",
+        "## Drift Analysis",
+        "",
+        *(
+            [f"- **ALERT**: Detected drift on `{d['date']}` (Score: `{d['score']:.2f}`, Threshold: `{d['threshold']:.2f}`)" for d in artifacts.drifts]
+            if artifacts.drifts else ["- No statistically significant drift detected during this run."]
+        ),
         "",
         "## Interpretation Notes",
         "",
