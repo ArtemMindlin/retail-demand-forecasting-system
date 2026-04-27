@@ -11,7 +11,7 @@ dataset:
   processed_panel_path: data/processed/fresh_retailnet_train.parquet
   use_local_cache: true
   refresh_processed_cache: false
-  top_n_series: 100
+  top_n_series: 300
   min_history_days: 70
   max_rows: null
   horizon: 7
@@ -30,7 +30,7 @@ features:
   include_stockout_lags: true
 
 validation:
-  initial_train_days: 56
+  initial_train_days: 45
   n_folds: 3
   fold_size_days: 7
   retrain_each_fold: true
@@ -39,9 +39,9 @@ models:
   point_model: auto_boosting
   quantiles: [0.1, 0.5, 0.9]
   seasonal_period: 7
-  n_estimators: 200
+  n_estimators: 500
   learning_rate: 0.05
-  max_depth: 6
+  max_depth: 8
 
 inventory:
   overstock_cost: 1.0

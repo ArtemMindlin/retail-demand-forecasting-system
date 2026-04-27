@@ -54,12 +54,6 @@ Crea un entorno virtual con `uv` e instala las dependencias del proyecto:
 brew install uv
 uv venv
 source .venv/bin/activate
-uv sync --extra dev
-```
-
-Backends acelerados opcionales:
-
-```bash
 uv sync --extra dev --extra ml
 ```
 
@@ -68,6 +62,20 @@ Ejecuta el experimento por defecto:
 ```bash
 uv run python -m retail_forecasting.run --config configs/default.yaml
 ```
+
+### Dashboard Interactivo
+
+Para explorar los resultados de forma visual, ver las alertas de drift y analizar la cobertura de Conformal Prediction:
+
+```bash
+uv run streamlit run src/retail_forecasting/visualization/dashboard.py
+```
+
+El dashboard permite:
+- Seleccionar entre diferentes ejecuciones de experimentos.
+- Visualizar intervalos de confianza ajustados estadísticamente.
+- Identificar puntos de "Concept Drift" en tiempo real.
+- Analizar el impacto económico (Coste Total) de cada modelo.
 
 El comando escribe un directorio de ejecución con timestamp dentro de `reports/` con:
 
