@@ -5,6 +5,7 @@ import pandas as pd
 from retail_forecasting.config import Settings
 from retail_forecasting.data.fresh_retailnet import load_prepared_panel
 from retail_forecasting.drift.regime_analysis import label_stockout_regime
+from retail_forecasting.drift.detectors import PageHinkleyDetector
 from retail_forecasting.evaluation.metrics import summarize_costs, summarize_predictions
 from retail_forecasting.evaluation.reporting import RunArtifacts, write_run_artifacts
 from retail_forecasting.features.engineering import build_supervised_frame
@@ -80,9 +81,14 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
         seasonal_period=settings.models.seasonal_period,
         horizon=settings.dataset.horizon,
     ).fit(prepared_panel)
-    boosting_model: AutoBoostingModel | None = None
+    boosting_model: ConformalBoostingModel | None = None
+
+    # Drift detection state
+    drift_detector = PageHinkleyDetector(threshold=5.0, min_instances=2)
+    detected_drifts = []
 
     for fold in folds:
+
         # Prepare training and validation frames for the current fold. If either frame is empty, skip to the next fold.
         train_mask = supervised_frame["date"] <= fold.train_end_date
         validation_mask = (
@@ -149,6 +155,16 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
             settings=settings,
         )
         fold_predictions.append(model_predictions)
+        
+        # Update drift detector with current fold MAE
+        fold_mae = (model_predictions["y_true"] - model_predictions["y_pred"]).abs().mean()
+        drift_status = drift_detector.update(fold_mae)
+        if drift_status.is_drift:
+            detected_drifts.append({
+                "date": fold.validation_start_date.date(),
+                "score": drift_status.score,
+                "threshold": drift_status.threshold
+            })
 
     if not fold_predictions:
         raise ValueError("Backtest did not produce any validation predictions.")
@@ -164,6 +180,7 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
         metrics_summary=metrics_summary,
         fold_metrics=fold_metrics,
         cost_summary=cost_summary,
+        drifts=detected_drifts,
     )
     return write_run_artifacts(artifacts, settings)
 
