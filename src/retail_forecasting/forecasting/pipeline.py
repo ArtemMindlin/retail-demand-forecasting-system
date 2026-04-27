@@ -18,6 +18,7 @@ from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalBoostingModel
 from retail_forecasting.models.linear import RidgeBaselineModel
 from retail_forecasting.models.naive import SeasonalNaiveModel
+from retail_forecasting.models.statistical import AutoArimaModel
 from retail_forecasting.utils.io import quantile_column_name
 
 
@@ -93,6 +94,7 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
     linear_model: RidgeBaselineModel | None = None
     boosting_model: ConformalBoostingModel | None = None
     cat_model: ConformalBoostingModel | None = None
+    arima_model: AutoArimaModel | None = None
     
     # Drift detection state
     drift_detector = PageHinkleyDetector(threshold=5.0, min_instances=2)
@@ -212,6 +214,23 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
             settings=settings,
         )
         fold_predictions.append(cat_predictions)
+
+        # ARIMA training and prediction (Local model)
+        if arima_model is None:
+            # We fit on the initial training data available
+            arima_model = AutoArimaModel(
+                seasonal_period=settings.models.seasonal_period,
+                horizon=settings.dataset.horizon
+            ).fit(train_frame)
+            
+        arima_predictions = _build_linear_predictions(
+            validation_frame=validation_frame,
+            feature_columns=feature_columns,
+            model=arima_model,
+            fold_id=fold.fold_id,
+            settings=settings,
+        )
+        fold_predictions.append(arima_predictions)
         
         # Update drift detector with current fold MAE
         fold_mae = (model_predictions["y_true"] - model_predictions["y_pred"]).abs().mean()
@@ -343,7 +362,13 @@ def _build_linear_predictions(
 
     prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
-    prediction_frame["y_pred"] = model.predict(validation_frame.loc[:, feature_columns])
+    
+    # Check if model is ARIMA to pass full frame with series_id
+    if hasattr(model, "model_name") and model.model_name == "auto_arima":
+        prediction_frame["y_pred"] = model.predict(validation_frame)
+    else:
+        prediction_frame["y_pred"] = model.predict(validation_frame.loc[:, feature_columns])
+        
     prediction_frame["model_name"] = model.model_name
     prediction_frame["backend_name"] = model.backend_name
     prediction_frame["fold_id"] = fold_id
