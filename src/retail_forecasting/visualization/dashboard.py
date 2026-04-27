@@ -113,12 +113,20 @@ if q_low_col in series_data.columns and q_high_col in series_data.columns:
         name="Intervalo de Confianza (CP)"
     ))
 
-# Plot Actual Demand
+# Plot Actual Demand (Total Horizon)
 fig.add_trace(go.Scatter(
     x=series_data["date"], y=series_data["y_true"],
-    mode='lines+markers', name="Demanda Real",
+    mode='lines+markers', name="Demanda Semanal (Target)",
     line=dict(color='black', width=2)
 ))
+
+# Plot Daily Observed Demand (Context for Imputation)
+if "original_observed_demand" in series_data.columns:
+    fig.add_trace(go.Scatter(
+        x=series_data["date"], y=series_data["original_observed_demand"],
+        mode='lines', name="Venta Diaria (Observada)",
+        line=dict(color='grey', width=1, dash='dot')
+    ))
 
 # Plot Prediction
 fig.add_trace(go.Scatter(
@@ -126,6 +134,15 @@ fig.add_trace(go.Scatter(
     mode='lines', name="Predicción (Punto)",
     line=dict(color='blue', dash='dash')
 ))
+
+# Plot Latent Demand Recovery (Only where imputed)
+if "is_imputed" in series_data.columns and series_data["is_imputed"].any():
+    imputed_points = series_data[series_data["is_imputed"]]
+    fig.add_trace(go.Scatter(
+        x=imputed_points["date"], y=imputed_points["latent_demand_est"],
+        mode='markers', name="Demanda Latente Recuperada",
+        marker=dict(symbol='star', size=12, color='purple', line=dict(width=1, color='white'))
+    ))
 
 # Plot Order Quantity
 fig.add_trace(go.Scatter(

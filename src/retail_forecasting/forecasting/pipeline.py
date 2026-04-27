@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from retail_forecasting.config import Settings
+from retail_forecasting.data.censorship import SupervisedImputer
 from retail_forecasting.data.fresh_retailnet import load_prepared_panel
 from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.drift.detectors import PageHinkleyDetector
@@ -48,6 +49,11 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         preprocessing_config=settings.preprocessing,
         split="train",
     )
+
+    # Latent demand recovery (Censored demand treatment)
+    print("Recuperando demanda latente (Censored Demand Imputation)...")
+    imputer = SupervisedImputer()
+    prepared_panel = imputer.impute(prepared_panel)
 
     # Actual experiment execution
     return run_experiment_from_frame(prepared_panel, settings)
@@ -208,10 +214,11 @@ def _build_baseline_predictions(
     Returns:
         A prediction frame with baseline forecasts and cost columns.
     """
-    prediction_frame = validation_frame.loc[
-        :,
-        ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"],
-    ].copy()
+    cols_to_keep = ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"]
+    if "latent_demand_est" in validation_frame.columns:
+        cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
+        
+    prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
     prediction_frame["y_pred"] = baseline_model.predict(validation_frame)
     prediction_frame["model_name"] = baseline_model.model_name
@@ -245,10 +252,11 @@ def _build_boosting_predictions(
     Returns:
         A prediction frame with point forecasts, quantiles, and cost columns.
     """
-    prediction_frame = validation_frame.loc[
-        :,
-        ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"],
-    ].copy()
+    cols_to_keep = ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"]
+    if "latent_demand_est" in validation_frame.columns:
+        cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
+
+    prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
     prediction_frame["y_pred"] = model.predict(validation_frame.loc[:, feature_columns])
     prediction_frame["model_name"] = settings.models.point_model
