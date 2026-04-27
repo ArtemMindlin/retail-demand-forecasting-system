@@ -15,6 +15,7 @@ from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
 from retail_forecasting.inventory.newsvendor import attach_inventory_costs, choose_order_quantity
 from retail_forecasting.models.boosting import AutoBoostingModel
 from retail_forecasting.models.conformal import ConformalBoostingModel
+from retail_forecasting.models.linear import RidgeBaselineModel
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.utils.io import quantile_column_name
 
@@ -88,8 +89,9 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
         seasonal_period=settings.models.seasonal_period,
         horizon=settings.dataset.horizon,
     ).fit(prepared_panel)
+    linear_model: RidgeBaselineModel | None = None
     boosting_model: ConformalBoostingModel | None = None
-
+    
     # Drift detection state
     drift_detector = PageHinkleyDetector(threshold=5.0, min_instances=2)
     detected_drifts = []
@@ -115,6 +117,22 @@ def run_experiment_from_frame(panel: pd.DataFrame, settings: Settings) -> RunArt
             settings=settings,
         )
         fold_predictions.append(baseline_predictions)
+
+        # Linear model training and prediction
+        if linear_model is None or settings.validation.retrain_each_fold:
+            linear_model = RidgeBaselineModel(random_seed=settings.project.random_seed)
+            linear_model.fit(
+                train_frame.loc[:, feature_columns],
+                train_frame["target_lead_time_demand"]
+            )
+        linear_predictions = _build_linear_predictions(
+            validation_frame=validation_frame,
+            feature_columns=feature_columns,
+            model=linear_model,
+            fold_id=fold.fold_id,
+            settings=settings,
+        )
+        fold_predictions.append(linear_predictions)
 
         # For boosting models, we optionally retrain for each fold based on settings.
         if boosting_model is None or settings.validation.retrain_each_fold:
@@ -275,5 +293,32 @@ def _build_boosting_predictions(
         inventory_config=settings.inventory,
         quantile_columns=quantile_columns,
         quantile_levels=settings.models.quantiles,
+    )
+    return attach_inventory_costs(prediction_frame, settings.inventory)
+
+
+def _build_linear_predictions(
+    validation_frame: pd.DataFrame,
+    feature_columns: list[str],
+    model: object,
+    fold_id: int,
+    settings: Settings,
+) -> pd.DataFrame:
+    """Build linear model forecasts and attach inventory costs for one fold."""
+    cols_to_keep = ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"]
+    if "latent_demand_est" in validation_frame.columns:
+        cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
+
+    prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
+    prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
+    prediction_frame["y_pred"] = model.predict(validation_frame.loc[:, feature_columns])
+    prediction_frame["model_name"] = model.model_name
+    prediction_frame["backend_name"] = model.backend_name
+    prediction_frame["fold_id"] = fold_id
+    prediction_frame["order_quantity"] = choose_order_quantity(
+        predictions=prediction_frame,
+        inventory_config=settings.inventory,
+        quantile_columns=[],
+        quantile_levels=[],
     )
     return attach_inventory_costs(prediction_frame, settings.inventory)
