@@ -41,6 +41,7 @@ El sistema sigue un patrón de **Tubería Basada en Contratos**:
 | 2026-04-28 | **Adaptive Retraining** | Integración de `PageHinkleyDetector` en el pipeline de backtesting para disparar reentrenamientos. |
 | 2026-04-28 | **Unified Makefile** | Estandarización de comandos de ejecución, tests y dashboard. |
 | 2026-04-28 | **Reporting Extra** | Inclusión de alertas de drift y comparativa de estrategias de datos en el `report.md`. |
+| 2026-04-28 | **Optuna Tuning** | Integración de búsqueda bayesiana de hiperparámetros con validación cruzada temporal interna. |
 
 ## 5. Gestión de Dependencias Futuras
 

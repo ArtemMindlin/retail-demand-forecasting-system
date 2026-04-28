@@ -67,6 +67,8 @@ class ModelConfig:
     n_estimators: int = 200
     learning_rate: float = 0.05
     max_depth: int = 6
+    use_tuning: bool = False
+    tuning_trials: int = 20
 
 
 @dataclass

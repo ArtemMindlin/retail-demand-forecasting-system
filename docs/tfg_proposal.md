@@ -33,7 +33,7 @@ Disenar y evaluar un sistema reproducible de forecasting para decisiones de inve
 3. Traducir la salida del forecast a una decision de inventario mediante una politica newsvendor de una sola etapa.
 4. Comparar modelos con metricas predictivas, probabilisticas y economicas.
 5. Documentar explicitamente como se evita leakage temporal y por que la evaluacion economica puede cambiar la conclusion experimental.
-6. Dejar una base preparada para extensiones posteriores: demanda latente, conformal prediction, drift detection y politicas de inventario mas ricas.
+6. Implementar técnicas de robustez y adaptabilidad: recuperación de demanda latente, conformal prediction, drift detection y optimización bayesiana de parámetros.
 
 ## Contribucion esperada
 
@@ -56,11 +56,10 @@ Se utilizara FreshRetailNet-50K como dataset principal. La informacion de stocko
 
 ### 3. Modelos
 
-Se incluiran:
-
+Se incluirán:
 - un baseline seasonal naive;
-- un modelo global de boosting sobre panel temporal;
-- soporte minimo para cuantiles `0.1`, `0.5` y `0.9`.
+- un modelo global de boosting con optimización de hiperparámetros vía **Optuna**;
+- soporte para cuantiles y calibración mediante **Conformal Prediction**.
 
 ### 4. Validacion
 
@@ -109,10 +108,9 @@ La capa de decision de la v1 sera un newsvendor por periodo. La cantidad pedida 
 - estudiar sensibilidad a costes y periodos con stockout;
 - documentar limitaciones y lecciones del sistema.
 
-### Fase 4. Extension para sobresaliente
+### Fase 4. Finalización y Defensa
 
-- quantile forecasting mas robusto;
-- conformal prediction;
-- demanda censurada o latent demand recovery;
-- deteccion de drift y reentrenamiento adaptativo;
-- dashboard para analisis interactivo.
+- análisis de calibración de cuantiles;
+- evaluación del impacto de la optimización en la decisión de inventario;
+- dashboard para análisis interactivo;
+- redacción de la memoria final.

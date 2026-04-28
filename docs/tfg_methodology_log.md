@@ -61,4 +61,5 @@ Con la inclusión del **Makefile** y la **Arquitectura por Contratos**, el proye
 *   [x] Lógica de reentrenamiento adaptativo operativa.
 *   [x] Makefile de automatización.
 *   [x] Documentación técnica integral y manual de dependencias.
+*   [x] Implementación de optimización de hiperparámetros con **Optuna**.
 *   [ ] Fortalecimiento de la suite de tests unitarios (Garantía de Calidad).

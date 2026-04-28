@@ -17,6 +17,7 @@ from retail_forecasting.inventory.newsvendor import (
     run_sensitivity_analysis,
 )
 from retail_forecasting.models.boosting import AutoBoostingModel
+from retail_forecasting.models.optimization import HyperparameterTuner
 from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.linear import RidgeBaselineModel
@@ -121,6 +122,19 @@ def run_experiment_from_frame(
     cat_model: ConformalForecaster | None = None
     arima_model: ConformalForecaster | None = None
 
+    # Optional: Hyperparameter Tuning Phase
+    best_boosting_params = {
+        "n_estimators": settings.models.n_estimators,
+        "learning_rate": settings.models.learning_rate,
+        "max_depth": settings.models.max_depth
+    }
+    if settings.models.use_tuning:
+        print(f"🔍 Starting Optuna Tuning for {data_strategy} strategy...")
+        # Use a representative training sample (up to the first fold's train end)
+        tuning_train_frame = supervised_frame[supervised_frame["date"] <= folds[0].train_end_date]
+        tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
+        best_boosting_params.update(tuner.tune_boosting(tuning_train_frame, feature_columns))
+
     # Drift detection state
     drift_detector = PageHinkleyDetector(threshold=15.0, min_instances=2)
     force_retrain = False
@@ -193,9 +207,7 @@ def run_experiment_from_frame(
             base_lgb = AutoBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
-                n_estimators=settings.models.n_estimators,
-                learning_rate=settings.models.learning_rate,
-                max_depth=settings.models.max_depth,
+                **best_boosting_params
             )
             base_lgb.fit(
                 sub_train_frame.loc[:, feature_columns],
@@ -223,9 +235,7 @@ def run_experiment_from_frame(
             base_cat = CatBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
-                n_estimators=settings.models.n_estimators,
-                learning_rate=settings.models.learning_rate,
-                max_depth=settings.models.max_depth,
+                **best_boosting_params
             )
             base_cat.fit(
                 sub_train_frame.loc[:, feature_columns],
