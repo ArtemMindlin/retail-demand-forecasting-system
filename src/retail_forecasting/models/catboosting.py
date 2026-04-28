@@ -25,6 +25,9 @@ class CatBoostingModel:
     backend_name: str = field(init=False, default="catboost_official")
 
     def fit(self, features: pd.DataFrame, target: pd.Series) -> "CatBoostingModel":
+        # Identify categorical features
+        cat_features = features.select_dtypes(include=["category", "object"]).columns.tolist()
+        
         # 1. Fit Point Model (Root Mean Square Error)
         self.point_model_ = CatBoostRegressor(
             iterations=self.n_estimators,
@@ -33,9 +36,10 @@ class CatBoostingModel:
             random_seed=self.random_seed,
             loss_function='RMSE',
             verbose=False,
-            allow_writing_files=False
+            allow_writing_files=False,
+            thread_count=-1
         )
-        self.point_model_.fit(features, target)
+        self.point_model_.fit(features, target, cat_features=cat_features)
 
         # 2. Fit Quantile Models (One per quantile for consistency)
         self.quantile_models_: dict[float, CatBoostRegressor] = {}
@@ -47,9 +51,10 @@ class CatBoostingModel:
                 random_seed=self.random_seed,
                 loss_function=f'Quantile:alpha={q}',
                 verbose=False,
-                allow_writing_files=False
+                allow_writing_files=False,
+                thread_count=-1
             )
-            q_model.fit(features, target)
+            q_model.fit(features, target, cat_features=cat_features)
             self.quantile_models_[q] = q_model
 
         return self

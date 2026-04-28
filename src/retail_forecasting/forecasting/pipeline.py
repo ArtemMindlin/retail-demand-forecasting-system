@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import numpy as np
 
 from retail_forecasting.config import Settings
 from retail_forecasting.data.censorship import LatentDemandImputer
@@ -9,8 +10,10 @@ from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.drift.detectors import PageHinkleyDetector
 from retail_forecasting.evaluation.metrics import summarize_costs, summarize_predictions
 from retail_forecasting.evaluation.reporting import RunArtifacts, write_run_artifacts
-from retail_forecasting.features.engineering import build_supervised_frame
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
+from retail_forecasting.features.engineering import (
+    build_supervised_frame,
+)
 from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
@@ -27,14 +30,7 @@ from retail_forecasting.utils.io import quantile_column_name
 
 
 def run_experiment(settings: Settings) -> RunArtifacts:
-    """Run the end-to-end experiment comparing Observed vs Latent demand.
-
-    Args:
-        settings: Fully resolved experiment settings.
-
-    Returns:
-        Combined artifacts for both strategies.
-    """
+    """Run the end-to-end experiment comparing Observed vs Latent demand."""
     if settings.dataset.source != "fresh_retailnet":
         raise ValueError(
             f"Unsupported dataset source '{settings.dataset.source}'. "
@@ -73,13 +69,13 @@ def run_experiment(settings: Settings) -> RunArtifacts:
 
     final_artifacts = RunArtifacts(
         prepared_panel=raw_panel,
-        supervised_frame=artifacts_obs.supervised_frame,  # Reference
+        supervised_frame=artifacts_obs.supervised_frame,
         predictions=merged_predictions,
         metrics_summary=merged_metrics,
         fold_metrics=merged_folds,
         cost_summary=merged_costs,
         sensitivity_summary=merged_sens,
-        drifts=artifacts_obs.drifts,  # Use drifts from observed run as proxy
+        drifts=artifacts_obs.drifts,
     )
 
     return write_run_artifacts(final_artifacts, settings)
@@ -88,16 +84,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
 def run_experiment_from_frame(
     panel: pd.DataFrame, settings: Settings, data_strategy: str = "Observed"
 ) -> RunArtifacts:
-    """Run the full backtesting pipeline from an in-memory panel.
-
-    Args:
-        panel: Prepared daily panel to backtest.
-        settings: Fully resolved experiment settings.
-        data_strategy: Label for the data strategy (e.g. 'Observed', 'Latent').
-
-    Returns:
-        The generated run artifacts.
-    """
+    """Run the full backtesting pipeline from an in-memory panel."""
     prepared_panel = label_stockout_regime(panel)
     supervised_frame, feature_columns = build_supervised_frame(
         panel=prepared_panel,
@@ -112,11 +99,7 @@ def run_experiment_from_frame(
         horizon=settings.dataset.horizon,
     )
 
-    fold_predictions = []
-    baseline_model = SeasonalNaiveModel(
-        seasonal_period=settings.models.seasonal_period,
-        horizon=settings.dataset.horizon,
-    ).fit(prepared_panel)
+    # State for cross-fold model reuse
     ridge_model: ConformalForecaster | None = None
     boosting_model: ConformalForecaster | None = None
     cat_model: ConformalForecaster | None = None
@@ -130,7 +113,6 @@ def run_experiment_from_frame(
     }
     if settings.models.use_tuning:
         print(f"🔍 Starting Optuna Tuning for {data_strategy} strategy...")
-        # Use a representative training sample (up to the first fold's train end)
         tuning_train_frame = supervised_frame[supervised_frame["date"] <= folds[0].train_end_date]
         tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
         best_boosting_params.update(tuner.tune_boosting(tuning_train_frame, feature_columns))
@@ -139,6 +121,12 @@ def run_experiment_from_frame(
     drift_detector = PageHinkleyDetector(threshold=15.0, min_instances=2)
     force_retrain = False
     detected_drifts = []
+
+    fold_predictions = []
+
+    baseline_model = SeasonalNaiveModel(
+        seasonal_period=settings.models.seasonal_period, horizon=settings.dataset.horizon
+    ).fit(prepared_panel)
 
     for fold in folds:
         # Prepare training and validation frames
@@ -270,15 +258,12 @@ def run_experiment_from_frame(
 
         # 5. ARIMA (Statistical)
         if arima_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
-            # Note: ARIMA fits on full panel internally, but we calibrate it
-            # on the current calibration frame for each fold.
             base_arima = AutoArimaModel(
                 seasonal_period=settings.models.seasonal_period,
                 horizon=settings.dataset.horizon
             ).fit(prepared_panel)
             arima_model = ConformalForecaster(base_arima)
             if not calib_frame.empty:
-                # ARIMA predict needs the full frame for series_id context
                 arima_model.calibrate(
                     calib_frame,
                     calib_frame["target_lead_time_demand"],
@@ -296,8 +281,7 @@ def run_experiment_from_frame(
         )
 
         # Update drift detector with current fold MAE
-        # Using the main point_model (LightGBM) for drift monitoring
-        boosting_fold_preds = fold_predictions[-3] # The boosting predictions just added
+        boosting_fold_preds = fold_predictions[-3] 
         fold_mae = (boosting_fold_preds["y_true"] - boosting_fold_preds["y_pred"]).abs().mean()
         drift_status = drift_detector.update(fold_mae)
         
@@ -324,7 +308,6 @@ def run_experiment_from_frame(
         base_inventory_config=settings.inventory,
     )
     
-    # Format extra report info for drift
     report_extra = ""
     if detected_drifts:
         drift_str = ", ".join([f"Fold {d['fold_id']} (score={d['score']:.2f})" for d in detected_drifts])
@@ -351,18 +334,7 @@ def _build_baseline_predictions(
     settings: Settings,
     data_strategy: str = "Observed",
 ) -> pd.DataFrame:
-    """Build baseline forecasts and attach inventory costs for one fold.
-
-    Args:
-        validation_frame: Validation rows for the current fold.
-        baseline_model: Fitted seasonal naive model.
-        fold_id: Fold identifier used in reporting.
-        settings: Fully resolved experiment settings.
-        data_strategy: Label for the data strategy used.
-
-    Returns:
-        A prediction frame with baseline forecasts and cost columns.
-    """
+    """Build baseline forecasts for one fold."""
     cols_to_keep = ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"]
     if "latent_demand_est" in validation_frame.columns:
         cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
@@ -391,7 +363,7 @@ def _build_model_predictions(
     settings: Settings,
     data_strategy: str = "Observed",
 ) -> pd.DataFrame:
-    """Build model forecasts, including conformal quantiles, and attach costs."""
+    """Build model forecasts and attach costs."""
     cols_to_keep = ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"]
     if "latent_demand_est" in validation_frame.columns:
         cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
@@ -399,7 +371,6 @@ def _build_model_predictions(
     prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
     
-    # ARIMA needs full frame for metadata context
     if hasattr(model.base_model, "model_name") and model.base_model.model_name == "auto_arima":
         prediction_frame["y_pred"] = model.predict(validation_frame)
     else:
@@ -410,7 +381,6 @@ def _build_model_predictions(
     prediction_frame["fold_id"] = fold_id
     prediction_frame["data_strategy"] = data_strategy
 
-    # Add conformal quantiles
     if hasattr(model.base_model, "model_name") and model.base_model.model_name == "auto_arima":
         quantile_predictions = model.predict_quantiles(validation_frame)
     else:

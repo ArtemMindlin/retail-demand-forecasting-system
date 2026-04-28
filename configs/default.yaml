@@ -11,7 +11,7 @@ dataset:
   processed_panel_path: data/processed/fresh_retailnet_train.parquet
   use_local_cache: true
   refresh_processed_cache: false
-  top_n_series: 100
+  top_n_series: 50
   min_history_days: 70
   max_rows: null
   horizon: 7
@@ -44,8 +44,8 @@ models:
   n_estimators: 500
   learning_rate: 0.05
   max_depth: 8
-  use_tuning: true
-  tuning_trials: 100
+  use_tuning: false
+  tuning_trials: 20
   optimize_for_cost: true
 
 inventory:
