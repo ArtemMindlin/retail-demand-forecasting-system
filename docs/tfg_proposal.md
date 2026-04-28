@@ -1,12 +1,12 @@
-# Propuesta inicial de TFG
+# Propuesta de TFG
 
-## Titulo tentativo
+## Titulo definitivo
 
-Diseño y evaluación de un sistema de forecasting probabilistico para decisiones de inventario en retail bajo incertidumbre, stockouts y concept drift.
+Forecasting probabilístico bajo condiciones de stockout: un enfoque de decisión de inventario para retail.
 
-## Problema
+## Resumen ejecutivo
 
-La mayoria de trabajos de forecasting en retail compara modelos usando metricas de error predictivo como MAE o RMSE. Ese enfoque es util para medir ajuste, pero no responde a la pregunta operativa clave: si una prediccion concreta conduce o no a mejores decisiones de inventario. En entornos de retail fresco, donde existen roturas de stock, demanda censurada y cambios frecuentes del contexto, un modelo con menor error medio no necesariamente minimiza el coste operativo total.
+En el sector retail, las roturas de stock (*stockouts*) actúan como un mecanismo de censura de datos, impidiendo observar la demanda real y sesgando los modelos de previsión tradicionales. Este Trabajo de Fin de Grado propone un sistema de forecasting probabilístico diseñado específicamente para operar en estos entornos de incertidumbre. Mediante el uso de modelos globales de *Machine Learning* y técnicas de recuperación de demanda latente, el sistema permite cuantificar el riesgo de falta de existencias y optimizar la cantidad a pedir basándose en el impacto económico real. La evaluación del sistema demuestra que priorizar la robustez ante stockouts y la calibración probabilística reduce significativamente el coste operativo total, superando los enfoques basados exclusivamente en la reducción del error predictivo puntual.
 
 ## Motivacion
 

@@ -21,6 +21,7 @@ class RunArtifacts:
     cost_summary: pd.DataFrame
     sensitivity_summary: Optional[pd.DataFrame] = None
     drifts: list[dict[str, Any]] = field(default_factory=list)
+    report_extra: str = ""
     run_directory: Path | None = None
 
 

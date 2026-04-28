@@ -37,6 +37,7 @@ class DatasetConfig:
 class PreprocessingConfig:
     drop_negative_sales: bool = True
     fill_missing_values: bool = True
+    imputation_strategy: str = "supervised"
 
 
 @dataclass
@@ -55,6 +56,7 @@ class ValidationConfig:
     n_folds: int = 3
     fold_size_days: int = 7
     retrain_each_fold: bool = True
+    drift_triggered_retrain: bool = False
 
 
 @dataclass

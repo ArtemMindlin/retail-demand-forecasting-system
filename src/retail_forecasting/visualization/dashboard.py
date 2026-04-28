@@ -136,13 +136,16 @@ fig.add_trace(go.Scatter(
 ))
 
 # Plot Latent Demand Recovery (Only where imputed)
-if "is_imputed" in series_data.columns and series_data["is_imputed"].any():
-    imputed_points = series_data[series_data["is_imputed"]]
-    fig.add_trace(go.Scatter(
-        x=imputed_points["date"], y=imputed_points["latent_demand_est"],
-        mode='markers', name="Demanda Latente Recuperada",
-        marker=dict(symbol='star', size=12, color='purple', line=dict(width=1, color='white'))
-    ))
+if "is_imputed" in series_data.columns:
+    # Fill NA with False to avoid masking error if column exists but has nulls
+    imputed_mask = series_data["is_imputed"].fillna(False).astype(bool)
+    if imputed_mask.any():
+        imputed_points = series_data[imputed_mask]
+        fig.add_trace(go.Scatter(
+            x=imputed_points["date"], y=imputed_points["latent_demand_est"],
+            mode='markers', name="Demanda Latente Recuperada",
+            marker=dict(symbol='star', size=12, color='purple', line=dict(width=1, color='white'))
+        ))
 
 # Plot Order Quantity
 fig.add_trace(go.Scatter(

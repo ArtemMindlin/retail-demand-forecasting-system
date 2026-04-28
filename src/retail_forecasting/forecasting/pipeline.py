@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from retail_forecasting.config import Settings
-from retail_forecasting.data.censorship import SupervisedImputer
+from retail_forecasting.data.censorship import LatentDemandImputer
 from retail_forecasting.data.fresh_retailnet import load_prepared_panel
 from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.drift.detectors import PageHinkleyDetector
@@ -54,11 +54,12 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     )
 
     # 3. Run Strategy B: Latent Demand (Imputed)
-    print("--- Running Strategy B: Latent Demand (Imputation) ---")
-    imputer = SupervisedImputer()
+    strategy_name = settings.preprocessing.imputation_strategy
+    print(f"--- Running Strategy B: Latent Demand (Strategy: {strategy_name}) ---")
+    imputer = LatentDemandImputer(strategy=strategy_name)
     imputed_panel = imputer.impute(raw_panel)
     artifacts_latent = run_experiment_from_frame(
-        imputed_panel, settings, data_strategy="Latent"
+        imputed_panel, settings, data_strategy=f"Latent_{strategy_name}"
     )
 
     # 4. Merge Artifacts
@@ -121,7 +122,8 @@ def run_experiment_from_frame(
     arima_model: ConformalForecaster | None = None
 
     # Drift detection state
-    drift_detector = PageHinkleyDetector(threshold=5.0, min_instances=2)
+    drift_detector = PageHinkleyDetector(threshold=15.0, min_instances=2)
+    force_retrain = False
     detected_drifts = []
 
     for fold in folds:
@@ -146,6 +148,10 @@ def run_experiment_from_frame(
             sub_train_frame = train_frame
             calib_frame = pd.DataFrame()
 
+        # Reset force_retrain if it was active
+        current_fold_retrained = force_retrain
+        force_retrain = False
+
         # 1. Seasonal Naive Baseline
         fold_predictions.append(
             _build_baseline_predictions(
@@ -158,7 +164,7 @@ def run_experiment_from_frame(
         )
 
         # 2. Ridge Regression (Linear Baseline)
-        if ridge_model is None or settings.validation.retrain_each_fold:
+        if ridge_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
             base_ridge = RidgeBaselineModel(random_seed=settings.project.random_seed)
             base_ridge.fit(
                 sub_train_frame.loc[:, feature_columns],
@@ -183,7 +189,7 @@ def run_experiment_from_frame(
         )
 
         # 3. LightGBM (Boosting)
-        if boosting_model is None or settings.validation.retrain_each_fold:
+        if boosting_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
             base_lgb = AutoBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
@@ -202,8 +208,7 @@ def run_experiment_from_frame(
                     calib_frame["target_lead_time_demand"],
                     alpha=settings.models.quantiles[0] * 2,
                 )
-        fold_predictions.append(
-            _build_model_predictions(
+        boosting_preds = _build_model_predictions(
                 validation_frame=validation_frame,
                 feature_columns=feature_columns,
                 model=boosting_model,
@@ -211,10 +216,10 @@ def run_experiment_from_frame(
                 settings=settings,
                 data_strategy=data_strategy,
             )
-        )
+        fold_predictions.append(boosting_preds)
 
         # 4. CatBoost (Boosting)
-        if cat_model is None or settings.validation.retrain_each_fold:
+        if cat_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
             base_cat = CatBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
@@ -245,7 +250,7 @@ def run_experiment_from_frame(
         )
 
         # 5. ARIMA (Statistical)
-        if arima_model is None or settings.validation.retrain_each_fold:
+        if arima_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
             # Note: ARIMA fits on full panel internally, but we calibrate it
             # on the current calibration frame for each fold.
             base_arima = AutoArimaModel(
@@ -273,14 +278,20 @@ def run_experiment_from_frame(
 
         # Update drift detector with current fold MAE
         # Using the main point_model (LightGBM) for drift monitoring
-        fold_mae = (fold_predictions[-3]["y_true"] - fold_predictions[-3]["y_pred"]).abs().mean()
+        boosting_fold_preds = fold_predictions[-3] # The boosting predictions just added
+        fold_mae = (boosting_fold_preds["y_true"] - boosting_fold_preds["y_pred"]).abs().mean()
         drift_status = drift_detector.update(fold_mae)
+        
         if drift_status.is_drift:
             detected_drifts.append({
-                "date": fold.validation_start_date.date(),
+                "date": str(fold.validation_start_date.date()),
                 "score": drift_status.score,
-                "threshold": drift_status.threshold
+                "threshold": drift_status.threshold,
+                "fold_id": fold.fold_id
             })
+            if settings.validation.drift_triggered_retrain:
+                print(f"⚠️ DRIFT DETECTED in Fold {fold.fold_id}. Forcing retrain for next fold.")
+                force_retrain = True
 
 
     if not fold_predictions:
@@ -293,6 +304,12 @@ def run_experiment_from_frame(
         predictions=predictions,
         base_inventory_config=settings.inventory,
     )
+    
+    # Format extra report info for drift
+    report_extra = ""
+    if detected_drifts:
+        drift_str = ", ".join([f"Fold {d['fold_id']} (score={d['score']:.2f})" for d in detected_drifts])
+        report_extra = f"**ALERT**: Concept drift detected and triggered adaptive retrains at: {drift_str}"
 
     artifacts = RunArtifacts(
         prepared_panel=prepared_panel,
@@ -303,6 +320,7 @@ def run_experiment_from_frame(
         cost_summary=cost_summary,
         sensitivity_summary=sensitivity_summary,
         drifts=detected_drifts,
+        report_extra=report_extra
     )
     return write_run_artifacts(artifacts, settings)
 

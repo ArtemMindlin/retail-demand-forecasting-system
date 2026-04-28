@@ -43,11 +43,22 @@ Tras integrar la **Imputación Supervisada** con el modelo **Boosting (LightGBM)
 
 ---
 
-## 6. Próximos Pasos de Implementación
-*   [x] Creación de `ConformalBoostingModel`.
-*   [x] Implementación de la lógica de calibración.
-*   [x] Implementación de `DriftDetector`.
-*   [x] Implementación de `EconomicSensitivityAnalyzer`.
-*   [x] Implementación de `SupervisedImputer` para demanda latente.
-*   [x] Visualización interactiva completa en Dashboard.
+## 7. Modularización y Reentrenamiento Adaptativo (Hitos Finales)
+
+### 7.1 Imputación Modular
+Se ha evolucionado el sistema de recuperación de demanda latente hacia una arquitectura modular (`LatentDemandImputer`). Esto permite comparar científicamente el impacto de diferentes heurísticas (Media Histórica, Escalado) frente al modelo profesor supervisado.
+
+### 7.2 Reentrenamiento Gatillado por Drift
+Se ha cerrado el bucle de control del sistema mediante la integración operativa del detector de drift. El pipeline ahora monitoriza el error en tiempo real y decide autónomamente cuándo el modelo requiere una actualización, optimizando el compromiso entre coste computacional y precisión predictiva.
+
+### 7.3 Conclusión Técnica
+Con la inclusión del **Makefile** y la **Arquitectura por Contratos**, el proyecto ha alcanzado un nivel de madurez de ingeniería listo para su defensa y entrega.
+
+---
+
+## 8. Estado Actual del Proyecto
+*   [x] Refactorización modular de imputación.
+*   [x] Lógica de reentrenamiento adaptativo operativa.
+*   [x] Makefile de automatización.
+*   [x] Documentación técnica integral y manual de dependencias.
 *   [ ] Fortalecimiento de la suite de tests unitarios (Garantía de Calidad).

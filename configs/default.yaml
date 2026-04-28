@@ -20,6 +20,7 @@ dataset:
 preprocessing:
   drop_negative_sales: true
   fill_missing_values: true
+  imputation_strategy: supervised
 
 features:
   lags: [1, 7, 14, 28]
@@ -34,6 +35,7 @@ validation:
   n_folds: 3
   fold_size_days: 7
   retrain_each_fold: true
+  drift_triggered_retrain: false
 
 models:
   point_model: auto_boosting

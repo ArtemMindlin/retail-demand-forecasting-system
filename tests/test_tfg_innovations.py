@@ -3,10 +3,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-from retail_forecasting.data.censorship import SupervisedImputer
+from retail_forecasting.data.censorship import LatentDemandImputer
 from retail_forecasting.drift.detectors import PageHinkleyDetector
 from retail_forecasting.models.boosting import AutoBoostingModel
-from retail_forecasting.models.conformal import ConformalBoostingModel
+from retail_forecasting.models.conformal import ConformalForecaster
 
 
 def test_supervised_imputer_logic():
@@ -24,7 +24,7 @@ def test_supervised_imputer_logic():
     df.loc[99, "observed_demand"] = 0.0
     df.loc[99, "stockout_hours"] = 24.0
     
-    imputer = SupervisedImputer()
+    imputer = LatentDemandImputer(strategy="supervised")
     imputed_df = imputer.impute(df)
     
     # The last day should be imputed with a value close to 10 (since history was 10)
@@ -67,7 +67,7 @@ def test_conformal_interval_widening():
     X_cal = pd.DataFrame({"feat": [1, 2, 3]})
     y_cal = pd.Series([10.0, 10.0, 10.0])
     
-    conformal = ConformalBoostingModel(DummyModel())
+    conformal = ConformalForecaster(DummyModel())
     conformal.calibrate(X_cal, y_cal, alpha=0.2)
     
     # q_hat should be large because the error (10 - 5.5) is large
