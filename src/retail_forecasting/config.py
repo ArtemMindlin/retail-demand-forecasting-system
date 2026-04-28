@@ -69,6 +69,7 @@ class ModelConfig:
     max_depth: int = 6
     use_tuning: bool = False
     tuning_trials: int = 20
+    optimize_for_cost: bool = False
 
 
 @dataclass

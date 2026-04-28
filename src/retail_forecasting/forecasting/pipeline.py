@@ -204,10 +204,19 @@ def run_experiment_from_frame(
 
         # 3. LightGBM (Boosting)
         if boosting_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
+            # Prepare cost parameters if optimization is enabled
+            cost_params = {}
+            if settings.models.optimize_for_cost:
+                cost_params = {
+                    "overstock_cost": settings.inventory.overstock_cost,
+                    "stockout_cost": settings.inventory.stockout_cost
+                }
+                
             base_lgb = AutoBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
-                **best_boosting_params
+                **best_boosting_params,
+                **cost_params
             )
             base_lgb.fit(
                 sub_train_frame.loc[:, feature_columns],

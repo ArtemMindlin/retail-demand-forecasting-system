@@ -32,11 +32,14 @@ class AutoBoostingModel:
     n_estimators: int
     learning_rate: float
     max_depth: int
+    overstock_cost: float = 1.0
+    stockout_cost: float = 0.0 # 0.0 means standard regression
     model_name: str = "auto_boosting"
     backend_name: str = field(init=False, default="unknown")
 
     def fit(self, features: pd.DataFrame, target: pd.Series) -> "AutoBoostingModel":
-        # Build the main point model. This model is used to produce a single prediction per row.
+        # Build the main point model.
+        # If stockout_cost > 0, we use a cost-aware objective (pinball loss at critical fractil)
         self.point_model_ = self._build_point_model()
 
         # Fit the point model to the data.
@@ -73,9 +76,15 @@ class AutoBoostingModel:
         return quantile_predictions
 
     def _build_point_model(self) -> object:
+        # Calculate critical fractil if costs are provided
+        if self.stockout_cost > 0:
+            critical_fractil = self.stockout_cost / (self.stockout_cost + self.overstock_cost)
+            print(f"🎯 Cost-Aware Training: Optimizing point model for critical fractil τ = {critical_fractil:.4f}")
+            return self._build_quantile_model(critical_fractil)
+
+        # Default to standard regression (MSE-like)
         if _lightgbm_available():
             import lightgbm as lgb
-
             self.backend_name = "lightgbm"
             return lgb.LGBMRegressor(
                 objective="regression",
@@ -91,7 +100,6 @@ class AutoBoostingModel:
 
         if _xgboost_available():
             from xgboost import XGBRegressor
-
             self.backend_name = "xgboost"
             return XGBRegressor(
                 objective="reg:squarederror",
@@ -114,7 +122,7 @@ class AutoBoostingModel:
     def _build_quantile_model(self, quantile: float) -> object:
         if _lightgbm_available():
             import lightgbm as lgb
-
+            self.backend_name = "lightgbm" # Ensure backend name is set even if only quantiles used
             return lgb.LGBMRegressor(
                 objective="quantile",
                 alpha=quantile,

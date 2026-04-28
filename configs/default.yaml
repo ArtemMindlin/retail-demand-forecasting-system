@@ -44,8 +44,9 @@ models:
   n_estimators: 500
   learning_rate: 0.05
   max_depth: 8
-  use_tuning: true
-  tuning_trials: 3
+  use_tuning: false
+  tuning_trials: 20
+  optimize_for_cost: false
 
 inventory:
   overstock_cost: 1.0
