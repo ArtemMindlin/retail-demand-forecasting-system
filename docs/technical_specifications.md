@@ -42,6 +42,8 @@ El sistema sigue un patrón de **Tubería Basada en Contratos**:
 | 2026-04-28 | **Unified Makefile** | Estandarización de comandos de ejecución, tests y dashboard. |
 | 2026-04-28 | **Reporting Extra** | Inclusión de alertas de drift y comparativa de estrategias de datos en el `report.md`. |
 | 2026-04-28 | **Optuna Tuning** | Integración de búsqueda bayesiana de hiperparámetros con validación cruzada temporal interna. |
+| 2026-04-28 | **Hardware Parallelization** | Paralelización multihilo de ARIMA (Joblib), Boosting y Optuna para optimizar el uso de CPU. |
+| 2026-04-28 | **Prescriptive Training** | Implementación de funciones de pérdida asimétricas orientadas al fractil crítico de inventario. |
 
 ## 5. Gestión de Dependencias Futuras
 

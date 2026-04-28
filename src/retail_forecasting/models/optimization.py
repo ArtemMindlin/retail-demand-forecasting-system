@@ -71,7 +71,7 @@ class HyperparameterTuner:
             return float(mae)
 
         study = optuna.create_study(direction="minimize")
-        study.optimize(objective, n_trials=self.n_trials)
+        study.optimize(objective, n_trials=self.n_trials, n_jobs=-1)
         
         self.best_params = study.best_params
         print(f"✅ Optuna Optimization Finished. Best MAE: {study.best_value:.4f}")

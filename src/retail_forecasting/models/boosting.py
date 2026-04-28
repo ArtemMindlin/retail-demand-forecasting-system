@@ -95,6 +95,7 @@ class AutoBoostingModel:
                 max_depth=self.max_depth,
                 subsample=0.8,
                 colsample_bytree=0.8,
+                n_jobs=-1,
                 verbosity=-1,
             )
 
@@ -133,6 +134,7 @@ class AutoBoostingModel:
                 max_depth=self.max_depth,
                 subsample=0.8,
                 colsample_bytree=0.8,
+                n_jobs=-1,
                 verbosity=-1,
             )
 
