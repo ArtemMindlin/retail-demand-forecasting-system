@@ -6,10 +6,10 @@ Este capítulo presenta una revisión de la literatura y las bases teóricas fun
 \section{Previsión de la Demanda en Retail: De Modelos Locales a Globales}
 Tradicionalmente, la previsión de series temporales se ha abordado mediante modelos \textbf{locales}, donde se entrena un modelo individual (como ARIMA o suavizado exponencial) para cada SKU o combinación tienda-producto. Sin embargo, en el contexto del \textit{retail} masivo, con miles de productos heterogéneos, este enfoque presenta limitaciones de escalabilidad y dificultad para manejar productos con poco historial (\textit{cold-start problem}).
 
-El paradigma actual ha girado hacia los \textbf{Modelos Globales de Pronóstico (GFMs)}, donde un único modelo se entrena sobre la totalidad de las series temporales de la base de datos. Montero-Manso y Hyndman (2021) demostraron teóricamente que los modelos globales no son restrictivos y pueden capturar patrones compartidos (estacionalidad, elasticidad de precio) de manera más eficiente que los locales, reduciendo el riesgo de sobreajuste y mejorando la precisión en datos intermitentes. Este enfoque ha dominado competiciones de referencia como la M5 Walmart, donde las soluciones ganadoras fueron casi exclusivamente modelos globales basados en \textit{Machine Learning}.
+El paradigma actual ha girado hacia los \textbf{Modelos Globales de Pronóstico (GFMs)}, donde un único modelo se entrena sobre la totalidad de las series temporales de la base de datos. Montero-Manso y Hyndman (2021) \cite{montero2021principles} demostraron teóricamente que los modelos globales no son restrictivos y pueden capturar patrones compartidos (estacionalidad, elasticidad de precio) de manera más eficiente que los locales, reduciendo el riesgo de sobreajuste y mejorando la precisión en datos intermitentes. Este enfoque ha dominado competiciones de referencia como la M5 Walmart, donde las soluciones ganadoras fueron casi exclusivamente modelos globales basados en \textit{Machine Learning}.
 
 \section{Modelos de Gradient Boosting: El Caso de CatBoost}
-Los algoritmos de \textit{Gradient Boosted Decision Trees} (GBDT) son el estado del arte para datos tabulares y series temporales con covariables exógenas. Entre las implementaciones principales (XGBoost, LightGBM, CatBoost), este trabajo selecciona \textbf{CatBoost} por sus ventajas críticas en el dominio del \textit{retail}:
+Los algoritmos de \textit{Gradient Boosted Decision Trees} (GBDT) son el estado del arte para datos tabulares y series temporales con covariables exógenas. Entre las implementaciones principales (XGBoost, LightGBM, CatBoost), este trabajo selecciona \textbf{CatBoost} \cite{prokhorenkova2018catboost} por sus ventajas críticas en el dominio del \textit{retail}:
 
 \begin{itemize}
     \item \textbf{Gestión de variables categóricas:} Utiliza técnicas de \textit{Ordered Boosting} y esquemas de codificación interna que evitan el \textit{target leakage}, permitiendo manejar identificadores de tienda y producto de alta cardinalidad de forma nativa.
@@ -18,12 +18,12 @@ Los algoritmos de \textit{Gradient Boosted Decision Trees} (GBDT) son el estado 
 \end{itemize}
 
 \section{Cuantificación de la Incertidumbre y Conformal Prediction}
-Una predicción puntual es insuficiente para la gestión de inventarios; es necesario cuantificar la probabilidad de diferentes escenarios. En la literatura reciente (2024-2025), la \textbf{Conformal Prediction (CP)} ha emergido como una técnica fundamental para generar intervalos de confianza con garantías teóricas de cobertura, independientemente de la distribución del modelo subyacente.
+Una predicción puntual es insuficiente para la gestión de inventarios; es necesario cuantificar la probabilidad de diferentes escenarios. En la literatura reciente (2024-2025), la \textbf{Conformal Prediction (CP)} \cite{angelopoulos2021gentle, vovk2005algorithmic} ha emergido como una técnica fundamental para generar intervalos de confianza con garantías teóricas de cobertura, independientemente de la distribución del modelo subyacente.
 
 A diferencia de la regresión cuantílica estándar, que puede sufrir falta de calibración ante cambios en la distribución (\textit{dataset shift}), los métodos de CP como \textit{EnbPI} (Ensemble Batch Prediction Intervals) ajustan dinámicamente el ancho del intervalo basándose en los errores recientes observados en el historial. Esto es vital para asegurar que, por ejemplo, un intervalo del 90\% contenga realmente la demanda el 90\% de las veces en condiciones de operación reales.
 
 \section{Optimización de Inventarios: El Problema del Newsvendor}
-La conexión entre el pronóstico y la acción se realiza mediante el modelo del \textbf{Newsvendor} (vendedor de periódicos). Este modelo clásico determina la cantidad óptima a pedir ($Q^*$) minimizando el coste esperado, que es el equilibrio entre el coste de sobrestock ($c_o$, exceso de producto que se desperdicia) y el coste de infra-stock ($c_u$, venta perdida).
+La conexión entre el pronóstico y la acción se realiza mediante el modelo del \textbf{Newsvendor} (vendedor de periódicos). Este modelo clásico \cite{silver1998inventory} determina la cantidad óptima a pedir ($Q^*$) minimizando el coste esperado, que es el equilibrio entre el coste de sobrestock ($c_o$, exceso de producto que se desperdicia) y el coste de infra-stock ($c_u$, venta perdida).
 
 La solución óptima viene dada por el \textit{fractil crítico}:
 \begin{equation}
