@@ -1,4 +1,54 @@
 \chapter{Metodología}
 \label{chap:metodologia}
 
-Descripción del enfoque estadístico y experimental...
+En este capítulo se describe el diseño del sistema, desde la formulación del problema de aprendizaje supervisado hasta el marco de evaluación económica. La metodología se ha diseñado para garantizar la robustez estadística y la aplicabilidad de los resultados en un entorno operativo real.
+
+\section{Formulación del Problema}
+El objetivo es predecir la demanda acumulada de un producto en una tienda específica durante un horizonte de planificación determinado ($H$). Formalmente, definimos la demanda observada para una serie $s$ en el tiempo $t$ como $y_{s,t}$. El objetivo (\textit{target}) de nuestro modelo en el instante $t$ es la demanda total durante el \textit{lead time}:
+
+\begin{equation}
+    Y_{s,t} = \sum_{i=0}^{H-1} y_{s, t+i}
+\end{equation}
+
+Esta formulación permite que el pronóstico esté directamente alineado con la decisión de inventario: cuántas unidades se necesitan para cubrir el periodo hasta la próxima reposición.
+
+\section{Ingeniería de Características y Política Anti-Leakage}
+Para capturar la complejidad de la demanda en \textit{retail}, se construye un panel de datos enriquecido con diversas familias de características. Un principio fundamental en el diseño es la \textbf{prevención del sesgo de información futura} (\textit{data leakage}).
+
+\begin{itemize}
+    \item \textbf{Características Temporales}: Componentes cíclicos extraídos de la fecha, como el día de la semana, semana del año, mes y indicadores de festivos.
+    \item \textbf{Variables de Retardo (\textit{Lags})}: Valores históricos de la demanda, descuentos y horas de rotura de stock. Se utilizan retardos positivos para asegurar que el modelo solo utiliza información disponible en el momento de la predicción.
+    \item \textbf{Estadísticas Móviles (\textit{Rolling Windows})}: Medias, sumas y desviaciones típicas calculadas sobre ventanas deslizantes (ej. 7, 14, 28 días) para capturar tendencias y volatilidad reciente.
+    \item \textbf{Variables Exógenas}: Datos meteorológicos (temperatura, precipitación, humedad) y variables contextuales (actividad promocional).
+    \item \textbf{Identificadores Estáticos}: Variables categóricas que representan la jerarquía del producto y la ubicación de la tienda.
+\end{itemize}
+
+\section{Diseño Experimental: Validación Walk-Forward}
+Dada la naturaleza temporal de los datos, no es posible utilizar una validación cruzada aleatoria tradicional, ya que violaría la estructura causal del tiempo. En su lugar, se implementa un esquema de \textbf{validación temporal \textit{walk-forward}} con ventanas expansivas.
+
+El proceso se divide en $N$ pliegues (\textit{folds}). Para cada pliegue:
+\begin{enumerate}
+    \item El conjunto de entrenamiento incluye todos los datos desde el inicio hasta una fecha de corte $T_{train}$.
+    \item Se deja un \textit{gap} de seguridad igual al horizonte de predicción $H$ para evitar que información del futuro se filtre en las variables retardadas.
+    \item El conjunto de validación comprende los datos en el intervalo $[T_{train} + H, T_{train} + H + \Delta]$, donde $\Delta$ es el tamaño de la ventana de validación.
+\end{enumerate}
+
+Este esquema garantiza que el modelo se evalúe siempre sobre datos que nunca ha visto y que son cronológicamente posteriores a su entrenamiento, simulando un despliegue real en producción.
+
+\section{Cuantificación de la Incertidumbre}
+El sistema no genera una predicción única, sino un conjunto de cuantiles ($\tau \in \{0.1, 0.5, 0.9\}$) mediante \textbf{Regresión Cuantílica} utilizando CatBoost. Para asegurar que estos cuantiles sean fiables, se integran técnicas de \textbf{Conformal Prediction}. 
+
+El método ajusta los intervalos de confianza basándose en la magnitud de los residuos observados en un conjunto de calibración. Esto permite transformar los intervalos "crudos" del modelo en intervalos con garantías teóricas de cobertura, adaptándose a periodos de alta volatilidad donde el modelo tiende a ser menos preciso.
+
+\section{Marco de Evaluación Multi-Objetivo}
+La evaluación del sistema se realiza en tres niveles complementarios:
+
+\begin{itemize}
+    \item \textbf{Métricas Predictivas}: MAE (\textit{Mean Absolute Error}) para medir la precisión central y RMSE (\textit{Root Mean Squared Error}) para penalizar grandes desviaciones.
+    \item \textbf{Métricas Probabilísticas}: \textit{Pinball Loss} para evaluar la calidad de los cuantiles y \textit{Coverage} para verificar si el porcentaje de datos que caen dentro del intervalo de confianza coincide con el nivel de confianza teórico.
+    \item \textbf{Métricas Económicas}: Se utiliza el modelo del \textit{Newsvendor} para calcular el coste total operativo:
+    \begin{equation}
+        Coste = (c_o \times Overstock) + (c_u \times Stockout)
+    \end{equation}
+    donde $c_o$ es el coste unitario por exceso de stock y $c_u$ el coste de oportunidad por venta perdida.
+\end{itemize}
