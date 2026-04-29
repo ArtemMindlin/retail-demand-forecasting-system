@@ -15,42 +15,14 @@ Todos los modelos se han validado mediante el esquema \textit{walk-forward} desc
 \section{Análisis de Métricas Predictivas (MAE y RMSE)}
 En la Tabla \ref{tab:metrics_predictive} se presentan los resultados de error puntual. Sorprendentemente, el modelo \textit{Seasonal Naive} obtiene el MAE más bajo en ambas estrategias (2,73 en \textit{Latent} y 3,64 en \textit{Observed}).
 
-\begin{table}[h]
-\centering
-\begin{tabular}{@{}llcc@{}}
-\toprule
-\textbf{Estrategia} & \textbf{Modelo} & \textbf{MAE} & \textbf{RMSE} \\ \midrule
-Latent & Seasonal Naive & 2,73 & 4,05 \\
-Latent & CatBoost & 3,26 & 4,86 \\
-Latent & Auto-Boosting (LGBM) & 3,85 & 6,01 \\ \midrule
-Observed & Seasonal Naive & 3,64 & 5,10 \\
-Observed & CatBoost & 4,09 & 5,70 \\
-\bottomrule
-\end{tabular}
-\caption{Comparativa de errores predictivos (MAE y RMSE).}
-\label{tab:metrics_predictive}
-\end{table}
+\input{tables/table_predictive}
 
 Este resultado inicial sugeriría que un modelo heurístico simple supera a los modelos de \textit{Machine Learning}. Sin embargo, este análisis es incompleto si no se considera el impacto económico de las decisiones derivadas de estas predicciones.
 
 \section{Evaluación Económica y Decisiones de Inventario}
 El núcleo de este TFG es la evaluación del coste total operativo. Al aplicar la política de \textit{Newsvendor}, el ranking de modelos cambia drásticamente. Como se observa en la Tabla \ref{tab:metrics_cost}, el modelo \textbf{CatBoost} bajo la estrategia \textit{Latent} resulta ser el más eficiente, con un coste total de 34.558 unidades, superando al \textit{Seasonal Naive} (38.197).
 
-\begin{table}[h]
-\centering
-\begin{tabular}{@{}llcc@{}}
-\toprule
-\textbf{Estrategia} & \textbf{Modelo} & \textbf{Coste Total} & \textbf{Coste Medio} \\ \midrule
-\textbf{Latent} & \textbf{CatBoost} & \textbf{34.558} & \textbf{5,48} \\
-Latent & Auto-Boosting (LGBM) & 35.349 & 5,61 \\
-Latent & Seasonal Naive & 38.197 & 6,06 \\ \midrule
-Observed & Auto-Boosting (LGBM) & 47.238 & 7,49 \\
-Observed & CatBoost & 51.021 & 8,09 \\
-\bottomrule
-\end{tabular}
-\caption{Comparativa de costes operativos totales (Newsvendor).}
-\label{tab:metrics_cost}
-\end{table}
+\input{tables/table_costs}
 
 \textbf{Validación de la Hipótesis Principal}: Estos resultados confirman que un menor error medio (MAE) no garantiza un menor coste operativo. CatBoost, a pesar de tener un MAE un 19\% superior al \textit{Seasonal Naive} en la estrategia \textit{Latent}, reduce el coste total en un 9,5\%. Esto se debe a una mejor gestión de la asimetría entre el coste de sobrestock y el de rotura.
 
