@@ -1,10 +1,41 @@
 \chapter{Introducción}
 \label{chap:introduccion}
 
-Este documento presenta el desarrollo de un sistema de predicción de demanda para el sector retail, centrado en la excelencia académica y el rigor estadístico.
-
 \section{Motivación}
-El sector retail se enfrenta a desafíos constantes en la gestión de inventarios...
+En la era del \textit{Big Data} y la inteligencia artificial, la gestión de la cadena de suministro en el sector \textit{retail} ha evolucionado de un enfoque reactivo a uno proactivo basado en la analítica avanzada. Sin embargo, la previsión de la demanda sigue siendo uno de los mayores desafíos operativos, especialmente en el segmento de productos frescos, donde la volatilidad de la demanda y la corta vida útil de los productos generan un entorno de alta incertidumbre.
+
+La relevancia de este problema no es solo operativa, sino también económica y ética. En España, se estima que el desperdicio alimentario genera un coste directo al sector \textit{retail} de aproximadamente 13.000 millones de euros anuales, representando cerca del 1,64\% de las ventas totales. Además, el marco legislativo ha dado un giro crítico con la entrada en vigor de la Ley 1/2025 de Prevención de las Pérdidas y el Desperdicio Alimentario, que obliga a las empresas de distribución a implementar planes estratégicos de prevención y penaliza severamente la ineficiencia en la gestión de excedentes.
+
+Este Trabajo de Fin de Grado nace de la necesidad de alinear los modelos matemáticos de previsión con la realidad de la toma de decisiones en el punto de venta. No se trata únicamente de predecir cuánto se va a vender, sino de entender el riesgo asociado a cada decisión de inventario para minimizar tanto el coste por rotura de stock (\textit{stockout}) como el coste por sobrestock y desperdicio, contribuyendo así al Objetivo de Desarrollo Sostenible (ODS) 12: Producción y Consumo Responsables.
+
+\section{Definición del Problema}
+El enfoque tradicional del \textit{demand forecasting} se ha centrado históricamente en la obtención de predicciones puntuales (\textit{point forecasts}) mediante la minimización de métricas de error promedio como el MAE (\textit{Mean Absolute Error}) o el RMSE (\textit{Root Mean Squared Error}). Aunque útiles, estos enfoques presentan dos limitaciones críticas en entornos de \textit{retail} real:
+
+\begin{enumerate}
+    \item \textbf{Censura de datos por stockout:} Cuando un producto se agota en el estante, la demanda observada se detiene, pero la demanda latente (lo que los clientes habrían comprado) sigue existiendo. Ignorar este fenómeno introduce un sesgo negativo en los modelos, que tienden a subestimar la demanda real en periodos de rotura.
+    \item \textbf{Desconexión entre error y coste:} En el \textit{retail} de productos frescos, el coste de equivocarse "por exceso" (desperdicio) suele ser muy distinto al coste de equivocarse "por defecto" (pérdida de venta y fidelidad). Un modelo que minimiza el error medio puede no ser el que minimiza el coste operativo total si no considera esta asimetría.
+\end{enumerate}
+
+Este trabajo aborda estas limitaciones mediante un enfoque de \textbf{forecasting probabilístico}, donde el objetivo no es una cifra única, sino una distribución de probabilidad que permita cuantificar la incertidumbre y tomar decisiones de inventario optimizadas mediante el modelo del \textit{Newsvendor}.
 
 \section{Objetivos}
-El objetivo principal de este TFG es...
+El objetivo general de este proyecto es diseñar y evaluar un sistema de \textit{forecasting} probabilístico para decisiones de inventario en \textit{retail} fresco, centrado en la robustez estadística y el impacto económico real.
+
+Para alcanzar este objetivo general, se plantean los siguientes objetivos específicos:
+\begin{itemize}
+    \item Desarrollar un \textit{pipeline} de datos reproducible que permita la ingesta y preparación de series temporales de demanda a gran escala a partir del dataset \textit{Fresh RetailNet}.
+    \item Implementar modelos globales de \textit{Machine Learning} (CatBoost) capaces de capturar patrones complejos y compartir información entre diferentes productos y tiendas.
+    \item Integrar técnicas de \textit{Conformal Prediction} para garantizar la calibración estadística de los intervalos de confianza generados por el sistema.
+    \item Evaluar el rendimiento del sistema no solo mediante métricas predictivas clásicas, sino a través de una función de coste económico basada en la política del \textit{Newsvendor}.
+    \item Analizar la robustez del sistema ante fenómenos de deriva de datos (\textit{data drift}) y situaciones de demanda censurada.
+\end{itemize}
+
+\section{Estructura del Documento}
+La presente memoria se organiza en seis capítulos adicionales:
+\begin{itemize}
+    \item El \textbf{Capítulo 2: Estado del Arte} revisa la literatura actual sobre series temporales, modelos de \textit{boosting} y gestión de inventarios.
+    \item El \textbf{Capítulo 3: Metodología} detalla el diseño experimental, la formulación de los modelos y la estrategia de validación \textit{walk-forward}.
+    \item El \textbf{Capítulo 4: Implementación} describe la arquitectura del software desarrollado y las herramientas tecnológicas utilizadas.
+    \item El \textbf{Capítulo 5: Resultados} presenta el análisis comparativo de los modelos y la evaluación del impacto económico.
+    \item El \textbf{Capítulo 6: Conclusiones} sintetiza los hallazgos principales y propone líneas de investigación futuras.
+\end{itemize}
