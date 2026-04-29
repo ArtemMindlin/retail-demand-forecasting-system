@@ -1,4 +1,39 @@
-\chapter{Implementación}
+\chapter{Implementación y Arquitectura}
 \label{chap:implementacion}
 
-Detalles del desarrollo del sistema en Python...
+Este capítulo detalla la realización técnica del sistema, describiendo la arquitectura del software, las tecnologías utilizadas y los patrones de diseño que garantizan la modularidad, la reproducibilidad y el rigor estadístico del proceso de \textit{forecasting}.
+
+\section{Arquitectura del Sistema}
+El sistema se ha diseñado siguiendo un enfoque de \textbf{arquitectura modular basada en pipelines}, inspirada en los principios de MLOps. La estructura del código se organiza en torno a tres procesos o tuberías principales:
+
+\begin{enumerate}
+    \item \textbf{Pipeline de Datos}: Encargado de la ingesta desde fuentes externas (Hugging Face), la limpieza y la transformación de series temporales en un panel supervisado. Se implementa un sistema de \textit{caching} para evitar descargas redundantes y asegurar que los experimentos partan siempre de la misma base de datos.
+    \item \textbf{Pipeline de Entrenamiento}: Gestiona el ciclo de vida de los modelos, incluyendo la ingeniería de características sin \textit{leakage}, la búsqueda de hiperparámetros mediante optimización bayesiana y el almacenamiento de artefactos.
+    \item \textbf{Pipeline de Evaluación y Decisión}: Toma las predicciones del modelo, aplica técnicas de calibración (Conformal Prediction), las transforma en decisiones de inventario mediante el modelo del \textit{Newsvendor} y genera reportes detallados.
+\end{enumerate}
+
+\section{Stack Tecnológico}
+La elección de herramientas se basa en su madurez, rendimiento y capacidad de integración:
+\begin{itemize}
+    \item \textbf{Lenguaje}: Python 3.10+, aprovechando su ecosistema líder en ciencia de datos.
+    \item \textbf{Procesamiento de Datos}: \texttt{Pandas} y \texttt{NumPy} para la manipulación eficiente de paneles temporales.
+    \item \textbf{Modelado}: \texttt{CatBoost} como motor principal de \textit{Gradient Boosting} por su excelente manejo nativo de variables categóricas y soporte de incertidumbre.
+    \item \textbf{Optimización}: \texttt{Optuna} para la sintonización automática de hiperparámetros, utilizando algoritmos de \textit{Tree-structured Parzen Estimator} (TPE).
+    \item \textbf{Entorno y Reproducción}: Gestión de dependencias mediante \texttt{uv} y configuración centralizada con archivos YAML.
+\end{itemize}
+
+\section{Patrones de Diseño Aplicados}
+Para elevar la calidad del software desde una perspectiva de ingeniería, se han aplicado los siguientes patrones:
+\begin{itemize}
+    \item \textbf{Patrón Strategy}: Permite intercambiar el motor de \textit{forecasting} (ej. cambiar entre CatBoost, XGBoost o modelos estadísticos) sin modificar la lógica principal de validación y evaluación.
+    \item \textbf{Patrón Factory}: Utilizado en el módulo de características (\texttt{features/engineering.py}) para generar de forma dinámica y parametrizada los \textit{lags} y ventanas móviles según la configuración del experimento.
+    \item \textbf{Patrón Decorator}: Aplicado en la capa de calibración para añadir capacidades de \textit{Conformal Prediction} a cualquier modelo base de forma no intrusiva.
+\end{itemize}
+
+\section{Implementación del Rigor Estadístico}
+La implementación técnica no es un fin en sí mismo, sino un soporte para la validez científica del trabajo. Esto se refleja en:
+\begin{itemize}
+    \item \textbf{Contratos de Datos}: Uso de validaciones internas para asegurar que no existe \textit{temporal leakage} entre los conjuntos de entrenamiento y prueba.
+    \item \textbf{Modularidad de Métricas}: Desacoplamiento de las métricas de error (MAE, RMSE) de las métricas económicas (coste total), permitiendo un análisis multi-objetivo sin sesgar el entrenamiento del modelo.
+    \item \textbf{Reproducibilidad}: Cada ejecución genera un reporte (\texttt{reports/}) que incluye la configuración exacta de los hiperparámetros y el estado de la semilla aleatoria, garantizando que cualquier resultado pueda ser auditado y replicado.
+\end{itemize}
