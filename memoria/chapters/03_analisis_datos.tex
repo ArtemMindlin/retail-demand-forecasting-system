@@ -1,0 +1,24 @@
+\chapter{Análisis del Conjunto de Datos}
+\label{chap:analisis_datos}
+
+Antes de abordar el modelado, es imperativo comprender la naturaleza y estructura de los datos. Este capítulo presenta un Análisis Exploratorio de Datos (EDA) sobre el dataset \textit{Fresh RetailNet}, identificando los patrones, retos y oportunidades que definen el problema de previsión.
+
+\section{Descripción del Dataset}
+El conjunto de datos \textit{Fresh RetailNet} es un benchmark masivo diseñado específicamente para el sector retail. Contiene series temporales diarias de ventas de productos frescos en diversas tiendas, acompañadas de metadatos jerárquicos y variables exógenas.
+
+Las características principales del dataset son:
+\begin{itemize}
+    \item \textbf{Panel de Datos}: Series temporales de longitud variable (hasta 90 días) para miles de combinaciones tienda-producto (\textit{SKUs}).
+    \item \textbf{Variables de Objetivo}: Cantidad vendida (\textit{sale\_amount}) normalizada.
+    \item \textbf{Variables de Contexto}: Precios, descuentos, festivos y datos meteorológicos (temperatura, precipitación).
+    \item \textbf{Indicadores de Stockout}: Información crítica sobre las horas en las que el producto no estuvo disponible en el estante.
+\end{itemize}
+
+\section{Patrones Temporales y Estacionalidad}
+El análisis visual de las series revela una fuerte estacionalidad semanal. Las ventas tienden a concentrarse en los días previos al fin de semana, con caídas significativas en días festivos oficiales cuando las tiendas permanecen cerradas. Esta naturaleza cíclica justifica el uso de \textit{lags} de 7 días y variables de calendario en la fase de ingeniería de características.
+
+\section{Análisis de la Intermitencia}
+Un rasgo distintivo del \textit{retail} fresco es la intermitencia. Muchas series presentan días con ventas cero, no debido a una falta de interés del consumidor, sino a la falta de disponibilidad del producto. Se ha cuantificado que aproximadamente el 15\% de las observaciones del dataset están afectadas por algún grado de \textit{stockout}, lo que subraya la importancia de la reconstrucción de la demanda latente propuesta en este trabajo.
+
+\section{Correlación con Variables Exógenas}
+Se observa una correlación positiva moderada entre la temperatura media y la demanda de ciertas categorías de productos frescos (ej. frutas de temporada). Asimismo, el factor "descuento" actúa como un fuerte impulsor de la demanda, alterando significativamente el patrón basal de ventas. El modelo desarrollado debe ser capaz de integrar estas señales para superar a los modelos autorregresivos simples.

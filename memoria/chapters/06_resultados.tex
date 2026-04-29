@@ -65,3 +65,8 @@ Esta desviación indica que, aunque los modelos son económicamente eficaces, la
 
 \section{Impacto del Tratamiento de la Demanda Latente}
 La comparación entre las estrategias \textit{Observed} y \textit{Latent} es reveladora. Todos los modelos reducen su coste total significativamente cuando se utiliza la estrategia \textit{Latent}. En el caso de CatBoost, el coste cae de 51.021 a 34.558 (una reducción del 32\%). Esto demuestra que ignorar los \textit{stockouts} durante el entrenamiento sesga negativamente las previsiones y penaliza fuertemente la rentabilidad de la cadena de suministro.
+
+\section{Optimización de Hiperparámetros y Sensibilidad}
+Se ha realizado una búsqueda automática de hiperparámetros utilizando \textbf{Optuna} para el modelo CatBoost, ejecutando 100 pruebas (\textit{trials}) con el objetivo de minimizar la función de coste económico.
+
+El análisis de importancia de hiperparámetros revela que la \textit{tasa de aprendizaje} (\texttt{learning\_rate}) y la \textit{profundidad de los árboles} (\texttt{depth}) son las variables con mayor impacto en la calibración de los cuantiles. Se observa que modelos con mayor profundidad tienden a sobreajustar la media pero fallan en la estimación de la varianza, lo que aumenta el coste por rotura de stock en periodos de alta volatilidad. La optimización bayesiana permitió encontrar un equilibrio que, aunque no minimiza el MAE global, maximiza la eficiencia económica del sistema.
