@@ -218,3 +218,13 @@ reports/*
 !reports/.gitkeep
 tmp/*
 output/*
+
+# LaTeX
+memoria/*.pdf
+memoria/*.log
+memoria/*.aux
+memoria/*.toc
+memoria/*.lof
+memoria/*.lot
+memoria/*.out
+memoria/*.synctex.gz

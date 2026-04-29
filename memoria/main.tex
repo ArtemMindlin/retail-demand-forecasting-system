@@ -1,0 +1,54 @@
+\documentclass[12pt,a4paper,oneside]{book}
+
+% --- Paquetes Básicos ---
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{booktabs}
+\usepackage{caption}
+
+% --- Configuración de Página ---
+\geometry{
+    a4paper,
+    top=3cm,
+    bottom=3cm,
+    left=3cm,
+    right=2.5cm
+}
+
+% --- Datos del TFG ---
+\title{Sistema de Predicción de Demanda para Retail con Análisis de Incertidumbre}
+\author{Artem Mindlin}
+\date{\today}
+
+\begin{document}
+
+% --- Portada ---
+\maketitle
+
+\frontmatter
+\tableofcontents
+\listoffigures
+\listoftables
+
+\mainmatter
+
+% --- Capítulos ---
+% Uso \input para que sea más fácil de organizar
+\input{chapters/01_introduccion}
+\input{chapters/02_estado_del_arte}
+\input{chapters/03_metodologia}
+\input{chapters/04_implementacion}
+\input{chapters/05_resultados}
+\input{chapters/06_conclusiones}
+
+\backmatter
+% --- Bibliografía ---
+% \bibliographystyle{plain}
+% \bibliography{references}
+
+\end{document}
