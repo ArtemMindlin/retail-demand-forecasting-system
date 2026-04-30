@@ -114,6 +114,95 @@ def test_eda_artifacts_are_written_as_expected(tmp_path: Path) -> None:
     assert (written.run_directory / "correlation_summary.csv").exists()
 
 
+def test_eda_plots_are_written_as_expected(tmp_path: Path) -> None:
+    panel = make_synthetic_panel(num_series=3, num_days=90)
+
+    artifacts = EdaArtifacts(
+        panel=panel,
+        dataset_summary=build_dataset_summary(panel),
+        config_alignment_summary=build_config_alignment_summary(
+            panel=panel,
+            dataset_config=DatasetConfig(top_n_series=3, min_history_days=70),
+        )[0],
+        missingness_summary=build_missingness_summary(panel),
+        numeric_summary=build_numeric_summary(panel),
+        series_summary=build_series_summary(panel),
+        temporal_summary=build_temporal_summary(panel),
+        weekday_summary=build_weekday_summary(panel),
+        series_gap_summary=build_series_gap_summary(panel),
+        stockout_summary=build_stockout_summary(panel),
+        stockout_by_series_summary=build_stockout_by_series_summary(panel),
+        stockout_demand_bands=build_stockout_demand_bands(panel),
+        correlation_summary=build_correlation_summary(panel),
+        warnings=[],
+    )
+
+    from retail_forecasting.eda.plots import render_eda_plots
+
+    written = write_eda_artifacts(
+        artifacts=artifacts,
+        output_dir=tmp_path,
+        run_name="eda_plot_test",
+        make_plots=True,
+        render_plots=render_eda_plots,
+    )
+
+    assert written.run_directory is not None
+    assert (written.run_directory / "coverage_heatmap.png").exists()
+    assert (written.run_directory / "observed_demand_distribution.png").exists()
+    assert (written.run_directory / "observed_demand_boxplot_top_series.png").exists()
+    assert (written.run_directory / "stockout_hours_distribution.png").exists()
+    assert (written.run_directory / "weekday_demand_profile.png").exists()
+    assert (written.run_directory / "zero_demand_rate_by_series.png").exists()
+    assert (written.run_directory / "stockout_band_demand.png").exists()
+    assert (written.run_directory / "stockout_vs_demand_scatter.png").exists()
+    assert (written.run_directory / "correlation_heatmap.png").exists()
+    assert (written.run_directory / "covariate_vs_demand_grid.png").exists()
+    assert (written.run_directory / "representative_series_panels.png").exists()
+
+
+def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
+    panel = make_synthetic_panel(num_series=3, num_days=90)
+    memoria_dir = tmp_path / "memoria"
+
+    artifacts = EdaArtifacts(
+        panel=panel,
+        dataset_summary=build_dataset_summary(panel),
+        config_alignment_summary=build_config_alignment_summary(
+            panel=panel,
+            dataset_config=DatasetConfig(top_n_series=3, min_history_days=70),
+        )[0],
+        missingness_summary=build_missingness_summary(panel),
+        numeric_summary=build_numeric_summary(panel),
+        series_summary=build_series_summary(panel),
+        temporal_summary=build_temporal_summary(panel),
+        weekday_summary=build_weekday_summary(panel),
+        series_gap_summary=build_series_gap_summary(panel),
+        stockout_summary=build_stockout_summary(panel),
+        stockout_by_series_summary=build_stockout_by_series_summary(panel),
+        stockout_demand_bands=build_stockout_demand_bands(panel),
+        correlation_summary=build_correlation_summary(panel),
+        warnings=[],
+    )
+
+    from retail_forecasting.eda.plots import render_eda_plots
+
+    write_eda_artifacts(
+        artifacts=artifacts,
+        output_dir=tmp_path,
+        run_name="eda_memoria_test",
+        make_plots=True,
+        render_plots=render_eda_plots,
+        memoria_dir=memoria_dir,
+    )
+
+    assert (memoria_dir / "figures" / "eda" / "eda_figures.tex").exists()
+    assert (memoria_dir / "figures" / "eda" / "coverage_heatmap.png").exists()
+    assert (
+        memoria_dir / "figures" / "eda" / "representative_series_panels.png"
+    ).exists()
+
+
 def test_eda_alignment_flags_stale_processed_panel_shape() -> None:
     panel = make_synthetic_panel(num_series=4, num_days=90)
 

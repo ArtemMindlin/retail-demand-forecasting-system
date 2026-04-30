@@ -1,13 +1,13 @@
 {
+  "latex-workshop.latex.outDir": "%DIR%",
+  "latex-workshop.latex.auxDir": "%DIR%",
   "latex-workshop.latex.tools": [
     {
       "name": "tectonic",
       "command": "tectonic",
       "args": [
         "--synctex",
-        "--keep-intermediates",
-        "--keep-logs",
-        "%DOC%"
+        "%DOC_EXT%"
       ],
       "env": {}
     }

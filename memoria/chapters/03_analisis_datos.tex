@@ -1,3 +1,4 @@
+% !TEX root = ../main.tex
 \chapter{Análisis del Conjunto de Datos}
 \label{chap:analisis_datos}
 
@@ -22,3 +23,54 @@ Un rasgo distintivo del \textit{retail} fresco es la intermitencia. Muchas serie
 
 \section{Correlación con Variables Exógenas}
 Se observa una correlación positiva moderada entre la temperatura media y la demanda de ciertas categorías de productos frescos (ej. frutas de temporada). Asimismo, el factor "descuento" actúa como un fuerte impulsor de la demanda, alterando significativamente el patrón basal de ventas. El modelo desarrollado debe ser capaz de integrar estas señales para superar a los modelos autorregresivos simples.
+
+\section{Interpretación de las Visualizaciones del EDA}
+
+Las visualizaciones generadas automáticamente complementan el análisis tabular del panel preparado y permiten identificar de forma más clara la estructura temporal, la heterogeneidad entre series y el impacto operativo de los \textit{stockouts}. Su objetivo no es modificar la semántica del problema, sino aportar evidencia descriptiva que justifique las decisiones posteriores de modelado y validación.
+
+\subsection{Cobertura temporal y calidad estructural del panel}
+
+La figura de cobertura temporal (\texttt{coverage\_heatmap.png}) muestra la presencia de observaciones para cada serie a lo largo del intervalo analizado. Su principal utilidad es verificar si el panel final presenta huecos, discontinuidades o series truncadas. En este caso, la cobertura es homogénea, lo que respalda que el conjunto preparado utilizado en el modelado mantiene una estructura balanceada tras el preprocesamiento y el filtrado de series.
+
+\subsection{Distribución de la demanda observada}
+
+La distribución global de la demanda (\texttt{observed\_demand\_distribution.png}) evidencia que la variable objetivo no sigue una forma aproximadamente normal, sino que presenta concentración en rangos bajos y una cola hacia valores mayores. Esto es coherente con un contexto \textit{retail} de producto fresco, donde la demanda diaria suele ser moderada, irregular y sensible a factores operativos y contextuales. La visualización de las series de mayor volumen mediante diagramas de caja (\texttt{observed\_demand\_boxplot\_top\_series.png}) confirma, además, que existe heterogeneidad relevante entre series, tanto en nivel medio como en variabilidad. Esta evidencia apoya el uso de modelos globales con contexto, en lugar de asumir que todas las series comparten una dinámica homogénea.
+
+\subsection{Estacionalidad semanal}
+
+La figura \texttt{weekday\_demand\_profile.png} muestra la evolución de la demanda media y mediana según el día de la semana. El patrón observado sugiere una estacionalidad semanal clara, con diferencias sistemáticas entre días laborables y fin de semana. Esta regularidad justifica directamente la inclusión de variables de calendario y de retardos semanales en la etapa de ingeniería de características. Desde el punto de vista metodológico, esta es una de las señales más sólidas del EDA, ya que conecta de forma clara la estructura de los datos con el diseño de los predictores temporales.
+
+\subsection{Intermitencia y demanda cero}
+
+La figura \texttt{zero\_demand\_rate\_by\_series.png} permite identificar las series con mayor proporción de observaciones en cero. Su lectura muestra que la intermitencia no afecta por igual a todo el panel, sino que se concentra con distinta intensidad según la serie. Esta heterogeneidad es importante porque advierte que las métricas agregadas pueden ocultar comportamientos muy diferentes entre productos o combinaciones tienda-producto. En consecuencia, la dificultad del problema no debe entenderse como uniforme, sino como dependiente del régimen operativo y de la naturaleza concreta de cada serie.
+
+\subsection{Frecuencia e intensidad de los stockouts}
+
+La distribución de horas de \textit{stockout} (\texttt{stockout\_hours\_distribution.png}) muestra que la falta de disponibilidad no es un fenómeno anecdótico, sino una característica estructural del conjunto analizado. Esto refuerza la idea de que el problema de predicción no puede interpretarse como una simple serie temporal de ventas observadas, ya que parte de esas observaciones están condicionadas por restricciones de disponibilidad en el lineal.
+
+La figura \texttt{stockout\_band\_demand.png} profundiza en este punto al comparar la demanda observada entre bandas de intensidad de \textit{stockout}. El patrón es coherente con la hipótesis de censura: cuando las horas de \textit{stockout} son severas, la demanda observada tiende a reducirse. No debe interpretarse esto como una estimación exacta de demanda latente, pero sí como evidencia descriptiva de que las ventas registradas pueden infraestimar el interés real del consumidor bajo condiciones de falta de stock.
+
+\subsection{Relación entre stockout y demanda observada}
+
+La figura \texttt{stockout\_vs\_demand\_scatter.png} representa la relación entre horas de \textit{stockout} y demanda observada, junto con una tendencia promedio. La relación agregada es negativa, aunque con alta dispersión. Esto indica que el efecto no es determinista ni uniforme, pero sí suficientemente visible como para considerar \texttt{stockout\_hours} una variable contextual relevante. La interpretación correcta es descriptiva y no causal: la visualización no demuestra por sí sola el mecanismo exacto de pérdida de ventas, pero sí aporta evidencia compatible con la existencia de censura operativa.
+
+\subsection{Relaciones con covariables exógenas}
+
+El mapa de correlaciones (\texttt{correlation\_heatmap.png}) y la cuadrícula de relaciones entre covariables y demanda (\texttt{covariate\_vs\_demand\_grid.png}) permiten estudiar la asociación entre la demanda observada y variables como descuento, temperatura o precipitación. En general, las relaciones marginales aparecen como moderadas o débiles, lo que sugiere que estas señales exógenas no deben interpretarse de forma aislada. Sin embargo, su inclusión sigue siendo razonable, ya que un modelo flexible puede capturar interacciones no lineales y dependencias condicionadas por serie o régimen que no se aprecian en una correlación global simple.
+
+\subsection{Concentración del volumen y series representativas}
+
+La figura \texttt{top\_series\_total\_demand.png} muestra que parte del volumen agregado se concentra en un subconjunto reducido de series. Esto contextualiza el uso de filtros como \texttt{top\_n\_series} y explica por qué el comportamiento agregado del panel puede cambiar cuando se restringe el análisis a las series más relevantes por volumen.
+
+Finalmente, la figura \texttt{representative\_series\_panels.png} ofrece una visión cualitativa especialmente útil para interpretar el problema. En estas series se observan simultáneamente patrones semanales, cambios de escala entre productos y episodios donde la demanda observada coexiste con intensidades elevadas de \textit{stockout}. Esta visualización es valiosa porque resume de forma intuitiva la complejidad conjunta del problema: estacionalidad, heterogeneidad entre series y posible censura por falta de disponibilidad.
+
+\subsection{Conclusiones del EDA}
+
+En conjunto, las visualizaciones permiten extraer varias conclusiones relevantes para el diseño experimental del sistema. En primer lugar, el panel preparado presenta una estructura temporal consistente y adecuada para validación temporal. En segundo lugar, existe una estacionalidad semanal clara que justifica el uso de retardos y variables de calendario. En tercer lugar, la heterogeneidad entre series y la intermitencia parcial del panel aconsejan evitar simplificaciones excesivas en el modelado. Por último, la frecuencia y la intensidad de los \textit{stockouts}, junto con su asociación negativa con la demanda observada, refuerzan la idea de que el contexto operativo debe incorporarse explícitamente en el sistema de predicción y en la interpretación de sus resultados.
+
+\section{Visualizaciones Generadas Automáticamente}
+\IfFileExists{figures/eda/eda_figures.tex}{
+    \input{figures/eda/eda_figures.tex}
+}{
+    % Ejecuta el modulo de EDA para materializar estas figuras.
+}

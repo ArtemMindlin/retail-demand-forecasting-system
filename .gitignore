@@ -228,3 +228,9 @@ memoria/*.lof
 memoria/*.lot
 memoria/*.out
 memoria/*.synctex.gz
+memoria/*.bbl
+memoria/*.blg
+memoria/.build/*
+!memoria/.build/.gitkeep
+memoria/figures/eda/*
+!memoria/figures/eda/.gitkeep
