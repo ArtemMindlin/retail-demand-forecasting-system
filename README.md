@@ -23,13 +23,16 @@ El proyecto utiliza `uv` para la gestión de dependencias y un `Makefile` para e
 # 1. Instalar dependencias
 make install
 
-# 2. Ejecutar experimento completo (Observed vs Latent)
+# 2. Ejecutar EDA reproducible sobre el panel preparado
+make eda
+
+# 3. Ejecutar experimento completo (Observed vs Latent)
 make run
 
-# 3. Lanzar dashboard interactivo
+# 4. Lanzar dashboard interactivo
 make dashboard
 
-# 4. Ejecutar tests de integridad
+# 5. Ejecutar tests de integridad
 make test-harness
 ```
 

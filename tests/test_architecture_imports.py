@@ -12,6 +12,7 @@ ALLOWED_LAYER_IMPORTS = {
     "config": set(),
     "data": {"config", "utils"},
     "drift": set(),
+    "eda": {"config", "data", "eda", "utils"},
     "evaluation": {"config", "utils", "visualization"},
     "features": {"config"},
     "forecasting": {
@@ -26,7 +27,7 @@ ALLOWED_LAYER_IMPORTS = {
         "utils",
     },
     "inventory": {"config"},
-    "models": {"utils"},
+    "models": {"config", "utils"},
     "run": {"config", "forecasting"},
     "utils": set(),
     "visualization": {"utils"},

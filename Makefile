@@ -6,7 +6,7 @@ PYTEST = uv run pytest
 CONFIG = configs/default.yaml
 DASHBOARD = src/retail_forecasting/visualization/dashboard.py
 
-.PHONY: help install run dashboard test test-harness lint format clean
+.PHONY: help install run eda dashboard test test-harness lint format clean
 
 help: ## Muestra este mensaje de ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -16,6 +16,9 @@ install: ## Instala dependencias y crea el entorno virtual con uv
 
 run: ## Ejecuta el experimento completo con la configuración por defecto
 	$(PYTHON) -m retail_forecasting.run --config $(CONFIG)
+
+eda: ## Ejecuta el modulo de EDA reproducible sobre el panel preparado
+	$(PYTHON) -m retail_forecasting.eda.run --config $(CONFIG)
 
 dashboard: ## Lanza el dashboard interactivo de Streamlit
 	uv run streamlit run $(DASHBOARD)

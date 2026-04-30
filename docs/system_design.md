@@ -6,11 +6,12 @@ El sistema sigue una arquitectura modular orientada a experimentacion reproducib
 
 1. ingesta de datos;
 2. preparacion del panel temporal;
-3. feature engineering sin leakage;
-4. entrenamiento y forecasting;
-5. decision de inventario;
-6. evaluacion economica;
-7. reporte y visualizacion.
+3. analisis exploratorio reproducible del panel;
+4. feature engineering sin leakage;
+5. entrenamiento y forecasting;
+6. decision de inventario;
+7. evaluacion economica;
+8. reporte y visualizacion.
 
 ## 1. Ingesta de datos
 
@@ -40,7 +41,18 @@ El preprocesamiento transforma el split bruto en un panel diario limpio:
 
 La v1 usa demanda observada. Los stockouts no se corrigen aun para recuperar demanda latente; se mantienen como senal contextual.
 
-## 3. Feature engineering temporal
+## 3. EDA reproducible
+
+El modulo `eda` opera exclusivamente sobre el panel preparado y no sobre nombres raw del dataset. Su objetivo es producir artefactos de analisis descriptivo auditables sin contaminar la logica de forecasting:
+
+- resumen de cobertura temporal y continuidad por serie;
+- perfilado tabular de missingness y variables numericas;
+- resumenes de estacionalidad semanal;
+- diagnosticos de frecuencia e intensidad de stockout;
+- correlaciones descriptivas con `observed_demand`;
+- reporte Markdown y plots bajo `reports/eda_*`.
+
+## 4. Feature engineering temporal
 
 ### Principios
 
@@ -63,7 +75,7 @@ La v1 usa demanda observada. Los stockouts no se corrigen aun para recuperar dem
 
 Para cada fecha `t`, el target es la suma de demanda observada en el horizonte `t ... t+h-1`.
 
-## 4. Entrenamiento
+## 5. Entrenamiento
 
 El pipeline soporta dos familias de modelo:
 
@@ -72,7 +84,7 @@ El pipeline soporta dos familias de modelo:
 
 El modelo global se entrena sobre el panel completo filtrado, no serie a serie. Esto mejora eficiencia y permite compartir informacion entre combinaciones de tienda y producto.
 
-## 5. Forecasting probabilistico
+## 6. Forecasting probabilistico
 
 La v1 implementa forecasting probabilistico minimo mediante cuantiles `0.1`, `0.5` y `0.9`.
 
@@ -84,7 +96,7 @@ Logica de backends:
 
 Los cuantiles se fuerzan a ser monotonicamente no decrecientes para evitar incoherencias basicas.
 
-## 6. Deteccion de drift
+## 7. Deteccion de drift
 
 La v1 no implementa aun un detector estadistico completo, pero deja preparado el modulo `drift` para:
 
@@ -94,7 +106,7 @@ La v1 no implementa aun un detector estadistico completo, pero deja preparado el
 
 Como aproximacion inicial, se pueden etiquetar regimenes de alta y baja intensidad de stockout para inspeccionar cambios de comportamiento.
 
-## 7. Reentrenamiento
+## 8. Reentrenamiento
 
 La estrategia inicial es walk-forward con ventana expansiva y reentrenamiento por fold. Esto refleja un proceso operativo sencillo:
 
@@ -108,7 +120,7 @@ El diseno permite anadir despues:
 - reentrenamiento gatillado por drift;
 - ventanas deslizantes.
 
-## 8. Simulacion / decision de inventario
+## 9. Simulacion / decision de inventario
 
 La v1 implementa una capa de decision newsvendor por periodo:
 
@@ -117,7 +129,7 @@ La v1 implementa una capa de decision newsvendor por periodo:
 
 Esta capa es deliberadamente simple, pero ya convierte forecast en accion y permite medir impacto economico.
 
-## 9. Evaluacion economica
+## 10. Evaluacion economica
 
 Para cada prediccion:
 
@@ -127,7 +139,7 @@ Para cada prediccion:
 
 Esto permite comparar modelos desde una perspectiva operativa. Un modelo con mejor MAE puede ser peor en coste si se equivoca en la direccion economicamente importante.
 
-## 10. Visualizacion de resultados
+## 11. Visualizacion de resultados
 
 Cada corrida genera:
 
@@ -137,7 +149,7 @@ Cada corrida genera:
 - graficos simples de coste y trade-off error-coste;
 - un reporte Markdown final en `reports/`.
 
-## 11. Como se evita usar informacion futura
+## 12. Como se evita usar informacion futura
 
 La politica anti-leakage es un requisito central del sistema:
 
@@ -148,7 +160,7 @@ La politica anti-leakage es un requisito central del sistema:
 
 Esto asegura que el rendimiento estimado sea defendible academicamente.
 
-## 12. Evolucion futura prevista
+## 13. Evolucion futura prevista
 
 La arquitectura queda lista para:
 

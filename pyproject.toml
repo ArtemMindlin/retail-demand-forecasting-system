@@ -35,6 +35,7 @@ ml = [
 
 [project.scripts]
 retail-forecast = "retail_forecasting.run:main"
+retail-eda = "retail_forecasting.eda.run:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
