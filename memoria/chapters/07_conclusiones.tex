@@ -16,7 +16,7 @@ Las conclusiones principales se resumen en los siguientes puntos:
 \end{itemize}
 
 \section{Contribución al Desarrollo Sostenible}
-Alineado con el \textbf{ODS 12 (Producción y Consumo Responsables)}, este trabajo aporta una herramienta técnica capaz de mitigar el desperdicio alimentario. Al optimizar las órdenes de compra mediante el modelo del \textit{Newsvendor}, el sistema reduce sistemáticamente el sobrestock de productos perecederos, disminuyendo la huella ambiental de la cadena de suministro sin comprometer la seguridad alimentaria ni el nivel de servicio al cliente.
+Alineado con el \textbf{ODS 12 (Producción y Consumo Responsables)}, este trabajo aporta una herramienta técnica capaz de mitigar el desperdicio alimentario. La incorporación de perfiles de coste por serie dentro de la política del \textit{Newsvendor} permite aproximar mejor el impacto diferencial del sobrestock y de la rotura según el producto y la tienda. En particular, la penalización adicional del exceso en series más perecederas o de menor rotación mejora la coherencia entre el objetivo económico del sistema y la reducción potencial del desperdicio alimentario, sin renunciar a la modelización explícita del nivel de servicio.
 
 \section{Análisis de Impacto Ético, Social y Ambiental}
 Más allá de los resultados técnicos, el presente proyecto tiene implicaciones significativas en varios ejes de responsabilidad social corporativa.
@@ -34,6 +34,7 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     \item \textbf{Calibración Avanzada}: Implementar métodos de \textit{Conformal Prediction} dinámicos que se ajusten en tiempo real según la variabilidad local de cada tienda o categoría de producto.
     \item \textbf{Compensación de Stockout Multietapa}: Desarrollar algoritmos de imputación más sofisticados que consideren el efecto de sustitución entre productos cuando ocurre una rotura de stock.
     \item \textbf{Integración con Logística}: Evolucionar de un modelo de una sola etapa (\textit{Newsvendor}) a una política de inventario multietapa que considere el \textit{lead time} variable y los costes de transporte.
+    \item \textbf{Costes Observados Reales}: Sustituir los perfiles sintéticos actuales por costes empíricos observados de merma, rotura y liquidación, con el fin de calibrar la política de inventario sobre una base económica más fiel.
 \end{itemize}
 
 Como cierre, este TFG demuestra que la integración de la estadística avanzada con la ingeniería de software permite transformar datos brutos en valor estratégico, proporcionando una base sólida para la digitalización inteligente del sector \textit{retail}.

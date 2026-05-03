@@ -38,3 +38,9 @@ La implementación técnica no es un fin en sí mismo, sino un soporte para la v
     \item \textbf{Modularidad de Métricas}: Desacoplamiento de las métricas de error (MAE, RMSE) de las métricas económicas (coste total), permitiendo un análisis multi-objetivo sin sesgar el entrenamiento del modelo.
     \item \textbf{Reproducibilidad}: Cada ejecución genera un reporte (\texttt{reports/}) que incluye la configuración exacta de los hiperparámetros y el estado de la semilla aleatoria, garantizando que cualquier resultado pueda ser auditado y replicado.
 \end{itemize}
+
+\section{Perfiles de Coste por Serie}
+
+La capa de inventario se ha extendido para soportar perfiles de coste específicos por serie (\texttt{series\_id = store\_id \times product\_id}). En lugar de utilizar un único par global $(c_o, c_u)$ para todo el sistema, se construye una tabla de costes sintéticos por serie a partir del panel preparado. Esta tabla utiliza como \textit{proxies} la intensidad de demanda, la intermitencia, la frecuencia histórica de \textit{stockout} y la inestabilidad agregada de la categoría de producto.
+
+El objetivo de esta extensión no es estimar un coste contable exacto, sino aproximar mejor la asimetría económica real del problema. Así, series con productos más perecederos o con rotación más lenta reciben un mayor $c_{o,s}$, mientras que series con mayor presión de demanda o con mayor criticidad histórica de servicio reciben un mayor $c_{u,s}$. La decisión de pedido sigue siendo modular y se mantiene dentro de la capa \texttt{inventory/}, preservando la separación entre predicción, decisión y evaluación.

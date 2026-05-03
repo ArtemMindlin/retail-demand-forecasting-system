@@ -196,11 +196,13 @@ def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
         memoria_dir=memoria_dir,
     )
 
-    assert (memoria_dir / "figures" / "eda" / "eda_figures.tex").exists()
+    tex_fragment = memoria_dir / "figures" / "eda" / "eda_figures.tex"
+    assert tex_fragment.exists()
     assert (memoria_dir / "figures" / "eda" / "coverage_heatmap.png").exists()
     assert (
         memoria_dir / "figures" / "eda" / "representative_series_panels.png"
     ).exists()
+    assert "Interpretación." in tex_fragment.read_text(encoding="utf-8")
 
 
 def test_eda_alignment_flags_stale_processed_panel_shape() -> None:

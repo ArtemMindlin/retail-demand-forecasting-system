@@ -49,7 +49,9 @@ La evaluación del sistema se realiza en tres niveles complementarios:
     \item \textbf{Métricas Probabilísticas}: \textit{Pinball Loss} para evaluar la calidad de los cuantiles y \textit{Coverage} para verificar si el porcentaje de datos que caen dentro del intervalo de confianza coincide con el nivel de confianza teórico.
     \item \textbf{Métricas Económicas}: Se utiliza el modelo del \textit{Newsvendor} para calcular el coste total operativo:
     \begin{equation}
-        Coste = (c_o \times Overstock) + (c_u \times Stockout)
+        Coste_{s,t} = (c_{o,s} \times Overstock_{s,t}) + (c_{u,s} \times Stockout_{s,t})
     \end{equation}
-    donde $c_o$ es el coste unitario por exceso de stock y $c_u$ el coste de oportunidad por venta perdida.
+    donde $c_{o,s}$ es el coste unitario por exceso de stock de la serie $s$ y $c_{u,s}$ el coste de oportunidad por venta perdida para esa misma serie.
 \end{itemize}
+
+En la versión actual del sistema, estos costes no son constantes globales para todo el panel, sino perfiles sintéticos dependientes de la combinación tienda-producto. En particular, $c_{o,s}$ aumenta cuando una serie presenta mayor perecibilidad sintética o un patrón de baja rotación, mientras que $c_{u,s}$ aumenta cuando la serie muestra mayor intensidad de demanda o mayor tensión histórica de \textit{stockout}. De este modo, el fractil crítico del modelo del \textit{Newsvendor} deja de ser único para todo el sistema y pasa a adaptarse a la criticidad operativa de cada serie individual.
