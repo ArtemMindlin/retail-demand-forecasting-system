@@ -35,6 +35,10 @@ def test_default_inventory_costs_are_positive() -> None:
 
     assert settings.inventory.overstock_cost > 0
     assert settings.inventory.stockout_cost > 0
+    assert isinstance(settings.inventory.use_series_costs, bool)
+    assert settings.inventory.series_cost_strategy in {"synthetic_series"}
+    assert settings.inventory.pareto_order_scales
+    assert all(scale >= 0.0 for scale in settings.inventory.pareto_order_scales)
 
 
 def test_default_reporting_does_not_write_into_data_cache() -> None:

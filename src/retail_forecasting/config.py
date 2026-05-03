@@ -76,7 +76,12 @@ class ModelConfig:
 class InventoryConfig:
     overstock_cost: float = 1.0
     stockout_cost: float = 4.0
+    use_series_costs: bool = False
+    series_cost_strategy: str = "synthetic_series"
     clip_negative_orders: bool = True
+    pareto_order_scales: list[float] = field(
+        default_factory=lambda: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3]
+    )
 
 
 @dataclass
@@ -115,7 +120,9 @@ def load_config(path: str | Path) -> Settings:
     dataset_section = raw_config.get("dataset", {})
     dataset = DatasetConfig(
         source=dataset_section.get("source", default_dataset.source),
-        hf_dataset_id=dataset_section.get("hf_dataset_id", default_dataset.hf_dataset_id),
+        hf_dataset_id=dataset_section.get(
+            "hf_dataset_id", default_dataset.hf_dataset_id
+        ),
         splits=dataset_section.get("splits", default_dataset.splits),
         local_cache_dir=_with_path(
             dataset_section,
@@ -127,7 +134,9 @@ def load_config(path: str | Path) -> Settings:
             "processed_panel_path",
             default_dataset.processed_panel_path,
         ),
-        use_local_cache=dataset_section.get("use_local_cache", default_dataset.use_local_cache),
+        use_local_cache=dataset_section.get(
+            "use_local_cache", default_dataset.use_local_cache
+        ),
         refresh_processed_cache=dataset_section.get(
             "refresh_processed_cache",
             default_dataset.refresh_processed_cache,
@@ -149,11 +158,37 @@ def load_config(path: str | Path) -> Settings:
     features = FeatureConfig(**raw_config.get("features", {}))
     validation = ValidationConfig(**raw_config.get("validation", {}))
     models = ModelConfig(**raw_config.get("models", {}))
-    inventory = InventoryConfig(**raw_config.get("inventory", {}))
+    inventory_section = raw_config.get("inventory", {})
+    inventory = InventoryConfig(
+        overstock_cost=inventory_section.get(
+            "overstock_cost", InventoryConfig().overstock_cost
+        ),
+        stockout_cost=inventory_section.get(
+            "stockout_cost", InventoryConfig().stockout_cost
+        ),
+        use_series_costs=inventory_section.get(
+            "use_series_costs",
+            InventoryConfig().use_series_costs,
+        ),
+        series_cost_strategy=inventory_section.get(
+            "series_cost_strategy",
+            InventoryConfig().series_cost_strategy,
+        ),
+        clip_negative_orders=inventory_section.get(
+            "clip_negative_orders",
+            InventoryConfig().clip_negative_orders,
+        ),
+        pareto_order_scales=inventory_section.get(
+            "pareto_order_scales",
+            InventoryConfig().pareto_order_scales,
+        ),
+    )
 
     reporting_section = raw_config.get("reporting", {})
     reporting = ReportingConfig(
-        output_dir=_with_path(reporting_section, "output_dir", default_reporting.output_dir),
+        output_dir=_with_path(
+            reporting_section, "output_dir", default_reporting.output_dir
+        ),
         run_name=reporting_section.get("run_name", default_reporting.run_name),
         make_plots=reporting_section.get("make_plots", default_reporting.make_plots),
     )

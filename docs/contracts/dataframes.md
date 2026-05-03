@@ -229,3 +229,41 @@ Expected columns:
 Expected ordering:
 
 - sorted ascending by `total_cost`
+
+## Pareto Frontier
+
+Created by:
+
+- `summarize_pareto_frontier()`
+
+Expected columns:
+
+| Column | Meaning |
+| --- | --- |
+| `model_name` | model label |
+| `backend_name` | backend label |
+| `policy_name` | candidate inventory policy label |
+| `order_scale` | multiplier applied to the selected `order_quantity` |
+| `observations` | number of prediction rows evaluated |
+| `mean_order_quantity` | mean candidate order quantity |
+| `total_overstock_units` | aggregate candidate overstock |
+| `total_stockout_units` | aggregate candidate stockout |
+| `total_overstock_cost` | aggregate candidate overstock cost |
+| `total_stockout_cost` | aggregate candidate stockout cost |
+| `total_cost` | aggregate candidate economic cost |
+| `mean_cost` | per-row mean candidate economic cost |
+| `service_level` | share of rows with no stockout units |
+| `fill_rate` | share of observed demand covered by candidate orders |
+| `is_pareto_efficient` | true when no candidate dominates this row on cost, overstock, and stockout |
+
+Optional grouping columns:
+
+| Column | Meaning |
+| --- | --- |
+| `data_strategy` | observed vs imputed demand strategy |
+
+Expected properties:
+
+- candidate policies do not mutate `predictions.csv`
+- Pareto efficiency is computed within each model/backend/strategy group
+- objectives for Pareto dominance are `total_cost`, `total_overstock_units`, and `total_stockout_units`, all minimized

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pandas as pd
-import numpy as np
 
 from retail_forecasting.config import Settings
 from retail_forecasting.data.censorship import LatentDemandImputer
@@ -18,7 +17,9 @@ from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
     run_sensitivity_analysis,
+    summarize_pareto_frontier,
 )
+from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
 from retail_forecasting.models.boosting import AutoBoostingModel
 from retail_forecasting.models.optimization import HyperparameterTuner
 from retail_forecasting.models.catboosting import CatBoostingModel
@@ -66,6 +67,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     merged_metrics, merged_folds = summarize_predictions(merged_predictions)
     merged_costs = summarize_costs(merged_predictions)
     merged_sens = run_sensitivity_analysis(merged_predictions, settings.inventory)
+    merged_pareto = summarize_pareto_frontier(merged_predictions, settings.inventory)
 
     final_artifacts = RunArtifacts(
         prepared_panel=raw_panel,
@@ -75,6 +77,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         fold_metrics=merged_folds,
         cost_summary=merged_costs,
         sensitivity_summary=merged_sens,
+        pareto_frontier=merged_pareto,
         drifts=artifacts_obs.drifts,
     )
 
@@ -86,6 +89,11 @@ def run_experiment_from_frame(
 ) -> RunArtifacts:
     """Run the full backtesting pipeline from an in-memory panel."""
     prepared_panel = label_stockout_regime(panel)
+    series_cost_profile = None
+    if settings.inventory.use_series_costs:
+        series_cost_profile = build_series_cost_profile(
+            prepared_panel, settings.inventory
+        )
     supervised_frame, feature_columns = build_supervised_frame(
         panel=prepared_panel,
         feature_config=settings.features,
@@ -109,13 +117,17 @@ def run_experiment_from_frame(
     best_boosting_params = {
         "n_estimators": settings.models.n_estimators,
         "learning_rate": settings.models.learning_rate,
-        "max_depth": settings.models.max_depth
+        "max_depth": settings.models.max_depth,
     }
     if settings.models.use_tuning:
         print(f"🔍 Starting Optuna Tuning for {data_strategy} strategy...")
-        tuning_train_frame = supervised_frame[supervised_frame["date"] <= folds[0].train_end_date]
+        tuning_train_frame = supervised_frame[
+            supervised_frame["date"] <= folds[0].train_end_date
+        ]
         tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
-        best_boosting_params.update(tuner.tune_boosting(tuning_train_frame, feature_columns))
+        best_boosting_params.update(
+            tuner.tune_boosting(tuning_train_frame, feature_columns)
+        )
 
     # Drift detection state
     drift_detector = PageHinkleyDetector(threshold=15.0, min_instances=2)
@@ -125,15 +137,15 @@ def run_experiment_from_frame(
     fold_predictions = []
 
     baseline_model = SeasonalNaiveModel(
-        seasonal_period=settings.models.seasonal_period, horizon=settings.dataset.horizon
+        seasonal_period=settings.models.seasonal_period,
+        horizon=settings.dataset.horizon,
     ).fit(prepared_panel)
 
     for fold in folds:
         # Prepare training and validation frames
         train_mask = supervised_frame["date"] <= fold.train_end_date
-        validation_mask = (
-            (supervised_frame["date"] >= fold.validation_start_date)
-            & (supervised_frame["date"] <= fold.validation_end_date)
+        validation_mask = (supervised_frame["date"] >= fold.validation_start_date) & (
+            supervised_frame["date"] <= fold.validation_end_date
         )
         train_frame = supervised_frame.loc[train_mask].copy()
         validation_frame = supervised_frame.loc[validation_mask].copy()
@@ -162,11 +174,16 @@ def run_experiment_from_frame(
                 fold_id=fold.fold_id,
                 settings=settings,
                 data_strategy=data_strategy,
+                series_cost_profile=series_cost_profile,
             )
         )
 
         # 2. Ridge Regression (Linear Baseline)
-        if ridge_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
+        if (
+            ridge_model is None
+            or settings.validation.retrain_each_fold
+            or current_fold_retrained
+        ):
             base_ridge = RidgeBaselineModel(random_seed=settings.project.random_seed)
             base_ridge.fit(
                 sub_train_frame.loc[:, feature_columns],
@@ -187,24 +204,29 @@ def run_experiment_from_frame(
                 fold_id=fold.fold_id,
                 settings=settings,
                 data_strategy=data_strategy,
+                series_cost_profile=series_cost_profile,
             )
         )
 
         # 3. LightGBM (Boosting)
-        if boosting_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
+        if (
+            boosting_model is None
+            or settings.validation.retrain_each_fold
+            or current_fold_retrained
+        ):
             # Prepare cost parameters if optimization is enabled
             cost_params = {}
             if settings.models.optimize_for_cost:
                 cost_params = {
                     "overstock_cost": settings.inventory.overstock_cost,
-                    "stockout_cost": settings.inventory.stockout_cost
+                    "stockout_cost": settings.inventory.stockout_cost,
                 }
-                
+
             base_lgb = AutoBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
                 **best_boosting_params,
-                **cost_params
+                **cost_params,
             )
             base_lgb.fit(
                 sub_train_frame.loc[:, feature_columns],
@@ -218,21 +240,26 @@ def run_experiment_from_frame(
                     alpha=settings.models.quantiles[0] * 2,
                 )
         boosting_preds = _build_model_predictions(
-                validation_frame=validation_frame,
-                feature_columns=feature_columns,
-                model=boosting_model,
-                fold_id=fold.fold_id,
-                settings=settings,
-                data_strategy=data_strategy,
-            )
+            validation_frame=validation_frame,
+            feature_columns=feature_columns,
+            model=boosting_model,
+            fold_id=fold.fold_id,
+            settings=settings,
+            data_strategy=data_strategy,
+            series_cost_profile=series_cost_profile,
+        )
         fold_predictions.append(boosting_preds)
 
         # 4. CatBoost (Boosting)
-        if cat_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
+        if (
+            cat_model is None
+            or settings.validation.retrain_each_fold
+            or current_fold_retrained
+        ):
             base_cat = CatBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
-                **best_boosting_params
+                **best_boosting_params,
             )
             base_cat.fit(
                 sub_train_frame.loc[:, feature_columns],
@@ -253,14 +280,19 @@ def run_experiment_from_frame(
                 fold_id=fold.fold_id,
                 settings=settings,
                 data_strategy=data_strategy,
+                series_cost_profile=series_cost_profile,
             )
         )
 
         # 5. ARIMA (Statistical)
-        if arima_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
+        if (
+            arima_model is None
+            or settings.validation.retrain_each_fold
+            or current_fold_retrained
+        ):
             base_arima = AutoArimaModel(
                 seasonal_period=settings.models.seasonal_period,
-                horizon=settings.dataset.horizon
+                horizon=settings.dataset.horizon,
             ).fit(prepared_panel)
             arima_model = ConformalForecaster(base_arima)
             if not calib_frame.empty:
@@ -277,25 +309,31 @@ def run_experiment_from_frame(
                 fold_id=fold.fold_id,
                 settings=settings,
                 data_strategy=data_strategy,
+                series_cost_profile=series_cost_profile,
             )
         )
 
         # Update drift detector with current fold MAE
-        boosting_fold_preds = fold_predictions[-3] 
-        fold_mae = (boosting_fold_preds["y_true"] - boosting_fold_preds["y_pred"]).abs().mean()
+        boosting_fold_preds = fold_predictions[-3]
+        fold_mae = (
+            (boosting_fold_preds["y_true"] - boosting_fold_preds["y_pred"]).abs().mean()
+        )
         drift_status = drift_detector.update(fold_mae)
-        
-        if drift_status.is_drift:
-            detected_drifts.append({
-                "date": str(fold.validation_start_date.date()),
-                "score": drift_status.score,
-                "threshold": drift_status.threshold,
-                "fold_id": fold.fold_id
-            })
-            if settings.validation.drift_triggered_retrain:
-                print(f"⚠️ DRIFT DETECTED in Fold {fold.fold_id}. Forcing retrain for next fold.")
-                force_retrain = True
 
+        if drift_status.is_drift:
+            detected_drifts.append(
+                {
+                    "date": str(fold.validation_start_date.date()),
+                    "score": drift_status.score,
+                    "threshold": drift_status.threshold,
+                    "fold_id": fold.fold_id,
+                }
+            )
+            if settings.validation.drift_triggered_retrain:
+                print(
+                    f"⚠️ DRIFT DETECTED in Fold {fold.fold_id}. Forcing retrain for next fold."
+                )
+                force_retrain = True
 
     if not fold_predictions:
         raise ValueError("Backtest did not produce any validation predictions.")
@@ -306,11 +344,15 @@ def run_experiment_from_frame(
     sensitivity_summary = run_sensitivity_analysis(
         predictions=predictions,
         base_inventory_config=settings.inventory,
+        series_cost_profile=series_cost_profile,
     )
-    
+    pareto_frontier = summarize_pareto_frontier(predictions, settings.inventory)
+
     report_extra = ""
     if detected_drifts:
-        drift_str = ", ".join([f"Fold {d['fold_id']} (score={d['score']:.2f})" for d in detected_drifts])
+        drift_str = ", ".join(
+            [f"Fold {d['fold_id']} (score={d['score']:.2f})" for d in detected_drifts]
+        )
         report_extra = f"**ALERT**: Concept drift detected and triggered adaptive retrains at: {drift_str}"
 
     artifacts = RunArtifacts(
@@ -321,8 +363,9 @@ def run_experiment_from_frame(
         fold_metrics=fold_metrics,
         cost_summary=cost_summary,
         sensitivity_summary=sensitivity_summary,
+        pareto_frontier=pareto_frontier,
         drifts=detected_drifts,
-        report_extra=report_extra
+        report_extra=report_extra,
     )
     return write_run_artifacts(artifacts, settings)
 
@@ -333,12 +376,21 @@ def _build_baseline_predictions(
     fold_id: int,
     settings: Settings,
     data_strategy: str = "Observed",
+    series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build baseline forecasts for one fold."""
-    cols_to_keep = ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"]
+    cols_to_keep = [
+        "date",
+        "series_id",
+        "target_lead_time_demand",
+        "stockout_hours",
+        "stockout_regime",
+    ]
     if "latent_demand_est" in validation_frame.columns:
-        cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
-        
+        cols_to_keep.extend(
+            ["latent_demand_est", "is_imputed", "original_observed_demand"]
+        )
+
     prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
     prediction_frame["y_pred"] = baseline_model.predict(validation_frame)
@@ -351,8 +403,13 @@ def _build_baseline_predictions(
         inventory_config=settings.inventory,
         quantile_columns=[],
         quantile_levels=[],
+        series_cost_profile=series_cost_profile,
     )
-    return attach_inventory_costs(prediction_frame, settings.inventory)
+    return attach_inventory_costs(
+        prediction_frame,
+        settings.inventory,
+        series_cost_profile=series_cost_profile,
+    )
 
 
 def _build_model_predictions(
@@ -362,30 +419,49 @@ def _build_model_predictions(
     fold_id: int,
     settings: Settings,
     data_strategy: str = "Observed",
+    series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build model forecasts and attach costs."""
-    cols_to_keep = ["date", "series_id", "target_lead_time_demand", "stockout_hours", "stockout_regime"]
+    cols_to_keep = [
+        "date",
+        "series_id",
+        "target_lead_time_demand",
+        "stockout_hours",
+        "stockout_regime",
+    ]
     if "latent_demand_est" in validation_frame.columns:
-        cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
+        cols_to_keep.extend(
+            ["latent_demand_est", "is_imputed", "original_observed_demand"]
+        )
 
     prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
-    
-    if hasattr(model.base_model, "model_name") and model.base_model.model_name == "auto_arima":
+
+    if (
+        hasattr(model.base_model, "model_name")
+        and model.base_model.model_name == "auto_arima"
+    ):
         prediction_frame["y_pred"] = model.predict(validation_frame)
     else:
-        prediction_frame["y_pred"] = model.predict(validation_frame.loc[:, feature_columns])
-        
+        prediction_frame["y_pred"] = model.predict(
+            validation_frame.loc[:, feature_columns]
+        )
+
     prediction_frame["model_name"] = model.model_name
     prediction_frame["backend_name"] = model.backend_name
     prediction_frame["fold_id"] = fold_id
     prediction_frame["data_strategy"] = data_strategy
 
-    if hasattr(model.base_model, "model_name") and model.base_model.model_name == "auto_arima":
+    if (
+        hasattr(model.base_model, "model_name")
+        and model.base_model.model_name == "auto_arima"
+    ):
         quantile_predictions = model.predict_quantiles(validation_frame)
     else:
-        quantile_predictions = model.predict_quantiles(validation_frame.loc[:, feature_columns])
-    
+        quantile_predictions = model.predict_quantiles(
+            validation_frame.loc[:, feature_columns]
+        )
+
     quantile_columns = []
     for quantile in settings.models.quantiles:
         column = quantile_column_name(quantile)
@@ -397,6 +473,13 @@ def _build_model_predictions(
         predictions=prediction_frame,
         inventory_config=settings.inventory,
         quantile_columns=quantile_columns,
-        quantile_levels=[float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns],
+        quantile_levels=[
+            float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns
+        ],
+        series_cost_profile=series_cost_profile,
     )
-    return attach_inventory_costs(prediction_frame, settings.inventory)
+    return attach_inventory_costs(
+        prediction_frame,
+        settings.inventory,
+        series_cost_profile=series_cost_profile,
+    )

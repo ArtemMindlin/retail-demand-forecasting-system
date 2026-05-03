@@ -126,6 +126,7 @@ Estas metricas se usan para estudiar calibracion operacional aproximada y calida
 - coste de sobrestock
 - coste de rotura
 - coste total operativo
+- frontera de Pareto entre coste economico, sobrestock y rotura
 
 La v1 usa una estructura de costes configurable:
 
@@ -135,6 +136,11 @@ La v1 usa una estructura de costes configurable:
 La decision de pedido sigue:
 
 - `critical fractile = c_under / (c_under + c_over)`
+
+Ademas de la politica newsvendor seleccionada, el sistema evalua politicas
+candidatas que escalan la cantidad pedida. Esto permite visualizar el trade-off
+multiobjetivo: reducir desperdicio aproximado mediante menos sobrestock suele
+aumentar roturas, mientras que mejorar disponibilidad suele aumentar exceso.
 
 ## Escenarios con y sin drift
 
@@ -162,8 +168,9 @@ Motivo:
 El ranking principal se establece por:
 
 1. coste total operativo
-2. pinball loss y cobertura, cuando existan cuantiles
-3. MAE y RMSE como soporte diagnostico
+2. frontera de Pareto coste-sobrestock-rotura para interpretar trade-offs
+3. pinball loss y cobertura, cuando existan cuantiles
+4. MAE y RMSE como soporte diagnostico
 
 La conclusion experimental buscara identificar no solo que modelo predice mejor, sino que sistema toma mejores decisiones y bajo que condiciones.
 
