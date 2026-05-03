@@ -35,7 +35,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     if settings.dataset.source != "fresh_retailnet":
         raise ValueError(
             f"Unsupported dataset source '{settings.dataset.source}'. "
-            "The current v1 implementation supports only 'fresh_retailnet'."
+            "The current v2 implementation supports only 'fresh_retailnet'."
         )
 
     # 1. Load Original Panel

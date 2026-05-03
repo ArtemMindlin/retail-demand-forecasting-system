@@ -80,7 +80,7 @@ These rules protect the experimental validity and architecture of the project.
 
 17. Inventory decisions live in `src/retail_forecasting/inventory/`.
 
-18. The v1 inventory policy is single-period newsvendor.
+18. The current inventory policy is single-period newsvendor.
 
 19. `order_quantity` is derived from point forecasts or quantile forecasts plus the critical fractile.
 

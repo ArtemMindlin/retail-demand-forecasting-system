@@ -1,6 +1,6 @@
 # Dataframe Contracts
 
-This document defines the dataframe schemas used by the v1 pipeline.
+This document defines the dataframe schemas used by the v2 pipeline.
 
 The goal is to make agent changes safer: code may evolve, but these contracts should remain stable unless the experiment design changes deliberately.
 
@@ -11,7 +11,7 @@ Created by:
 - remote parquet read in `load_raw_split()`
 - optional local raw cache under `data/raw/fresh_retailnet/`
 
-Known raw columns used by v1:
+Known raw columns used by the current implementation:
 
 | Column | Meaning |
 | --- | --- |
@@ -48,7 +48,7 @@ Required columns:
 | --- | --- | --- |
 | `date` | datetime-like | forecast origin / panel date |
 | `series_id` | string-like | `store_id + "_" + product_id` |
-| `observed_demand` | numeric | observed demand used by v1 |
+| `observed_demand` | numeric | observed demand used by the current pipeline |
 | `stockout_hours` | numeric | stockout intensity/context |
 | `discount` | numeric | discount/context |
 | `holiday_flag` | numeric/binary | known calendar/context flag |

@@ -4,7 +4,7 @@
 
 El problema se formula como forecasting de demanda para decision de inventario en retail fresco. La salida del sistema no se evaluara solo por precision predictiva, sino por su capacidad para inducir decisiones con menor coste operativo esperado.
 
-En la v1, cada observacion representa una fecha de decision para una serie `store_id x product_id`. El objetivo es predecir la demanda observada acumulada durante el horizonte de lead time.
+En la v2, cada observacion representa una fecha de decision para una serie `store_id x product_id`. El objetivo es predecir la demanda acumulada durante el horizonte de lead time y evaluar decisiones de inventario bajo incertidumbre.
 
 ## Unidad de prediccion
 
@@ -20,7 +20,7 @@ En la v1, cada observacion representa una fecha de decision para una serie `stor
 
 ## Variable objetivo
 
-Target v1:
+Target v2:
 
 - suma de `sale_amount` observada a lo largo del horizonte `h`
 
@@ -89,7 +89,7 @@ Justificacion:
 - baseline interpretable y muy competitivo en series retail;
 - ayuda a separar valor real frente a complejidad gratuita.
 
-### Modelo avanzado v1
+### Modelo avanzado v2
 
 - boosting global sobre panel temporal
 
@@ -128,7 +128,7 @@ Estas metricas se usan para estudiar calibracion operacional aproximada y calida
 - coste total operativo
 - frontera de Pareto entre coste economico, sobrestock y rotura
 
-La v1 usa una estructura de costes configurable:
+La v2 usa una estructura de costes configurable y puede activar perfiles de coste por serie:
 
 - `c_over`: penalizacion por exceso
 - `c_under`: penalizacion por rotura
@@ -144,7 +144,7 @@ aumentar roturas, mientras que mejorar disponibilidad suele aumentar exceso.
 
 ## Escenarios con y sin drift
 
-La v1 no incluye aun un detector formal de drift, pero si prepara dos tipos de analisis:
+La v2 no incluye aun un detector formal de drift, pero si prepara dos tipos de analisis:
 
 1. comparacion fold a fold para observar degradacion temporal;
 2. segmentacion por intensidad de stockout como proxy de cambio de regimen operativo.
@@ -178,5 +178,5 @@ La conclusion experimental buscara identificar no solo que modelo predice mejor,
 
 - la demanda observada puede infraestimar demanda real en presencia de stockouts;
 - el dataset trabaja con demanda normalizada;
-- la v1 no modela aun demanda censurada ni lead times variables;
+- la v2 incorpora una estrategia heuristica de demanda latente, pero no estima demanda censurada con un modelo causal completo ni lead times variables;
 - la evaluacion economica es de una sola etapa, no una simulacion completa multi-periodo.

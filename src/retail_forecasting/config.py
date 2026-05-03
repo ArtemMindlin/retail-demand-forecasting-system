@@ -87,7 +87,7 @@ class InventoryConfig:
 @dataclass
 class ReportingConfig:
     output_dir: Path = Path("reports")
-    run_name: str = "fresh_retailnet_v1"
+    run_name: str = "fresh_retailnet_v2"
     make_plots: bool = True
 
 

@@ -19,7 +19,7 @@ Prefer domain names already used by the project:
 - `supervised_frame` for model-ready rows with features and target
 - `predictions` for model outputs plus inventory decisions
 - `metrics_summary`, `fold_metrics`, and `cost_summary` for evaluation outputs
-- `target_lead_time_demand` for the v1 target
+- `target_lead_time_demand` for the current lead-time demand target
 - `order_quantity` for the inventory decision
 
 Do not introduce alternate names for established columns unless the schema intentionally changes and `docs/contracts/dataframes.md` is updated.

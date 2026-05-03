@@ -77,7 +77,7 @@ def export_to_latex(
 
 if __name__ == "__main__":
     # Example usage for the latest report
-    latest_report = "reports/fresh_retailnet_v1_20260428_121659"
+    latest_report = "reports/fresh_retailnet_v2_YYYYMMDD_HHMMSS"
     export_to_latex(
         f"{latest_report}/metrics_summary.csv",
         f"{latest_report}/cost_summary.csv",

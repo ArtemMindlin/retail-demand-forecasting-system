@@ -146,7 +146,7 @@ Fuente principal:
 
 La capa de datos:
 
-- lee solo las columnas necesarias para la v1;
+- lee solo las columnas necesarias para la version actual;
 - cachea el split bruto en `data/raw/`;
 - materializa un panel procesado en `data/processed/`.
 
@@ -164,7 +164,7 @@ El preprocesamiento transforma el split bruto en un panel diario limpio:
 - filtrado de series con historia suficiente;
 - seleccion configurable de las series mas relevantes por volumen.
 
-La v1 usa demanda observada. Los stockouts no se corrigen aun para recuperar demanda latente; se mantienen como senal contextual.
+La v2 compara una estrategia de demanda observada con una estrategia heuristica de demanda latente. Los stockouts se mantienen como senal contextual y como insumo para el analisis operativo.
 
 ## 3. EDA reproducible
 
@@ -211,7 +211,7 @@ El modelo global se entrena sobre el panel completo filtrado, no serie a serie. 
 
 ## 6. Forecasting probabilistico
 
-La v1 implementa forecasting probabilistico minimo mediante cuantiles `0.1`, `0.5` y `0.9`.
+La v2 implementa forecasting probabilistico minimo mediante cuantiles `0.1`, `0.5` y `0.9`.
 
 Logica de backends:
 
@@ -223,7 +223,7 @@ Los cuantiles se fuerzan a ser monotonicamente no decrecientes para evitar incoh
 
 ## 7. Deteccion de drift
 
-La v1 no implementa aun un detector estadistico completo, pero deja preparado el modulo `drift` para:
+La v2 no implementa aun un detector estadistico completo, pero deja preparado el modulo `drift` para:
 
 - comparar rendimiento por fold temporal;
 - segmentar resultados por regimen operativo;
@@ -247,7 +247,7 @@ El diseno permite anadir despues:
 
 ## 9. Simulacion / decision de inventario
 
-La v1 implementa una capa de decision newsvendor por periodo:
+La v2 implementa una capa de decision newsvendor por periodo:
 
 - si solo hay forecast puntual, la cantidad pedida coincide con la prediccion puntual;
 - si hay cuantiles, la cantidad pedida se aproxima al fractil critico definido por la estructura de costes.
