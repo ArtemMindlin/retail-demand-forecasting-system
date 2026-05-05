@@ -103,6 +103,104 @@ class Settings:
     reporting: ReportingConfig = field(default_factory=ReportingConfig)
 
 
+def validate_settings(settings: Settings) -> None:
+    """Validate semantic experiment guardrails after loading configuration."""
+    errors: list[str] = []
+
+    if settings.dataset.source != "fresh_retailnet":
+        errors.append("dataset.source must be 'fresh_retailnet'.")
+
+    if settings.dataset.use_eval_as_holdout:
+        errors.append(
+            "dataset.use_eval_as_holdout must remain false until eval split temporal semantics are verified."
+        )
+
+    if settings.dataset.horizon <= 0:
+        errors.append("dataset.horizon must be greater than 0.")
+
+    if settings.dataset.min_history_days < settings.dataset.horizon:
+        errors.append("dataset.min_history_days must be at least dataset.horizon.")
+
+    if settings.dataset.top_n_series is not None and settings.dataset.top_n_series <= 0:
+        errors.append("dataset.top_n_series must be greater than 0 when set.")
+
+    if settings.dataset.max_rows is not None and settings.dataset.max_rows <= 0:
+        errors.append("dataset.max_rows must be greater than 0 when set.")
+
+    if settings.validation.initial_train_days < settings.dataset.horizon:
+        errors.append("validation.initial_train_days must be at least dataset.horizon.")
+
+    if settings.validation.n_folds <= 0:
+        errors.append("validation.n_folds must be greater than 0.")
+
+    if settings.validation.fold_size_days <= 0:
+        errors.append("validation.fold_size_days must be greater than 0.")
+
+    if not settings.features.lags:
+        errors.append("features.lags must not be empty.")
+
+    if any(lag <= 0 for lag in settings.features.lags):
+        errors.append("features.lags must contain only positive lags.")
+
+    if not settings.features.rolling_windows:
+        errors.append("features.rolling_windows must not be empty.")
+
+    if any(window <= 0 for window in settings.features.rolling_windows):
+        errors.append("features.rolling_windows must contain only positive windows.")
+
+    quantiles = settings.models.quantiles
+    if not quantiles:
+        errors.append("models.quantiles must not be empty.")
+    else:
+        if any(quantile <= 0.0 or quantile >= 1.0 for quantile in quantiles):
+            errors.append("models.quantiles must be strictly between 0 and 1.")
+        if len(set(quantiles)) != len(quantiles) or quantiles != sorted(quantiles):
+            errors.append(
+                "models.quantiles must be unique and sorted in ascending order."
+            )
+
+    if settings.models.seasonal_period <= 0:
+        errors.append("models.seasonal_period must be greater than 0.")
+
+    if settings.models.n_estimators <= 0:
+        errors.append("models.n_estimators must be greater than 0.")
+
+    if settings.models.learning_rate <= 0.0:
+        errors.append("models.learning_rate must be greater than 0.")
+
+    if settings.models.max_depth <= 0:
+        errors.append("models.max_depth must be greater than 0.")
+
+    if settings.models.tuning_trials <= 0:
+        errors.append("models.tuning_trials must be greater than 0.")
+
+    if settings.inventory.overstock_cost <= 0.0:
+        errors.append("inventory.overstock_cost must be greater than 0.")
+
+    if settings.inventory.stockout_cost <= 0.0:
+        errors.append("inventory.stockout_cost must be greater than 0.")
+
+    if settings.inventory.series_cost_strategy not in {"synthetic_series"}:
+        errors.append(
+            "inventory.series_cost_strategy must be one of: synthetic_series."
+        )
+
+    if not settings.inventory.pareto_order_scales:
+        errors.append("inventory.pareto_order_scales must not be empty.")
+
+    if any(scale < 0.0 for scale in settings.inventory.pareto_order_scales):
+        errors.append(
+            "inventory.pareto_order_scales must contain only non-negative scales."
+        )
+
+    if settings.reporting.output_dir.parts[:1] == ("data",):
+        errors.append("reporting.output_dir must not write into the data cache.")
+
+    if errors:
+        formatted_errors = "\n".join(f"- {error}" for error in errors)
+        raise ValueError(f"Invalid configuration:\n{formatted_errors}")
+
+
 def _with_path(section: dict[str, Any], key: str, default: Path) -> Path:
     value = section.get(key, default)
     return value if isinstance(value, Path) else Path(value)
@@ -193,7 +291,7 @@ def load_config(path: str | Path) -> Settings:
         make_plots=reporting_section.get("make_plots", default_reporting.make_plots),
     )
 
-    return Settings(
+    settings = Settings(
         project=project,
         dataset=dataset,
         preprocessing=preprocessing,
@@ -203,6 +301,8 @@ def load_config(path: str | Path) -> Settings:
         inventory=inventory,
         reporting=reporting,
     )
+    validate_settings(settings)
+    return settings
 
 
 def settings_to_dict(settings: Settings) -> dict[str, Any]:

@@ -39,7 +39,11 @@ def main() -> None:
         The reporting output directory can be overridden from the command line without modifying the YAML configuration.
     """
     args = build_parser().parse_args()
-    settings = load_config(args.config)
+    try:
+        settings = load_config(args.config)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None
+
     if args.output_dir is not None:
         settings.reporting.output_dir = Path(args.output_dir)
 

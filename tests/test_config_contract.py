@@ -2,7 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from retail_forecasting.config import load_config
+import pytest
+
+from retail_forecasting.config import (
+    DatasetConfig,
+    InventoryConfig,
+    ModelConfig,
+    ReportingConfig,
+    Settings,
+    ValidationConfig,
+    validate_settings,
+    load_config,
+)
 
 
 CONFIG_PATH = Path("configs/default.yaml")
@@ -46,3 +57,48 @@ def test_default_reporting_does_not_write_into_data_cache() -> None:
 
     output_dir = settings.reporting.output_dir
     assert output_dir.parts[0] != "data"
+
+
+def test_validate_settings_rejects_unsupported_eval_holdout() -> None:
+    settings = Settings(dataset=DatasetConfig(use_eval_as_holdout=True))
+
+    with pytest.raises(ValueError, match="use_eval_as_holdout"):
+        validate_settings(settings)
+
+
+def test_validate_settings_rejects_invalid_temporal_guardrails() -> None:
+    settings = Settings(
+        dataset=DatasetConfig(horizon=7, min_history_days=6),
+        validation=ValidationConfig(initial_train_days=6),
+    )
+
+    with pytest.raises(ValueError, match="min_history_days"):
+        validate_settings(settings)
+
+
+def test_validate_settings_rejects_invalid_quantiles() -> None:
+    settings = Settings(models=ModelConfig(quantiles=[0.5, 0.1, 0.5]))
+
+    with pytest.raises(ValueError, match="quantiles"):
+        validate_settings(settings)
+
+
+def test_validate_settings_rejects_unsorted_quantiles() -> None:
+    settings = Settings(models=ModelConfig(quantiles=[0.5, 0.1, 0.9]))
+
+    with pytest.raises(ValueError, match="ascending order"):
+        validate_settings(settings)
+
+
+def test_validate_settings_rejects_invalid_inventory_costs() -> None:
+    settings = Settings(inventory=InventoryConfig(overstock_cost=0.0))
+
+    with pytest.raises(ValueError, match="overstock_cost"):
+        validate_settings(settings)
+
+
+def test_validate_settings_rejects_data_cache_reporting_output() -> None:
+    settings = Settings(reporting=ReportingConfig(output_dir=Path("data/reports")))
+
+    with pytest.raises(ValueError, match="output_dir"):
+        validate_settings(settings)
