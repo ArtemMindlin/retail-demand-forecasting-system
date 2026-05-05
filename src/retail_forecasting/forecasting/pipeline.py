@@ -32,12 +32,6 @@ from retail_forecasting.utils.io import quantile_column_name
 
 def run_experiment(settings: Settings) -> RunArtifacts:
     """Run the end-to-end experiment comparing Observed vs Latent demand."""
-    if settings.dataset.source != "fresh_retailnet":
-        raise ValueError(
-            f"Unsupported dataset source '{settings.dataset.source}'. "
-            "The current v2 implementation supports only 'fresh_retailnet'."
-        )
-
     # 1. Load Original Panel
     raw_panel = load_prepared_panel(
         dataset_config=settings.dataset,

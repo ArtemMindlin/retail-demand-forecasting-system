@@ -201,95 +201,29 @@ def validate_settings(settings: Settings) -> None:
         raise ValueError(f"Invalid configuration:\n{formatted_errors}")
 
 
-def _with_path(section: dict[str, Any], key: str, default: Path) -> Path:
-    value = section.get(key, default)
-    return value if isinstance(value, Path) else Path(value)
-
-
 def load_config(path: str | Path) -> Settings:
     config_path = Path(path)
     with config_path.open("r", encoding="utf-8") as handle:
         raw_config = yaml.safe_load(handle) or {}
 
-    default_dataset = DatasetConfig()
-    default_reporting = ReportingConfig()
     project = ProjectConfig(**raw_config.get("project", {}))
 
-    dataset_section = raw_config.get("dataset", {})
-    dataset = DatasetConfig(
-        source=dataset_section.get("source", default_dataset.source),
-        hf_dataset_id=dataset_section.get(
-            "hf_dataset_id", default_dataset.hf_dataset_id
-        ),
-        splits=dataset_section.get("splits", default_dataset.splits),
-        local_cache_dir=_with_path(
-            dataset_section,
-            "local_cache_dir",
-            default_dataset.local_cache_dir,
-        ),
-        processed_panel_path=_with_path(
-            dataset_section,
-            "processed_panel_path",
-            default_dataset.processed_panel_path,
-        ),
-        use_local_cache=dataset_section.get(
-            "use_local_cache", default_dataset.use_local_cache
-        ),
-        refresh_processed_cache=dataset_section.get(
-            "refresh_processed_cache",
-            default_dataset.refresh_processed_cache,
-        ),
-        top_n_series=dataset_section.get("top_n_series", default_dataset.top_n_series),
-        min_history_days=dataset_section.get(
-            "min_history_days",
-            default_dataset.min_history_days,
-        ),
-        max_rows=dataset_section.get("max_rows", default_dataset.max_rows),
-        horizon=dataset_section.get("horizon", default_dataset.horizon),
-        use_eval_as_holdout=dataset_section.get(
-            "use_eval_as_holdout",
-            default_dataset.use_eval_as_holdout,
-        ),
-    )
+    dataset = DatasetConfig(**raw_config.get("dataset", {}))
+    dataset.local_cache_dir = Path(dataset.local_cache_dir)
+    dataset.processed_panel_path = Path(dataset.processed_panel_path)
 
     preprocessing = PreprocessingConfig(**raw_config.get("preprocessing", {}))
-    features = FeatureConfig(**raw_config.get("features", {}))
-    validation = ValidationConfig(**raw_config.get("validation", {}))
-    models = ModelConfig(**raw_config.get("models", {}))
-    inventory_section = raw_config.get("inventory", {})
-    inventory = InventoryConfig(
-        overstock_cost=inventory_section.get(
-            "overstock_cost", InventoryConfig().overstock_cost
-        ),
-        stockout_cost=inventory_section.get(
-            "stockout_cost", InventoryConfig().stockout_cost
-        ),
-        use_series_costs=inventory_section.get(
-            "use_series_costs",
-            InventoryConfig().use_series_costs,
-        ),
-        series_cost_strategy=inventory_section.get(
-            "series_cost_strategy",
-            InventoryConfig().series_cost_strategy,
-        ),
-        clip_negative_orders=inventory_section.get(
-            "clip_negative_orders",
-            InventoryConfig().clip_negative_orders,
-        ),
-        pareto_order_scales=inventory_section.get(
-            "pareto_order_scales",
-            InventoryConfig().pareto_order_scales,
-        ),
-    )
 
-    reporting_section = raw_config.get("reporting", {})
-    reporting = ReportingConfig(
-        output_dir=_with_path(
-            reporting_section, "output_dir", default_reporting.output_dir
-        ),
-        run_name=reporting_section.get("run_name", default_reporting.run_name),
-        make_plots=reporting_section.get("make_plots", default_reporting.make_plots),
-    )
+    features = FeatureConfig(**raw_config.get("features", {}))
+
+    validation = ValidationConfig(**raw_config.get("validation", {}))
+
+    models = ModelConfig(**raw_config.get("models", {}))
+
+    inventory = InventoryConfig(**raw_config.get("inventory", {}))
+
+    reporting = ReportingConfig(**raw_config.get("reporting", {}))
+    reporting.output_dir = Path(reporting.output_dir)
 
     settings = Settings(
         project=project,
