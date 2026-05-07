@@ -28,12 +28,10 @@ Do not introduce alternate names for established columns unless the schema inten
 
 Use these file naming conventions:
 
-- ADRs: `docs/decisions/ADR-0001-short-kebab-case-title.md`
-- plans: `docs/plans/YYYY-MM-DD-short-kebab-case-title.md`
 - contracts: `docs/contracts/<domain>.md`
 - general docs: `snake_case.md`
 
-Keep `AGENTS.md` short. Put detailed rules in `docs/` and link to them from `AGENTS.md`.
+Keep `AGENTS.md` short. Put detailed rules in the main `docs/` files and link to them from `AGENTS.md`.
 
 ## Tests
 

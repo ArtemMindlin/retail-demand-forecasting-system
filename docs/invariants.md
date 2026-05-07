@@ -112,6 +112,4 @@ These rules protect the experimental validity and architecture of the project.
 
     Do not treat them as source of truth for pipeline behavior.
 
-26. Durable design decisions belong in `docs/decisions/`.
-
-27. Current plans belong in `docs/plans/`.
+26. Durable design decisions belong in the main methodology and design documents.
