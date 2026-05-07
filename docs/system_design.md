@@ -20,122 +20,109 @@ flowchart TD
     A["Config YAML<br/>configs/default.yaml"] --> B["load_config()<br/>typed Settings"]
     B --> C["run_experiment()"]
 
-    C --> D["load_prepared_panel()<br/>FreshRetailNet train split"]
-    D --> E["prepare_daily_panel()<br/>raw names isolated in data layer"]
-    E --> F["Canonical panel<br/>date<br/>series_id<br/>observed_demand<br/>stockout_hours<br/>context/static ids"]
+    C --> D["load_prepared_panel()<br/>load cache or prepare FreshRetailNet panel"]
+    D --> E["Canonical panel<br/>date<br/>series_id<br/>observed_demand<br/>stockout_hours<br/>context/static ids"]
 
-    F --> G["Strategy A<br/>observed demand"]
-    F --> H["Strategy B<br/>latent demand imputation"]
-    H --> H1["LatentDemandImputer<br/>optional imputed demand signal"]
+    E --> F["Strategy A<br/>Observed demand"]
+    E --> G["Strategy B<br/>Latent demand"]
+    G --> G1["LatentDemandImputer<br/>stockout-aware demand correction"]
+    G1 --> G2["Imputed panel<br/>observed_demand replaced by latent_demand_est"]
 
-    G --> I["run_experiment_from_frame()<br/>Observed"]
-    H1 --> J["run_experiment_from_frame()<br/>Latent"]
+    F --> H["run_experiment_from_frame(panel, Observed)"]
+    G2 --> I["run_experiment_from_frame(panel, Latent_strategy)"]
 
-    I --> K["label_stockout_regime()"]
-    J --> L["label_stockout_regime()"]
+    H --> J["Observed predictions + metrics"]
+    I --> K["Latent predictions + metrics"]
 
-    K --> M{"use_series_costs?"}
-    L --> N{"use_series_costs?"}
-    M -->|yes| M1["build_series_cost_profile()<br/>c_over<br/>c_under<br/>critical_fractile"]
-    M -->|no| M2["global inventory costs"]
-    N -->|yes| N1["build_series_cost_profile()<br/>same contract"]
-    N -->|no| N2["global inventory costs"]
+    J --> L["merge strategy predictions"]
+    K --> L
 
-    K --> O["build_supervised_frame()"]
-    L --> P["build_supervised_frame()"]
-    O --> O1["Temporal features<br/>positive demand lags<br/>shifted rolling windows<br/>lagged stockout/discount/weather<br/>calendar/static features"]
-    P --> P1["Temporal features<br/>same anti-leakage contract"]
-    O1 --> Q["target_lead_time_demand<br/>sum demand from t to t+h-1"]
-    P1 --> R["target_lead_time_demand<br/>same horizon"]
+    L --> M["summarize_predictions()<br/>MAE, RMSE, pinball, coverage"]
+    L --> N["summarize_costs()<br/>economic ranking"]
+    L --> O["run_sensitivity_analysis()<br/>cost-ratio scenarios"]
+    L --> P["summarize_pareto_frontier()<br/>multiobjective policies"]
 
-    Q --> S["build_walk_forward_folds()"]
-    R --> T["build_walk_forward_folds()"]
-    S --> U["Fold loop<br/>expanding temporal validation"]
-    T --> V["Fold loop<br/>same fold semantics"]
+    M --> Q["RunArtifacts"]
+    N --> Q
+    O --> Q
+    P --> Q
+    L --> Q
 
-    U --> U1["train_frame<br/>date <= train_end_date"]
-    U --> U2["validation_frame<br/>validation_start_date to validation_end_date"]
-    V --> V1["train_frame"]
-    V --> V2["validation_frame"]
+    Q --> R["write_run_artifacts()"]
+    R --> R1["predictions.csv"]
+    R --> R2["metrics_summary.csv"]
+    R --> R3["fold_metrics.csv"]
+    R --> R4["cost_summary.csv"]
+    R --> R5["sensitivity_summary.csv"]
+    R --> R6["pareto_frontier.csv"]
+    R --> R7["report.md"]
+    R --> R8["plots when enabled"]
+```
 
-    U1 --> W["calibration split<br/>sub-train + calibration"]
-    V1 --> X["calibration split"]
+### Detalle de `run_experiment_from_frame()`
 
-    W --> Y["Model families"]
-    X --> Z["Model families"]
-    Y --> Y1["Seasonal naive<br/>heuristic baseline"]
-    Y --> Y2["Ridge baseline<br/>linear model"]
-    Y --> Y3["Auto boosting<br/>LightGBM/XGBoost/sklearn fallback"]
-    Y --> Y4["CatBoost"]
-    Y --> Y5["Auto ARIMA"]
+```mermaid
+flowchart TD
+    A["Input panel<br/>Observed or Latent strategy"] --> B["label_stockout_regime()"]
 
-    Z --> Z1["Same model families<br/>latent strategy"]
+    B --> C["build_supervised_frame()<br/>features + target"]
+    C --> C1["Temporal features<br/>positive demand lags<br/>shifted rolling windows<br/>lagged stockout/discount/weather<br/>calendar/static ids"]
+    C --> C2["target_lead_time_demand<br/>sum demand from t to t+h-1"]
 
-    Y2 --> AA["ConformalForecaster<br/>optional calibration"]
-    Y3 --> AA
-    Y4 --> AA
-    Y5 --> AA
-    Z1 --> AB["ConformalForecaster<br/>optional calibration"]
+    B --> D{"inventory.use_series_costs?"}
+    D -->|true| D1["build_series_cost_profile()<br/>series-level c_over<br/>series-level c_under<br/>critical_fractile"]
+    D -->|false| D2["global inventory costs<br/>config c_over / c_under"]
 
-    Y1 --> AC["Prediction frame"]
-    AA --> AC
-    AB --> AD["Prediction frame"]
+    B --> E["build_walk_forward_folds()<br/>temporal validation"]
+    E --> F["Fold loop"]
 
-    AC --> AC1["Forecast outputs<br/>y_pred<br/>q_* when available<br/>model_name<br/>backend_name<br/>fold_id"]
-    AD --> AD1["Forecast outputs<br/>same schema"]
+    F --> F1["train_frame<br/>date <= train_end_date"]
+    F --> F2["validation_frame<br/>validation_start_date to validation_end_date"]
+    F1 --> F3["calibration split<br/>sub-train + calibration"]
 
-    AC1 --> AE["choose_order_quantity()"]
-    AD1 --> AF["choose_order_quantity()"]
-    AE --> AE1{"Quantiles available?"}
-    AF --> AF1{"Quantiles available?"}
-    AE1 -->|yes| AG["interpolate forecast quantile<br/>at critical_fractile"]
-    AE1 -->|no| AH["order_quantity = y_pred"]
-    AF1 -->|yes| AI["interpolate forecast quantile"]
-    AF1 -->|no| AJ["order_quantity = y_pred"]
+    F3 --> G["Fit or reuse models"]
+    G --> G1["Seasonal naive"]
+    G --> G2["Ridge + ConformalForecaster"]
+    G --> G3["Auto boosting + ConformalForecaster"]
+    G --> G4["CatBoost + ConformalForecaster"]
+    G --> G5["Auto ARIMA + ConformalForecaster"]
 
-    AG --> AK["attach_inventory_costs()"]
-    AH --> AK
-    AI --> AL["attach_inventory_costs()"]
-    AJ --> AL
-    AK --> AK1["Inventory columns<br/>overstock_units<br/>stockout_units<br/>overstock_cost<br/>stockout_cost<br/>total_cost"]
-    AL --> AL1["Inventory columns<br/>same schema"]
+    F2 --> H["Build prediction frame"]
+    G1 --> H
+    G2 --> H
+    G3 --> H
+    G4 --> H
+    G5 --> H
 
-    AK1 --> AM["concatenate fold predictions<br/>Observed"]
-    AL1 --> AN["concatenate fold predictions<br/>Latent"]
-    AM --> AO["merge strategy predictions"]
-    AN --> AO
+    H --> H1["Forecast columns<br/>y_pred<br/>q_* if available<br/>model_name<br/>backend_name<br/>fold_id<br/>data_strategy"]
 
-    AO --> AP["summarize_predictions()"]
-    AO --> AQ["summarize_costs()"]
-    AO --> AR["run_sensitivity_analysis()"]
-    AO --> AS["summarize_pareto_frontier()"]
+    H1 --> I["choose_order_quantity()"]
+    D1 --> I
+    D2 --> I
 
-    AP --> AP1["Predictive diagnostics<br/>MAE<br/>RMSE<br/>pinball loss<br/>coverage"]
-    AQ --> AQ1["Economic summary<br/>total_cost<br/>mean_cost<br/>overstock units<br/>stockout units"]
-    AR --> AR1["Cost-ratio sensitivity<br/>Cs/Co scenarios"]
-    AS --> AS1["Candidate policies<br/>order_scale grid"]
-    AS1 --> AS2["Evaluate each candidate<br/>candidate order quantity<br/>cost<br/>overstock<br/>stockout<br/>service level<br/>fill rate"]
-    AS2 --> AS3["Pareto dominance<br/>minimize cost<br/>minimize overstock<br/>minimize stockout"]
-    AS3 --> AS4["is_pareto_efficient"]
+    I --> I1{"Quantiles available?"}
+    I1 -->|yes| I2["interpolate forecast quantile<br/>at critical_fractile"]
+    I1 -->|no| I3["use point forecast<br/>order_quantity = y_pred"]
 
-    AP1 --> AT["RunArtifacts"]
-    AQ1 --> AT
-    AR1 --> AT
-    AS4 --> AT
-    AO --> AT
+    I2 --> J["attach_inventory_costs()"]
+    I3 --> J
+    D1 --> J
+    D2 --> J
 
-    AT --> AU["write_run_artifacts()"]
-    AU --> AU1["predictions.csv"]
-    AU --> AU2["metrics_summary.csv"]
-    AU --> AU3["fold_metrics.csv"]
-    AU --> AU4["cost_summary.csv"]
-    AU --> AU5["sensitivity_summary.csv"]
-    AU --> AU6["pareto_frontier.csv"]
-    AU --> AU7["report.md"]
-    AU --> AU8["plots when enabled"]
+    J --> J1["Inventory columns<br/>overstock_units<br/>stockout_units<br/>overstock_cost<br/>stockout_cost<br/>total_cost"]
+    J1 --> K["append fold predictions"]
 
-    AU7 --> AV["Interpretation<br/>accuracy diagnostics + economic ranking"]
-    AU6 --> AW["Multiobjective interpretation<br/>availability vs overstock/waste trade-off"]
+    K --> L["concatenate folds"]
+    L --> M["summarize_predictions()"]
+    L --> N["summarize_costs()"]
+    L --> O["run_sensitivity_analysis()"]
+    L --> P["summarize_pareto_frontier()"]
+
+    M --> Q["RunArtifacts for one strategy"]
+    N --> Q
+    O --> Q
+    P --> Q
+    L --> Q
 ```
 
 ## 1. Ingesta de datos
