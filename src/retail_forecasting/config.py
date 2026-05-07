@@ -61,7 +61,6 @@ class ValidationConfig:
 
 @dataclass
 class ModelConfig:
-    point_model: str = "auto_boosting"
     quantiles: list[float] = field(default_factory=lambda: [0.1, 0.5, 0.9])
     seasonal_period: int = 7
     n_estimators: int = 200

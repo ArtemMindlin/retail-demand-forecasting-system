@@ -38,7 +38,6 @@ validation:
   drift_triggered_retrain: false
 
 models:
-  point_model: auto_boosting
   quantiles: [0.1, 0.5, 0.9]
   seasonal_period: 7
   n_estimators: 500
