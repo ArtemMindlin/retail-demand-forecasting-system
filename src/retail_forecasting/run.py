@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from retail_forecasting.config import load_config
 from retail_forecasting.forecasting.pipeline import run_experiment
 
@@ -41,11 +43,14 @@ def main() -> None:
     args = build_parser().parse_args()
     try:
         settings = load_config(args.config)
-    except ValueError as exc:
+    except (ValueError, ValidationError) as exc:
         raise SystemExit(str(exc)) from None
 
     if args.output_dir is not None:
-        settings.reporting.output_dir = Path(args.output_dir)
+        new_reporting = settings.reporting.model_copy(
+            update={"output_dir": Path(args.output_dir)}
+        )
+        settings = settings.model_copy(update={"reporting": new_reporting})
 
     artifacts = run_experiment(settings)
     if artifacts.run_directory is None:
