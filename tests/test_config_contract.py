@@ -11,6 +11,7 @@ from retail_forecasting.config import (
     DatasetConfig,
     InventoryConfig,
     ModelConfig,
+    PreprocessingConfig,
     ReportingConfig,
     Settings,
     ValidationConfig,
@@ -91,6 +92,11 @@ def test_settings_instantiation_rejects_invalid_inventory_costs() -> None:
 def test_settings_instantiation_rejects_data_cache_reporting_output() -> None:
     with pytest.raises(ValidationError, match="output_dir"):
         Settings(reporting=ReportingConfig(output_dir=Path("data/reports")))
+
+
+def test_settings_instantiation_rejects_invalid_imputation_strategy() -> None:
+    with pytest.raises(ValidationError, match="imputation_strategy"):
+        Settings(preprocessing=PreprocessingConfig(imputation_strategy="random_forest"))
 
 
 def test_config_is_immutable() -> None:

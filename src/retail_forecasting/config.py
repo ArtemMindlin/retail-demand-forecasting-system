@@ -59,7 +59,9 @@ class PreprocessingConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     drop_negative_sales: bool = True
     fill_missing_values: bool = True
-    imputation_strategy: str = "supervised"
+    imputation_strategy: Literal[
+        "supervised", "historical_mean", "clipped_scaling", "none"
+    ] = "supervised"
 
 
 class FeatureConfig(BaseModel):
