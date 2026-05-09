@@ -97,6 +97,8 @@ La construcción de los pliegues exige un número mínimo de fechas distintas en
 
 El término asociado al horizonte garantiza que el último origen de validación tenga suficiente futuro observado para calcular la demanda acumulada del horizonte. En la configuración base, este requisito toma el valor $45 + 3 \cdot 7 + 7 - 1 = 72$ fechas distintas.
 
+Operativamente, los pliegues se construyen sobre el calendario global de fechas únicas del panel, no sobre cada serie individual. El primer pliegue comienza tras $D_0$ fechas de entrenamiento inicial y cada pliegue posterior desplaza el inicio de validación $\Delta$ fechas hacia delante. Para el pliegue $j$, el índice inicial de validación es $D_0 + j \cdot \Delta$ y el índice final es $D_0 + (j+1)\cdot\Delta - 1$. El último índice admisible es $D - H$, donde $D$ es el número total de fechas únicas; de este modo, el último origen de validación aún dispone de $H$ observaciones futuras, incluyendo el propio día de origen, para construir la etiqueta de demanda acumulada.
+
 Este esquema garantiza que el modelo se evalúe siempre sobre datos que nunca ha visto y que son cronológicamente posteriores a su entrenamiento, simulando un despliegue real en producción.
 
 \section{Cuantificación de la Incertidumbre y Calibración}
