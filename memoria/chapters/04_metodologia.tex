@@ -13,6 +13,10 @@ El objetivo es predecir la demanda acumulada de un producto en una tienda espec�
 
 Esta formulación permite que el pronóstico esté directamente alineado con la decisión de inventario: cuántas unidades se necesitan para cubrir el periodo hasta la próxima reposición.
 
+En la implementación, esta variable se construye desplazando la demanda observada hacia el futuro dentro de cada serie tienda-producto. Para cada origen temporal $t$, se agregan los valores $y_{s,t}$, $y_{s,t+1}$, ..., $y_{s,t+H-1}$, sin mezclar observaciones de distintas series. Por tanto, la demanda observada diaria no se usa como objetivo aislado, sino como componente de una etiqueta acumulada de \textit{lead time}. Las últimas observaciones de cada serie se descartan cuando no existe un horizonte futuro completo para calcular esta suma.
+
+Esta distinción es crítica para evitar \textit{data leakage}: los valores futuros se usan únicamente para construir la etiqueta durante entrenamiento y evaluación, mientras que las variables explicativas se calculan con información disponible antes del origen de predicción, mediante retardos positivos y ventanas móviles históricas.
+
 \section{Ingeniería de Características y Política Anti-Leakage}
 Para capturar la complejidad de la demanda en \textit{retail}, se construye un panel de datos enriquecido con diversas familias de características. Un principio fundamental en el diseño es la \textbf{prevención del sesgo de información futura} (\textit{data leakage}).
 
