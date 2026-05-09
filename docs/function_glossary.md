@@ -52,29 +52,11 @@ main()
 
 ### `load_config`
 - Archivo: `src/retail_forecasting/config.py`
-- Que hace: carga el YAML y construye un objeto `Settings` tipado.
+- Que hace: carga el YAML y construye un objeto `Settings` tipado y validado automáticamente con Pydantic.
 - Recibe:
-  - `path`: ruta al archivo de configuracion.
+  - `path`: ruta al archivo de configuración.
 - Devuelve: `Settings`.
 - Se usa en: `main()`.
-
-### `_with_path`
-- Archivo: `src/retail_forecasting/config.py`
-- Que hace: asegura que ciertos campos de configuracion queden como `Path`.
-- Recibe:
-  - `section`: diccionario de configuracion;
-  - `key`: clave a leer;
-  - `default`: valor por defecto.
-- Devuelve: `Path`.
-- Se usa en: `load_config()`.
-
-### `settings_to_dict`
-- Archivo: `src/retail_forecasting/config.py`
-- Que hace: convierte `Settings` a un diccionario serializable para escribirlo en el report.
-- Recibe:
-  - `settings`: configuracion del experimento.
-- Devuelve: `dict[str, Any]`.
-- Se usa en: `build_markdown_report()`.
 
 ## Data Loading
 

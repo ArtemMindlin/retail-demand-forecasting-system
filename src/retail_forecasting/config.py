@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import yaml
 from pydantic import (
@@ -182,7 +182,3 @@ def load_config(path: str | Path) -> Settings:
         raw_config = yaml.safe_load(handle) or {}
 
     return Settings(**raw_config)
-
-
-def settings_to_dict(settings: Settings) -> dict[str, Any]:
-    return settings.model_dump()

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from retail_forecasting.config import Settings, settings_to_dict
+from retail_forecasting.config import Settings
 from retail_forecasting.utils.io import (
     dataframe_to_markdown,
     ensure_directory,
@@ -63,7 +63,7 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
 
 
 def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
-    serializable_settings = settings_to_dict(settings)
+    serializable_settings = settings.model_dump()
     settings_lines = [
         f"- `{section}`: `{values}`"
         for section, values in serializable_settings.items()
