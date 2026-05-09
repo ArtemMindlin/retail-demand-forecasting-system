@@ -28,6 +28,49 @@ Para capturar la complejidad de la demanda en \textit{retail}, se construye un p
     \item \textbf{Identificadores Estáticos}: Variables categóricas que representan la jerarquía del producto y la ubicación de la tienda.
 \end{itemize}
 
+\subsection{Construcción Operativa de Variables}
+La función de ingeniería de características transforma el panel diario en una matriz supervisada manteniendo una correspondencia uno-a-uno entre cada fila y un origen de predicción $(s,t)$. La Tabla~\ref{tab:feature_engineering_variables} resume las familias de variables construidas, sus nombres representativos y la restricción temporal aplicada.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{p{0.23\textwidth} p{0.34\textwidth} p{0.34\textwidth}}
+        \toprule
+        \textbf{Familia} & \textbf{Variables generadas} & \textbf{Criterio temporal} \\
+        \midrule
+        Calendario &
+        \texttt{day\_of\_week}, \texttt{day\_of\_month}, \texttt{month}, \texttt{week\_of\_year}, \texttt{is\_weekend}, \texttt{holiday\_flag}, \texttt{activity\_flag} &
+        Disponibles en el origen de predicción; no dependen de demanda futura. \\
+        \addlinespace
+        Demanda histórica &
+        \texttt{demand\_lag\_1}, \texttt{demand\_lag\_7}, \texttt{demand\_lag\_14}, \texttt{demand\_lag\_28} &
+        Se calculan con retardos positivos por \texttt{series\_id}; en $t$ solo se usan valores $y_{s,t-k}$. \\
+        \addlinespace
+        Ventanas móviles de demanda &
+        \texttt{demand\_roll\_mean\_*}, \texttt{demand\_roll\_sum\_*}, \texttt{demand\_roll\_std\_*} &
+        Antes del rolling se aplica \texttt{shift(1)}, por lo que la ventana termina en $t-1$ y excluye la demanda del día evaluado. \\
+        \addlinespace
+        Promoción y disponibilidad &
+        \texttt{discount\_lag\_*}, \texttt{stockout\_lag\_*}, \texttt{stockout\_roll\_mean\_*} &
+        Entran únicamente como información histórica. Los \textit{stockouts} realizados no se usan contemporáneamente para predecir el mismo origen. \\
+        \addlinespace
+        Meteorología &
+        \texttt{precpt\_lag\_*}, \texttt{avg\_temperature\_lag\_*}, \texttt{avg\_humidity\_lag\_*}, \texttt{avg\_wind\_level\_lag\_*} &
+        Se incorporan con retardos positivos para evitar usar observaciones exógenas realizadas después del origen temporal. \\
+        \addlinespace
+        Identificadores estáticos &
+        \texttt{city\_id}, \texttt{store\_id}, \texttt{management\_group\_id}, \texttt{first\_category\_id}, \texttt{second\_category\_id}, \texttt{third\_category\_id}, \texttt{product\_id} &
+        Son atributos fijos de tienda, producto o jerarquía comercial; no introducen información futura. \\
+        \bottomrule
+    \end{tabular}
+    \caption{Familias de variables construidas durante la ingeniería de características.}
+    \label{tab:feature_engineering_variables}
+\end{table}
+
+Los retardos y ventanas concretos se parametrizan desde la configuración del experimento, lo que permite comparar distintas granularidades históricas sin alterar el código. En la configuración base se utilizan retardos de 1, 7, 14 y 28 días, junto con ventanas móviles de 7 y 28 días, capturando tanto memoria de muy corto plazo como patrones semanales.
+
+Después de construir estas variables, se eliminan las filas que no disponen de historial suficiente para calcular los retardos o ventanas requeridas. También se eliminan las filas sin \texttt{target\_lead\_time\_demand}, normalmente situadas al final de cada serie por falta de horizonte futuro completo. Finalmente, la columna objetivo queda excluida explícitamente del conjunto \texttt{feature\_columns}; de este modo, la matriz de entrada contiene solo información disponible en el origen de predicción, mientras que la demanda futura acumulada se conserva únicamente como etiqueta supervisada.
+
 \section{Diseño Experimental: Validación Walk-Forward}
 Dada la naturaleza temporal de los datos, no es posible utilizar una validación cruzada aleatoria tradicional, ya que violaría la estructura causal del tiempo. En su lugar, se implementa un esquema de \textbf{validación temporal \textit{walk-forward}} con ventanas expansivas.
 
