@@ -36,10 +36,26 @@ El proceso se divide en $N$ pliegues (\textit{folds}). Para cada pliegue:
 
 Este esquema garantiza que el modelo se evalúe siempre sobre datos que nunca ha visto y que son cronológicamente posteriores a su entrenamiento, simulando un despliegue real en producción.
 
-\section{Cuantificación de la Incertidumbre}
-El sistema no genera una predicción única, sino un conjunto de cuantiles ($\tau \in \{0.1, 0.5, 0.9\}$) mediante \textbf{Regresión Cuantílica} utilizando CatBoost. Para asegurar que estos cuantiles sean fiables, se integran técnicas de \textbf{Conformal Prediction}. 
+\section{Cuantificación de la Incertidumbre y Calibración}
+El sistema no genera únicamente una predicción puntual, sino un conjunto de cuantiles operativos ($\tau \in \{0.1, 0.5, 0.9\}$) para soportar la toma de decisiones bajo riesgo. Para asegurar que estos cuantiles sean estadísticamente válidos, se integra un marco de \textbf{Conformal Prediction}.
 
-El método ajusta los intervalos de confianza basándose en la magnitud de los residuos observados en un conjunto de calibración. Esto permite transformar los intervalos "crudos" del modelo en intervalos con garantías teóricas de cobertura, adaptándose a periodos de alta volatilidad donde el modelo tiende a ser menos preciso.
+\subsection{El Problema de los Cuantiles Crudos}
+Los modelos de \textit{Gradient Boosting} (como CatBoost o LightGBM) pueden entrenarse utilizando una función de pérdida de \textit{Pinball}, lo que les permite estimar cuantiles. Sin embargo, en la práctica, estos cuantiles suelen estar mal calibrados debido al \textit{overfitting} o a cambios en la distribución de los datos, lo que significa que un intervalo del $80\%$ nominal podría cubrir solo el $65\%$ de los datos reales.
+
+\subsection{Marco de Conformal Prediction}
+Para corregir este sesgo, se implementa una variante del método de \textit{Split Conformal Prediction}. El proceso se formaliza de la siguiente manera:
+
+\begin{enumerate}
+    \item \textbf{Corte de Calibración}: Se reserva un conjunto de datos de calibración ($\mathcal{D}_{cal}$) que no ha sido utilizado durante el entrenamiento del modelo. En este sistema, se utilizan los últimos 21 días del conjunto de entrenamiento para este fin.
+    \item \textbf{Score de No-Conformidad}: Para cada observación en $\mathcal{D}_{cal}$, se calcula un \textit{score} de error que mide la discrepancia entre el valor real $y_i$ y el intervalo predicho. Cuando el modelo base ofrece cuantiles, se usa un score de tipo CQR basado en la máxima desviación respecto a los extremos del intervalo; cuando solo ofrece predicción puntual, se usa el residuo absoluto.
+    \item \textbf{Ajuste de Cuantiles}: Se calcula el percentil corregido de los errores observados en el conjunto de calibración. El cuantil final para una nueva observación $x_{test}$ se define como:
+    \begin{equation}
+        q_{final} = \hat{q}_{\tau}(x_{test}) + Q(1-\alpha, \{E_i\}_{i \in \mathcal{D}_{cal}})
+    \end{equation}
+    donde $Q$ es la función de cuantil empírico sobre los errores de calibración.
+\end{enumerate}
+
+Este enfoque garantiza, bajo la asunción de intercambiabilidad de los datos, que el error de cobertura esté acotado teóricamente, proporcionando intervalos de confianza robustos que se ensanchan automáticamente en periodos de alta incertidumbre y se estrechan cuando el modelo es preciso.
 
 \section{Marco de Evaluación Multi-Objetivo}
 La evaluación del sistema se realiza en tres niveles complementarios:

@@ -39,8 +39,52 @@ La implementación técnica no es un fin en sí mismo, sino un soporte para la v
     \item \textbf{Reproducibilidad}: Cada ejecución genera un reporte (\texttt{reports/}) que incluye la configuración exacta de los hiperparámetros y el estado de la semilla aleatoria, garantizando que cualquier resultado pueda ser auditado y replicado.
 \end{itemize}
 
-\section{Perfiles de Coste por Serie}
+\section{Tratamiento de la Demanda Latente}
+Uno de los retos principales del proyecto es el sesgo introducido por las roturas de stock (\textit{stockouts}). Cuando un producto se agota durante parte del día, las ventas observadas pueden quedar artificialmente deprimidas, aunque la demanda latente (lo que el cliente habría comprado con disponibilidad suficiente) siga existiendo. El sistema implementa un módulo de \texttt{LatentDemandImputer} para abordar este problema.
 
+\subsection{Estrategia de Imputación Supervisada}
+La técnica principal implementada es un enfoque de \textbf{Modelo Profesor (\textit{Teacher Model})}. El proceso consiste en:
+\begin{enumerate}
+    \item \textbf{Filtro de Datos Limpios}: Se segmenta el panel de datos en días "limpios" (con stock suficiente) y días "censurados" (con rotura de stock detectada).
+    \item \textbf{Entrenamiento del Imputador}: Se entrena un modelo LightGBM exclusivamente sobre los días limpios. El modelo aprende a predecir la demanda basándose en la estacionalidad (mes, día de la semana) y la jerarquía de productos, sin verse contaminado por el sesgo de la falta de stock.
+    \item \textbf{Des-censura de Ventas}: El modelo entrenado predice la demanda esperada para los días de rotura. La demanda latente final se estima como el valor máximo entre la venta observada y la predicción del modelo:
+    \begin{equation}
+        \hat{y}_{latente} = \max(y_{observada}, \hat{y}_{profesor})
+    \end{equation}
+\end{enumerate}
+
+Este enfoque permite que el pipeline compare de forma empírica el rendimiento de los modelos entrenados con datos "sucios" (basales) frente a datos corregidos estadísticamente.
+
+\section{Configuración Robusta y Principios MLOps}
+Para garantizar que el sistema es escalable y apto para un entorno de producción, se ha migrado la gestión de parámetros de simples diccionarios a un sistema basado en \textbf{Pydantic}.
+
+\subsection{Validación y Contratos de Configuración}
+El uso de modelos de datos de Pydantic aporta las siguientes ventajas operativas:
+\begin{itemize}
+    \item \textbf{Validación Automática}: El sistema rechaza cualquier configuración con tipos erróneos o valores fuera de rango (ej. horizontes negativos) antes de iniciar la ejecución pesada.
+    \item \textbf{Inmutabilidad (\textit{Frozen Config})}: Una vez cargados los parámetros, el objeto de configuración queda bloqueado. Esto previene cambios accidentales durante el experimento, asegurando que los metadatos del reporte coinciden exactamente con lo ejecutado.
+    \item \textbf{Inyección por Entorno}: Gracias a \texttt{pydantic-settings}, el sistema soporta la sobrescritura de parámetros mediante variables de entorno (\texttt{RETAIL\_*}), facilitando el despliegue en contenedores Docker y tuberías de integración continua (CI/CD) sin necesidad de modificar archivos fuente.
+\end{itemize}
+
+\section{Perfiles de Coste por Serie}
 La capa de inventario se ha extendido para soportar perfiles de coste específicos por serie (\texttt{series\_id = store\_id \times product\_id}). En lugar de utilizar un único par global $(c_o, c_u)$ para todo el sistema, se construye una tabla de costes sintéticos por serie a partir del panel preparado. Esta tabla utiliza como \textit{proxies} la intensidad de demanda, la intermitencia, la frecuencia histórica de \textit{stockout} y la inestabilidad agregada de la categoría de producto.
 
 El objetivo de esta extensión no es estimar un coste contable exacto, sino aproximar mejor la asimetría económica real del problema. Así, series con productos más perecederos o con rotación más lenta reciben un mayor $c_{o,s}$, mientras que series con mayor presión de demanda o con mayor criticidad histórica de servicio reciben un mayor $c_{u,s}$. La decisión de pedido sigue siendo modular y se mantiene dentro de la capa \texttt{inventory/}, preservando la separación entre predicción, decisión y evaluación.
+
+\subsection{Algoritmo de Generación de Perfiles Económicos}
+Para la construcción de los costes sintéticos, se ha diseñado un motor heurístico que transforma métricas logísticas en coeficientes de coste. El proceso sigue tres etapas fundamentales:
+
+\begin{enumerate}
+    \item \textbf{Normalización por Percentiles}: Dado que las magnitudes de demanda varían órdenes de magnitud entre productos, todas las métricas base (demanda media, intermitencia, inestabilidad) se transforman a su rango percentil $[0, 1]$ relativo al resto del panel. Esto permite comparar de forma justa el comportamiento de un producto de alto volumen con uno marginal.
+    \item \textbf{Dimensiones de Decisión}: Se calculan tres puntuaciones compuestas mediante combinaciones lineales de los percentiles:
+    \begin{itemize}
+        \item \textit{Perecederidad}: Basada en la inestabilidad histórica de la categoría de producto y la intermitencia individual. Captura el riesgo de obsolescencia.
+        \item \textit{Criticidad de Servicio}: Pondera el volumen de ventas y la tensión histórica de \textit{stockout}. Identifica productos donde una rotura de stock tiene un alto impacto en el nivel de servicio percibido.
+        \item \textit{Baja Rotación (Slow-moving)}: Identifica productos con demanda esporádica que son ineficientes de mantener en stock.
+    \end{itemize}
+    \item \textbf{Cálculo del Fractil Crítico}: Estas puntuaciones actúan como multiplicadores de los costes base configurados ($c_{o,base}, c_{s,base}$), resultando en un par $(c_{o,s}, c_{s,s})$ único para cada serie. Finalmente, se deriva el fractil crítico individual mediante la fórmula del \textit{Newsvendor}:
+    \begin{equation}
+        \tau_s = \frac{c_{s,s}}{c_{s,s} + c_{o,s}}
+    \end{equation}
+    Este valor $\tau_s$ es el que guía la optimización de la cantidad de pedido para cada serie específica durante el proceso de evaluación.
+\end{enumerate}
