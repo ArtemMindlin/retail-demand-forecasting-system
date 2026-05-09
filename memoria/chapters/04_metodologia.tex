@@ -92,10 +92,10 @@ El proceso se divide en $N$ pliegues (\textit{folds}). Para cada pliegue:
 La construcción de los pliegues exige un número mínimo de fechas distintas en el panel. Si $D_0$ es el número de días iniciales de entrenamiento, $N$ el número de pliegues, $\Delta$ el tamaño de cada ventana de validación y $H$ el horizonte de predicción, el requisito operativo es:
 
 \begin{equation}
-    D_{min} = D_0 + N \cdot \Delta + H
+    D_{min} = D_0 + N \cdot \Delta + H - 1
 \end{equation}
 
-El último término garantiza que el último origen de validación tenga suficiente futuro observado para calcular la demanda acumulada del horizonte. En la configuración base, este requisito toma el valor $45 + 3 \cdot 7 + 7 = 73$ fechas distintas.
+El término asociado al horizonte garantiza que el último origen de validación tenga suficiente futuro observado para calcular la demanda acumulada del horizonte. En la configuración base, este requisito toma el valor $45 + 3 \cdot 7 + 7 - 1 = 72$ fechas distintas.
 
 Este esquema garantiza que el modelo se evalúe siempre sobre datos que nunca ha visto y que son cronológicamente posteriores a su entrenamiento, simulando un despliegue real en producción.
 

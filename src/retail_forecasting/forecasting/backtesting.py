@@ -60,6 +60,7 @@ def build_walk_forward_folds(
         validation_config.initial_train_days
         + validation_config.n_folds * validation_config.fold_size_days
         + horizon
+        - 1
     )
     if len(unique_dates) < minimum_dates_required:
         raise ValueError(
@@ -68,7 +69,7 @@ def build_walk_forward_folds(
         )
 
     folds: list[FoldSpec] = []
-    last_valid_index = len(unique_dates) - horizon - 1
+    last_valid_index = len(unique_dates) - horizon
 
     for fold_id in range(validation_config.n_folds):
         validation_start_index = (

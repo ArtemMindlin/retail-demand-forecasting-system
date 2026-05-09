@@ -24,6 +24,24 @@ def test_walk_forward_folds_respect_horizon_cutoff() -> None:
     assert (first_fold.validation_start_date - first_fold.train_end_date).days == 7
 
 
+def test_walk_forward_folds_allow_last_complete_target_origin() -> None:
+    panel = make_synthetic_panel(num_series=1, num_days=14)
+    validation = ValidationConfig(initial_train_days=5, n_folds=2, fold_size_days=3)
+
+    folds = build_walk_forward_folds(panel, validation, horizon=4)
+
+    assert len(folds) == 2
+    assert folds[-1].validation_end_date == panel["date"].max() - pd.Timedelta(days=3)
+
+
+def test_walk_forward_folds_require_enough_dates_for_last_target() -> None:
+    panel = make_synthetic_panel(num_series=1, num_days=13)
+    validation = ValidationConfig(initial_train_days=5, n_folds=2, fold_size_days=3)
+
+    with pytest.raises(ValueError, match="Need at least 14, found 13"):
+        build_walk_forward_folds(panel, validation, horizon=4)
+
+
 def test_fold_spec_validates_temporal_contract() -> None:
     with pytest.raises(
         ValidationError,
