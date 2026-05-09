@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, overload
+from typing import Literal
 
 import pandas as pd
 from pandas.core.groupby.generic import SeriesGroupBy
@@ -27,30 +27,12 @@ class FeatureFrameMetadata(BaseModel):
     rows_not_latest_origin: int = Field(default=0, ge=0)
 
 
-@overload
-def build_feature_frame(
-    panel: pd.DataFrame,
-    feature_config: FeatureConfig,
-    *,
-    return_metadata: Literal[False] = False,
-) -> tuple[pd.DataFrame, list[str]]: ...
-
-
-@overload
-def build_feature_frame(
-    panel: pd.DataFrame,
-    feature_config: FeatureConfig,
-    *,
-    return_metadata: Literal[True],
-) -> tuple[pd.DataFrame, FeatureFrameMetadata]: ...
-
-
 def build_feature_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
     *,
     return_metadata: bool = False,
-) -> tuple[pd.DataFrame, list[str]] | tuple[pd.DataFrame, FeatureFrameMetadata]:
+) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
     """Build reusable feature columns from a prepared daily panel.
 
     Args:
@@ -176,33 +158,13 @@ def build_feature_frame(
     return frame, feature_columns
 
 
-@overload
-def build_supervised_frame(
-    panel: pd.DataFrame,
-    feature_config: FeatureConfig,
-    horizon: int,
-    *,
-    return_metadata: Literal[False] = False,
-) -> tuple[pd.DataFrame, list[str]]: ...
-
-
-@overload
-def build_supervised_frame(
-    panel: pd.DataFrame,
-    feature_config: FeatureConfig,
-    horizon: int,
-    *,
-    return_metadata: Literal[True],
-) -> tuple[pd.DataFrame, FeatureFrameMetadata]: ...
-
-
 def build_supervised_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
     horizon: int,
     *,
     return_metadata: bool = False,
-) -> tuple[pd.DataFrame, list[str]] | tuple[pd.DataFrame, FeatureFrameMetadata]:
+) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
     """Build the supervised modeling frame and feature list from a panel.
 
     Args:
@@ -250,30 +212,12 @@ def build_supervised_frame(
     return frame, feature_columns
 
 
-@overload
-def build_inference_frame(
-    panel: pd.DataFrame,
-    feature_config: FeatureConfig,
-    *,
-    return_metadata: Literal[False] = False,
-) -> tuple[pd.DataFrame, list[str]]: ...
-
-
-@overload
-def build_inference_frame(
-    panel: pd.DataFrame,
-    feature_config: FeatureConfig,
-    *,
-    return_metadata: Literal[True],
-) -> tuple[pd.DataFrame, FeatureFrameMetadata]: ...
-
-
 def build_inference_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
     *,
     return_metadata: bool = False,
-) -> tuple[pd.DataFrame, list[str]] | tuple[pd.DataFrame, FeatureFrameMetadata]:
+) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
     """Build one prediction-ready row per series from the latest valid origin.
 
     Args:
