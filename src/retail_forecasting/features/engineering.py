@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from pandas.core.groupby.generic import SeriesGroupBy
 
 from retail_forecasting.config import FeatureConfig
 
@@ -59,19 +60,25 @@ def build_supervised_frame(
         sum_column = f"demand_roll_sum_{window}"
         std_column = f"demand_roll_std_{window}"
         frame[mean_column] = grouped["observed_demand"].transform(
-            lambda series: series.shift(1).rolling(window=window, min_periods=window).mean()
+            lambda series: series.shift(1)
+            .rolling(window=window, min_periods=window)
+            .mean()
         )
         frame[sum_column] = grouped["observed_demand"].transform(
-            lambda series: series.shift(1).rolling(window=window, min_periods=window).sum()
+            lambda series: series.shift(1)
+            .rolling(window=window, min_periods=window)
+            .sum()
         )
         frame[std_column] = grouped["observed_demand"].transform(
-            lambda series: series.shift(1).rolling(window=window, min_periods=window).std()
+            lambda series: series.shift(1)
+            .rolling(window=window, min_periods=window)
+            .std()
         )
         frame[std_column] = frame[std_column].fillna(0.0)
         feature_columns.extend([mean_column, sum_column, std_column])
 
     if feature_config.include_discount_lags:
-         for lag in sorted(set(feature_config.lags)):
+        for lag in sorted(set(feature_config.lags)):
             column = f"discount_lag_{lag}"
             frame[column] = grouped["discount"].shift(lag)
             feature_columns.append(column)
@@ -84,7 +91,9 @@ def build_supervised_frame(
         for window in sorted(set(feature_config.rolling_windows)):
             column = f"stockout_roll_mean_{window}"
             frame[column] = grouped["stockout_hours"].transform(
-                lambda series: series.shift(1).rolling(window=window, min_periods=window).mean()
+                lambda series: series.shift(1)
+                .rolling(window=window, min_periods=window)
+                .mean()
             )
             feature_columns.append(column)
 
@@ -113,7 +122,9 @@ def build_supervised_frame(
         ]
         feature_columns.extend(static_columns)
 
-    frame["target_lead_time_demand"] = _build_target(grouped["observed_demand"], horizon)
+    frame["target_lead_time_demand"] = _build_target(
+        grouped["observed_demand"], horizon
+    )
     frame["target_horizon_days"] = horizon
 
     frame = frame.loc[frame["target_lead_time_demand"].notna()].copy()
@@ -123,7 +134,7 @@ def build_supervised_frame(
     return frame, feature_columns
 
 
-def _build_target(series_group: pd.core.groupby.SeriesGroupBy, horizon: int) -> pd.Series:
+def _build_target(series_group: SeriesGroupBy, horizon: int) -> pd.Series:
     """Aggregate future demand over the configured forecast horizon.
 
     Args:
