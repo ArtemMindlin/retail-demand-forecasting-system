@@ -89,6 +89,14 @@ El proceso se divide en $N$ pliegues (\textit{folds}). Para cada pliegue:
     \item El conjunto de validación comprende los datos en el intervalo $[T_{train} + H, T_{train} + H + \Delta]$, donde $\Delta$ es el tamaño de la ventana de validación.
 \end{enumerate}
 
+La construcción de los pliegues exige un número mínimo de fechas distintas en el panel. Si $D_0$ es el número de días iniciales de entrenamiento, $N$ el número de pliegues, $\Delta$ el tamaño de cada ventana de validación y $H$ el horizonte de predicción, el requisito operativo es:
+
+\begin{equation}
+    D_{min} = D_0 + N \cdot \Delta + H
+\end{equation}
+
+El último término garantiza que el último origen de validación tenga suficiente futuro observado para calcular la demanda acumulada del horizonte. En la configuración base, este requisito toma el valor $45 + 3 \cdot 7 + 7 = 73$ fechas distintas.
+
 Este esquema garantiza que el modelo se evalúe siempre sobre datos que nunca ha visto y que son cronológicamente posteriores a su entrenamiento, simulando un despliegue real en producción.
 
 \section{Cuantificación de la Incertidumbre y Calibración}
