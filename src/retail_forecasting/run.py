@@ -49,7 +49,9 @@ def main() -> None:
     args = build_parser().parse_args()
     try:
         settings = load_config(args.config)
-    except (ValueError, ValidationError) as exc:
+    except ValidationError as exc:
+        raise SystemExit(_format_validation_error(exc)) from None
+    except ValueError as exc:
         raise SystemExit(str(exc)) from None
 
     # Handle Reporting overrides (output_dir and run_name)
@@ -68,6 +70,18 @@ def main() -> None:
         raise RuntimeError("Run finished without a report directory.")
 
     print(f"Report written to: {artifacts.run_directory / 'report.md'}")
+
+
+def _format_validation_error(exc: ValidationError) -> str:
+    messages = []
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error["loc"])
+        if error["type"] == "greater_than":
+            message = f"{location} must be greater than {error['ctx']['gt']}."
+        else:
+            message = f"{location}: {error['msg']}"
+        messages.append(f"- {message}")
+    return "Invalid configuration:\n" + "\n".join(messages)
 
 
 if __name__ == "__main__":

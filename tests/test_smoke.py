@@ -9,16 +9,17 @@ from tests import make_synthetic_panel
 
 def test_smoke_run_generates_report(tmp_path: Path) -> None:
     panel = make_synthetic_panel(num_series=3, num_days=90)
-    settings = Settings()
-    settings.dataset = DatasetConfig(
-        top_n_series=3,
-        min_history_days=70,
-        horizon=7,
-    )
-    settings.reporting = ReportingConfig(
-        output_dir=tmp_path,
-        run_name="smoke_test",
-        make_plots=False,
+    settings = Settings(
+        dataset=DatasetConfig(
+            top_n_series=3,
+            min_history_days=70,
+            horizon=7,
+        ),
+        reporting=ReportingConfig(
+            output_dir=tmp_path,
+            run_name="smoke_test",
+            make_plots=False,
+        ),
     )
 
     artifacts = run_experiment_from_frame(panel, settings)
