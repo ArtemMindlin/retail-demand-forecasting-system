@@ -86,6 +86,24 @@ training/backtesting and inference. `build_supervised_frame()` adds
 availability. `build_inference_frame()` does not build a target and returns the
 latest feature-complete row per `series_id`.
 
+All three builders keep the legacy return contract by default:
+
+```python
+frame, feature_columns = build_supervised_frame(...)
+```
+
+When called with `return_metadata=True`, they return a Pydantic
+`FeatureFrameMetadata` object instead of the raw feature column list:
+
+```python
+frame, metadata = build_supervised_frame(..., return_metadata=True)
+```
+
+The metadata records the feature columns, target column, horizon, configured
+lags/windows, input/output row counts, rows dropped due to missing targets or
+features, and rows skipped in inference because they were not the latest valid
+origin.
+
 Required carry-through columns:
 
 | Column | Meaning |

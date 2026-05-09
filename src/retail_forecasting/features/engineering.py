@@ -1,15 +1,56 @@
 from __future__ import annotations
 
+from typing import Literal, overload
+
 import pandas as pd
 from pandas.core.groupby.generic import SeriesGroupBy
+from pydantic import BaseModel, ConfigDict, Field
 
 from retail_forecasting.config import FeatureConfig
+
+
+class FeatureFrameMetadata(BaseModel):
+    """Auditable metadata for feature frame construction."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    mode: Literal["features", "supervised", "inference"]
+    feature_columns: list[str] = Field(min_length=1)
+    target_column: str | None = None
+    horizon: int | None = Field(default=None, gt=0)
+    lags: list[int] = Field(min_length=1)
+    rolling_windows: list[int] = Field(min_length=1)
+    input_rows: int = Field(ge=0)
+    output_rows: int = Field(ge=0)
+    dropped_rows_missing_target: int = Field(default=0, ge=0)
+    dropped_rows_missing_features: int = Field(default=0, ge=0)
+    rows_not_latest_origin: int = Field(default=0, ge=0)
+
+
+@overload
+def build_feature_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+    *,
+    return_metadata: Literal[False] = False,
+) -> tuple[pd.DataFrame, list[str]]: ...
+
+
+@overload
+def build_feature_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+    *,
+    return_metadata: Literal[True],
+) -> tuple[pd.DataFrame, FeatureFrameMetadata]: ...
 
 
 def build_feature_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
-) -> tuple[pd.DataFrame, list[str]]:
+    *,
+    return_metadata: bool = False,
+) -> tuple[pd.DataFrame, list[str]] | tuple[pd.DataFrame, FeatureFrameMetadata]:
     """Build reusable feature columns from a prepared daily panel.
 
     Args:
@@ -123,14 +164,44 @@ def build_feature_frame(
         ]
         feature_columns.extend(static_columns)
 
+    if return_metadata:
+        return frame, _build_metadata(
+            mode="features",
+            feature_config=feature_config,
+            feature_columns=feature_columns,
+            input_rows=len(panel),
+            output_rows=len(frame),
+        )
     return frame, feature_columns
+
+
+@overload
+def build_supervised_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+    horizon: int,
+    *,
+    return_metadata: Literal[False] = False,
+) -> tuple[pd.DataFrame, list[str]]: ...
+
+
+@overload
+def build_supervised_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+    horizon: int,
+    *,
+    return_metadata: Literal[True],
+) -> tuple[pd.DataFrame, FeatureFrameMetadata]: ...
 
 
 def build_supervised_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
     horizon: int,
-) -> tuple[pd.DataFrame, list[str]]:
+    *,
+    return_metadata: bool = False,
+) -> tuple[pd.DataFrame, list[str]] | tuple[pd.DataFrame, FeatureFrameMetadata]:
     """Build the supervised modeling frame and feature list from a panel.
 
     Args:
@@ -153,17 +224,54 @@ def build_supervised_frame(
     )
     frame["target_horizon_days"] = horizon
 
+    before_target_drop = len(frame)
     frame = frame.loc[frame["target_lead_time_demand"].notna()].copy()
+    dropped_rows_missing_target = before_target_drop - len(frame)
+
+    before_feature_drop = len(frame)
     frame = frame.dropna(subset=feature_columns)
+    dropped_rows_missing_features = before_feature_drop - len(frame)
     frame = frame.reset_index(drop=True)
 
+    if return_metadata:
+        return frame, _build_metadata(
+            mode="supervised",
+            feature_config=feature_config,
+            feature_columns=feature_columns,
+            input_rows=len(panel),
+            output_rows=len(frame),
+            target_column="target_lead_time_demand",
+            horizon=horizon,
+            dropped_rows_missing_target=dropped_rows_missing_target,
+            dropped_rows_missing_features=dropped_rows_missing_features,
+        )
     return frame, feature_columns
+
+
+@overload
+def build_inference_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+    *,
+    return_metadata: Literal[False] = False,
+) -> tuple[pd.DataFrame, list[str]]: ...
+
+
+@overload
+def build_inference_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+    *,
+    return_metadata: Literal[True],
+) -> tuple[pd.DataFrame, FeatureFrameMetadata]: ...
 
 
 def build_inference_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
-) -> tuple[pd.DataFrame, list[str]]:
+    *,
+    return_metadata: bool = False,
+) -> tuple[pd.DataFrame, list[str]] | tuple[pd.DataFrame, FeatureFrameMetadata]:
     """Build one prediction-ready row per series from the latest valid origin.
 
     Args:
@@ -179,10 +287,24 @@ def build_inference_frame(
         panel=panel,
         feature_config=feature_config,
     )
+    before_feature_drop = len(frame)
     frame = frame.dropna(subset=feature_columns)
+    dropped_rows_missing_features = before_feature_drop - len(frame)
+    feature_complete_rows = len(frame)
     frame = frame.groupby("series_id", sort=False, as_index=False).tail(1)
+    rows_not_latest_origin = feature_complete_rows - len(frame)
     frame = frame.reset_index(drop=True)
 
+    if return_metadata:
+        return frame, _build_metadata(
+            mode="inference",
+            feature_config=feature_config,
+            feature_columns=feature_columns,
+            input_rows=len(panel),
+            output_rows=len(frame),
+            dropped_rows_missing_features=dropped_rows_missing_features,
+            rows_not_latest_origin=rows_not_latest_origin,
+        )
     return frame, feature_columns
 
 
@@ -243,3 +365,31 @@ def _validate_required_columns(
             "Cannot build feature frame without required columns: "
             f"{', '.join(sorted(missing_columns))}"
         )
+
+
+def _build_metadata(
+    *,
+    mode: Literal["features", "supervised", "inference"],
+    feature_config: FeatureConfig,
+    feature_columns: list[str],
+    input_rows: int,
+    output_rows: int,
+    target_column: str | None = None,
+    horizon: int | None = None,
+    dropped_rows_missing_target: int = 0,
+    dropped_rows_missing_features: int = 0,
+    rows_not_latest_origin: int = 0,
+) -> FeatureFrameMetadata:
+    return FeatureFrameMetadata(
+        mode=mode,
+        feature_columns=feature_columns,
+        target_column=target_column,
+        horizon=horizon,
+        lags=sorted(set(feature_config.lags)),
+        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        input_rows=input_rows,
+        output_rows=output_rows,
+        dropped_rows_missing_target=dropped_rows_missing_target,
+        dropped_rows_missing_features=dropped_rows_missing_features,
+        rows_not_latest_origin=rows_not_latest_origin,
+    )
