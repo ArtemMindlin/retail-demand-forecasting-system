@@ -48,6 +48,138 @@ def build_feature_frame(
         Historical features are built with positive lags so they only use past
         information relative to each forecast origin.
     """
+    frame, feature_columns = _build_feature_frame_core(
+        panel=panel,
+        feature_config=feature_config,
+    )
+
+    if return_metadata:
+        return frame, FeatureFrameMetadata(
+            mode="features",
+            feature_columns=feature_columns,
+            lags=sorted(set(feature_config.lags)),
+            rolling_windows=sorted(set(feature_config.rolling_windows)),
+            input_rows=len(panel),
+            output_rows=len(frame),
+        )
+    return frame, feature_columns
+
+
+def build_supervised_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+    horizon: int,
+    *,
+    return_metadata: bool = False,
+) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
+    """Build the supervised modeling frame and feature list from a panel.
+
+    Args:
+        panel: Prepared daily panel with one row per series and date.
+        feature_config: Feature engineering configuration.
+        horizon: Forecast horizon expressed in days.
+
+    Returns:
+        A tuple containing the supervised frame and the ordered feature column
+        names used for modeling.
+    """
+    frame, feature_columns = _build_feature_frame_core(
+        panel=panel,
+        feature_config=feature_config,
+    )
+    grouped = frame.groupby("series_id", sort=False)
+
+    frame["target_lead_time_demand"] = _build_target(
+        grouped["observed_demand"], horizon
+    )
+    frame["target_horizon_days"] = horizon
+
+    before_target_drop = len(frame)
+    frame = frame.loc[frame["target_lead_time_demand"].notna()].copy()
+    dropped_rows_missing_target = before_target_drop - len(frame)
+
+    before_feature_drop = len(frame)
+    frame = frame.dropna(subset=feature_columns)
+    dropped_rows_missing_features = before_feature_drop - len(frame)
+    frame = frame.reset_index(drop=True)
+
+    if return_metadata:
+        return frame, FeatureFrameMetadata(
+            mode="supervised",
+            feature_columns=feature_columns,
+            target_column="target_lead_time_demand",
+            horizon=horizon,
+            lags=sorted(set(feature_config.lags)),
+            rolling_windows=sorted(set(feature_config.rolling_windows)),
+            input_rows=len(panel),
+            output_rows=len(frame),
+            dropped_rows_missing_target=dropped_rows_missing_target,
+            dropped_rows_missing_features=dropped_rows_missing_features,
+        )
+    return frame, feature_columns
+
+
+def build_inference_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+    *,
+    return_metadata: bool = False,
+) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
+    """Build one prediction-ready row per series from the latest valid origin.
+
+    Args:
+        panel: Prepared daily panel containing all history available at
+            inference time.
+        feature_config: Feature engineering configuration.
+
+    Returns:
+        A tuple containing the latest row per series with complete features and
+        the ordered feature column names used for modeling.
+    """
+    frame, feature_columns = _build_feature_frame_core(
+        panel=panel,
+        feature_config=feature_config,
+    )
+    before_feature_drop = len(frame)
+    frame = frame.dropna(subset=feature_columns)
+    dropped_rows_missing_features = before_feature_drop - len(frame)
+    feature_complete_rows = len(frame)
+    frame = frame.groupby("series_id", sort=False, as_index=False).tail(1)
+    rows_not_latest_origin = feature_complete_rows - len(frame)
+    frame = frame.reset_index(drop=True)
+
+    if return_metadata:
+        return frame, FeatureFrameMetadata(
+            mode="inference",
+            feature_columns=feature_columns,
+            lags=sorted(set(feature_config.lags)),
+            rolling_windows=sorted(set(feature_config.rolling_windows)),
+            input_rows=len(panel),
+            output_rows=len(frame),
+            dropped_rows_missing_features=dropped_rows_missing_features,
+            rows_not_latest_origin=rows_not_latest_origin,
+        )
+    return frame, feature_columns
+
+
+def _build_target(series_group: SeriesGroupBy, horizon: int) -> pd.Series:
+    """Aggregate future demand over the configured forecast horizon.
+
+    Args:
+        series_group: Grouped demand series by ``series_id``.
+        horizon: Forecast horizon expressed in days.
+
+    Returns:
+        A Series containing lead-time demand targets for each row.
+    """
+    future_terms = [series_group.shift(-offset) for offset in range(horizon)]
+    return pd.concat(future_terms, axis=1).sum(axis=1, min_count=horizon)
+
+
+def _build_feature_frame_core(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+) -> tuple[pd.DataFrame, list[str]]:
     _validate_required_columns(panel=panel, feature_config=feature_config)
     frame = panel.copy().sort_values(["series_id", "date"]).reset_index(drop=True)
     grouped = frame.groupby("series_id", sort=False)
@@ -146,127 +278,7 @@ def build_feature_frame(
         ]
         feature_columns.extend(static_columns)
 
-    if return_metadata:
-        return frame, FeatureFrameMetadata(
-            mode="features",
-            feature_columns=feature_columns,
-            lags=sorted(set(feature_config.lags)),
-            rolling_windows=sorted(set(feature_config.rolling_windows)),
-            input_rows=len(panel),
-            output_rows=len(frame),
-        )
     return frame, feature_columns
-
-
-def build_supervised_frame(
-    panel: pd.DataFrame,
-    feature_config: FeatureConfig,
-    horizon: int,
-    *,
-    return_metadata: bool = False,
-) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
-    """Build the supervised modeling frame and feature list from a panel.
-
-    Args:
-        panel: Prepared daily panel with one row per series and date.
-        feature_config: Feature engineering configuration.
-        horizon: Forecast horizon expressed in days.
-
-    Returns:
-        A tuple containing the supervised frame and the ordered feature column
-        names used for modeling.
-    """
-    frame, feature_columns = build_feature_frame(
-        panel=panel,
-        feature_config=feature_config,
-    )
-    grouped = frame.groupby("series_id", sort=False)
-
-    frame["target_lead_time_demand"] = _build_target(
-        grouped["observed_demand"], horizon
-    )
-    frame["target_horizon_days"] = horizon
-
-    before_target_drop = len(frame)
-    frame = frame.loc[frame["target_lead_time_demand"].notna()].copy()
-    dropped_rows_missing_target = before_target_drop - len(frame)
-
-    before_feature_drop = len(frame)
-    frame = frame.dropna(subset=feature_columns)
-    dropped_rows_missing_features = before_feature_drop - len(frame)
-    frame = frame.reset_index(drop=True)
-
-    if return_metadata:
-        return frame, FeatureFrameMetadata(
-            mode="supervised",
-            feature_columns=feature_columns,
-            target_column="target_lead_time_demand",
-            horizon=horizon,
-            lags=sorted(set(feature_config.lags)),
-            rolling_windows=sorted(set(feature_config.rolling_windows)),
-            input_rows=len(panel),
-            output_rows=len(frame),
-            dropped_rows_missing_target=dropped_rows_missing_target,
-            dropped_rows_missing_features=dropped_rows_missing_features,
-        )
-    return frame, feature_columns
-
-
-def build_inference_frame(
-    panel: pd.DataFrame,
-    feature_config: FeatureConfig,
-    *,
-    return_metadata: bool = False,
-) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
-    """Build one prediction-ready row per series from the latest valid origin.
-
-    Args:
-        panel: Prepared daily panel containing all history available at
-            inference time.
-        feature_config: Feature engineering configuration.
-
-    Returns:
-        A tuple containing the latest row per series with complete features and
-        the ordered feature column names used for modeling.
-    """
-    frame, feature_columns = build_feature_frame(
-        panel=panel,
-        feature_config=feature_config,
-    )
-    before_feature_drop = len(frame)
-    frame = frame.dropna(subset=feature_columns)
-    dropped_rows_missing_features = before_feature_drop - len(frame)
-    feature_complete_rows = len(frame)
-    frame = frame.groupby("series_id", sort=False, as_index=False).tail(1)
-    rows_not_latest_origin = feature_complete_rows - len(frame)
-    frame = frame.reset_index(drop=True)
-
-    if return_metadata:
-        return frame, FeatureFrameMetadata(
-            mode="inference",
-            feature_columns=feature_columns,
-            lags=sorted(set(feature_config.lags)),
-            rolling_windows=sorted(set(feature_config.rolling_windows)),
-            input_rows=len(panel),
-            output_rows=len(frame),
-            dropped_rows_missing_features=dropped_rows_missing_features,
-            rows_not_latest_origin=rows_not_latest_origin,
-        )
-    return frame, feature_columns
-
-
-def _build_target(series_group: SeriesGroupBy, horizon: int) -> pd.Series:
-    """Aggregate future demand over the configured forecast horizon.
-
-    Args:
-        series_group: Grouped demand series by ``series_id``.
-        horizon: Forecast horizon expressed in days.
-
-    Returns:
-        A Series containing lead-time demand targets for each row.
-    """
-    future_terms = [series_group.shift(-offset) for offset in range(horizon)]
-    return pd.concat(future_terms, axis=1).sum(axis=1, min_count=horizon)
 
 
 def _validate_required_columns(
