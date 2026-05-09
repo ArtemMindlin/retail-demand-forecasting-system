@@ -29,6 +29,8 @@ def build_series_cost_profile(
             f"{', '.join(sorted(missing_columns))}"
         )
 
+    conf = inventory_config.synthetic_cost_config
+
     series_summary = (
         panel.groupby("series_id")
         .agg(
@@ -83,24 +85,36 @@ def build_series_cost_profile(
     profile["intermittency_rank"] = _percentile_rank(profile["zero_demand_rate"])
     profile["stockout_rank"] = _percentile_rank(profile["stockout_day_rate"])
 
+    # Dimensional Scoring using parameterized weights
+    pw = conf.perishability_weights
     profile["synthetic_perishability_score"] = (
-        0.5 * profile["category_zero_rank"]
-        + 0.3 * profile["category_cv_rank"]
-        + 0.2 * profile["intermittency_rank"]
-    )
-    profile["slow_moving_score"] = 0.6 * profile["intermittency_rank"] + 0.4 * (
-        1.0 - profile["demand_rank"]
-    )
-    profile["service_criticality_score"] = (
-        0.7 * profile["demand_rank"] + 0.3 * profile["stockout_rank"]
+        pw[0] * profile["category_zero_rank"]
+        + pw[1] * profile["category_cv_rank"]
+        + pw[2] * profile["intermittency_rank"]
     )
 
-    profile["perishability_factor"] = (
-        0.8 + 0.8 * profile["synthetic_perishability_score"]
+    sw = conf.slow_moving_weights
+    profile["slow_moving_score"] = sw[0] * profile["intermittency_rank"] + sw[1] * (
+        1.0 - profile["demand_rank"]
     )
-    profile["slow_moving_factor"] = 0.9 + 0.5 * profile["slow_moving_score"]
+
+    cw = conf.criticality_weights
+    profile["service_criticality_score"] = (
+        cw[0] * profile["demand_rank"] + cw[1] * profile["stockout_rank"]
+    )
+
+    # Rescaling using parameterized base and multipliers
+    profile["perishability_factor"] = (
+        conf.perishability_base
+        + conf.perishability_multiplier * profile["synthetic_perishability_score"]
+    )
+    profile["slow_moving_factor"] = (
+        conf.slow_moving_base
+        + conf.slow_moving_multiplier * profile["slow_moving_score"]
+    )
     profile["service_criticality_factor"] = (
-        0.9 + 0.5 * profile["service_criticality_score"]
+        conf.service_criticality_base
+        + conf.service_criticality_multiplier * profile["service_criticality_score"]
     )
 
     profile["c_over"] = (

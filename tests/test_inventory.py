@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from retail_forecasting.config import InventoryConfig
+from retail_forecasting.config import InventoryConfig, SyntheticCostConfig
 from retail_forecasting.inventory.cost_profiles import (
     attach_series_costs,
     build_series_cost_profile,
@@ -60,6 +60,38 @@ def test_series_cost_profile_builds_row_specific_costs() -> None:
     assert (profile["c_under"] > 0).all()
     assert profile["critical_fractile"].between(0.0, 1.0).all()
     assert profile["c_over"].nunique() > 1 or profile["c_under"].nunique() > 1
+
+
+def test_series_cost_profile_uses_synthetic_cost_parameters() -> None:
+    panel = make_synthetic_panel(num_series=4, num_days=90)
+    base_inventory = InventoryConfig(
+        overstock_cost=1.0,
+        stockout_cost=4.0,
+        use_series_costs=True,
+        series_cost_strategy="synthetic_series",
+    )
+    custom_inventory = InventoryConfig(
+        overstock_cost=1.0,
+        stockout_cost=4.0,
+        use_series_costs=True,
+        series_cost_strategy="synthetic_series",
+        synthetic_cost_config=SyntheticCostConfig(
+            perishability_base=1.2,
+            perishability_multiplier=0.0,
+            slow_moving_base=1.0,
+            slow_moving_multiplier=0.0,
+            service_criticality_base=1.5,
+            service_criticality_multiplier=0.0,
+        ),
+    )
+
+    base_profile = build_series_cost_profile(panel, base_inventory)
+    custom_profile = build_series_cost_profile(panel, custom_inventory)
+
+    assert not custom_profile["c_over"].equals(base_profile["c_over"])
+    assert not custom_profile["c_under"].equals(base_profile["c_under"])
+    assert (custom_profile["c_over"] == 1.2).all()
+    assert (custom_profile["c_under"] == 6.0).all()
 
 
 def test_newsvendor_uses_series_specific_critical_fractile() -> None:

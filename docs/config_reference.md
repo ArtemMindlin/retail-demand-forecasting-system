@@ -478,6 +478,39 @@ series_cost_strategy: synthetic_series
 `synthetic_series` construye costes heuristicos usando proxies del panel, como
 intensidad de demanda, intermitencia, stockouts y categoria de producto.
 
+### `synthetic_cost_config`
+
+Parametros de la heuristica `synthetic_series`.
+
+Ejemplo:
+
+```yaml
+synthetic_cost_config:
+  perishability_weights: [0.5, 0.3, 0.2]
+  slow_moving_weights: [0.6, 0.4]
+  criticality_weights: [0.7, 0.3]
+  perishability_base: 0.8
+  perishability_multiplier: 0.8
+  slow_moving_base: 0.9
+  slow_moving_multiplier: 0.5
+  service_criticality_base: 0.9
+  service_criticality_multiplier: 0.5
+```
+
+Los pesos deben ser no negativos y sumar aproximadamente `1.0` dentro de cada
+dimension. Las bases deben ser positivas y los multiplicadores no negativos.
+
+Interpretacion:
+
+- `perishability_weights` combina inestabilidad de categoria, variabilidad de
+  categoria e intermitencia de la serie para ajustar `c_over`.
+- `slow_moving_weights` combina intermitencia y baja intensidad de demanda para
+  ajustar `c_over`.
+- `criticality_weights` combina intensidad de demanda y tension historica de
+  stockout para ajustar `c_under`.
+- Las bases y multiplicadores controlan cuanto se separan los costes por serie
+  de los costes globales `overstock_cost` y `stockout_cost`.
+
 ### `clip_negative_orders`
 
 Si es `true`, cantidades de pedido negativas se recortan a cero.
