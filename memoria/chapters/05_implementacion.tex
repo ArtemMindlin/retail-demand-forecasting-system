@@ -39,6 +39,19 @@ La implementación técnica no es un fin en sí mismo, sino un soporte para la v
     \item \textbf{Reproducibilidad}: Cada ejecución genera un reporte (\texttt{reports/}) que incluye la configuración exacta de los hiperparámetros y el estado de la semilla aleatoria, garantizando que cualquier resultado pueda ser auditado y replicado.
 \end{itemize}
 
+\section{Inferencia y Tratamiento de Series con Historial Insuficiente}
+El pipeline de entrenamiento y el flujo de inferencia comparten la misma función base de ingeniería de características, pero aplican políticas distintas sobre las filas resultantes. Durante entrenamiento se conservan todos los orígenes temporales que tienen variables completas y etiqueta futura disponible. En cambio, durante inferencia solo se necesita una predicción actual por serie, por lo que el sistema selecciona la última fila con variables completas de cada \texttt{series\_id}.
+
+En este contexto, un origen de predicción es una pareja $(s,t)$: la serie tienda-producto $s$ observada hasta la fecha $t$. Una misma serie puede tener muchos orígenes válidos en el histórico, pero para inferencia operativa solo interesa el más reciente. Por ello, el metadato \texttt{rows\_not\_latest\_origin} contabiliza filas que eran técnicamente válidas para el modelo, pero se descartan por corresponder a fechas anteriores dentro de la misma serie.
+
+Para cubrir casos de \textit{cold start} sin modificar el pipeline de entrenamiento, se implementa una política específica de inferencia. Las series cuya última fila no dispone de todas las variables requeridas se marcan con \texttt{prediction\_source = cold\_start\_fallback} y reciben una predicción heurística basada en medias históricas. La jerarquía de búsqueda es:
+
+\begin{center}
+    \texttt{series\_id} $\rightarrow$ \texttt{product\_id} $\rightarrow$ \texttt{third\_category\_id} $\rightarrow$ \texttt{global}
+\end{center}
+
+La predicción de respaldo se calcula como la demanda diaria media del nivel disponible multiplicada por el horizonte $H$. Esta decisión mantiene separadas las responsabilidades del sistema: el modelo solo recibe filas con variables completas, mientras que la política de inferencia documenta explícitamente qué predicciones proceden del modelo y cuáles proceden de una regla de respaldo. Como compromiso, esta aproximación es simple y robusta para un prototipo experimental, aunque no captura patrones estacionales dentro del horizonte con la misma precisión que un modelo entrenado.
+
 \section{Tratamiento de la Demanda Latente}
 Uno de los retos principales del proyecto es el sesgo introducido por las roturas de stock (\textit{stockouts}). Cuando un producto se agota durante parte del día, las ventas observadas pueden quedar artificialmente deprimidas, aunque la demanda latente (lo que el cliente habría comprado con disponibilidad suficiente) siga existiendo. El sistema implementa un módulo de \texttt{LatentDemandImputer} para abordar este problema.
 
@@ -67,7 +80,7 @@ El uso de modelos de datos de Pydantic aporta las siguientes ventajas operativas
 \end{itemize}
 
 \section{Perfiles de Coste por Serie}
-La capa de inventario se ha extendido para soportar perfiles de coste específicos por serie (\texttt{series\_id = store\_id \times product\_id}). En lugar de utilizar un único par global $(c_o, c_u)$ para todo el sistema, se construye una tabla de costes sintéticos por serie a partir del panel preparado. Esta tabla utiliza como \textit{proxies} la intensidad de demanda, la intermitencia, la frecuencia histórica de \textit{stockout} y la inestabilidad agregada de la categoría de producto.
+La capa de inventario se ha extendido para soportar perfiles de coste específicos por serie (\texttt{series\_id = store\_id} $\times$ \texttt{product\_id}). En lugar de utilizar un único par global $(c_o, c_u)$ para todo el sistema, se construye una tabla de costes sintéticos por serie a partir del panel preparado. Esta tabla utiliza como \textit{proxies} la intensidad de demanda, la intermitencia, la frecuencia histórica de \textit{stockout} y la inestabilidad agregada de la categoría de producto.
 
 El objetivo de esta extensión no es estimar un coste contable exacto, sino aproximar mejor la asimetría económica real del problema. Así, series con productos más perecederos o con rotación más lenta reciben un mayor $c_{o,s}$, mientras que series con mayor presión de demanda o con mayor criticidad histórica de servicio reciben un mayor $c_{u,s}$. La decisión de pedido sigue siendo modular y se mantiene dentro de la capa \texttt{inventory/}, preservando la separación entre predicción, decisión y evaluación.
 

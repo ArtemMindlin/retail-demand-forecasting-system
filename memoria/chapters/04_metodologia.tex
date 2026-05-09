@@ -23,7 +23,7 @@ Para capturar la complejidad de la demanda en \textit{retail}, se construye un p
 \begin{itemize}
     \item \textbf{Características Temporales}: Componentes cíclicos extraídos de la fecha, como el día de la semana, semana del año, mes y indicadores de festivos.
     \item \textbf{Variables de Retardo (\textit{Lags})}: Valores históricos de la demanda, descuentos y horas de rotura de stock. Se utilizan retardos positivos para asegurar que el modelo solo utiliza información disponible en el momento de la predicción.
-    \item \textbf{Estadísticas Móviles (\textit{Rolling Windows})}: Medias, sumas y desviaciones típicas calculadas sobre ventanas deslizantes (ej. 7, 14, 28 días) para capturar tendencias y volatilidad reciente.
+    \item \textbf{Estadísticas Móviles (\textit{Rolling Windows})}: Medias, sumas y desviaciones típicas calculadas sobre ventanas deslizantes (ej. 7 y 28 días) para capturar tendencias y volatilidad reciente.
     \item \textbf{Variables Exógenas}: Datos meteorológicos (temperatura, precipitación, humedad) y variables contextuales (actividad promocional).
     \item \textbf{Identificadores Estáticos}: Variables categóricas que representan la jerarquía del producto y la ubicación de la tienda.
 \end{itemize}
@@ -69,7 +69,15 @@ La función de ingeniería de características transforma el panel diario en una
 
 Los retardos y ventanas concretos se parametrizan desde la configuración del experimento, lo que permite comparar distintas granularidades históricas sin alterar el código. En la configuración base se utilizan retardos de 1, 7, 14 y 28 días, junto con ventanas móviles de 7 y 28 días, capturando tanto memoria de muy corto plazo como patrones semanales.
 
-Después de construir estas variables, se eliminan las filas que no disponen de historial suficiente para calcular los retardos o ventanas requeridas. También se eliminan las filas sin \texttt{target\_lead\_time\_demand}, normalmente situadas al final de cada serie por falta de horizonte futuro completo. Finalmente, la columna objetivo queda excluida explícitamente del conjunto \texttt{feature\_columns}; de este modo, la matriz de entrada contiene solo información disponible en el origen de predicción, mientras que la demanda futura acumulada se conserva únicamente como etiqueta supervisada.
+Después de construir estas variables, se eliminan las filas que no disponen de historial suficiente para calcular los retardos o ventanas requeridas. Esta eliminación se realiza de forma independiente por \texttt{series\_id}. Por ejemplo, con un retardo máximo de 28 días y una ventana móvil máxima de 28 días, las primeras 28 observaciones de cada serie tienda-producto no pueden utilizarse como filas supervisadas, ya que todavía no existe historial completo hasta $t-1$. También se eliminan las filas sin \texttt{target\_lead\_time\_demand}, normalmente situadas al final de cada serie por falta de horizonte futuro completo.
+
+En la configuración base, el horizonte de predicción es $H=7$. Por tanto, además de las primeras 28 observaciones descartadas por construcción de variables históricas, las últimas $H-1=6$ observaciones de cada serie no tienen etiqueta futura completa. Con el mínimo configurado de 70 días de historial por serie, el número mínimo teórico de orígenes supervisados utilizables es:
+
+\begin{equation}
+    70 - 28 - (7 - 1) = 36
+\end{equation}
+
+Este recorte temporal no constituye una pérdida arbitraria de datos, sino una consecuencia necesaria de formular un problema supervisado sin fuga de información futura. Finalmente, la columna objetivo queda excluida explícitamente del conjunto \texttt{feature\_columns}; de este modo, la matriz de entrada contiene solo información disponible en el origen de predicción, mientras que la demanda futura acumulada se conserva únicamente como etiqueta supervisada.
 
 \section{Diseño Experimental: Validación Walk-Forward}
 Dada la naturaleza temporal de los datos, no es posible utilizar una validación cruzada aleatoria tradicional, ya que violaría la estructura causal del tiempo. En su lugar, se implementa un esquema de \textbf{validación temporal \textit{walk-forward}} con ventanas expansivas.
