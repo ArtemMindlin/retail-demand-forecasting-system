@@ -162,6 +162,26 @@ main()
   - `FeatureFrameMetadata` con las columnas de features y metadatos auditables.
 - Se usa en: futuros flujos de inferencia/despliegue.
 
+### `build_inference_frame_with_fallback`
+- Archivo: `src/retail_forecasting/features/engineering.py`
+- Que hace: construye la ultima fila por `series_id` para inferencia y decide si cada fila va al modelo o a un fallback jerarquico de `cold start`.
+- Recibe:
+  - `panel`;
+  - `feature_config`;
+  - `horizon`.
+- Devuelve:
+  - `pd.DataFrame` con una fila por serie y columnas de routing:
+    - `prediction_source`;
+    - `fallback_level`;
+    - `fallback_target_lead_time_demand`;
+  - `InferenceFallbackMetadata` con contadores de filas del modelo y del fallback.
+- Jerarquia de fallback:
+  - `series_id`;
+  - `product_id`;
+  - `third_category_id`;
+  - global.
+- Se usa en: futuros flujos de inferencia/despliegue con politica explicita de `cold start`.
+
 ### `FeatureFrameMetadata`
 - Archivo: `src/retail_forecasting/features/engineering.py`
 - Que hace: contrato Pydantic congelado con metadatos auditables de feature engineering.
@@ -178,6 +198,22 @@ main()
   - `dropped_rows_missing_features`;
   - `rows_not_latest_origin`.
 - Se usa en: salidas de `build_feature_frame()`, `build_supervised_frame()` y `build_inference_frame()`.
+
+### `InferenceFallbackMetadata`
+- Archivo: `src/retail_forecasting/features/engineering.py`
+- Que hace: contrato Pydantic congelado con metadatos auditables del routing de inferencia con fallback.
+- Campos principales:
+  - `feature_columns`;
+  - `horizon`;
+  - `input_rows`;
+  - `output_rows`;
+  - `model_rows`;
+  - `cold_start_rows`;
+  - `fallback_rows_series`;
+  - `fallback_rows_product`;
+  - `fallback_rows_third_category`;
+  - `fallback_rows_global`.
+- Se usa en: salida de `build_inference_frame_with_fallback()`.
 
 ### `_build_target`
 - Archivo: `src/retail_forecasting/features/engineering.py`

@@ -79,12 +79,15 @@ Created by:
 - `build_feature_frame()`
 - `build_supervised_frame()`
 - `build_inference_frame()`
+- `build_inference_frame_with_fallback()`
 
 `build_feature_frame()` contains the shared feature transformation used by both
 training/backtesting and inference. `build_supervised_frame()` adds
 `target_lead_time_demand` and drops rows without full feature and target
 availability. `build_inference_frame()` does not build a target and returns the
-latest feature-complete row per `series_id`.
+latest feature-complete row per `series_id`. `build_inference_frame_with_fallback()`
+returns the latest row per `series_id` regardless of feature completeness and
+adds routing information for model inference vs. cold-start fallback.
 
 All three builders return a Pydantic `FeatureFrameMetadata` object:
 
@@ -97,6 +100,11 @@ The metadata records the feature columns, target column, horizon, configured
 lags/windows, input/output row counts, rows dropped due to missing targets or
 features, and rows skipped in inference because they were not the latest valid
 origin.
+
+`build_inference_frame_with_fallback()` returns an `InferenceFallbackMetadata`
+object instead. It records the feature columns, horizon, configured
+lags/windows, total output rows, model-routed rows, cold-start rows, and the
+count assigned to each fallback level.
 
 Required carry-through columns:
 
@@ -141,6 +149,32 @@ Feature semantics:
 ```text
 features(t) may use information from dates <= t - 1,
 except calendar/static features known at t.
+```
+
+## Inference Routing Frame
+
+Created by:
+
+- `build_inference_frame_with_fallback()`
+
+Required routing columns:
+
+| Column | Meaning |
+| --- | --- |
+| `prediction_source` | `model` when the row has a complete feature vector, otherwise `cold_start_fallback` |
+| `fallback_level` | fallback hierarchy level used for cold-start rows: `series`, `product`, `third_category`, or `global` |
+| `fallback_target_lead_time_demand` | fallback lead-time prediction; null for model-routed rows |
+
+Fallback semantics:
+
+```text
+fallback_target_lead_time_demand = mean_daily_observed_demand * horizon
+```
+
+Hierarchy semantics:
+
+```text
+series_id -> product_id -> third_category_id -> global
 ```
 
 ## Fold Spec
