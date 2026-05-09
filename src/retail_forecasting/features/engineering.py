@@ -165,10 +165,11 @@ def build_feature_frame(
         feature_columns.extend(static_columns)
 
     if return_metadata:
-        return frame, _build_metadata(
+        return frame, FeatureFrameMetadata(
             mode="features",
-            feature_config=feature_config,
             feature_columns=feature_columns,
+            lags=sorted(set(feature_config.lags)),
+            rolling_windows=sorted(set(feature_config.rolling_windows)),
             input_rows=len(panel),
             output_rows=len(frame),
         )
@@ -234,14 +235,15 @@ def build_supervised_frame(
     frame = frame.reset_index(drop=True)
 
     if return_metadata:
-        return frame, _build_metadata(
+        return frame, FeatureFrameMetadata(
             mode="supervised",
-            feature_config=feature_config,
             feature_columns=feature_columns,
-            input_rows=len(panel),
-            output_rows=len(frame),
             target_column="target_lead_time_demand",
             horizon=horizon,
+            lags=sorted(set(feature_config.lags)),
+            rolling_windows=sorted(set(feature_config.rolling_windows)),
+            input_rows=len(panel),
+            output_rows=len(frame),
             dropped_rows_missing_target=dropped_rows_missing_target,
             dropped_rows_missing_features=dropped_rows_missing_features,
         )
@@ -296,10 +298,11 @@ def build_inference_frame(
     frame = frame.reset_index(drop=True)
 
     if return_metadata:
-        return frame, _build_metadata(
+        return frame, FeatureFrameMetadata(
             mode="inference",
-            feature_config=feature_config,
             feature_columns=feature_columns,
+            lags=sorted(set(feature_config.lags)),
+            rolling_windows=sorted(set(feature_config.rolling_windows)),
             input_rows=len(panel),
             output_rows=len(frame),
             dropped_rows_missing_features=dropped_rows_missing_features,
@@ -365,31 +368,3 @@ def _validate_required_columns(
             "Cannot build feature frame without required columns: "
             f"{', '.join(sorted(missing_columns))}"
         )
-
-
-def _build_metadata(
-    *,
-    mode: Literal["features", "supervised", "inference"],
-    feature_config: FeatureConfig,
-    feature_columns: list[str],
-    input_rows: int,
-    output_rows: int,
-    target_column: str | None = None,
-    horizon: int | None = None,
-    dropped_rows_missing_target: int = 0,
-    dropped_rows_missing_features: int = 0,
-    rows_not_latest_origin: int = 0,
-) -> FeatureFrameMetadata:
-    return FeatureFrameMetadata(
-        mode=mode,
-        feature_columns=feature_columns,
-        target_column=target_column,
-        horizon=horizon,
-        lags=sorted(set(feature_config.lags)),
-        rolling_windows=sorted(set(feature_config.rolling_windows)),
-        input_rows=input_rows,
-        output_rows=output_rows,
-        dropped_rows_missing_target=dropped_rows_missing_target,
-        dropped_rows_missing_features=dropped_rows_missing_features,
-        rows_not_latest_origin=rows_not_latest_origin,
-    )
