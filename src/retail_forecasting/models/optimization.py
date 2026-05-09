@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+from typing import TypedDict
+
+import numpy as np
 import optuna
 import pandas as pd
-import numpy as np
-from typing import Any, Dict
+
 from retail_forecasting.config import Settings
 from retail_forecasting.models.boosting import AutoBoostingModel
+
+
+class BoostingParams(TypedDict):
+    n_estimators: int
+    learning_rate: float
+    max_depth: int
 
 
 class HyperparameterTuner:
@@ -14,14 +22,14 @@ class HyperparameterTuner:
     def __init__(self, settings: Settings, n_trials: int = 20):
         self.settings = settings
         self.n_trials = n_trials
-        self.best_params: Dict[str, Any] = {}
+        self.best_params: BoostingParams | None = None
 
     def tune_boosting(
         self,
         train_frame: pd.DataFrame,
         feature_columns: list[str],
         target_col: str = "target_lead_time_demand",
-    ) -> Dict[str, Any]:
+    ) -> BoostingParams:
         """Find best parameters for the Boosting model.
 
         Args:
@@ -49,20 +57,20 @@ class HyperparameterTuner:
             }
 
         def objective(trial: optuna.Trial) -> float:
-            params = {
+            params: BoostingParams = {
                 "n_estimators": trial.suggest_int("n_estimators", 50, 800),
                 "learning_rate": trial.suggest_float(
                     "learning_rate", 0.005, 0.2, log=True
                 ),
                 "max_depth": trial.suggest_int("max_depth", 3, 12),
-                "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
             }
 
             model = AutoBoostingModel(
                 quantiles=self.settings.models.quantiles,
                 random_seed=self.settings.project.random_seed,
-                **params,
+                n_estimators=params["n_estimators"],
+                learning_rate=params["learning_rate"],
+                max_depth=params["max_depth"],
             )
 
             model.fit(t_train.loc[:, feature_columns], t_train[target_col])

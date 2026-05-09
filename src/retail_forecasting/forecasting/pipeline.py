@@ -21,7 +21,7 @@ from retail_forecasting.inventory.newsvendor import (
 )
 from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
 from retail_forecasting.models.boosting import AutoBoostingModel
-from retail_forecasting.models.optimization import HyperparameterTuner
+from retail_forecasting.models.optimization import BoostingParams, HyperparameterTuner
 from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.linear import RidgeBaselineModel
@@ -109,7 +109,7 @@ def run_experiment_from_frame(
     arima_model: ConformalForecaster | None = None
 
     # Optional: Hyperparameter Tuning Phase
-    best_boosting_params = {
+    best_boosting_params: BoostingParams = {
         "n_estimators": settings.models.n_estimators,
         "learning_rate": settings.models.learning_rate,
         "max_depth": settings.models.max_depth,
@@ -120,9 +120,7 @@ def run_experiment_from_frame(
             supervised_frame["date"] <= folds[0].train_end_date
         ]
         tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
-        best_boosting_params.update(
-            tuner.tune_boosting(tuning_train_frame, feature_columns)
-        )
+        best_boosting_params = tuner.tune_boosting(tuning_train_frame, feature_columns)
 
     # Drift detection state
     drift_detector = PageHinkleyDetector(threshold=15.0, min_instances=2)
@@ -209,19 +207,22 @@ def run_experiment_from_frame(
             or settings.validation.retrain_each_fold
             or current_fold_retrained
         ):
-            # Prepare cost parameters if optimization is enabled
-            cost_params = {}
-            if settings.models.optimize_for_cost:
-                cost_params = {
-                    "overstock_cost": settings.inventory.overstock_cost,
-                    "stockout_cost": settings.inventory.stockout_cost,
-                }
-
             base_lgb = AutoBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
-                **best_boosting_params,
-                **cost_params,
+                n_estimators=best_boosting_params["n_estimators"],
+                learning_rate=best_boosting_params["learning_rate"],
+                max_depth=best_boosting_params["max_depth"],
+                overstock_cost=(
+                    settings.inventory.overstock_cost
+                    if settings.models.optimize_for_cost
+                    else 1.0
+                ),
+                stockout_cost=(
+                    settings.inventory.stockout_cost
+                    if settings.models.optimize_for_cost
+                    else 0.0
+                ),
             )
             base_lgb.fit(
                 sub_train_frame.loc[:, feature_columns],
@@ -254,7 +255,9 @@ def run_experiment_from_frame(
             base_cat = CatBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
-                **best_boosting_params,
+                n_estimators=best_boosting_params["n_estimators"],
+                learning_rate=best_boosting_params["learning_rate"],
+                max_depth=best_boosting_params["max_depth"],
             )
             base_cat.fit(
                 sub_train_frame.loc[:, feature_columns],
