@@ -1,11 +1,12 @@
-# Feature Engineering Flow: `build_supervised_frame`
+# Feature Engineering Flow
 
-This diagram illustrates the process of transforming a daily panel into a supervised learning frame with features and targets.
+This diagram illustrates the shared feature transformation used by both supervised training/backtesting and inference.
 
 ```mermaid
 %%{init: { 'flowchart': { 'htmlLabels': false } } }%%
 graph TD
-    Start(["Start: build_supervised_frame"]) --> Sort["Sort by series_id & date"]
+    Start(["Start: build_feature_frame"]) --> Validate["Validate required columns"]
+    Validate --> Sort["Sort by series_id & date"]
     Sort --> DateFeat["Extract Date Features: day, month, weekend, holiday"]
     
     DateFeat --> Lags["Demand Lags: shift(lag)"]
@@ -24,12 +25,21 @@ graph TD
     Weather --> Static
     Exog -- "No" --> Static
 
-    Static --> Target["_build_target: Sum of demand over Lead Time (Horizon)"]
-    
-    Target --> Cleaning["Drop Rows with NaNs (caused by lagging/shifting)"]
-    Cleaning --> End(["Return Supervised Frame + Feature List"])
+    Static --> SharedEnd(["Return Feature Frame + Feature List"])
+
+    SharedEnd --> Supervised["build_supervised_frame"]
+    Supervised --> Target["_build_target: Sum of demand over Lead Time (Horizon)"]
+    Target --> TrainClean["Drop rows missing target or features"]
+    TrainClean --> TrainEnd(["Return Supervised Frame"])
+
+    SharedEnd --> Inference["build_inference_frame"]
+    Inference --> InferenceClean["Drop rows missing features"]
+    InferenceClean --> Latest["Keep latest valid row per series_id"]
+    Latest --> InferenceEnd(["Return Inference Frame"])
 
     style Start fill:#e1f5fe,stroke:#01579b
-    style End fill:#e1f5fe,stroke:#01579b
+    style SharedEnd fill:#e1f5fe,stroke:#01579b
+    style TrainEnd fill:#e1f5fe,stroke:#01579b
+    style InferenceEnd fill:#e1f5fe,stroke:#01579b
     style Exogenous_Features fill:#f8f9fa,stroke:#333,stroke-dasharray: 5 5
 ```

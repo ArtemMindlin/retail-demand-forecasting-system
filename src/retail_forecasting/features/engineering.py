@@ -6,25 +6,26 @@ from pandas.core.groupby.generic import SeriesGroupBy
 from retail_forecasting.config import FeatureConfig
 
 
-def build_supervised_frame(
+def build_feature_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
-    horizon: int,
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Build the supervised modeling frame and feature list from a panel.
+    """Build reusable feature columns from a prepared daily panel.
 
     Args:
         panel: Prepared daily panel with one row per series and date.
         feature_config: Feature engineering configuration.
-        horizon: Forecast horizon expressed in days.
 
     Returns:
-        A tuple containing the supervised frame and the ordered feature column
-        names used for modeling.
+        A tuple containing the feature frame and the ordered feature column
+        names used for modeling. The returned frame is not filtered for missing
+        feature values, so callers can apply training or inference policies.
 
     Notes:
-        Historical features are built with positive lags so they only use past information relative to each forecast origin.
+        Historical features are built with positive lags so they only use past
+        information relative to each forecast origin.
     """
+    _validate_required_columns(panel=panel, feature_config=feature_config)
     frame = panel.copy().sort_values(["series_id", "date"]).reset_index(drop=True)
     grouped = frame.groupby("series_id", sort=False)
 
@@ -122,6 +123,31 @@ def build_supervised_frame(
         ]
         feature_columns.extend(static_columns)
 
+    return frame, feature_columns
+
+
+def build_supervised_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+    horizon: int,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Build the supervised modeling frame and feature list from a panel.
+
+    Args:
+        panel: Prepared daily panel with one row per series and date.
+        feature_config: Feature engineering configuration.
+        horizon: Forecast horizon expressed in days.
+
+    Returns:
+        A tuple containing the supervised frame and the ordered feature column
+        names used for modeling.
+    """
+    frame, feature_columns = build_feature_frame(
+        panel=panel,
+        feature_config=feature_config,
+    )
+    grouped = frame.groupby("series_id", sort=False)
+
     frame["target_lead_time_demand"] = _build_target(
         grouped["observed_demand"], horizon
     )
@@ -129,6 +155,32 @@ def build_supervised_frame(
 
     frame = frame.loc[frame["target_lead_time_demand"].notna()].copy()
     frame = frame.dropna(subset=feature_columns)
+    frame = frame.reset_index(drop=True)
+
+    return frame, feature_columns
+
+
+def build_inference_frame(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Build one prediction-ready row per series from the latest valid origin.
+
+    Args:
+        panel: Prepared daily panel containing all history available at
+            inference time.
+        feature_config: Feature engineering configuration.
+
+    Returns:
+        A tuple containing the latest row per series with complete features and
+        the ordered feature column names used for modeling.
+    """
+    frame, feature_columns = build_feature_frame(
+        panel=panel,
+        feature_config=feature_config,
+    )
+    frame = frame.dropna(subset=feature_columns)
+    frame = frame.groupby("series_id", sort=False, as_index=False).tail(1)
     frame = frame.reset_index(drop=True)
 
     return frame, feature_columns
@@ -146,3 +198,48 @@ def _build_target(series_group: SeriesGroupBy, horizon: int) -> pd.Series:
     """
     future_terms = [series_group.shift(-offset) for offset in range(horizon)]
     return pd.concat(future_terms, axis=1).sum(axis=1, min_count=horizon)
+
+
+def _validate_required_columns(
+    panel: pd.DataFrame,
+    feature_config: FeatureConfig,
+) -> None:
+    required_columns = {
+        "series_id",
+        "date",
+        "observed_demand",
+        "holiday_flag",
+        "activity_flag",
+    }
+    if feature_config.include_discount_lags:
+        required_columns.add("discount")
+    if feature_config.include_stockout_lags:
+        required_columns.add("stockout_hours")
+    if feature_config.include_weather_lags:
+        required_columns.update(
+            {
+                "precpt",
+                "avg_temperature",
+                "avg_humidity",
+                "avg_wind_level",
+            }
+        )
+    if feature_config.include_static_ids:
+        required_columns.update(
+            {
+                "city_id",
+                "store_id",
+                "management_group_id",
+                "first_category_id",
+                "second_category_id",
+                "third_category_id",
+                "product_id",
+            }
+        )
+
+    missing_columns = required_columns - set(panel.columns)
+    if missing_columns:
+        raise ValueError(
+            "Cannot build feature frame without required columns: "
+            f"{', '.join(sorted(missing_columns))}"
+        )

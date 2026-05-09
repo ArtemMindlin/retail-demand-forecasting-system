@@ -76,7 +76,15 @@ Expected properties:
 
 Created by:
 
+- `build_feature_frame()`
 - `build_supervised_frame()`
+- `build_inference_frame()`
+
+`build_feature_frame()` contains the shared feature transformation used by both
+training/backtesting and inference. `build_supervised_frame()` adds
+`target_lead_time_demand` and drops rows without full feature and target
+availability. `build_inference_frame()` does not build a target and returns the
+latest feature-complete row per `series_id`.
 
 Required carry-through columns:
 

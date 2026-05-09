@@ -119,6 +119,17 @@ main()
 
 ## Feature Engineering
 
+### `build_feature_frame`
+- Archivo: `src/retail_forecasting/features/engineering.py`
+- Que hace: construye las features compartidas por entrenamiento e inferencia, sin crear target.
+- Recibe:
+  - `panel`;
+  - `feature_config`.
+- Devuelve:
+  - `pd.DataFrame` con las columnas originales y las features derivadas;
+  - `list[str]` con las columnas de features.
+- Se usa en: `build_supervised_frame()` y `build_inference_frame()`.
+
 ### `build_supervised_frame`
 - Archivo: `src/retail_forecasting/features/engineering.py`
 - Que hace: construye el dataset supervisado para ML con features y target.
@@ -139,6 +150,17 @@ main()
   - ids estaticos;
   - target `target_lead_time_demand`.
 - Se usa en: `run_experiment_from_frame()`.
+
+### `build_inference_frame`
+- Archivo: `src/retail_forecasting/features/engineering.py`
+- Que hace: construye una fila lista para prediccion por serie, sin target futuro.
+- Recibe:
+  - `panel`;
+  - `feature_config`.
+- Devuelve:
+  - `pd.DataFrame` con la ultima fila valida por `series_id`;
+  - `list[str]` con las columnas de features.
+- Se usa en: futuros flujos de inferencia/despliegue.
 
 ### `_build_target`
 - Archivo: `src/retail_forecasting/features/engineering.py`
