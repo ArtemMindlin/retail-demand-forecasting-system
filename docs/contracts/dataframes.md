@@ -188,9 +188,14 @@ Fields:
 | Field | Meaning |
 | --- | --- |
 | `fold_id` | integer fold index |
+| `horizon` | forecast horizon used to enforce the temporal gap |
 | `train_end_date` | latest allowed training origin date |
 | `validation_start_date` | first validation origin date |
 | `validation_end_date` | last validation origin date |
+
+`FoldSpec` is a frozen Pydantic contract. It validates non-negative fold ids,
+positive horizons, chronological validation windows, and the required temporal
+gap.
 
 Required temporal relation:
 

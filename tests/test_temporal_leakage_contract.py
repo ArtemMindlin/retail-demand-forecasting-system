@@ -114,6 +114,7 @@ def test_walk_forward_folds_leave_horizon_gap_before_validation() -> None:
         folds = build_walk_forward_folds(panel, validation, horizon=horizon)
 
         for fold in folds:
+            assert fold.horizon == horizon
             assert fold.train_end_date == fold.validation_start_date - pd.Timedelta(
                 days=horizon,
             )

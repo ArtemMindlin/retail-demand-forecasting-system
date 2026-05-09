@@ -233,7 +233,11 @@ main()
   - `panel`;
   - `validation_config`;
   - `horizon`.
-- Devuelve: `list[FoldSpec]`.
+- Devuelve: `list[FoldSpec]`, donde cada `FoldSpec` es un contrato Pydantic congelado con `fold_id`, `horizon`, `train_end_date`, `validation_start_date` y `validation_end_date`.
+- Invariantes:
+  - `horizon > 0`;
+  - `fold_id >= 0`;
+  - `train_end_date = validation_start_date - horizon`.
 - Se usa en: `run_experiment_from_frame()`.
 
 ### `run_experiment`
