@@ -127,7 +127,7 @@ main()
   - `feature_config`.
 - Devuelve:
   - `pd.DataFrame` con las columnas originales y las features derivadas;
-  - `list[str]` con las columnas de features, o `FeatureFrameMetadata` si `return_metadata=True`.
+  - `FeatureFrameMetadata` con las columnas de features y metadatos auditables.
 - Se usa en: `build_supervised_frame()` y `build_inference_frame()`.
 
 ### `build_supervised_frame`
@@ -139,7 +139,7 @@ main()
   - `horizon`.
 - Devuelve:
   - `pd.DataFrame` con el frame supervisado;
-  - `list[str]` con las columnas de features, o `FeatureFrameMetadata` si `return_metadata=True`.
+  - `FeatureFrameMetadata` con las columnas de features y metadatos auditables.
 - Hace internamente:
   - variables de calendario;
   - lags de demanda;
@@ -159,7 +159,7 @@ main()
   - `feature_config`.
 - Devuelve:
   - `pd.DataFrame` con la ultima fila valida por `series_id`;
-  - `list[str]` con las columnas de features, o `FeatureFrameMetadata` si `return_metadata=True`.
+  - `FeatureFrameMetadata` con las columnas de features y metadatos auditables.
 - Se usa en: futuros flujos de inferencia/despliegue.
 
 ### `FeatureFrameMetadata`
@@ -177,7 +177,7 @@ main()
   - `dropped_rows_missing_target`;
   - `dropped_rows_missing_features`;
   - `rows_not_latest_origin`.
-- Se usa en: llamadas con `return_metadata=True`.
+- Se usa en: salidas de `build_feature_frame()`, `build_supervised_frame()` y `build_inference_frame()`.
 
 ### `_build_target`
 - Archivo: `src/retail_forecasting/features/engineering.py`

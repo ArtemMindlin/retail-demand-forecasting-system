@@ -25,17 +25,17 @@ graph TD
     Weather --> Static
     Exog -- "No" --> Static
 
-    Static --> SharedEnd(["Return Feature Frame + Feature List"])
+    Static --> SharedEnd(["Return Feature Frame + Metadata"])
 
     SharedEnd --> Supervised["build_supervised_frame"]
     Supervised --> Target["_build_target: Sum of demand over Lead Time (Horizon)"]
     Target --> TrainClean["Drop rows missing target or features"]
-    TrainClean --> TrainEnd(["Return Supervised Frame"])
+    TrainClean --> TrainEnd(["Return Supervised Frame + Metadata"])
 
     SharedEnd --> Inference["build_inference_frame"]
     Inference --> InferenceClean["Drop rows missing features"]
     InferenceClean --> Latest["Keep latest valid row per series_id"]
-    Latest --> InferenceEnd(["Return Inference Frame"])
+    Latest --> InferenceEnd(["Return Inference Frame + Metadata"])
 
     style Start fill:#e1f5fe,stroke:#01579b
     style SharedEnd fill:#e1f5fe,stroke:#01579b

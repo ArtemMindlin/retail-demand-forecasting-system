@@ -14,11 +14,12 @@ def test_supervised_frame_uses_future_demand_only_as_target() -> None:
     feature_config = FeatureConfig(lags=[1, 2], rolling_windows=[3])
     horizon = 4
 
-    supervised, feature_columns = build_supervised_frame(
+    supervised, metadata = build_supervised_frame(
         panel=panel,
         feature_config=feature_config,
         horizon=horizon,
     )
+    feature_columns = metadata.feature_columns
 
     row = supervised.iloc[0]
     source = _series_source(panel, row["series_id"])
@@ -38,16 +39,19 @@ def test_historical_features_exclude_current_row_values() -> None:
     panel = make_synthetic_panel(num_series=1, num_days=30)
     feature_config = FeatureConfig(lags=[1, 2], rolling_windows=[3])
 
-    supervised, feature_columns = build_supervised_frame(
+    supervised, metadata = build_supervised_frame(
         panel=panel,
         feature_config=feature_config,
         horizon=3,
     )
+    feature_columns = metadata.feature_columns
 
     row = supervised.iloc[0]
     source = _series_source(panel, row["series_id"])
     source_index = _source_index_for_date(source, row["date"])
-    past_demand_window = source.loc[source_index - 3 : source_index - 1, "observed_demand"]
+    past_demand_window = source.loc[
+        source_index - 3 : source_index - 1, "observed_demand"
+    ]
 
     assert row["demand_lag_1"] == source.loc[source_index - 1, "observed_demand"]
     assert row["demand_lag_2"] == source.loc[source_index - 2, "observed_demand"]
@@ -62,11 +66,12 @@ def test_realized_context_enters_model_only_as_lagged_features() -> None:
     panel = make_synthetic_panel(num_series=1, num_days=30)
     feature_config = FeatureConfig(lags=[1, 2], rolling_windows=[3])
 
-    supervised, feature_columns = build_supervised_frame(
+    supervised, metadata = build_supervised_frame(
         panel=panel,
         feature_config=feature_config,
         horizon=3,
     )
+    feature_columns = metadata.feature_columns
 
     row = supervised.iloc[0]
     source = _series_source(panel, row["series_id"])
@@ -92,10 +97,13 @@ def test_realized_context_enters_model_only_as_lagged_features() -> None:
         ].mean(),
     )
     assert row["precpt_lag_1"] == source.loc[source_index - 1, "precpt"]
-    assert row["avg_temperature_lag_2"] == source.loc[
-        source_index - 2,
-        "avg_temperature",
-    ]
+    assert (
+        row["avg_temperature_lag_2"]
+        == source.loc[
+            source_index - 2,
+            "avg_temperature",
+        ]
+    )
 
 
 def test_walk_forward_folds_leave_horizon_gap_before_validation() -> None:

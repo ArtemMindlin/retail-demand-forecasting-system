@@ -30,9 +30,7 @@ class FeatureFrameMetadata(BaseModel):
 def build_feature_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
-    *,
-    return_metadata: bool = False,
-) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
+) -> tuple[pd.DataFrame, FeatureFrameMetadata]:
     """Build reusable feature columns from a prepared daily panel.
 
     Args:
@@ -40,9 +38,10 @@ def build_feature_frame(
         feature_config: Feature engineering configuration.
 
     Returns:
-        A tuple containing the feature frame and the ordered feature column
-        names used for modeling. The returned frame is not filtered for missing
-        feature values, so callers can apply training or inference policies.
+        A tuple containing the feature frame and metadata with the ordered
+        feature column names used for modeling. The returned frame is not
+        filtered for missing feature values, so callers can apply training or
+        inference policies.
 
     Notes:
         Historical features are built with positive lags so they only use past
@@ -53,25 +52,21 @@ def build_feature_frame(
         feature_config=feature_config,
     )
 
-    if return_metadata:
-        return frame, FeatureFrameMetadata(
-            mode="features",
-            feature_columns=feature_columns,
-            lags=sorted(set(feature_config.lags)),
-            rolling_windows=sorted(set(feature_config.rolling_windows)),
-            input_rows=len(panel),
-            output_rows=len(frame),
-        )
-    return frame, feature_columns
+    return frame, FeatureFrameMetadata(
+        mode="features",
+        feature_columns=feature_columns,
+        lags=sorted(set(feature_config.lags)),
+        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        input_rows=len(panel),
+        output_rows=len(frame),
+    )
 
 
 def build_supervised_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
     horizon: int,
-    *,
-    return_metadata: bool = False,
-) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
+) -> tuple[pd.DataFrame, FeatureFrameMetadata]:
     """Build the supervised modeling frame and feature list from a panel.
 
     Args:
@@ -80,8 +75,8 @@ def build_supervised_frame(
         horizon: Forecast horizon expressed in days.
 
     Returns:
-        A tuple containing the supervised frame and the ordered feature column
-        names used for modeling.
+        A tuple containing the supervised frame and metadata with the ordered
+        feature column names used for modeling.
     """
     frame, feature_columns = _build_feature_frame_core(
         panel=panel,
@@ -103,28 +98,24 @@ def build_supervised_frame(
     dropped_rows_missing_features = before_feature_drop - len(frame)
     frame = frame.reset_index(drop=True)
 
-    if return_metadata:
-        return frame, FeatureFrameMetadata(
-            mode="supervised",
-            feature_columns=feature_columns,
-            target_column="target_lead_time_demand",
-            horizon=horizon,
-            lags=sorted(set(feature_config.lags)),
-            rolling_windows=sorted(set(feature_config.rolling_windows)),
-            input_rows=len(panel),
-            output_rows=len(frame),
-            dropped_rows_missing_target=dropped_rows_missing_target,
-            dropped_rows_missing_features=dropped_rows_missing_features,
-        )
-    return frame, feature_columns
+    return frame, FeatureFrameMetadata(
+        mode="supervised",
+        feature_columns=feature_columns,
+        target_column="target_lead_time_demand",
+        horizon=horizon,
+        lags=sorted(set(feature_config.lags)),
+        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        input_rows=len(panel),
+        output_rows=len(frame),
+        dropped_rows_missing_target=dropped_rows_missing_target,
+        dropped_rows_missing_features=dropped_rows_missing_features,
+    )
 
 
 def build_inference_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
-    *,
-    return_metadata: bool = False,
-) -> tuple[pd.DataFrame, list[str] | FeatureFrameMetadata]:
+) -> tuple[pd.DataFrame, FeatureFrameMetadata]:
     """Build one prediction-ready row per series from the latest valid origin.
 
     Args:
@@ -134,7 +125,7 @@ def build_inference_frame(
 
     Returns:
         A tuple containing the latest row per series with complete features and
-        the ordered feature column names used for modeling.
+        metadata with the ordered feature column names used for modeling.
     """
     frame, feature_columns = _build_feature_frame_core(
         panel=panel,
@@ -148,18 +139,16 @@ def build_inference_frame(
     rows_not_latest_origin = feature_complete_rows - len(frame)
     frame = frame.reset_index(drop=True)
 
-    if return_metadata:
-        return frame, FeatureFrameMetadata(
-            mode="inference",
-            feature_columns=feature_columns,
-            lags=sorted(set(feature_config.lags)),
-            rolling_windows=sorted(set(feature_config.rolling_windows)),
-            input_rows=len(panel),
-            output_rows=len(frame),
-            dropped_rows_missing_features=dropped_rows_missing_features,
-            rows_not_latest_origin=rows_not_latest_origin,
-        )
-    return frame, feature_columns
+    return frame, FeatureFrameMetadata(
+        mode="inference",
+        feature_columns=feature_columns,
+        lags=sorted(set(feature_config.lags)),
+        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        input_rows=len(panel),
+        output_rows=len(frame),
+        dropped_rows_missing_features=dropped_rows_missing_features,
+        rows_not_latest_origin=rows_not_latest_origin,
+    )
 
 
 def _build_target(series_group: SeriesGroupBy, horizon: int) -> pd.Series:

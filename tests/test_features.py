@@ -16,9 +16,8 @@ def test_build_supervised_frame_uses_only_past_features() -> None:
     panel = make_synthetic_panel(num_series=1, num_days=20)
     feature_config = FeatureConfig(lags=[1, 2], rolling_windows=[3])
 
-    supervised, feature_columns = build_supervised_frame(
-        panel, feature_config, horizon=3
-    )
+    supervised, metadata = build_supervised_frame(panel, feature_config, horizon=3)
+    feature_columns = metadata.feature_columns
     assert "demand_lag_1" in feature_columns
     assert "target_lead_time_demand" in supervised.columns
 
@@ -43,7 +42,8 @@ def test_build_inference_frame_returns_latest_complete_feature_row_per_series() 
     panel = make_synthetic_panel(num_series=2, num_days=20)
     feature_config = FeatureConfig(lags=[1, 2], rolling_windows=[3])
 
-    inference, feature_columns = build_inference_frame(panel, feature_config)
+    inference, metadata = build_inference_frame(panel, feature_config)
+    feature_columns = metadata.feature_columns
 
     assert len(inference) == panel["series_id"].nunique()
     assert "target_lead_time_demand" not in inference.columns
@@ -54,7 +54,7 @@ def test_build_inference_frame_returns_latest_complete_feature_row_per_series() 
         assert row.date == latest_dates.loc[row.series_id]
 
 
-def test_build_supervised_frame_can_return_pydantic_metadata() -> None:
+def test_build_supervised_frame_returns_pydantic_metadata() -> None:
     panel = make_synthetic_panel(num_series=1, num_days=20)
     feature_config = FeatureConfig(lags=[1, 2], rolling_windows=[3])
     horizon = 3
@@ -63,7 +63,6 @@ def test_build_supervised_frame_can_return_pydantic_metadata() -> None:
         panel,
         feature_config,
         horizon=horizon,
-        return_metadata=True,
     )
 
     assert isinstance(metadata, FeatureFrameMetadata)
@@ -80,14 +79,13 @@ def test_build_supervised_frame_can_return_pydantic_metadata() -> None:
     assert metadata.rolling_windows == [3]
 
 
-def test_build_inference_frame_can_return_pydantic_metadata() -> None:
+def test_build_inference_frame_returns_pydantic_metadata() -> None:
     panel = make_synthetic_panel(num_series=2, num_days=20)
     feature_config = FeatureConfig(lags=[1, 2], rolling_windows=[3])
 
     inference, metadata = build_inference_frame(
         panel,
         feature_config,
-        return_metadata=True,
     )
 
     assert isinstance(metadata, FeatureFrameMetadata)

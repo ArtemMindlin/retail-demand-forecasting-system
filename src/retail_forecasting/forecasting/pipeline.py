@@ -88,11 +88,12 @@ def run_experiment_from_frame(
         series_cost_profile = build_series_cost_profile(
             prepared_panel, settings.inventory
         )
-    supervised_frame, feature_columns = build_supervised_frame(
+    supervised_frame, feature_metadata = build_supervised_frame(
         panel=prepared_panel,
         feature_config=settings.features,
         horizon=settings.dataset.horizon,
     )
+    feature_columns = feature_metadata.feature_columns
 
     # Build walk-forward folds
     folds = build_walk_forward_folds(
