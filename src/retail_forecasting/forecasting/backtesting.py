@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -26,7 +28,7 @@ class FoldSpec(BaseModel):
         mode="before",
     )
     @classmethod
-    def _coerce_timestamp(cls, value: object) -> pd.Timestamp:
+    def _coerce_timestamp(cls, value: Any) -> pd.Timestamp:
         return pd.Timestamp(value)
 
     @model_validator(mode="after")
