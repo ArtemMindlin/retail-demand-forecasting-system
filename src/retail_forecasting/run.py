@@ -28,6 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional override for the reporting output directory.",
     )
+    parser.add_argument(
+        "--run-name",
+        default=None,
+        help="Optional override for the experiment run name.",
+    )
     return parser
 
 
@@ -38,7 +43,8 @@ def main() -> None:
         None.
 
     Notes:
-        The reporting output directory can be overridden from the command line without modifying the YAML configuration.
+        The reporting output directory and run name can be overridden from the command line
+        without modifying the YAML configuration.
     """
     args = build_parser().parse_args()
     try:
@@ -46,10 +52,15 @@ def main() -> None:
     except (ValueError, ValidationError) as exc:
         raise SystemExit(str(exc)) from None
 
+    # Handle Reporting overrides (output_dir and run_name)
+    reporting_updates = {}
     if args.output_dir is not None:
-        new_reporting = settings.reporting.model_copy(
-            update={"output_dir": Path(args.output_dir)}
-        )
+        reporting_updates["output_dir"] = Path(args.output_dir)
+    if args.run_name is not None:
+        reporting_updates["run_name"] = args.run_name
+
+    if reporting_updates:
+        new_reporting = settings.reporting.model_copy(update=reporting_updates)
         settings = settings.model_copy(update={"reporting": new_reporting})
 
     artifacts = run_experiment(settings)
