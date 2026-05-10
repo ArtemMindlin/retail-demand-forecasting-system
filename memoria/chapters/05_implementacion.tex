@@ -94,6 +94,8 @@ En validación temporal, \texttt{FoldSpec} representa cada pliegue \textit{walk-
 
 Esta capa de contratos reduce el riesgo de ejecutar experimentos con estados incoherentes: por ejemplo, un pliegue que no respete el hueco temporal del horizonte no puede construirse como objeto válido. El coste computacional añadido es despreciable frente al entrenamiento de modelos, mientras que la ganancia en trazabilidad y robustez es relevante para un sistema experimental donde la ausencia de \textit{leakage} temporal es una condición central.
 
+Como extensión de esta filosofía, cada ejecución de \textit{backtesting} consolida sus metadatos en un artefacto \texttt{backtest\_metadata.json}. Este fichero no solo preserva el contexto general del experimento, sino también los pliegues efectivamente construidos, sus tamaños de entrenamiento y validación, el resumen del panel supervisado, el \textit{hash} de configuración y el \textit{commit} de Git asociado. De este modo, la validación temporal no queda auditada únicamente por contratos en memoria, sino también por un rastro persistente que permite comparar ejecuciones, depurar desviaciones y justificar resultados ante terceros.
+
 \section{Perfiles de Coste por Serie}
 La capa de inventario se ha extendido para soportar perfiles de coste específicos por serie (\texttt{series\_id = store\_id} $\times$ \texttt{product\_id}). En lugar de utilizar un único par global $(c_o, c_u)$ para todo el sistema, se construye una tabla de costes sintéticos por serie a partir del panel preparado. Esta tabla utiliza como \textit{proxies} la intensidad de demanda, la intermitencia, la frecuencia histórica de \textit{stockout} y la inestabilidad agregada de la categoría de producto.
 
