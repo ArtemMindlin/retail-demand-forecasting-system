@@ -353,6 +353,22 @@ Matiz actual:
 - si el drift se detecta en el ultimo fold, no cambia metricas porque no hay un
   fold posterior.
 
+## `DriftConfig`
+
+Controla la vigilancia online del rendimiento durante el backtesting.
+
+### `threshold`
+
+Umbral del detector Page-Hinkley. Valores mas altos lo hacen mas conservador.
+
+### `delta`
+
+Pequena tolerancia para ignorar fluctuaciones menores del error monitorizado.
+
+### `min_instances`
+
+Numero minimo de observaciones antes de permitir alertas de drift.
+
 ## `ModelConfig`
 
 Controla cuantiles, estacionalidad, hiperparametros de boosting, tuning y

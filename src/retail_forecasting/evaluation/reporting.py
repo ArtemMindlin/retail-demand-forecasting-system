@@ -78,6 +78,20 @@ class ModelRunMetadata(BaseModel):
     retrain_each_fold: bool
 
 
+class DriftDetectorMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    detector_name: str
+    threshold: float = Field(gt=0)
+    delta: float = Field(ge=0)
+    min_instances: int = Field(gt=0)
+    monitored_metric: str
+    observations_seen: int = Field(ge=0)
+    alerts_detected: int = Field(ge=0)
+    max_score: float = Field(ge=0)
+    last_score: float = Field(ge=0)
+
+
 class BacktestMetadata(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -91,6 +105,7 @@ class BacktestMetadata(BaseModel):
     validation: ValidationMetadata
     models: ModelRunMetadata
     tuning: TuningMetadata | None = None
+    drift: DriftDetectorMetadata
 
 
 @dataclass

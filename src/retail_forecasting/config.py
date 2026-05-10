@@ -90,6 +90,13 @@ class ValidationConfig(BaseModel):
     drift_triggered_retrain: bool = False
 
 
+class DriftConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    threshold: float = Field(default=15.0, gt=0)
+    delta: float = Field(default=0.005, ge=0)
+    min_instances: int = Field(default=2, gt=0)
+
+
 class ModelConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     quantiles: list[float] = Field(
@@ -196,6 +203,7 @@ class Settings(BaseSettings):
     preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
     features: FeatureConfig = Field(default_factory=FeatureConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
+    drift: DriftConfig = Field(default_factory=DriftConfig)
     models: ModelConfig = Field(default_factory=ModelConfig)
     inventory: InventoryConfig = Field(default_factory=InventoryConfig)
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)

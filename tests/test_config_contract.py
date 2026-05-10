@@ -32,6 +32,9 @@ def test_default_config_preserves_experimental_guardrails() -> None:
     assert settings.validation.initial_train_days >= settings.dataset.horizon
     assert settings.validation.n_folds > 0
     assert settings.validation.fold_size_days > 0
+    assert settings.drift.threshold > 0
+    assert settings.drift.delta >= 0
+    assert settings.drift.min_instances > 0
 
 
 def test_default_model_quantiles_are_valid_and_orderable() -> None:

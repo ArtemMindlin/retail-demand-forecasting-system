@@ -37,6 +37,11 @@ validation:
   retrain_each_fold: true
   drift_triggered_retrain: false
 
+drift:
+  threshold: 15.0
+  delta: 0.005
+  min_instances: 2
+
 models:
   quantiles: [0.1, 0.5, 0.9]
   seasonal_period: 7

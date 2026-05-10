@@ -12,6 +12,7 @@ from retail_forecasting.evaluation.metrics import summarize_costs, summarize_pre
 from retail_forecasting.evaluation.reporting import (
     BacktestMetadata,
     DatasetMetadata,
+    DriftDetectorMetadata,
     FeaturePipelineMetadata,
     FoldRunMetadata,
     ModelRunMetadata,
@@ -158,9 +159,15 @@ def run_experiment_from_frame(
         tuning_metadata = tuning_result.metadata
 
     # Drift detection state
-    drift_detector = PageHinkleyDetector(threshold=15.0, min_instances=2)
+    drift_detector = PageHinkleyDetector(
+        threshold=settings.drift.threshold,
+        delta=settings.drift.delta,
+        min_instances=settings.drift.min_instances,
+    )
     force_retrain = False
     detected_drifts = []
+    max_drift_score = 0.0
+    last_drift_score = 0.0
 
     fold_predictions = []
     fold_run_metadata: list[FoldRunMetadata] = []
@@ -366,6 +373,8 @@ def run_experiment_from_frame(
             (boosting_fold_preds["y_true"] - boosting_fold_preds["y_pred"]).abs().mean()
         )
         drift_status = drift_detector.update(fold_mae)
+        last_drift_score = drift_status.score
+        max_drift_score = max(max_drift_score, drift_status.score)
 
         if drift_status.is_drift:
             detected_drifts.append(
@@ -440,6 +449,17 @@ def run_experiment_from_frame(
             retrain_each_fold=settings.validation.retrain_each_fold,
         ),
         tuning=tuning_metadata,
+        drift=DriftDetectorMetadata(
+            detector_name="PageHinkleyDetector",
+            threshold=settings.drift.threshold,
+            delta=settings.drift.delta,
+            min_instances=settings.drift.min_instances,
+            monitored_metric="boosting_fold_mae",
+            observations_seen=drift_detector.observations_seen,
+            alerts_detected=len(detected_drifts),
+            max_score=max_drift_score,
+            last_score=last_drift_score,
+        ),
     )
 
     artifacts = RunArtifacts(

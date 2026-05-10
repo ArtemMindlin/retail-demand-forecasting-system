@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class DriftResult:
     """Container for drift detection results."""
 
@@ -13,6 +13,7 @@ class DriftResult:
     detected_at_index: int | None = None
 
 
+@dataclass(slots=True)
 class PageHinkleyDetector:
     """Implementation of the Page-Hinkley test for concept drift detection.
 
@@ -25,29 +26,29 @@ class PageHinkleyDetector:
     the model's performance is degrading (Concept Drift).
     """
 
-    def __init__(
-        self, threshold: float = 30.0, delta: float = 0.005, min_instances: int = 30
-    ):
-        """Initialize the detector.
+    threshold: float = 30.0
+    delta: float = 0.005
+    min_instances: int = 30
+    cumulative_error: float = field(default=0.0, init=False)
+    observations_seen: int = field(default=0, init=False)
+    cumulative_deviation: float = field(default=0.0, init=False)
+    min_cumulative_deviation: float = field(default=0.0, init=False)
+    current_mean_error: float = field(default=0.0, init=False)
+    last_deviation: float = field(default=0.0, init=False)
+    drift_detected: bool = field(default=False, init=False)
 
-        Args:
-            threshold: Cumulative deviation threshold (lambda). Higher values
-                make the detector more robust to noise but slower to detect.
-            delta: Magnitude of changes that are allowed.
-            min_instances: Minimum number of samples before detecting drift.
-        """
-        self.threshold = threshold
-        self.delta = delta
-        self.min_instances = min_instances
-
+    def __post_init__(self) -> None:
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the detector state."""
-        self.sum_errors = 0.0
-        self.n = 0
-        self.min_sum_errors = 0.0
-        self.is_drift = False
+        self.cumulative_error = 0.0
+        self.observations_seen = 0
+        self.cumulative_deviation = 0.0
+        self.min_cumulative_deviation = 0.0
+        self.current_mean_error = 0.0
+        self.last_deviation = 0.0
+        self.drift_detected = False
 
     def update(self, error: float) -> DriftResult:
         """Update the detector with a new error observation.
@@ -58,40 +59,26 @@ class PageHinkleyDetector:
         Returns:
             A DriftResult object indicating if drift was detected.
         """
-        self.n += 1
+        self.observations_seen += 1
+        self.cumulative_error += error
+        self.current_mean_error = self.cumulative_error / self.observations_seen
 
-        # Calculate the average error so far
-        avg_error = self.sum_errors / self.n if self.n > 0 else 0.0
-        self.sum_errors += error
+        # Simplified PH logic for a degrading metric:
+        # deviations above the running mean accumulate evidence for drift.
+        self.last_deviation = error - self.current_mean_error - self.delta
+        self.cumulative_deviation += self.last_deviation
+        if self.cumulative_deviation < self.min_cumulative_deviation:
+            self.min_cumulative_deviation = self.cumulative_deviation
 
-        # Cumulative deviation
-        # We look for an increase in the mean error
-        self.sum_errors_diff = error - avg_error - self.delta
-        # In PH, we track the cumulative sum and its minimum
-        # This is a simplified version focusing on performance degradation
-        # (increasing errors).
+        ph_stat = self.cumulative_deviation - self.min_cumulative_deviation
 
-        # Simplified PH logic for increasing signal:
-        # m_n = sum_{i=1}^n (x_i - mean_i - delta)
-        # M_n = min(m_1 ... m_n)
-        # PH_n = m_n - M_n
-        # if PH_n > threshold -> Drift!
-
-        # For simplicity in this implementation, we'll use a cumulative
-        # absolute deviation approach often used in drift monitoring.
-        self.sum_errors += error - avg_error - self.delta
-        if self.sum_errors < self.min_sum_errors:
-            self.min_sum_errors = self.sum_errors
-
-        ph_stat = self.sum_errors - self.min_sum_errors
-
-        if self.n > self.min_instances and ph_stat > self.threshold:
-            self.is_drift = True
+        if self.observations_seen > self.min_instances and ph_stat > self.threshold:
+            self.drift_detected = True
             return DriftResult(
                 is_drift=True,
                 score=ph_stat,
                 threshold=self.threshold,
-                detected_at_index=self.n,
+                detected_at_index=self.observations_seen,
             )
 
         return DriftResult(is_drift=False, score=ph_stat, threshold=self.threshold)

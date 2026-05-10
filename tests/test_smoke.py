@@ -44,6 +44,8 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
     assert metadata["features"]["supervised_rows"] == len(artifacts.supervised_frame)
     assert metadata["validation"]["folds_created"] == settings.validation.n_folds
     assert metadata["tuning"] is None
+    assert metadata["drift"]["detector_name"] == "PageHinkleyDetector"
+    assert metadata["drift"]["threshold"] == settings.drift.threshold
 
 
 def test_smoke_run_serializes_tuning_metadata(tmp_path: Path) -> None:
@@ -76,3 +78,4 @@ def test_smoke_run_serializes_tuning_metadata(tmp_path: Path) -> None:
     assert metadata["tuning"]["strategy"] == "optuna_temporal_holdout"
     assert metadata["tuning"]["n_trials_requested"] == 2
     assert metadata["tuning"]["best_params"]["n_estimators"] > 0
+    assert metadata["drift"]["min_instances"] == settings.drift.min_instances

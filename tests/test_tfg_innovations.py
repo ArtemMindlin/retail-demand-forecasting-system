@@ -50,6 +50,9 @@ def test_page_hinkley_drift_detection():
             break
 
     assert drift_detected is True
+    assert 21 <= detector.observations_seen <= 30
+    assert detector.current_mean_error > 0
+    assert detector.cumulative_deviation >= detector.min_cumulative_deviation
 
 
 def test_conformal_interval_widening():
