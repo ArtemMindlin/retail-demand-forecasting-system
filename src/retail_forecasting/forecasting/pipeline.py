@@ -8,7 +8,19 @@ from retail_forecasting.data.fresh_retailnet import load_prepared_panel
 from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.drift.detectors import PageHinkleyDetector
 from retail_forecasting.evaluation.metrics import summarize_costs, summarize_predictions
-from retail_forecasting.evaluation.reporting import RunArtifacts, write_run_artifacts
+from retail_forecasting.evaluation.reporting import (
+    BacktestMetadata,
+    DatasetMetadata,
+    FeaturePipelineMetadata,
+    FoldRunMetadata,
+    ModelRunMetadata,
+    RunArtifacts,
+    ValidationMetadata,
+    build_config_hash,
+    get_git_commit,
+    utc_timestamp,
+    write_run_artifacts,
+)
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
 from retail_forecasting.features.engineering import (
     build_supervised_frame,
@@ -63,6 +75,24 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     merged_sens = run_sensitivity_analysis(merged_predictions, settings.inventory)
     merged_pareto = summarize_pareto_frontier(merged_predictions, settings.inventory)
 
+    combined_metadata = None
+    if artifacts_obs.backtest_metadata is not None:
+        combined_metadata = artifacts_obs.backtest_metadata.model_copy(
+            update={
+                "data_strategy": f"Observed+Latent_{strategy_name}",
+                "created_at": utc_timestamp(),
+                "models": ModelRunMetadata(
+                    models_run=sorted(
+                        merged_predictions["model_name"].dropna().unique().tolist()
+                    ),
+                    quantiles=settings.models.quantiles,
+                    optimize_for_cost=settings.models.optimize_for_cost,
+                    use_tuning=settings.models.use_tuning,
+                    retrain_each_fold=settings.validation.retrain_each_fold,
+                ),
+            }
+        )
+
     final_artifacts = RunArtifacts(
         prepared_panel=raw_panel,
         supervised_frame=artifacts_obs.supervised_frame,
@@ -73,6 +103,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         sensitivity_summary=merged_sens,
         pareto_frontier=merged_pareto,
         drifts=artifacts_obs.drifts,
+        backtest_metadata=combined_metadata,
     )
 
     return write_run_artifacts(final_artifacts, settings)
@@ -128,6 +159,7 @@ def run_experiment_from_frame(
     detected_drifts = []
 
     fold_predictions = []
+    fold_run_metadata: list[FoldRunMetadata] = []
 
     baseline_model = SeasonalNaiveModel(
         seasonal_period=settings.models.seasonal_period,
@@ -144,6 +176,19 @@ def run_experiment_from_frame(
         validation_frame = supervised_frame.loc[validation_mask].copy()
         if train_frame.empty or validation_frame.empty:
             continue
+        fold_run_metadata.append(
+            FoldRunMetadata(
+                fold_id=fold.fold_id,
+                horizon=fold.horizon,
+                train_end_date=str(fold.train_end_date.date()),
+                validation_start_date=str(fold.validation_start_date.date()),
+                validation_end_date=str(fold.validation_end_date.date()),
+                train_rows=len(train_frame),
+                validation_rows=len(validation_frame),
+                train_series=train_frame["series_id"].nunique(),
+                validation_series=validation_frame["series_id"].nunique(),
+            )
+        )
 
         # Calibration split for conformal methods
         calib_days = 21
@@ -353,6 +398,45 @@ def run_experiment_from_frame(
         )
         report_extra = f"**ALERT**: Concept drift detected and triggered adaptive retrains at: {drift_str}"
 
+    backtest_metadata = BacktestMetadata(
+        run_name=settings.reporting.run_name,
+        data_strategy=data_strategy,
+        created_at=utc_timestamp(),
+        git_commit=get_git_commit(),
+        config_hash=build_config_hash(settings),
+        dataset=DatasetMetadata(
+            rows=len(prepared_panel),
+            series=prepared_panel["series_id"].nunique(),
+            unique_dates=prepared_panel["date"].nunique(),
+            date_min=str(prepared_panel["date"].min().date()),
+            date_max=str(prepared_panel["date"].max().date()),
+        ),
+        features=FeaturePipelineMetadata(
+            horizon=settings.dataset.horizon,
+            lags=feature_metadata.lags,
+            rolling_windows=feature_metadata.rolling_windows,
+            feature_columns=len(feature_metadata.feature_columns),
+            input_rows=feature_metadata.input_rows,
+            supervised_rows=feature_metadata.output_rows,
+            dropped_rows_missing_target=feature_metadata.dropped_rows_missing_target,
+            dropped_rows_missing_features=feature_metadata.dropped_rows_missing_features,
+        ),
+        validation=ValidationMetadata(
+            initial_train_days=settings.validation.initial_train_days,
+            n_folds_requested=settings.validation.n_folds,
+            fold_size_days=settings.validation.fold_size_days,
+            folds_created=len(fold_run_metadata),
+            folds=fold_run_metadata,
+        ),
+        models=ModelRunMetadata(
+            models_run=sorted(predictions["model_name"].dropna().unique().tolist()),
+            quantiles=settings.models.quantiles,
+            optimize_for_cost=settings.models.optimize_for_cost,
+            use_tuning=settings.models.use_tuning,
+            retrain_each_fold=settings.validation.retrain_each_fold,
+        ),
+    )
+
     artifacts = RunArtifacts(
         prepared_panel=prepared_panel,
         supervised_frame=supervised_frame,
@@ -364,6 +448,7 @@ def run_experiment_from_frame(
         pareto_frontier=pareto_frontier,
         drifts=detected_drifts,
         report_extra=report_extra,
+        backtest_metadata=backtest_metadata,
     )
     return write_run_artifacts(artifacts, settings)
 

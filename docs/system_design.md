@@ -265,6 +265,7 @@ Cada corrida genera:
 - tablas de coste agregado;
 - frontera de Pareto de politicas candidatas;
 - predicciones por fold;
+- `backtest_metadata.json` con dataset, features, folds, modelos, hash de configuracion y commit Git;
 - graficos simples de coste y trade-off error-coste;
 - un reporte Markdown final en `reports/`.
 

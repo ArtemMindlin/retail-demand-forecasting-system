@@ -36,7 +36,7 @@ La implementación técnica no es un fin en sí mismo, sino un soporte para la v
 \begin{itemize}
     \item \textbf{Contratos de Datos}: Uso de validaciones internas para asegurar que no existe \textit{temporal leakage} entre los conjuntos de entrenamiento y prueba.
     \item \textbf{Modularidad de Métricas}: Desacoplamiento de las métricas de error (MAE, RMSE) de las métricas económicas (coste total), permitiendo un análisis multi-objetivo sin sesgar el entrenamiento del modelo.
-    \item \textbf{Reproducibilidad}: Cada ejecución genera un reporte (\texttt{reports/}) que incluye la configuración exacta de los hiperparámetros y el estado de la semilla aleatoria, garantizando que cualquier resultado pueda ser auditado y replicado.
+    \item \textbf{Reproducibilidad}: Cada ejecución genera un reporte (\texttt{reports/}) y un archivo \texttt{backtest\_metadata.json} con resumen de datos, variables, pliegues, modelos, hash de configuración y commit Git, garantizando que cualquier resultado pueda ser auditado y replicado.
 \end{itemize}
 
 \section{Inferencia y Tratamiento de Series con Historial Insuficiente}

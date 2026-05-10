@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import subprocess
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, Optional
 
 import pandas as pd
+from pydantic import BaseModel, ConfigDict, Field
 
 from retail_forecasting.config import Settings
 from retail_forecasting.utils.io import (
@@ -13,6 +18,77 @@ from retail_forecasting.utils.io import (
     make_run_directory,
 )
 from retail_forecasting.visualization.plots import render_standard_plots
+
+
+class DatasetMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    rows: int = Field(ge=0)
+    series: int = Field(ge=0)
+    unique_dates: int = Field(ge=0)
+    date_min: str
+    date_max: str
+
+
+class FeaturePipelineMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    horizon: int = Field(gt=0)
+    lags: list[int] = Field(min_length=1)
+    rolling_windows: list[int] = Field(min_length=1)
+    feature_columns: int = Field(ge=0)
+    input_rows: int = Field(ge=0)
+    supervised_rows: int = Field(ge=0)
+    dropped_rows_missing_target: int = Field(ge=0)
+    dropped_rows_missing_features: int = Field(ge=0)
+
+
+class FoldRunMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    fold_id: int = Field(ge=0)
+    horizon: int = Field(gt=0)
+    train_end_date: str
+    validation_start_date: str
+    validation_end_date: str
+    train_rows: int = Field(ge=0)
+    validation_rows: int = Field(ge=0)
+    train_series: int = Field(ge=0)
+    validation_series: int = Field(ge=0)
+
+
+class ValidationMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    initial_train_days: int = Field(gt=0)
+    n_folds_requested: int = Field(gt=0)
+    fold_size_days: int = Field(gt=0)
+    folds_created: int = Field(ge=0)
+    folds: list[FoldRunMetadata]
+
+
+class ModelRunMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    models_run: list[str] = Field(min_length=1)
+    quantiles: list[float] = Field(min_length=1)
+    optimize_for_cost: bool
+    use_tuning: bool
+    retrain_each_fold: bool
+
+
+class BacktestMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    run_name: str
+    data_strategy: str
+    created_at: str
+    git_commit: str | None
+    config_hash: str
+    dataset: DatasetMetadata
+    features: FeaturePipelineMetadata
+    validation: ValidationMetadata
+    models: ModelRunMetadata
 
 
 @dataclass
@@ -27,6 +103,7 @@ class RunArtifacts:
     pareto_frontier: Optional[pd.DataFrame] = None
     drifts: list[dict[str, Any]] = field(default_factory=list)
     report_extra: str = ""
+    backtest_metadata: BacktestMetadata | None = None
     run_directory: Path | None = None
 
 
@@ -47,6 +124,11 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
         )
     if artifacts.pareto_frontier is not None:
         artifacts.pareto_frontier.to_csv(run_dir / "pareto_frontier.csv", index=False)
+    if artifacts.backtest_metadata is not None:
+        (run_dir / "backtest_metadata.json").write_text(
+            artifacts.backtest_metadata.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
 
     if settings.reporting.make_plots:
         render_standard_plots(
@@ -60,6 +142,28 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
 
     artifacts.run_directory = run_dir
     return artifacts
+
+
+def build_config_hash(settings: Settings) -> str:
+    serialized = json.dumps(settings.model_dump(mode="json"), sort_keys=True)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def get_git_commit() -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout.strip() or None
+
+
+def utc_timestamp() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:

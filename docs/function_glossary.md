@@ -428,12 +428,23 @@ main()
 
 ### `write_run_artifacts`
 - Archivo: `src/retail_forecasting/evaluation/reporting.py`
-- Que hace: guarda CSVs, plots y report final en el directorio de la corrida.
+- Que hace: guarda CSVs, metadata de backtest, plots y report final en el directorio de la corrida.
 - Recibe:
   - `artifacts`;
   - `settings`.
 - Devuelve: `RunArtifacts`.
 - Se usa en: `run_experiment_from_frame()`.
+
+### `BacktestMetadata`
+- Archivo: `src/retail_forecasting/evaluation/reporting.py`
+- Que hace: contrato Pydantic congelado que resume la trazabilidad de una corrida de backtesting.
+- Incluye:
+  - resumen del dataset;
+  - metadata del frame supervisado;
+  - folds ejecutados y filas por fold;
+  - modelos ejecutados;
+  - hash de configuracion y commit Git.
+- Se escribe en: `backtest_metadata.json`.
 
 ### `build_markdown_report`
 - Archivo: `src/retail_forecasting/evaluation/reporting.py`
