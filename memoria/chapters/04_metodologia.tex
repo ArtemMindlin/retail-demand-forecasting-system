@@ -34,7 +34,7 @@ La función de ingeniería de características transforma el panel diario en una
 \begin{table}[htbp]
     \centering
     \small
-    \begin{tabular}{p{0.23\textwidth} p{0.34\textwidth} p{0.34\textwidth}}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.23\textwidth} >{\raggedright\arraybackslash}p{0.34\textwidth} >{\raggedright\arraybackslash}p{0.34\textwidth}}
         \toprule
         \textbf{Familia} & \textbf{Variables generadas} & \textbf{Criterio temporal} \\
         \midrule
@@ -79,7 +79,7 @@ En la configuración base, el horizonte de predicción es $H=7$. Por tanto, adem
 
 Este recorte temporal no constituye una pérdida arbitraria de datos, sino una consecuencia necesaria de formular un problema supervisado sin fuga de información futura. Finalmente, la columna objetivo queda excluida explícitamente del conjunto \texttt{feature\_columns}; de este modo, la matriz de entrada contiene solo información disponible en el origen de predicción, mientras que la demanda futura acumulada se conserva únicamente como etiqueta supervisada.
 
-\section{Diseño Experimental: Validación Walk-Forward}
+\section{Validación Walk-Forward}
 Dada la naturaleza temporal de los datos, no es posible utilizar una validación cruzada aleatoria tradicional, ya que violaría la estructura causal del tiempo. En su lugar, se implementa un esquema de \textbf{validación temporal \textit{walk-forward}} con ventanas expansivas.
 
 El proceso se divide en $N$ pliegues (\textit{folds}). Para cada pliegue:

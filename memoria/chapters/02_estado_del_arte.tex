@@ -4,7 +4,7 @@
 
 Este capítulo presenta una revisión de la literatura y las bases teóricas fundamentales sobre las que se apoya el sistema desarrollado. Se exploran los paradigmas modernos de previsión de demanda, la evolución de los modelos basados en árboles, la cuantificación de la incertidumbre y la optimización de inventarios bajo condiciones de censura.
 
-\section{Previsión de la Demanda en Retail: De Modelos Locales a Globales}
+\section{Previsión de la Demanda en Retail}
 Tradicionalmente, la previsión de series temporales se ha abordado mediante modelos \textbf{locales}, donde se entrena un modelo individual (como ARIMA o suavizado exponencial) para cada SKU o combinación tienda-producto. Sin embargo, en el contexto del \textit{retail} masivo, con miles de productos heterogéneos, este enfoque presenta limitaciones de escalabilidad y dificultad para manejar productos con poco historial (\textit{cold-start problem}).
 
 El paradigma actual ha girado hacia los \textbf{Modelos Globales de Pronóstico (GFMs)}, donde un único modelo se entrena sobre la totalidad de las series temporales de la base de datos. Montero-Manso y Hyndman (2021) \cite{montero2021principles} demostraron teóricamente que los modelos globales no son restrictivos y pueden capturar patrones compartidos (estacionalidad, elasticidad de precio) de manera más eficiente que los locales, reduciendo el riesgo de sobreajuste y mejorando la precisión en datos intermitentes. Este enfoque ha dominado competiciones de referencia como la M5 Walmart, donde las soluciones ganadoras fueron casi exclusivamente modelos globales basados en \textit{Machine Learning}.

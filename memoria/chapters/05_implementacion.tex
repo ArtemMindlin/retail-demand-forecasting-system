@@ -27,8 +27,8 @@ La elección de herramientas se basa en su madurez, rendimiento y capacidad de i
 Para elevar la calidad del software desde una perspectiva de ingeniería, se han aplicado los siguientes patrones:
 \begin{itemize}
     \item \textbf{Patrón Strategy}: Permite intercambiar el motor de \textit{forecasting} (ej. cambiar entre CatBoost, XGBoost o modelos estadísticos) sin modificar la lógica principal de validación y evaluación.
-    \item \textbf{Patrón Factory}: Utilizado en el módulo de características (\texttt{features/engineering.py}) para generar de forma dinámica y parametrizada los \textit{lags} y ventanas móviles según la configuración del experimento.
-    \item \textbf{Patrón Decorator}: Aplicado en la capa de calibración para añadir capacidades de \textit{Conformal Prediction} a cualquier modelo base de forma no intrusiva.
+    \item \textbf{Patrón Factory}: Utilizado en el módulo de características para generar de forma dinámica y parametrizada los \textit{lags} y ventanas móviles según la configuración del experimento.
+    \item \textbf{Patrón Decorator}: Aplicado en la capa de calibración para añadir \textit{Conformal Prediction} a cualquier modelo base de forma no intrusiva.
 \end{itemize}
 
 \section{Implementación del Rigor Estadístico}
@@ -44,7 +44,7 @@ El pipeline de entrenamiento y el flujo de inferencia comparten la misma funció
 
 En este contexto, un origen de predicción es una pareja $(s,t)$: la serie tienda-producto $s$ observada hasta la fecha $t$. Una misma serie puede tener muchos orígenes válidos en el histórico, pero para inferencia operativa solo interesa el más reciente. Por ello, el metadato \texttt{rows\_not\_latest\_origin} contabiliza filas que eran técnicamente válidas para el modelo, pero se descartan por corresponder a fechas anteriores dentro de la misma serie.
 
-Para cubrir casos de \textit{cold start} sin modificar el pipeline de entrenamiento, se implementa una política específica de inferencia. Las series cuya última fila no dispone de todas las variables requeridas se marcan con \texttt{prediction\_source = cold\_start\_fallback} y reciben una predicción heurística basada en medias históricas. La jerarquía de búsqueda es:
+Para cubrir casos de \textit{cold start} sin modificar el pipeline de entrenamiento, se implementa una política específica de inferencia. Las series cuya última fila no dispone de todas las variables requeridas se marcan como \texttt{cold\_start\_fallback} y reciben una predicción heurística basada en medias históricas. La jerarquía de búsqueda es:
 
 \begin{center}
     \texttt{series\_id} $\rightarrow$ \texttt{product\_id} $\rightarrow$ \texttt{third\_category\_id} $\rightarrow$ \texttt{global}
@@ -82,7 +82,9 @@ El primer uso de Pydantic se aplica a la configuración experimental. Esto aport
 \subsection{Contratos de Objetos del Pipeline}
 Además de la configuración, Pydantic se utiliza para representar objetos internos que contienen información crítica para la validez experimental. Este diseño evita que determinadas invariantes queden solo como convenciones documentadas o supuestos implícitos en el código.
 
-En ingeniería de características, \texttt{FeatureFrameMetadata} registra las columnas utilizadas por el modelo, el horizonte, los retardos, las ventanas móviles y el número de filas descartadas por falta de objetivo o variables. En inferencia, \texttt{InferenceFallbackMetadata} audita cuántas filas se envían al modelo y cuántas se resuelven mediante la política de \textit{cold start}, distinguiendo el nivel jerárquico usado en el respaldo.
+En ingeniería de características, \texttt{FeatureFrameMetadata} registra las columnas utilizadas por el modelo, el horizonte, los retardos, las ventanas móviles y el número de filas descartadas por falta de objetivo o variables.
+
+En inferencia, \texttt{InferenceFallbackMetadata} audita cuántas filas se envían al modelo y cuántas se resuelven mediante la política de \textit{cold start}, además del nivel jerárquico usado en el respaldo.
 
 En validación temporal, \texttt{FoldSpec} representa cada pliegue \textit{walk-forward} como un contrato Pydantic congelado. Este objeto almacena el identificador del pliegue, el horizonte y las fechas de entrenamiento y validación, y valida en tiempo de ejecución invariantes como:
 
