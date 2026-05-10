@@ -15,6 +15,7 @@ from retail_forecasting.evaluation.reporting import (
     FoldRunMetadata,
     ModelRunMetadata,
     RunArtifacts,
+    TuningRunMetadata,
     ValidationMetadata,
     build_config_hash,
     get_git_commit,
@@ -140,18 +141,31 @@ def run_experiment_from_frame(
     arima_model: ConformalForecaster | None = None
 
     # Optional: Hyperparameter Tuning Phase
-    best_boosting_params: BoostingParams = {
-        "n_estimators": settings.models.n_estimators,
-        "learning_rate": settings.models.learning_rate,
-        "max_depth": settings.models.max_depth,
-    }
+    best_boosting_params = BoostingParams(
+        n_estimators=settings.models.n_estimators,
+        learning_rate=settings.models.learning_rate,
+        max_depth=settings.models.max_depth,
+    )
+    tuning_metadata = None
     if settings.models.use_tuning:
         print(f"🔍 Starting Optuna Tuning for {data_strategy} strategy...")
         tuning_train_frame = supervised_frame[
             supervised_frame["date"] <= folds[0].train_end_date
         ]
         tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
-        best_boosting_params = tuner.tune_boosting(tuning_train_frame, feature_columns)
+        tuning_result = tuner.tune_boosting(tuning_train_frame, feature_columns)
+        best_boosting_params = tuning_result.best_params
+        tuning_metadata = TuningRunMetadata(
+            strategy=tuning_result.metadata.strategy,
+            n_trials_requested=tuning_result.metadata.n_trials_requested,
+            best_score=tuning_result.metadata.best_score,
+            train_rows=tuning_result.metadata.train_rows,
+            validation_rows=tuning_result.metadata.validation_rows,
+            validation_cutoff=str(tuning_result.metadata.validation_cutoff.date()),
+            feature_count=tuning_result.metadata.feature_count,
+            target_col=tuning_result.metadata.target_col,
+            best_params=tuning_result.metadata.best_params.model_dump(),
+        )
 
     # Drift detection state
     drift_detector = PageHinkleyDetector(threshold=15.0, min_instances=2)
@@ -255,9 +269,9 @@ def run_experiment_from_frame(
             base_lgb = AutoBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
-                n_estimators=best_boosting_params["n_estimators"],
-                learning_rate=best_boosting_params["learning_rate"],
-                max_depth=best_boosting_params["max_depth"],
+                n_estimators=best_boosting_params.n_estimators,
+                learning_rate=best_boosting_params.learning_rate,
+                max_depth=best_boosting_params.max_depth,
                 overstock_cost=(
                     settings.inventory.overstock_cost
                     if settings.models.optimize_for_cost
@@ -300,9 +314,9 @@ def run_experiment_from_frame(
             base_cat = CatBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
-                n_estimators=best_boosting_params["n_estimators"],
-                learning_rate=best_boosting_params["learning_rate"],
-                max_depth=best_boosting_params["max_depth"],
+                n_estimators=best_boosting_params.n_estimators,
+                learning_rate=best_boosting_params.learning_rate,
+                max_depth=best_boosting_params.max_depth,
             )
             base_cat.fit(
                 sub_train_frame.loc[:, feature_columns],
@@ -435,6 +449,7 @@ def run_experiment_from_frame(
             use_tuning=settings.models.use_tuning,
             retrain_each_fold=settings.validation.retrain_each_fold,
         ),
+        tuning=tuning_metadata,
     )
 
     artifacts = RunArtifacts(
