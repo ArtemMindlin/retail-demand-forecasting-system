@@ -3,24 +3,25 @@
 This diagram documents the control flow of `build_walk_forward_folds()`.
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}} }%%
 flowchart TD
-    A["Input: panel, validation_config, horizon"] --> B["Extract global unique dates<br/>unique_dates = sorted(date.drop_duplicates())"]
+    A["Input: panel, validation_config, horizon"] --> B["Extract global unique dates\nunique_dates = sorted(date.drop_duplicates())"]
 
-    B --> C["Compute minimum required dates<br/>D_min = initial_train_days + n_folds * fold_size_days + horizon - 1"]
+    B --> C["Compute minimum required dates\nD_min = initial_train_days + n_folds * fold_size_days + horizon - 1"]
 
     C --> D{"len(unique_dates) < D_min?"}
-    D -- "Yes" --> E["Raise ValueError<br/>not enough dates"]
+    D -- "Yes" --> E["Raise ValueError\nnot enough dates"]
     D -- "No" --> F["Initialize folds = []"]
 
-    F --> G["Compute last valid validation origin<br/>last_valid_index = len(unique_dates) - horizon"]
+    F --> G["Compute last valid validation origin\nlast_valid_index = len(unique_dates) - horizon"]
 
-    G --> H["Loop fold_id<br/>0 ... n_folds - 1"]
+    G --> H["Loop fold_id\n0 ... n_folds - 1"]
 
     H --> I["validation_start_index = initial_train_days + fold_id * fold_size_days"]
     I --> J["validation_end_index = validation_start_index + fold_size_days - 1"]
 
     J --> K{"validation_end_index > last_valid_index?"}
-    K -- "Yes" --> L["Break loop<br/>target horizon would be incomplete"]
+    K -- "Yes" --> L["Break loop\ntarget horizon would be incomplete"]
     K -- "No" --> M["Map validation indexes to dates"]
 
     M --> N["validation_start_date = unique_dates[validation_start_index]"]
@@ -46,7 +47,7 @@ flowchart TD
     H --> U["Loop finished"]
     U --> T
 
-    T -- "Yes" --> V["Raise ValueError<br/>no valid fold could be created"]
+    T -- "Yes" --> V["Raise ValueError\nno valid fold could be created"]
     T -- "No" --> W["Return list[FoldSpec]"]
 ```
 
