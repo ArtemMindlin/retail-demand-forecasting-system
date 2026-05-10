@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from retail_forecasting.config import Settings
+from retail_forecasting.contracts.tuning import BoostingParams
 from retail_forecasting.data.censorship import LatentDemandImputer
 from retail_forecasting.data.fresh_retailnet import load_prepared_panel
 from retail_forecasting.drift.regime_analysis import label_stockout_regime
@@ -15,7 +16,6 @@ from retail_forecasting.evaluation.reporting import (
     FoldRunMetadata,
     ModelRunMetadata,
     RunArtifacts,
-    TuningRunMetadata,
     ValidationMetadata,
     build_config_hash,
     get_git_commit,
@@ -34,7 +34,7 @@ from retail_forecasting.inventory.newsvendor import (
 )
 from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
 from retail_forecasting.models.boosting import AutoBoostingModel
-from retail_forecasting.models.optimization import BoostingParams, HyperparameterTuner
+from retail_forecasting.models.optimization import HyperparameterTuner
 from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.linear import RidgeBaselineModel
@@ -155,17 +155,7 @@ def run_experiment_from_frame(
         tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
         tuning_result = tuner.tune_boosting(tuning_train_frame, feature_columns)
         best_boosting_params = tuning_result.best_params
-        tuning_metadata = TuningRunMetadata(
-            strategy=tuning_result.metadata.strategy,
-            n_trials_requested=tuning_result.metadata.n_trials_requested,
-            best_score=tuning_result.metadata.best_score,
-            train_rows=tuning_result.metadata.train_rows,
-            validation_rows=tuning_result.metadata.validation_rows,
-            validation_cutoff=str(tuning_result.metadata.validation_cutoff.date()),
-            feature_count=tuning_result.metadata.feature_count,
-            target_col=tuning_result.metadata.target_col,
-            best_params=tuning_result.metadata.best_params.model_dump(),
-        )
+        tuning_metadata = tuning_result.metadata
 
     # Drift detection state
     drift_detector = PageHinkleyDetector(threshold=15.0, min_instances=2)

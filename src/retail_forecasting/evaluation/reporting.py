@@ -12,6 +12,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
 from retail_forecasting.config import Settings
+from retail_forecasting.contracts.tuning import TuningMetadata
 from retail_forecasting.utils.io import (
     dataframe_to_markdown,
     ensure_directory,
@@ -77,20 +78,6 @@ class ModelRunMetadata(BaseModel):
     retrain_each_fold: bool
 
 
-class TuningRunMetadata(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    strategy: str
-    n_trials_requested: int = Field(gt=0)
-    best_score: float | None = Field(default=None, ge=0)
-    train_rows: int = Field(ge=0)
-    validation_rows: int = Field(ge=0)
-    validation_cutoff: str
-    feature_count: int = Field(ge=0)
-    target_col: str
-    best_params: dict[str, int | float]
-
-
 class BacktestMetadata(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -103,7 +90,7 @@ class BacktestMetadata(BaseModel):
     features: FeaturePipelineMetadata
     validation: ValidationMetadata
     models: ModelRunMetadata
-    tuning: TuningRunMetadata | None = None
+    tuning: TuningMetadata | None = None
 
 
 @dataclass

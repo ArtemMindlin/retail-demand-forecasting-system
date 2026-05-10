@@ -69,9 +69,10 @@ def test_smoke_run_serializes_tuning_metadata(tmp_path: Path) -> None:
 
     assert artifacts.backtest_metadata is not None
     assert artifacts.backtest_metadata.tuning is not None
-    assert artifacts.backtest_metadata.tuning.best_params["n_estimators"] > 0
+    assert artifacts.backtest_metadata.tuning.best_params.n_estimators > 0
     metadata = json.loads(
         (artifacts.run_directory / "backtest_metadata.json").read_text(encoding="utf-8")
     )
     assert metadata["tuning"]["strategy"] == "optuna_temporal_holdout"
     assert metadata["tuning"]["n_trials_requested"] == 2
+    assert metadata["tuning"]["best_params"]["n_estimators"] > 0
