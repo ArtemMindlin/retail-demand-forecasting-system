@@ -27,13 +27,13 @@ jobs:
           version: "latest"
 
       - name: Install dependencies
-        run: uv pip install --system -e ".[dev,ml]"
+        run: uv sync --all-extras --dev
 
       - name: Run Ruff Linter
-        run: uv run ruff check .
+        run: uv run python -m ruff check .
 
       - name: Run Ruff Formatter check
-        run: uv run ruff format --check .
+        run: uv run python -m ruff format --check .
 
       - name: Run Pytest
         run: uv run pytest
