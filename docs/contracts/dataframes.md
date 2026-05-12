@@ -244,6 +244,101 @@ Expected properties:
 - `order_quantity >= 0` when `clip_negative_orders = true`
 - quantile columns are monotonic by level within each row
 
+## Business Output Frame
+
+Intended for:
+
+- daily batch export to the replenishment manager
+- future `reorder_recommendations.csv` artifact
+
+This is a business-facing contract derived from model predictions,
+inventory decisions, and inference-routing metadata. It is not yet the
+canonical persisted artifact of the current pipeline, but it defines the
+target schema for business-oriented runs.
+
+Required columns:
+
+| Column | Meaning |
+| --- | --- |
+| `decision_date` | business decision date; usually the forecast origin date used to place tomorrow's order |
+| `series_id` | SKU decision key |
+| `store_id` | store identifier |
+| `product_id` | product identifier |
+| `predicted_lead_time_demand` | lead-time demand estimate used as the central recommendation signal |
+| `order_quantity` | recommended reorder quantity |
+| `prediction_source` | `model` when the recommendation came from a full model prediction, otherwise `cold_start_fallback` |
+| `fallback_level` | fallback hierarchy used when `prediction_source = cold_start_fallback`; null otherwise |
+| `risk_flag` | operational review flag such as `cold_start`, `high_uncertainty`, `drift_watch`, or `extreme_order_quantity` |
+| `notes` | optional free-text or enumerated explanation for the replenishment manager |
+
+Optional columns:
+
+| Column | Meaning |
+| --- | --- |
+| `q_<level>` | optional quantile forecasts used to communicate uncertainty |
+| `stockout_hours` | latest stockout context at the forecast origin |
+| `stockout_regime` | stockout regime label when available |
+| `data_strategy` | `Observed` or latent-demand strategy label |
+| `model_name` | champion model used to generate the recommendation |
+| `backend_name` | implementation/backend label |
+
+Expected properties:
+
+- one row per `series_id` and `decision_date`
+- `order_quantity >= 0`
+- `predicted_lead_time_demand >= 0`
+- `fallback_level` is null when `prediction_source = model`
+- `fallback_level in {series, product, third_category, global}` when `prediction_source = cold_start_fallback`
+- `risk_flag` may be null for standard recommendations
+
+Semantics:
+
+```text
+predicted_lead_time_demand = y_pred when using model predictions
+```
+
+```text
+predicted_lead_time_demand = fallback_target_lead_time_demand when using cold-start fallback
+```
+
+## Exceptions Frame
+
+Intended for:
+
+- future `exceptions.csv` artifact
+- manual review queue for the replenishment manager
+
+This frame contains only flagged recommendation rows that require additional
+review before export to downstream procurement systems.
+
+Required columns:
+
+| Column | Meaning |
+| --- | --- |
+| `decision_date` | business decision date |
+| `series_id` | SKU decision key |
+| `store_id` | store identifier |
+| `product_id` | product identifier |
+| `risk_flag` | primary exception category |
+| `order_quantity` | recommended reorder quantity under review |
+| `prediction_source` | `model` or `cold_start_fallback` |
+| `notes` | review context or explanation |
+
+Optional columns:
+
+| Column | Meaning |
+| --- | --- |
+| `fallback_level` | fallback hierarchy for cold-start rows |
+| `predicted_lead_time_demand` | central demand estimate behind the recommendation |
+| `q_<level>` | uncertainty context for manual review |
+| `model_name` | model responsible for the recommendation |
+
+Expected properties:
+
+- every row must have a non-null `risk_flag`
+- each row must correspond to a row in the business output frame
+- exception rows should be a strict subset of the daily recommendation export
+
 ## Metrics Summary
 
 Created by:

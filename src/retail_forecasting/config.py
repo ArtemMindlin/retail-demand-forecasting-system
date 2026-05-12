@@ -176,6 +176,21 @@ class InventoryConfig(BaseModel):
         return v
 
 
+class BusinessConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    flag_cold_start: bool = True
+    flag_drift_watch: bool = True
+    flag_high_uncertainty: bool = True
+    high_uncertainty_interval_quantile: float = Field(default=0.95, gt=0.0, lt=1.0)
+    flag_extreme_order_quantity: bool = True
+    extreme_order_quantity_quantile: float = Field(default=0.99, gt=0.0, lt=1.0)
+    champion_data_strategy: str | None = "Observed"
+    champion_model_name: str = "catboost"
+    champion_backend_name: str = "conformal_catboost_official"
+    champion_min_cost_improvement_pct: float = Field(default=0.0, ge=0.0)
+    champion_max_service_level_degradation: float = Field(default=0.02, ge=0.0, le=1.0)
+
+
 class ReportingConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     output_dir: Path = Path("reports")
@@ -206,6 +221,7 @@ class Settings(BaseSettings):
     drift: DriftConfig = Field(default_factory=DriftConfig)
     models: ModelConfig = Field(default_factory=ModelConfig)
     inventory: InventoryConfig = Field(default_factory=InventoryConfig)
+    business: BusinessConfig = Field(default_factory=BusinessConfig)
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
 
     @model_validator(mode="after")

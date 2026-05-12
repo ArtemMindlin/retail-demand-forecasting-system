@@ -15,6 +15,43 @@ Las características principales del dataset son:
     \item \textbf{Indicadores de Stockout}: Información crítica sobre las horas en las que el producto no estuvo disponible en el estante.
 \end{itemize}
 
+Para mantener una interpretación consistente a lo largo del proyecto, el panel raw del benchmark se transforma en un panel preparado con nombres canónicos. La Tabla~\ref{tab:dataset_variables} resume las variables principales, su procedencia y su función analítica dentro del sistema.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.16\textwidth} >{\raggedright\arraybackslash}p{0.22\textwidth} >{\raggedright\arraybackslash}p{0.16\textwidth} >{\raggedright\arraybackslash}p{0.34\textwidth}}
+        \toprule
+        \textbf{Variable / familia} & \textbf{Nombre en el panel} & \textbf{Tipo} & \textbf{Papel en el sistema} \\
+        \midrule
+        Fecha diaria & \texttt{date} & temporal & Origen de predicción y eje principal del panel. \\
+        Identificador de serie & \texttt{series\_id} & categórica & Clave tienda-producto para agrupar historia y construir features por serie. \\
+        Demanda observada & demanda observada / sale amount & numérica & Señal objetivo base utilizada para construir la etiqueta acumulada de horizonte. \\
+        Horas de \textit{stockout} & horas de stockout / stock hour 6--22 count & numérica & Intensidad de falta de disponibilidad; actúa como contexto operativo y señal de censura. \\
+        Descuento & \texttt{discount} & numérica & Variable comercial exógena que captura promociones o rebajas. \\
+        Festivo & \texttt{holiday\_flag} & binaria & Indicador de cierre o comportamiento especial asociado a días festivos. \\
+        Actividad promocional & \texttt{activity\_flag} & binaria & Señal contextual de actividad comercial o evento local. \\
+        Precipitación & \texttt{precpt} & numérica & Variable meteorológica exógena. \\
+        Temperatura media & \texttt{avg\_temperature} & numérica & Variable meteorológica exógena. \\
+        Humedad media & \texttt{avg\_humidity} & numérica & Variable meteorológica exógena. \\
+        Nivel medio de viento & \texttt{avg\_wind\_level} & numérica & Variable meteorológica exógena. \\
+        Ciudad & \texttt{city\_id} & categórica & Identificador jerárquico estático del entorno geográfico. \\
+        Tienda & \texttt{store\_id} & categórica & Identificador estático de la ubicación comercial. \\
+        Grupo de gestión & management group id & categórica & Nivel jerárquico de gestión de la tienda. \\
+        Primera categoría & first category id & categórica & Primer nivel de la jerarquía del producto. \\
+        Segunda categoría & second category id & categórica & Segundo nivel de la jerarquía del producto. \\
+        Tercera categoría & third category id & categórica & Tercer nivel de la jerarquía del producto. \\
+        Producto & product id & categórica & Identificador del SKU concreto modelado. \\
+        \bottomrule
+    \end{tabular}
+    }
+    \caption{Variables principales del dataset \textit{Fresh RetailNet} y su papel en el panel preparado.}
+    \label{tab:dataset_variables}
+\end{table}
+
+En términos operativos, las columnas \texttt{date} y \texttt{series\_id} definen la estructura temporal y panelizada del problema. El resto de variables se divide en tres grupos funcionales: la demanda observada que actúa como señal base, las variables contextuales exógenas que describen el entorno operativo y las variables estáticas que codifican la jerarquía geográfica y comercial de cada serie. Esta separación es importante porque más adelante determina qué campos pueden utilizarse como entrada, cuáles solo sirven como contexto y cuáles no deben confundirse con la etiqueta objetivo.
+
 \section{Patrones Temporales y Estacionalidad}
 El análisis visual de las series revela una fuerte estacionalidad semanal. Las ventas tienden a concentrarse en los días previos al fin de semana, con caídas significativas en días festivos oficiales cuando las tiendas permanecen cerradas. Esta naturaleza cíclica justifica el uso de \textit{lags} de 7 días y variables de calendario en la fase de ingeniería de características.
 

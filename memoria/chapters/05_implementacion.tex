@@ -68,6 +68,13 @@ La técnica principal implementada es un enfoque de \textbf{Modelo Profesor (\te
 
 Este enfoque permite que el pipeline compare de forma empírica el rendimiento de los modelos entrenados con datos "sucios" (basales) frente a datos corregidos estadísticamente.
 
+\section{Baseline Estacional}
+Además de los modelos supervisados y estadísticos más complejos, el sistema incorpora un baseline \textit{Seasonal Naive} como referencia mínima de rendimiento. Este modelo no aprende parámetros a partir de las variables explicativas, sino que extrapola la dinámica más reciente de la propia serie temporal. Su papel no es maximizar el rendimiento, sino ofrecer una cota de comparación simple, robusta y fácilmente interpretable.
+
+En cada origen de predicción, la estimación se construye a partir de los valores observados previos de la misma \texttt{series\_id}. El pronóstico para un horizonte $H$ se obtiene acumulando la demanda de los periodos estacionales más recientes disponibles, con el objetivo de capturar el patrón repetitivo dominante de la serie. Si no existe historial suficiente para recuperar alguno de esos retardos estacionales, la contribución correspondiente se trata como nula y la predicción final se mantiene no negativa.
+
+Este baseline es útil por dos motivos. Primero, establece una referencia fuerte frente a la que comparar modelos más complejos: si un modelo aprendido no supera de forma consistente al \textit{Seasonal Naive}, su valor añadido es cuestionable. Segundo, permite evaluar si la ganancia del modelado supervisado compensa la complejidad adicional introducida por el entrenamiento, la calibración y la optimización de hiperparámetros. En un problema de demanda con estacionalidad marcada, este tipo de baseline suele ser un adversario exigente y, por tanto, una referencia metodológicamente apropiada.
+
 \section{Contratos Pydantic y Principios MLOps}
 Para garantizar que el sistema es escalable y auditable, se ha migrado la gestión de parámetros y metadatos críticos de simples diccionarios o estructuras informales a contratos explícitos basados en \textbf{Pydantic}.
 

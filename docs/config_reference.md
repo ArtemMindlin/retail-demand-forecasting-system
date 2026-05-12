@@ -554,6 +554,132 @@ Evalua politicas como:
 
 y busca politicas no dominadas en coste, sobrestock y stockout.
 
+## `BusinessConfig`
+
+Controla la politica de revision manual de recomendaciones de reposicion.
+
+Esta capa no cambia el forecast ni la logica del newsvendor. Su funcion es
+marcar recomendaciones para revision humana en los artefactos
+`reorder_recommendations.csv` y `exceptions.csv`.
+
+### `flag_cold_start`
+
+Si es `true`, filas con `prediction_source = cold_start_fallback` se etiquetan
+con `risk_flag = cold_start`.
+
+### `flag_drift_watch`
+
+Si es `true`, filas pertenecientes a folds marcados por el detector de drift se
+etiquetan con `risk_flag = drift_watch`, salvo que ya tengan un flag anterior.
+
+### `flag_high_uncertainty`
+
+Si es `true`, recomendaciones con intervalos de prediccion especialmente anchos
+se marcan con `risk_flag = high_uncertainty`.
+
+### `high_uncertainty_interval_quantile`
+
+Cuantil usado para definir el umbral de anchura del intervalo.
+
+Ejemplo:
+
+```yaml
+high_uncertainty_interval_quantile: 0.95
+```
+
+Interpretacion:
+
+- `0.95` significa marcar el 5% superior de anchuras de intervalo dentro de la
+  corrida;
+- debe estar estrictamente entre `0` y `1`.
+
+### `flag_extreme_order_quantity`
+
+Si es `true`, recomendaciones con cantidades de pedido extremas se marcan con
+`risk_flag = extreme_order_quantity`.
+
+### `extreme_order_quantity_quantile`
+
+Cuantil usado para definir el umbral de cantidad extrema.
+
+Ejemplo:
+
+```yaml
+extreme_order_quantity_quantile: 0.99
+```
+
+Interpretacion:
+
+- `0.99` significa marcar el 1% superior de cantidades de pedido dentro de la
+  corrida;
+- debe estar estrictamente entre `0` y `1`.
+
+### `champion_data_strategy`
+
+Estrategia actualmente tratada como `champion` para la politica de promocion.
+
+Ejemplo:
+
+```yaml
+champion_data_strategy: Observed
+```
+
+Si es `null`, la seleccion del champion ignora `data_strategy` y se apoya solo
+en `champion_model_name` y `champion_backend_name`.
+
+### `champion_model_name`
+
+Nombre del modelo actualmente desplegado como `champion`.
+
+Ejemplo:
+
+```yaml
+champion_model_name: catboost
+```
+
+### `champion_backend_name`
+
+Backend asociado al `champion`.
+
+Ejemplo:
+
+```yaml
+champion_backend_name: conformal_catboost_official
+```
+
+### `champion_min_cost_improvement_pct`
+
+Mejora porcentual minima en `total_cost` que un `challenger` debe lograr para
+ser promocionable.
+
+Ejemplo:
+
+```yaml
+champion_min_cost_improvement_pct: 5.0
+```
+
+Interpretacion:
+
+- `5.0` significa que el challenger debe reducir `total_cost` al menos un 5%
+  respecto al champion;
+- el valor debe ser mayor o igual que `0`.
+
+### `champion_max_service_level_degradation`
+
+Degradacion maxima permitida en `service_level` al comparar un `challenger`
+contra el `champion`.
+
+Ejemplo:
+
+```yaml
+champion_max_service_level_degradation: 0.02
+```
+
+Interpretacion:
+
+- `0.02` permite perder hasta dos puntos porcentuales de `service_level`;
+- el valor debe estar entre `0` y `1`.
+
 ## `ReportingConfig`
 
 Controla los artefactos generados.

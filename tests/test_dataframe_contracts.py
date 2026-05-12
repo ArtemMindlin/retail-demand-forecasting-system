@@ -137,10 +137,14 @@ def _assert_cost_summary_contract(cost_summary) -> None:
         "total_stockout_cost",
         "total_cost",
         "mean_cost",
+        "service_level",
+        "fill_rate",
     }
 
     assert required_columns.issubset(cost_summary.columns)
     assert cost_summary["total_cost"].is_monotonic_increasing
+    assert cost_summary["service_level"].between(0.0, 1.0).all()
+    assert cost_summary["fill_rate"].between(0.0, 1.0).all()
 
 
 def _assert_pareto_frontier_contract(pareto_frontier) -> None:

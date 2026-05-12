@@ -18,7 +18,7 @@ graph TD
     Tuning -- "No" --> Loop["Start Cross-Validation Loop"]
     Optuna --> Loop
 
-    Loop --> FitPredict["Fit & Predict Models: Naive, Ridge, LGBM, CatBoost, ARIMA"]
+    Loop --> FitPredict["Fit & Predict Models: Naive, LGBM, CatBoost"]
     FitPredict --> Calibrate["Conformal Calibration & Newsvendor Decision"]
     
     Calibrate --> Drift["PageHinkleyDetector: Update & Check Drift"]

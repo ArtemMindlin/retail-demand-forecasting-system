@@ -70,6 +70,19 @@ inventory:
     service_criticality_base: 0.9
     service_criticality_multiplier: 0.5
 
+business:
+  flag_cold_start: true
+  flag_drift_watch: true
+  flag_high_uncertainty: true
+  high_uncertainty_interval_quantile: 0.95
+  flag_extreme_order_quantity: true
+  extreme_order_quantity_quantile: 0.99
+  champion_data_strategy: Observed
+  champion_model_name: catboost
+  champion_backend_name: conformal_catboost_official
+  champion_min_cost_improvement_pct: 0.0
+  champion_max_service_level_degradation: 0.02
+
 reporting:
   output_dir: reports
   run_name: fresh_retailnet_v2

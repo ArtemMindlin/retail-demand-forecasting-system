@@ -153,15 +153,26 @@ En una fase posterior se anadiran detectores explicitos y politicas de reentrena
 
 ## Estrategia de reentrenamiento
 
-Por defecto:
+Politica operacional objetivo:
 
-- reentrenamiento en cada fold con ventana expansiva
+- reentrenamiento programado con cadencia fija, por ejemplo semanal;
+- reentrenamiento adicional cuando el monitor de drift o degradacion lo
+  recomiende;
+- evaluacion del nuevo modelo como `challenger` antes de sustituir al
+  `champion`.
 
-Motivo:
+En el backtesting experimental actual, el sistema sigue reentrenando por fold
+con ventana expansiva para estimar rendimiento de forma conservadora. Sin
+embargo, la interpretacion de negocio es distinta: en operacion, el modelo en
+uso debe permanecer estable hasta que exista evidencia suficiente para promover
+un sustituto mejor.
 
-- replica una practica razonable para sistemas operativos en series temporales;
-- reduce riesgo de sesgo por usar un modelo congelado demasiado tiempo;
-- sirve como base para comparar mas adelante reentrenamiento fijo vs adaptativo.
+Regla de aceptacion recomendada:
+
+1. el challenger debe mejorar `total_cost`;
+2. no debe degradar el nivel de servicio por encima del umbral aceptado;
+3. no debe llegar acompañado de alertas bloqueantes de calidad de datos o
+   monitorizacion.
 
 ## Criterios de comparacion final
 

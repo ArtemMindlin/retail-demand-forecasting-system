@@ -6,7 +6,9 @@ import numpy as np
 import pandas as pd
 
 
-def summarize_predictions(predictions: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def summarize_predictions(
+    predictions: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     records = []
     fold_records = []
 
@@ -20,7 +22,7 @@ def summarize_predictions(predictions: pd.DataFrame) -> tuple[pd.DataFrame, pd.D
         else:
             model_name, backend_name = keys
             strategy = None
-            
+
         record = _build_metric_record(subset, model_name, backend_name)
         if strategy:
             record["data_strategy"] = strategy
@@ -33,7 +35,7 @@ def summarize_predictions(predictions: pd.DataFrame) -> tuple[pd.DataFrame, pd.D
         else:
             fold_id, model_name, backend_name = keys
             strategy = None
-            
+
         record = _build_metric_record(subset, model_name, backend_name)
         record["fold_id"] = fold_id
         if strategy:
@@ -44,12 +46,21 @@ def summarize_predictions(predictions: pd.DataFrame) -> tuple[pd.DataFrame, pd.D
 
 
 def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
+    enriched = predictions.copy()
+    enriched["service_level_hit"] = (
+        enriched["stockout_units"].to_numpy(dtype=float) <= 0.0
+    ).astype(float)
+    enriched["served_units"] = np.minimum(
+        enriched["y_true"].to_numpy(dtype=float),
+        enriched["order_quantity"].to_numpy(dtype=float),
+    )
+
     group_cols = ["model_name", "backend_name"]
     if "data_strategy" in predictions.columns:
         group_cols.insert(0, "data_strategy")
 
     summary = (
-        predictions.groupby(group_cols, dropna=False)
+        enriched.groupby(group_cols, dropna=False)
         .agg(
             observations=("y_true", "size"),
             mean_order_quantity=("order_quantity", "mean"),
@@ -59,8 +70,19 @@ def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
             total_stockout_cost=("stockout_cost", "sum"),
             total_cost=("total_cost", "sum"),
             mean_cost=("total_cost", "mean"),
+            service_level=("service_level_hit", "mean"),
+            served_units=("served_units", "sum"),
+            total_demand=("y_true", "sum"),
         )
         .reset_index()
+    )
+    summary["fill_rate"] = np.where(
+        summary["total_demand"] > 0.0,
+        summary["served_units"] / summary["total_demand"],
+        1.0,
+    )
+    summary = (
+        summary.drop(columns=["served_units", "total_demand"])
         .sort_values("total_cost")
         .reset_index(drop=True)
     )

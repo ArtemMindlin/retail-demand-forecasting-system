@@ -5,15 +5,15 @@
 En este capítulo se describe el diseño del sistema, desde la formulación del problema de aprendizaje supervisado hasta el marco de evaluación económica. La metodología se ha diseñado para garantizar la robustez estadística y la aplicabilidad de los resultados en un entorno operativo real.
 
 \section{Formulación del Problema}
-El objetivo es predecir la demanda acumulada de un producto en una tienda específica durante un horizonte de planificación determinado ($H$). Formalmente, definimos la demanda observada para una serie $s$ en el tiempo $t$ como $y_{s,t}$. El objetivo (\textit{target}) de nuestro modelo en el instante $t$ es la demanda total durante el \textit{lead time}:
+El objetivo operativo es determinar la cantidad de pedido que debe emitir el responsable de reposición para cada SKU y cada fecha de decisión. Para ello, primero se estima la demanda acumulada de un producto en una tienda específica durante un horizonte de planificación determinado ($H$). Formalmente, definimos la demanda observada para una serie $s$ en el tiempo $t$ como $y_{s,t}$. El objetivo (\textit{target}) de nuestro modelo en el instante $t$ es la demanda total durante el \textit{lead time}, que actúa como entrada para la política de aprovisionamiento:
 
 \begin{equation}
     Y_{s,t} = \sum_{i=0}^{H-1} y_{s, t+i}
 \end{equation}
 
-Esta formulación permite que el pronóstico esté directamente alineado con la decisión de inventario: cuántas unidades se necesitan para cubrir el periodo hasta la próxima reposición.
+Esta formulación permite que el pronóstico esté directamente alineado con la decisión de inventario: cuántas unidades se necesitan para cubrir el periodo hasta la próxima reposición y, por tanto, qué cantidad debería pedirse mañana para minimizar el coste operativo esperado.
 
-En la implementación, esta variable se construye desplazando la demanda observada hacia el futuro dentro de cada serie tienda-producto. Para cada origen temporal $t$, se agregan los valores $y_{s,t}$, $y_{s,t+1}$, ..., $y_{s,t+H-1}$, sin mezclar observaciones de distintas series. Por tanto, la demanda observada diaria no se usa como objetivo aislado, sino como componente de una etiqueta acumulada de \textit{lead time}. Las últimas observaciones de cada serie se descartan cuando no existe un horizonte futuro completo para calcular esta suma.
+En la implementación, esta variable se construye desplazando la demanda observada hacia el futuro dentro de cada serie tienda-producto. Para cada origen temporal $t$, se agregan los valores $y_{s,t}$, $y_{s,t+1}$, ..., $y_{s,t+H-1}$, sin mezclar observaciones de distintas series. Por tanto, la demanda observada diaria no se usa como objetivo aislado, sino como componente de una etiqueta acumulada de \textit{lead time} que más tarde se transforma en una decisión de compra. Las últimas observaciones de cada serie se descartan cuando no existe un horizonte futuro completo para calcular esta suma.
 
 Esta distinción es crítica para evitar \textit{data leakage}: los valores futuros se usan únicamente para construir la etiqueta durante entrenamiento y evaluación, mientras que las variables explicativas se calculan con información disponible antes del origen de predicción, mediante retardos positivos y ventanas móviles históricas.
 

@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from retail_forecasting.config import (
+    BusinessConfig,
     DatasetConfig,
     InventoryConfig,
     ModelConfig,
@@ -35,6 +36,12 @@ def test_default_config_preserves_experimental_guardrails() -> None:
     assert settings.drift.threshold > 0
     assert settings.drift.delta >= 0
     assert settings.drift.min_instances > 0
+    assert 0.0 < settings.business.high_uncertainty_interval_quantile < 1.0
+    assert 0.0 < settings.business.extreme_order_quantity_quantile < 1.0
+    assert settings.business.champion_model_name
+    assert settings.business.champion_backend_name
+    assert settings.business.champion_min_cost_improvement_pct >= 0.0
+    assert 0.0 <= settings.business.champion_max_service_level_degradation <= 1.0
 
 
 def test_default_model_quantiles_are_valid_and_orderable() -> None:
@@ -98,6 +105,20 @@ def test_settings_instantiation_rejects_unsorted_quantiles() -> None:
 def test_settings_instantiation_rejects_invalid_inventory_costs() -> None:
     with pytest.raises(ValidationError, match="overstock_cost"):
         Settings(inventory=InventoryConfig(overstock_cost=0.0))
+
+
+def test_settings_instantiation_rejects_invalid_business_thresholds() -> None:
+    with pytest.raises(ValidationError, match="high_uncertainty_interval_quantile"):
+        Settings(business=BusinessConfig(high_uncertainty_interval_quantile=1.0))
+
+    with pytest.raises(ValidationError, match="extreme_order_quantity_quantile"):
+        Settings(business=BusinessConfig(extreme_order_quantity_quantile=0.0))
+
+    with pytest.raises(ValidationError, match="champion_min_cost_improvement_pct"):
+        Settings(business=BusinessConfig(champion_min_cost_improvement_pct=-0.1))
+
+    with pytest.raises(ValidationError, match="champion_max_service_level_degradation"):
+        Settings(business=BusinessConfig(champion_max_service_level_degradation=1.1))
 
 
 def test_settings_instantiation_rejects_invalid_synthetic_cost_weights() -> None:

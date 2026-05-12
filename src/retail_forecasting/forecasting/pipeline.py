@@ -3,6 +3,8 @@ from __future__ import annotations
 import pandas as pd
 
 from retail_forecasting.config import Settings
+from retail_forecasting.contracts.drift import DriftDetectorMetadata, DriftEvent
+from retail_forecasting.contracts.backtesting import FoldRunMetadata
 from retail_forecasting.contracts.tuning import BoostingParams
 from retail_forecasting.data.censorship import LatentDemandImputer
 from retail_forecasting.data.fresh_retailnet import load_prepared_panel
@@ -12,9 +14,7 @@ from retail_forecasting.evaluation.metrics import summarize_costs, summarize_pre
 from retail_forecasting.evaluation.reporting import (
     BacktestMetadata,
     DatasetMetadata,
-    DriftDetectorMetadata,
     FeaturePipelineMetadata,
-    FoldRunMetadata,
     ModelRunMetadata,
     RunArtifacts,
     ValidationMetadata,
@@ -38,9 +38,7 @@ from retail_forecasting.models.boosting import AutoBoostingModel
 from retail_forecasting.models.optimization import HyperparameterTuner
 from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
-from retail_forecasting.models.linear import RidgeBaselineModel
 from retail_forecasting.models.naive import SeasonalNaiveModel
-from retail_forecasting.models.statistical import AutoArimaModel
 from retail_forecasting.utils.io import quantile_column_name
 
 
@@ -136,10 +134,8 @@ def run_experiment_from_frame(
     )
 
     # State for cross-fold model reuse
-    ridge_model: ConformalForecaster | None = None
     boosting_model: ConformalForecaster | None = None
     cat_model: ConformalForecaster | None = None
-    arima_model: ConformalForecaster | None = None
 
     # Optional: Hyperparameter Tuning Phase
     best_boosting_params = BoostingParams(
@@ -165,7 +161,7 @@ def run_experiment_from_frame(
         min_instances=settings.drift.min_instances,
     )
     force_retrain = False
-    detected_drifts = []
+    detected_drifts: list[DriftEvent] = []
     max_drift_score = 0.0
     last_drift_score = 0.0
 
@@ -227,37 +223,7 @@ def run_experiment_from_frame(
             )
         )
 
-        # 2. Ridge Regression (Linear Baseline)
-        if (
-            ridge_model is None
-            or settings.validation.retrain_each_fold
-            or current_fold_retrained
-        ):
-            base_ridge = RidgeBaselineModel(random_seed=settings.project.random_seed)
-            base_ridge.fit(
-                sub_train_frame.loc[:, feature_columns],
-                sub_train_frame["target_lead_time_demand"],
-            )
-            ridge_model = ConformalForecaster(base_ridge)
-            if not calib_frame.empty:
-                ridge_model.calibrate(
-                    calib_frame.loc[:, feature_columns],
-                    calib_frame["target_lead_time_demand"],
-                    alpha=settings.models.quantiles[0] * 2,
-                )
-        fold_predictions.append(
-            _build_model_predictions(
-                validation_frame=validation_frame,
-                feature_columns=feature_columns,
-                model=ridge_model,
-                fold_id=fold.fold_id,
-                settings=settings,
-                data_strategy=data_strategy,
-                series_cost_profile=series_cost_profile,
-            )
-        )
-
-        # 3. LightGBM (Boosting)
+        # 2. LightGBM (Boosting)
         if (
             boosting_model is None
             or settings.validation.retrain_each_fold
@@ -302,7 +268,7 @@ def run_experiment_from_frame(
         )
         fold_predictions.append(boosting_preds)
 
-        # 4. CatBoost (Boosting)
+        # 3. CatBoost (Boosting)
         if (
             cat_model is None
             or settings.validation.retrain_each_fold
@@ -338,37 +304,8 @@ def run_experiment_from_frame(
             )
         )
 
-        # 5. ARIMA (Statistical)
-        if (
-            arima_model is None
-            or settings.validation.retrain_each_fold
-            or current_fold_retrained
-        ):
-            base_arima = AutoArimaModel(
-                seasonal_period=settings.models.seasonal_period,
-                horizon=settings.dataset.horizon,
-            ).fit(prepared_panel)
-            arima_model = ConformalForecaster(base_arima)
-            if not calib_frame.empty:
-                arima_model.calibrate(
-                    calib_frame,
-                    calib_frame["target_lead_time_demand"],
-                    alpha=settings.models.quantiles[0] * 2,
-                )
-        fold_predictions.append(
-            _build_model_predictions(
-                validation_frame=validation_frame,
-                feature_columns=feature_columns,
-                model=arima_model,
-                fold_id=fold.fold_id,
-                settings=settings,
-                data_strategy=data_strategy,
-                series_cost_profile=series_cost_profile,
-            )
-        )
-
         # Update drift detector with current fold MAE
-        boosting_fold_preds = fold_predictions[-3]
+        boosting_fold_preds = fold_predictions[-2]
         fold_mae = (
             (boosting_fold_preds["y_true"] - boosting_fold_preds["y_pred"]).abs().mean()
         )
@@ -378,12 +315,12 @@ def run_experiment_from_frame(
 
         if drift_status.is_drift:
             detected_drifts.append(
-                {
-                    "date": str(fold.validation_start_date.date()),
-                    "score": drift_status.score,
-                    "threshold": drift_status.threshold,
-                    "fold_id": fold.fold_id,
-                }
+                DriftEvent(
+                    date=str(fold.validation_start_date.date()),
+                    score=drift_status.score,
+                    threshold=drift_status.threshold,
+                    fold_id=fold.fold_id,
+                )
             )
             if settings.validation.drift_triggered_retrain:
                 print(
@@ -407,7 +344,10 @@ def run_experiment_from_frame(
     report_extra = ""
     if detected_drifts:
         drift_str = ", ".join(
-            [f"Fold {d['fold_id']} (score={d['score']:.2f})" for d in detected_drifts]
+            [
+                f"Fold {event.fold_id} (score={event.score:.2f})"
+                for event in detected_drifts
+            ]
         )
         report_extra = f"**ALERT**: Concept drift detected and triggered adaptive retrains at: {drift_str}"
 
@@ -545,30 +485,16 @@ def _build_model_predictions(
     prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
 
-    if (
-        hasattr(model.base_model, "model_name")
-        and model.base_model.model_name == "auto_arima"
-    ):
-        prediction_frame["y_pred"] = model.predict(validation_frame)
-    else:
-        prediction_frame["y_pred"] = model.predict(
-            validation_frame.loc[:, feature_columns]
-        )
+    prediction_frame["y_pred"] = model.predict(validation_frame.loc[:, feature_columns])
 
     prediction_frame["model_name"] = model.model_name
     prediction_frame["backend_name"] = model.backend_name
     prediction_frame["fold_id"] = fold_id
     prediction_frame["data_strategy"] = data_strategy
 
-    if (
-        hasattr(model.base_model, "model_name")
-        and model.base_model.model_name == "auto_arima"
-    ):
-        quantile_predictions = model.predict_quantiles(validation_frame)
-    else:
-        quantile_predictions = model.predict_quantiles(
-            validation_frame.loc[:, feature_columns]
-        )
+    quantile_predictions = model.predict_quantiles(
+        validation_frame.loc[:, feature_columns]
+    )
 
     quantile_columns = []
     for quantile in settings.models.quantiles:

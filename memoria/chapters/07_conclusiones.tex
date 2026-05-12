@@ -5,11 +5,11 @@
 Este capítulo final sintetiza las contribuciones principales de este Trabajo de Fin de Grado, discute sus implicaciones para el sector \textit{retail} y propone líneas de investigación para continuar evolucionando el sistema.
 
 \section{Conclusiones Generales}
-El desarrollo de este sistema de \textit{forecasting} probabilístico ha permitido validar empíricamente que la excelencia en la previsión de demanda no debe medirse únicamente por la reducción del error medio absoluto, sino por la capacidad del modelo para inducir decisiones económicamente óptimas en un entorno de incertidumbre.
+El desarrollo de este sistema de apoyo a la reposición ha permitido validar empíricamente que la excelencia no debe medirse únicamente por la reducción del error medio absoluto, sino por la capacidad del modelo para inducir decisiones de pedido económicamente óptimas en un entorno de incertidumbre.
 
 Las conclusiones principales se resumen en los siguientes puntos:
 \begin{itemize}
-    \item \textbf{Desconexión entre error y coste}: Se ha demostrado que modelos con mayor error predictivo puntual (como CatBoost frente a Seasonal Naive) pueden generar ahorros operativos significativos (9.5\%) al gestionar mejor la incertidumbre y la asimetría de costes.
+    \item \textbf{Desconexión entre error y coste}: Se ha demostrado que modelos con mayor error predictivo puntual (como CatBoost frente a Seasonal Naive) pueden generar ahorros operativos significativos (9.5\%) al gestionar mejor la incertidumbre y la asimetría de costes de la reposición.
     \item \textbf{Importancia de la Demanda Latente}: La recuperación de la demanda censurada por \textit{stockouts} ha resultado ser el factor más determinante para la rentabilidad, logrando reducciones de coste de hasta el 32\% frente a modelos entrenados con demanda observada.
     \item \textbf{Rigor en la Validación}: El uso de un esquema de validación \textit{walk-forward} estricto ha permitido obtener estimaciones de rendimiento realistas, evitando el sobreajuste y el \textit{leakage} temporal que invalidarían los resultados académicos.
     \item \textbf{Desafíos en la Calibración}: A pesar del éxito económico, la sub-cobertura detectada en los intervalos de confianza revela que la cuantificación de la incertidumbre aleatoria sigue siendo un reto complejo que requiere técnicas de calibración proactivas.
@@ -23,7 +23,7 @@ Más allá de los resultados técnicos, el presente proyecto tiene implicaciones
 
 \begin{itemize}
     \item \textbf{Impacto Ambiental y Huella de Carbono}: El entrenamiento de modelos globales de \textit{Machine Learning} requiere un consumo energético no despreciable. Se estima que el proceso de optimización bayesiana de este trabajo ha generado una huella de carbono aproximada de 2.5 kg de CO2eq. Sin embargo, este coste se ve ampliamente compensado por la reducción del desperdicio alimentario, que evita las emisiones asociadas a la producción, transporte y descomposición de toneladas de productos frescos.
-    \item \textbf{Ética de la Automatización}: El sistema se propone como una herramienta de soporte a la decisión, no de sustitución del criterio humano. La transparencia en la cuantificación de la incertidumbre permite que los gestores de tienda entiendan el riesgo de cada pedido, fomentando una colaboración humano-máquina ética y responsable.
+    \item \textbf{Ética de la Automatización}: El sistema se propone como una herramienta de soporte a la decisión, no de sustitución del criterio humano. La transparencia en la cuantificación de la incertidumbre permite que el responsable de reposición entienda el riesgo de cada pedido, fomentando una colaboración humano-máquina ética y responsable.
     \item \textbf{Privacidad y Seguridad de Datos}: El dataset utilizado se encuentra debidamente anonimizado, cumpliendo con los estándares de privacidad europeos (GDPR). No se utiliza información personal de clientes, sino patrones agregados de consumo.
 \end{itemize}
 
@@ -37,4 +37,4 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     \item \textbf{Costes Observados Reales}: Sustituir los perfiles sintéticos actuales por costes empíricos observados de merma, rotura y liquidación, con el fin de calibrar la política de inventario sobre una base económica más fiel.
 \end{itemize}
 
-Como cierre, este TFG demuestra que la integración de la estadística avanzada con la ingeniería de software permite transformar datos brutos en valor estratégico, proporcionando una base sólida para la digitalización inteligente del sector \textit{retail}.
+Como cierre, este TFG demuestra que la integración de la estadística avanzada con la ingeniería de software permite transformar datos brutos en una recomendación de pedido útil para la operación diaria, proporcionando una base sólida para la digitalización inteligente del sector \textit{retail}.

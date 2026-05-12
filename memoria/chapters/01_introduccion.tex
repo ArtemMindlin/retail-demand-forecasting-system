@@ -7,27 +7,27 @@ En la era del \textit{Big Data} y la inteligencia artificial, la gestión de la 
 
 La relevancia de este problema no es solo operativa, sino también económica y ética. A nivel europeo, se estima que el desperdicio alimentario genera un coste directo al sector \textit{retail} de aproximadamente 13.000 millones de euros anuales, representando cerca del 1,64\% de las ventas totales \cite{eucommission2023foodwaste}. En España, estas cifras han servido de base para una transformación del marco legislativo con la entrada en vigor de la Ley 1/2025 de Prevención de las Pérdidas y el Desperdicio Alimentario \cite{leydesperdicio2025}, que obliga a las empresas de distribución a implementar planes estratégicos de prevención y penaliza severamente la ineficiencia en la gestión de excedentes.
 
-Este Trabajo de Fin de Grado nace de la necesidad de alinear los modelos matemáticos de previsión con la realidad de la toma de decisiones en el punto de venta. No se trata únicamente de predecir cuánto se va a vender, sino de entender el riesgo asociado a cada decisión de inventario para minimizar tanto el coste por rotura de stock (\textit{stockout}) como el coste por sobrestock y desperdicio, contribuyendo así al Objetivo de Desarrollo Sostenible (ODS) 12: Producción y Consumo Responsables \cite{ods12un}.
+Este Trabajo de Fin de Grado nace de la necesidad de alinear los modelos matemáticos de previsión con la realidad de la toma de decisiones en la reposición. El caso de uso central no es una predicción abstracta de demanda, sino una respuesta operativa a una pregunta concreta del responsable de aprovisionamiento: \emph{¿cuántas unidades debe pedir mañana cada SKU?} Para contestarla, el sistema debe estimar la demanda esperada a horizonte de \textit{lead time} y el riesgo asociado a cada decisión de inventario, con el fin de minimizar tanto el coste por rotura de stock (\textit{stockout}) como el coste por sobrestock y desperdicio, contribuyendo así al Objetivo de Desarrollo Sostenible (ODS) 12: Producción y Consumo Responsables \cite{ods12un}.
 
 \section{Definición del Problema}
-El enfoque tradicional del \textit{demand forecasting} se ha centrado históricamente en la obtención de predicciones puntuales (\textit{point forecasts}) mediante la minimización de métricas de error promedio como el MAE (\textit{Mean Absolute Error}) o el RMSE (\textit{Root Mean Squared Error}). Aunque útiles, estos enfoques presentan dos limitaciones críticas en entornos de \textit{retail} real:
+El enfoque tradicional del \textit{demand forecasting} se ha centrado históricamente en la obtención de predicciones puntuales (\textit{point forecasts}) mediante la minimización de métricas de error promedio como el MAE (\textit{Mean Absolute Error}) o el RMSE (\textit{Root Mean Squared Error}). Aunque útiles, estos enfoques presentan dos limitaciones críticas en entornos de \textit{retail} real y no resuelven por sí solos la decisión de reposición:
 
 \begin{enumerate}
     \item \textbf{Censura de datos por stockout:} Cuando un producto se agota en el estante, la demanda observada se detiene, pero la demanda latente (lo que los clientes habrían comprado) sigue existiendo. Ignorar este fenómeno introduce un sesgo negativo en los modelos, que tienden a subestimar la demanda real en periodos de rotura.
-    \item \textbf{Desconexión entre error y coste:} En el \textit{retail} de productos frescos, el coste de equivocarse "por exceso" (desperdicio) suele ser muy distinto al coste de equivocarse "por defecto" (pérdida de venta y fidelidad). Un modelo que minimiza el error medio puede no ser el que minimiza el coste operativo total si no considera esta asimetría.
+    \item \textbf{Desconexión entre error y coste:} En el \textit{retail} de productos frescos, el coste de equivocarse "por exceso" (desperdicio) suele ser muy distinto al coste de equivocarse "por defecto" (pérdida de venta y fidelidad). Un modelo que minimiza el error medio puede no ser el que minimiza el coste operativo total de la reposición si no considera esta asimetría.
 \end{enumerate}
 
-Este trabajo aborda estas limitaciones mediante un enfoque de \textbf{forecasting probabilístico}, donde el objetivo no es una cifra única, sino una distribución de probabilidad que permita cuantificar la incertidumbre y tomar decisiones de inventario optimizadas mediante el modelo del \textit{Newsvendor}.
+Este trabajo aborda estas limitaciones mediante un enfoque de \textbf{forecasting probabilístico}, donde el objetivo no es una cifra única, sino una distribución de probabilidad que permita cuantificar la incertidumbre y tomar decisiones de inventario optimizadas mediante el modelo del \textit{Newsvendor}. En otras palabras, la predicción es un medio para decidir la cantidad de pedido, no un fin aislado.
 
 \section{Objetivos}
-El objetivo general de este proyecto es diseñar y evaluar un sistema de \textit{forecasting} probabilístico para decisiones de inventario en \textit{retail} fresco, centrado en la robustez estadística y el impacto económico real.
+El objetivo general de este proyecto es diseñar y evaluar un sistema de apoyo a la reposición para \textit{retail} fresco, centrado en la robustez estadística y el impacto económico real de cada decisión de pedido por SKU.
 
 Para alcanzar este objetivo general, se plantean los siguientes objetivos específicos:
 \begin{itemize}
-    \item Desarrollar un \textit{pipeline} de datos reproducible que permita la ingesta y preparación de series temporales de demanda a gran escala a partir del dataset \textit{Fresh RetailNet}.
+    \item Desarrollar un \textit{pipeline} de datos reproducible que permita la ingesta y preparación de series temporales de demanda a gran escala a partir del dataset \textit{Fresh RetailNet}, con el objetivo de alimentar decisiones de reposición por SKU.
     \item Implementar modelos globales de \textit{Machine Learning} (CatBoost) capaces de capturar patrones complejos y compartir información entre diferentes productos y tiendas.
     \item Integrar técnicas de \textit{Conformal Prediction} para garantizar la calibración estadística de los intervalos de confianza generados por el sistema.
-    \item Evaluar el rendimiento del sistema no solo mediante métricas predictivas clásicas, sino a través de una función de coste económico basada en la política del \textit{Newsvendor}.
+    \item Evaluar el rendimiento del sistema no solo mediante métricas predictivas clásicas, sino a través de una función de coste económico basada en la política del \textit{Newsvendor} y orientada a la decisión de compra.
     \item Analizar la robustez del sistema ante fenómenos de deriva de datos (\textit{data drift}) y situaciones de demanda censurada.
 \end{itemize}
 

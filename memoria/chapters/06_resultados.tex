@@ -2,7 +2,7 @@
 \chapter{Resultados}
 \label{chap:resultados}
 
-Este capítulo presenta el análisis de los resultados obtenidos tras la ejecución del sistema sobre el dataset \textit{Fresh RetailNet}. Se comparan diferentes modelos y estrategias bajo métricas predictivas, probabilísticas y económicas, validando las hipótesis planteadas en la introducción.
+Este capítulo presenta el análisis de los resultados obtenidos tras la ejecución del sistema sobre el dataset \textit{Fresh RetailNet}. Se comparan diferentes modelos y estrategias bajo métricas predictivas, probabilísticas y económicas para determinar qué política de previsión produce la menor pérdida económica en la reposición de cada SKU.
 
 \section{Resumen de Experimentos}
 Se han evaluado cuatro familias de modelos bajo dos estrategias de tratamiento de datos:
@@ -21,11 +21,11 @@ En la Tabla \ref{tab:metrics_predictive} se presentan los resultados de error pu
 Este resultado inicial sugeriría que un modelo heurístico simple supera a los modelos de \textit{Machine Learning}. Sin embargo, este análisis es incompleto si no se considera el impacto económico de las decisiones derivadas de estas predicciones.
 
 \section{Evaluación Económica y Decisiones de Inventario}
-El núcleo de este TFG es la evaluación del coste total operativo. Al aplicar la política de \textit{Newsvendor}, el ranking de modelos cambia drásticamente. Como se observa en la Tabla \ref{tab:metrics_cost}, el modelo \textbf{CatBoost} bajo la estrategia \textit{Latent} resulta ser el más eficiente, con un coste total de 34.558 unidades, superando al \textit{Seasonal Naive} (38.197).
+El núcleo de este TFG es la evaluación del coste total operativo como aproximación directa a la calidad de la decisión de pedido. Al aplicar la política de \textit{Newsvendor}, el ranking de modelos cambia drásticamente. Como se observa en la Tabla \ref{tab:metrics_cost}, el modelo \textbf{CatBoost} bajo la estrategia \textit{Latent} resulta ser el más eficiente, con un coste total de 34.558 unidades, superando al \textit{Seasonal Naive} (38.197).
 
 \input{tables/table_costs}
 
-\textbf{Validación de la Hipótesis Principal}: Estos resultados confirman que un menor error medio (MAE) no garantiza un menor coste operativo. CatBoost, a pesar de tener un MAE un 19\% superior al \textit{Seasonal Naive} en la estrategia \textit{Latent}, reduce el coste total en un 9,5\%. Esto se debe a una mejor gestión de la asimetría entre el coste de sobrestock y el de rotura.
+\textbf{Validación de la Hipótesis Principal}: Estos resultados confirman que un menor error medio (MAE) no garantiza un menor coste operativo. CatBoost, a pesar de tener un MAE un 19\% superior al \textit{Seasonal Naive} en la estrategia \textit{Latent}, reduce el coste total en un 9,5\%. Esto se debe a una mejor gestión de la asimetría entre el coste de sobrestock y el de rotura, precisamente la información que necesita el responsable de reposición para decidir cuántas unidades pedir.
 
 \section{Análisis de Calibración e Incertidumbre}
 Se ha evaluado la cobertura de los intervalos de confianza del 80\% (generados entre los cuantiles 0.1 y 0.9). Los resultados muestran un fenómeno de \textbf{sub-cobertura}:
@@ -37,7 +37,7 @@ Se ha evaluado la cobertura de los intervalos de confianza del 80\% (generados e
 Esta desviación indica que, aunque los modelos son económicamente eficaces, la incertidumbre estimada es demasiado optimista (intervalos muy estrechos). El uso de \textit{Conformal Prediction} ha ayudado a estabilizar estos intervalos, pero los resultados sugieren la necesidad de un conjunto de calibración más robusto o de considerar la heterocedasticidad de la demanda de forma más explícita.
 
 \section{Impacto del Tratamiento de la Demanda Latente}
-La comparación entre las estrategias \textit{Observed} y \textit{Latent} es reveladora. Todos los modelos reducen su coste total significativamente cuando se utiliza la estrategia \textit{Latent}. En el caso de CatBoost, el coste cae de 51.021 a 34.558 (una reducción del 32\%). Esto demuestra que ignorar los \textit{stockouts} durante el entrenamiento sesga negativamente las previsiones y penaliza fuertemente la rentabilidad de la cadena de suministro.
+La comparación entre las estrategias \textit{Observed} y \textit{Latent} es reveladora. Todos los modelos reducen su coste total significativamente cuando se utiliza la estrategia \textit{Latent}. En el caso de CatBoost, el coste cae de 51.021 a 34.558 (una reducción del 32\%). Esto demuestra que ignorar los \textit{stockouts} durante el entrenamiento sesga negativamente las previsiones y penaliza fuertemente la rentabilidad de la cadena de suministro y la calidad de la recomendación de compra.
 
 \section{Optimización de Hiperparámetros y Sensibilidad}
 Se ha realizado una búsqueda automática de hiperparámetros utilizando \textbf{Optuna} para el modelo CatBoost, ejecutando 100 pruebas (\textit{trials}) con el objetivo de minimizar la función de coste económico.

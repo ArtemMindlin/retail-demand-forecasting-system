@@ -53,10 +53,12 @@ flowchart TD
     R --> R2["metrics_summary.csv"]
     R --> R3["fold_metrics.csv"]
     R --> R4["cost_summary.csv"]
-    R --> R5["sensitivity_summary.csv"]
-    R --> R6["pareto_frontier.csv"]
-    R --> R7["report.md"]
-    R --> R8["plots when enabled"]
+    R --> R5["reorder_recommendations.csv"]
+    R --> R6["exceptions.csv"]
+    R --> R7["sensitivity_summary.csv"]
+    R --> R8["pareto_frontier.csv"]
+    R --> R9["report.md"]
+    R --> R10["plots when enabled"]
 ```
 
 ### Detalle de `run_experiment_from_frame()`
@@ -82,17 +84,13 @@ flowchart TD
 
     F3 --> G["Fit or reuse models"]
     G --> G1["Seasonal naive"]
-    G --> G2["Ridge + ConformalForecaster"]
-    G --> G3["Auto boosting + ConformalForecaster"]
-    G --> G4["CatBoost + ConformalForecaster"]
-    G --> G5["Auto ARIMA + ConformalForecaster"]
+    G --> G2["Auto boosting + ConformalForecaster"]
+    G --> G3["CatBoost + ConformalForecaster"]
 
     F2 --> H["Build prediction frame"]
     G1 --> H
     G2 --> H
     G3 --> H
-    G4 --> H
-    G5 --> H
 
     H --> H1["Forecast columns<br/>y_pred<br/>q_* if available<br/>model_name<br/>backend_name<br/>fold_id<br/>data_strategy"]
 
@@ -220,19 +218,47 @@ Como aproximacion inicial, se pueden etiquetar regimenes de alta y baja intensid
 
 ## 8. Reentrenamiento
 
-La estrategia inicial es walk-forward con ventana expansiva y reentrenamiento por fold. Esto refleja un proceso operativo sencillo:
+La interpretacion operacional del proyecto no es ``entrenar siempre el modelo
+mas reciente'', sino mantener un `champion` estable y evaluar cada nuevo modelo
+como `challenger`.
 
-- acumular datos historicos;
-- reentrenar antes de cada nuevo bloque de decision;
-- evaluar si el rendimiento y el coste se sostienen a lo largo del tiempo.
+Politica objetivo:
 
-El diseno permite anadir despues:
+- `champion`: modelo vigente para generar recomendaciones diarias;
+- `challenger`: candidato entrenado con datos mas recientes o activado por
+  drift;
+- promocion: solo si mejora `total_cost`, mantiene el nivel de servicio dentro
+  del umbral aceptado y no presenta fallos de calidad o monitorizacion.
 
-- politicas de reentrenamiento fijo;
-- reentrenamiento gatillado por drift;
-- ventanas deslizantes.
+En el estado actual del repo, el backtesting reentrena por fold para estimar
+rendimiento bajo distintas fechas de decision. Esa logica experimental no debe
+confundirse con la politica de produccion: el objetivo de negocio es un ciclo
+de recomendacion diario y un ciclo de promocion de modelos mucho mas
+gobernado.
 
-## 9. Simulacion / decision de inventario
+## 9. Ciclo operativo diario
+
+El sistema se concibe como un flujo batch diario:
+
+1. se cierra el dato del dia `t`;
+2. se ejecuta la validacion de calidad de datos;
+3. el modelo `champion` genera recomendaciones de pedido para `t+1`;
+4. se escriben `reorder_recommendations.csv` y `exceptions.csv`;
+5. el responsable de reposicion revisa solo los SKUs marcados;
+6. las recomendaciones aprobadas se exportan al sistema de compras;
+7. la demanda realizada posterior alimenta monitorizacion y futuros
+   reentrenamientos.
+
+Este diseno evita depender de serving online y encaja mejor con un problema de
+reposicion diaria en retail fresco.
+
+La estrategia experimental sigue usando walk-forward con ventana expansiva y
+reentrenamiento por fold para medir rendimiento con rigor temporal. Esa
+eleccion sirve para validacion, pero no sustituye la politica operacional: el
+modelo champion debe cambiar solo cuando un challenger supera los criterios de
+promocion definidos.
+
+## 10. Simulacion / decision de inventario
 
 La v2 implementa una capa de decision newsvendor por periodo:
 
@@ -241,7 +267,7 @@ La v2 implementa una capa de decision newsvendor por periodo:
 
 Esta capa es deliberadamente simple, pero ya convierte forecast en accion y permite medir impacto economico.
 
-## 10. Evaluacion economica
+## 11. Evaluacion economica
 
 Para cada prediccion:
 
@@ -257,7 +283,7 @@ coste economico, sobrestock, rotura, nivel de servicio y fill rate. Los puntos
 Pareto-eficientes muestran politicas no dominadas y hacen explicito el conflicto
 entre disponibilidad y desperdicio aproximado.
 
-## 11. Visualizacion de resultados
+## 12. Visualizacion de resultados
 
 Cada corrida genera:
 
@@ -269,7 +295,7 @@ Cada corrida genera:
 - graficos simples de coste y trade-off error-coste;
 - un reporte Markdown final en `reports/`.
 
-## 12. Como se evita usar informacion futura
+## 13. Como se evita usar informacion futura
 
 La politica anti-leakage es un requisito central del sistema:
 
@@ -280,7 +306,7 @@ La politica anti-leakage es un requisito central del sistema:
 
 Esto asegura que el rendimiento estimado sea defendible academicamente.
 
-## 13. Evolucion futura prevista
+## 14. Evolucion futura prevista
 
 La arquitectura queda lista para:
 
