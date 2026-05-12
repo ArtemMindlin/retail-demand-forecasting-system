@@ -36,6 +36,7 @@ from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
     run_sensitivity_analysis,
+    simulate_inventory_policy,
     summarize_pareto_frontier,
 )
 from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
@@ -77,6 +78,9 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     merged_predictions = pd.concat(
         [artifacts_obs.predictions, artifacts_latent.predictions], ignore_index=True
     )
+    # Run dynamic inventory simulation on merged results
+    merged_predictions = simulate_inventory_policy(merged_predictions)
+
     merged_metrics, merged_folds = summarize_predictions(merged_predictions)
     merged_costs = summarize_costs(merged_predictions)
     merged_sens = run_sensitivity_analysis(merged_predictions, settings.inventory)
@@ -342,6 +346,9 @@ def run_experiment_from_frame(
         raise ValueError("Backtest did not produce any validation predictions.")
 
     predictions = pd.concat(fold_predictions, ignore_index=True)
+    # Run dynamic inventory simulation
+    predictions = simulate_inventory_policy(predictions)
+
     metrics_summary, fold_metrics = summarize_predictions(predictions)
     cost_summary = summarize_costs(predictions)
     sensitivity_summary = run_sensitivity_analysis(
