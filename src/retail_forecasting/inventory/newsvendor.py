@@ -21,7 +21,15 @@ def choose_order_quantity(
     quantile_columns: list[str],
     quantile_levels: list[float],
     series_cost_profile: pd.DataFrame | None = None,
+    current_stock: pd.Series | None = None,
+    on_order: pd.Series | None = None,
 ) -> pd.Series:
+    """Determine the optimal order quantity using an Order-Up-To (S) policy.
+
+    If current_stock and on_order are provided, the function calculates the
+    Order-Up-To level (S) and subtracts the current Inventory Position.
+    Otherwise, it defaults to the static Newsvendor quantity.
+    """
     enriched = attach_series_costs(
         predictions=predictions,
         inventory_config=inventory_config,
@@ -29,27 +37,39 @@ def choose_order_quantity(
     )
     alpha = enriched["critical_fractile"].to_numpy(dtype=float)
 
-    # Boosting models provide quantile forecasts.
+    # 1. Determine the 'Order-Up-To' level (S) based on lead-time demand distribution
     if quantile_columns:
         sorted_pairs = sorted(
             zip(quantile_levels, quantile_columns), key=lambda item: item[0]
         )
         levels = np.asarray([pair[0] for pair in sorted_pairs], dtype=float)
         values = enriched[[pair[1] for pair in sorted_pairs]].to_numpy(dtype=float)
-        orders = np.asarray(
+        s_levels = np.asarray(
             [
                 _interpolate_quantile(levels, row, row_alpha)
                 for row, row_alpha in zip(values, alpha, strict=False)
             ],
             dtype=float,
         )
-
-    # Heuristic models provide only point forecasts.
     else:
-        orders = enriched["y_pred"].to_numpy(dtype=float)
+        # Heuristic models: S = Point Forecast
+        s_levels = enriched["y_pred"].to_numpy(dtype=float)
+
+    # 2. Subtract current Inventory Position (On-Hand + On-Order - Backlog)
+    # Note: In our simulation context, 'current_stock' represents On-Hand minus Backlog
+    inventory_position = np.zeros_like(s_levels)
+    if current_stock is not None:
+        inventory_position += (
+            current_stock.reindex(predictions.index).fillna(0.0).to_numpy()
+        )
+    if on_order is not None:
+        inventory_position += on_order.reindex(predictions.index).fillna(0.0).to_numpy()
+
+    orders = s_levels - inventory_position
 
     if inventory_config.clip_negative_orders:
         orders = np.maximum(orders, 0.0)
+
     return pd.Series(orders, index=predictions.index, name="order_quantity")
 
 

@@ -78,8 +78,21 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     merged_predictions = pd.concat(
         [artifacts_obs.predictions, artifacts_latent.predictions], ignore_index=True
     )
+
+    # Extract cost profile from one of the strategies (they share the same series)
+    # This is safe as the synthetic cost profile is built from the same initial panel
+    sample_series_cost_profile = None
+    if settings.inventory.use_series_costs:
+        sample_series_cost_profile = build_series_cost_profile(
+            raw_panel, settings.inventory
+        )
+
     # Run dynamic inventory simulation on merged results
-    merged_predictions = simulate_inventory_policy(merged_predictions)
+    merged_predictions = simulate_inventory_policy(
+        merged_predictions,
+        inventory_config=settings.inventory,
+        series_cost_profile=sample_series_cost_profile,
+    )
 
     merged_metrics, merged_folds = summarize_predictions(merged_predictions)
     merged_costs = summarize_costs(merged_predictions)
@@ -355,7 +368,11 @@ def run_experiment_from_frame(
 
     predictions = pd.concat(fold_predictions, ignore_index=True)
     # Run dynamic inventory simulation
-    predictions = simulate_inventory_policy(predictions)
+    predictions = simulate_inventory_policy(
+        predictions,
+        inventory_config=settings.inventory,
+        series_cost_profile=series_cost_profile,
+    )
 
     metrics_summary, fold_metrics = summarize_predictions(predictions)
     cost_summary = summarize_costs(predictions)

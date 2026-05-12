@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import pandas as pd
+from typing import Any
 
 
 @dataclass
@@ -62,20 +63,37 @@ class InventoryState:
 
 
 def simulate_inventory_policy(
-    predictions: pd.DataFrame, initial_on_hand: float = 0.0
+    predictions: pd.DataFrame,
+    inventory_config: Any,
+    series_cost_profile: pd.DataFrame | None = None,
+    initial_on_hand: float = 0.0,
 ) -> pd.DataFrame:
     """
     Simulates a multi-period inventory policy across backtest folds.
 
     This replaces the static newsvendor logic with a dynamic one where
     the ending state of fold N is the starting state of fold N+1.
+
+    Now uses 'choose_order_quantity' iteratively to implement an
+    Inventory-Aware Order-Up-To policy.
     """
+    from retail_forecasting.inventory.newsvendor import (
+        attach_inventory_costs,
+        choose_order_quantity,
+    )
+
     if "fold_id" not in predictions.columns:
         return predictions  # Cannot simulate without temporal order
 
     results = []
 
-    # Group by model and series
+    # Identify available quantile columns for the decider
+    quantile_columns = [c for c in predictions.columns if c.startswith("q_")]
+    quantile_levels = [
+        float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns
+    ]
+
+    # Group by model and series to maintain state continuity
     group_cols = ["data_strategy", "model_name", "backend_name", "series_id"]
     group_cols = [c for c in group_cols if c in predictions.columns]
 
@@ -90,34 +108,66 @@ def simulate_inventory_policy(
             c_under=subset["c_under"].iloc[0] if "c_under" in subset.columns else 4.0,
         )
 
-        # Pipeline: Order at end of fold N arrives at start of fold N+1
-        pending_orders = []  # List of (arrival_fold, quantity)
+        # Tracking pipeline: (arrival_fold, quantity)
+        pending_orders = []
 
         for _, row in subset.iterrows():
             current_fold = row["fold_id"]
 
-            # 1. Collect arrivals for this fold
+            # 1. Collect arrivals for this fold (orders placed in previous folds)
             arrivals = sum(q for f, q in pending_orders if f == current_fold)
             pending_orders = [(f, q) for f, q in pending_orders if f != current_fold]
 
-            # 2. Step the simulation
-            # Note: y_true in our pipeline is the lead-time demand for the horizon
-            # order_quantity was chosen at the START of the horizon
+            # 2. DECISION: Choose order quantity considering current inventory position
+            # We use a single-row dataframe for the decider call
+            decider_input = pd.DataFrame([row])
+
+            # On-Hand minus Backlog is the net stock available
+            net_stock = pd.Series(
+                [state.on_hand - state.backlog], index=decider_input.index
+            )
+            # Sum of all pending orders is the On-Order amount
+            on_order_val = sum(q for f, q in pending_orders)
+            on_order_series = pd.Series([on_order_val], index=decider_input.index)
+
+            # Recalculate order_quantity dynamically
+            new_order_qty = choose_order_quantity(
+                predictions=decider_input,
+                inventory_config=inventory_config,
+                quantile_columns=quantile_columns
+                if row["model_name"] != "seasonal_naive"
+                else [],
+                quantile_levels=quantile_levels
+                if row["model_name"] != "seasonal_naive"
+                else [],
+                series_cost_profile=series_cost_profile,
+                current_stock=net_stock,
+                on_order=on_order_series,
+            ).iloc[0]
+
+            # 3. ADVANCE: Advance the physical simulation
             state.step(
-                demand=row["y_true"],
-                order_quantity=row["order_quantity"],
-                arrivals=arrivals,
+                demand=row["y_true"], order_quantity=new_order_qty, arrivals=arrivals
             )
 
-            # 3. Schedule next arrival (assuming lead time = 1 fold/horizon)
-            pending_orders.append((current_fold + 1, row["order_quantity"]))
+            # 4. SCHEDULE: Arrival for next fold (lead time = 1 fold/horizon)
+            pending_orders.append((current_fold + 1, new_order_qty))
 
-            # 4. Record enriched row
+            # 5. RECORD: Save enriched row
             sim_row = row.copy()
+            sim_row["order_quantity"] = (
+                new_order_qty  # Update with inventory-aware decision
+            )
             sim_row["sim_on_hand"] = state.on_hand
             sim_row["sim_backlog"] = state.backlog
             sim_row["sim_arrivals"] = arrivals
             sim_row["sim_total_cost"] = state.history[-1]["cost"]
-            results.append(sim_row)
+
+            # Re-calculate costs for this row based on updated order_quantity (for static baseline comparison)
+            cost_row = attach_inventory_costs(
+                pd.DataFrame([sim_row]), inventory_config, series_cost_profile
+            ).iloc[0]
+
+            results.append(cost_row)
 
     return pd.DataFrame(results)
