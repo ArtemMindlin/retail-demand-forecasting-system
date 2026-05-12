@@ -7,36 +7,39 @@ En la era del \textit{Big Data} y la inteligencia artificial, la gestión de la 
 
 La relevancia de este problema no es solo operativa, sino también económica y ética. A nivel europeo, se estima que el desperdicio alimentario genera un coste directo al sector \textit{retail} de aproximadamente 13.000 millones de euros anuales, representando cerca del 1,64\% de las ventas totales \cite{eucommission2023foodwaste}. En España, estas cifras han servido de base para una transformación del marco legislativo con la entrada en vigor de la Ley 1/2025 de Prevención de las Pérdidas y el Desperdicio Alimentario \cite{leydesperdicio2025}, que obliga a las empresas de distribución a implementar planes estratégicos de prevención y penaliza severamente la ineficiencia en la gestión de excedentes.
 
-Este Trabajo de Fin de Grado nace de la necesidad de alinear los modelos matemáticos de previsión con la realidad de la toma de decisiones en la reposición. El caso de uso central no es una predicción abstracta de demanda, sino una respuesta operativa a una pregunta concreta del responsable de aprovisionamiento: \emph{¿cuántas unidades debe pedir mañana cada SKU?} Para contestarla, el sistema debe estimar la demanda esperada a horizonte de \textit{lead time} y el riesgo asociado a cada decisión de inventario, con el fin de minimizar tanto el coste por rotura de stock (\textit{stockout}) como el coste por sobrestock y desperdicio, contribuyendo así al Objetivo de Desarrollo Sostenible (ODS) 12: Producción y Consumo Responsables \cite{ods12un}.
+Este Trabajo de Fin de Grado nace de la necesidad de alinear los modelos matemáticos de previsión con la realidad de la toma de decisiones en la reposición. El caso de uso central no es una predicción abstracta de demanda, sino la construcción de un \textbf{Sistema de Apoyo a la Decisión (DSS) End-to-End} que responda a una pregunta operativa concreta del responsable de aprovisionamiento: \emph{¿cuántas unidades debe pedir mañana cada SKU bajo restricciones logísticas reales?} Para contestarla, el sistema no solo estima la demanda esperada y cuantifica la incertidumbre matemáticamente, sino que orquesta una simulación dinámica y una optimización de recursos para minimizar tanto el coste por rotura de stock (\textit{stockout}) como el coste por sobrestock y desperdicio, contribuyendo así al Objetivo de Desarrollo Sostenible (ODS) 12: Producción y Consumo Responsables \cite{ods12un}.
 
 \section{Definición del Problema}
-El enfoque tradicional del \textit{demand forecasting} se ha centrado históricamente en la obtención de predicciones puntuales (\textit{point forecasts}) mediante la minimización de métricas de error promedio como el MAE (\textit{Mean Absolute Error}) o el RMSE (\textit{Root Mean Squared Error}). Aunque útiles, estos enfoques presentan dos limitaciones críticas en entornos de \textit{retail} real y no resuelven por sí solos la decisión de reposición:
+El enfoque tradicional del \textit{demand forecasting} se ha centrado históricamente en la obtención de predicciones puntuales (\textit{point forecasts}) mediante la minimización de métricas de error promedio como el MAE (\textit{Mean Absolute Error}) o el RMSE (\textit{Root Mean Squared Error}). Aunque útiles, estos enfoques presentan severas limitaciones cuando intentan utilizarse aisladamente en entornos de \textit{retail} de producción:
 
 \begin{enumerate}
-    \item \textbf{Censura de datos por stockout:} Cuando un producto se agota en el estante, la demanda observada se detiene, pero la demanda latente (lo que los clientes habrían comprado) sigue existiendo. Ignorar este fenómeno introduce un sesgo negativo en los modelos, que tienden a subestimar la demanda real en periodos de rotura.
-    \item \textbf{Desconexión entre error y coste:} En el \textit{retail} de productos frescos, el coste de equivocarse "por exceso" (desperdicio) suele ser muy distinto al coste de equivocarse "por defecto" (pérdida de venta y fidelidad). Un modelo que minimiza el error medio puede no ser el que minimiza el coste operativo total de la reposición si no considera esta asimetría.
+    \item \textbf{Censura de datos por stockout:} Cuando un producto se agota en el estante, la demanda observada se detiene, pero la demanda latente (lo que los clientes habrían comprado) sigue existiendo. Ignorar este fenómeno introduce un sesgo negativo en los modelos.
+    \item \textbf{Desconexión entre error estadístico y coste logístico:} En productos frescos, el coste de equivocarse "por exceso" (desperdicio) suele ser muy distinto al coste de equivocarse "por defecto" (pérdida de venta y fidelidad). 
+    \item \textbf{Decisiones estáticas vs. dinámicas:} Los modelos teóricos a menudo asumen que cada día se empieza desde cero. En la realidad, el inventario sobrante o faltante se acumula (\textit{efecto látigo}), requiriendo políticas dinámicas que consideren el estado físico del almacén.
+    \item \textbf{Capacidad infinita ilusoria:} Una recomendación de pedido óptima para un producto aislado deja de ser válida si, al sumar todo el catálogo, se supera el presupuesto de compra o la capacidad de almacenamiento de la tienda.
 \end{enumerate}
 
-Este trabajo aborda estas limitaciones mediante un enfoque de \textbf{forecasting probabilístico}, donde el objetivo no es una cifra única, sino una distribución de probabilidad que permita cuantificar la incertidumbre y tomar decisiones de inventario optimizadas mediante el modelo del \textit{Newsvendor}. En otras palabras, la predicción es un medio para decidir la cantidad de pedido, no un fin aislado.
+Este trabajo aborda estas limitaciones mediante un enfoque unificado: desde un \textbf{forecasting probabilístico} avanzado con garantías matemáticas (\textit{Mondrian Conformal Prediction}) hasta la toma de decisión bajo restricciones mediante Investigación de Operaciones (Programación Lineal) y MLOps, todo empaquetado en una arquitectura industrial lista para despliegue.
 
 \section{Objetivos}
-El objetivo general de este proyecto es diseñar y evaluar un sistema de apoyo a la reposición para \textit{retail} fresco, centrado en la robustez estadística y el impacto económico real de cada decisión de pedido por SKU.
+El objetivo general de este proyecto es diseñar, evaluar y desplegar un sistema completo de apoyo a la reposición para \textit{retail} fresco, elevando la solución desde un experimento estadístico hasta un motor de decisión logística de nivel industrial.
 
 Para alcanzar este objetivo general, se plantean los siguientes objetivos específicos:
 \begin{itemize}
-    \item Desarrollar un \textit{pipeline} de datos reproducible que permita la ingesta y preparación de series temporales de demanda a gran escala a partir del dataset \textit{Fresh RetailNet}, con el objetivo de alimentar decisiones de reposición por SKU.
-    \item Implementar modelos globales de \textit{Machine Learning} (CatBoost) capaces de capturar patrones complejos y compartir información entre diferentes productos y tiendas.
-    \item Integrar técnicas de \textit{Conformal Prediction} para garantizar la calibración estadística de los intervalos de confianza generados por el sistema.
-    \item Evaluar el rendimiento del sistema no solo mediante métricas predictivas clásicas, sino a través de una función de coste económico basada en la política del \textit{Newsvendor} y orientada a la decisión de compra.
-    \item Analizar la robustez del sistema ante fenómenos de deriva de datos (\textit{data drift}) y situaciones de demanda censurada.
+    \item Desarrollar un \textit{pipeline} de datos reproducible que incluya compuertas de calidad (\textit{Data Quality Gates}) y la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}.
+    \item Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos.
+    \item Garantizar la calibración estadística y la equidad de las predicciones mediante técnicas del estado del arte como \textit{Mondrian Conformal Prediction} e hiper-optimización multi-objetivo (\textit{Pareto Frontier}).
+    \item Evaluar el rendimiento mediante un gemelo digital logístico (Simulación Dinámica de Inventario $s,S$) que integre restricciones operativas globales usando Programación Lineal (\textit{Continuous Knapsack}).
+    \item Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software, incluyendo seguimiento automatizado (MLflow), explicabilidad (SHAP), despliegue como microservicio (FastAPI) y un cuadro de mandos interactivo para análisis \textit{What-If} (Streamlit), todo ello soportado por contenerización (Docker) e Integración Continua (CI/CD).
 \end{itemize}
 
 \section{Estructura del Documento}
 La presente memoria se organiza en seis capítulos adicionales:
 \begin{itemize}
-    \item El \textbf{Capítulo 2: Estado del Arte} revisa la literatura actual sobre series temporales, modelos de \textit{boosting} y gestión de inventarios.
-    \item El \textbf{Capítulo 3: Metodología} detalla el diseño experimental, la formulación de los modelos y la estrategia de validación \textit{walk-forward}.
-    \item El \textbf{Capítulo 4: Implementación} describe la arquitectura del software desarrollado y las herramientas tecnológicas utilizadas.
-    \item El \textbf{Capítulo 5: Resultados} presenta el análisis comparativo de los modelos y la evaluación del impacto económico.
-    \item El \textbf{Capítulo 6: Conclusiones} sintetiza los hallazgos principales y propone líneas de investigación futuras.
+    \item El \textbf{Capítulo 2: Estado del Arte} revisa la literatura actual sobre series temporales, modelos de \textit{boosting}, conformal prediction y gestión de inventarios.
+    \item El \textbf{Capítulo 3: Análisis de Datos} describe el dataset utilizado y su preparación.
+    \item El \textbf{Capítulo 4: Metodología} detalla la formulación matemática de los modelos, la calibración avanzada, la optimización multi-objetivo y el gemelo digital logístico.
+    \item El \textbf{Capítulo 5: Implementación y Arquitectura} describe el diseño del software MLOps, la API de despliegue, el sistema de diagnóstico automático y la infraestructura CI/CD.
+    \item El \textbf{Capítulo 6: Resultados} presenta el análisis comparativo de los modelos, el impacto de las restricciones globales y la explicabilidad del sistema.
+    \item El \textbf{Capítulo 7: Conclusiones} sintetiza los hallazgos principales.
 \end{itemize}

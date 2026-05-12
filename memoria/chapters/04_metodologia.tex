@@ -2,7 +2,7 @@
 \chapter{Metodología}
 \label{chap:metodologia}
 
-En este capítulo se describe el diseño del sistema, desde la formulación del problema de aprendizaje supervisado hasta el marco de evaluación económica. La metodología se ha diseñado para garantizar la robustez estadística y la aplicabilidad de los resultados en un entorno operativo real.
+En este capítulo se describe el diseño del sistema, desde la formulación del problema de aprendizaje supervisado hasta el marco de evaluación económica y de Investigación de Operaciones (OR). La metodología se ha rediseñado para trascender la predicción puramente estadística, garantizando la robustez operativa y la resolución de restricciones logísticas reales.
 
 \section{Formulación del Problema}
 El objetivo operativo es determinar la cantidad de pedido que debe emitir el responsable de reposición para cada SKU y cada fecha de decisión. Para ello, primero se estima la demanda acumulada de un producto en una tienda específica durante un horizonte de planificación determinado ($H$). Formalmente, definimos la demanda observada para una serie $s$ en el tiempo $t$ como $y_{s,t}$. El objetivo (\textit{target}) de nuestro modelo en el instante $t$ es la demanda total durante el \textit{lead time}, que actúa como entrada para la política de aprovisionamiento:
@@ -11,132 +11,52 @@ El objetivo operativo es determinar la cantidad de pedido que debe emitir el res
     Y_{s,t} = \sum_{i=0}^{H-1} y_{s, t+i}
 \end{equation}
 
-Esta formulación permite que el pronóstico esté directamente alineado con la decisión de inventario: cuántas unidades se necesitan para cubrir el periodo hasta la próxima reposición y, por tanto, qué cantidad debería pedirse mañana para minimizar el coste operativo esperado.
+Esta formulación alinea el pronóstico con la decisión de inventario: cuántas unidades se necesitan para cubrir el periodo hasta la próxima reposición y, por tanto, qué cantidad debería pedirse mañana para minimizar el coste operativo. Para evitar la fuga de información futura (\textit{data leakage}), los valores futuros se usan únicamente para construir esta etiqueta durante el entrenamiento, mientras que las variables explicativas se calculan exclusivamente con información disponible antes del origen de predicción.
 
-En la implementación, esta variable se construye desplazando la demanda observada hacia el futuro dentro de cada serie tienda-producto. Para cada origen temporal $t$, se agregan los valores $y_{s,t}$, $y_{s,t+1}$, ..., $y_{s,t+H-1}$, sin mezclar observaciones de distintas series. Por tanto, la demanda observada diaria no se usa como objetivo aislado, sino como componente de una etiqueta acumulada de \textit{lead time} que más tarde se transforma en una decisión de compra. Las últimas observaciones de cada serie se descartan cuando no existe un horizonte futuro completo para calcular esta suma.
+\section{Optimización Multi-Objetivo y Frente de Pareto}
+Históricamente, los modelos de \textit{demand forecasting} minimizaban una única métrica de error promedio, como el MAE o el RMSE. Sin embargo, en un problema de optimización de inventarios donde la gestión de la incertidumbre es vital, buscar únicamente reducir la media del error puede resultar en modelos con varianza infraestimada o sobreajustada.
 
-Esta distinción es crítica para evitar \textit{data leakage}: los valores futuros se usan únicamente para construir la etiqueta durante entrenamiento y evaluación, mientras que las variables explicativas se calculan con información disponible antes del origen de predicción, mediante retardos positivos y ventanas móviles históricas.
-
-\section{Ingeniería de Características y Política Anti-Leakage}
-Para capturar la complejidad de la demanda en \textit{retail}, se construye un panel de datos enriquecido con diversas familias de características. Un principio fundamental en el diseño es la \textbf{prevención del sesgo de información futura} (\textit{data leakage}).
-
-\begin{itemize}
-    \item \textbf{Características Temporales}: Componentes cíclicos extraídos de la fecha, como el día de la semana, semana del año, mes y indicadores de festivos.
-    \item \textbf{Variables de Retardo (\textit{Lags})}: Valores históricos de la demanda, descuentos y horas de rotura de stock. Se utilizan retardos positivos para asegurar que el modelo solo utiliza información disponible en el momento de la predicción.
-    \item \textbf{Estadísticas Móviles (\textit{Rolling Windows})}: Medias, sumas y desviaciones típicas calculadas sobre ventanas deslizantes (ej. 7 y 28 días) para capturar tendencias y volatilidad reciente.
-    \item \textbf{Variables Exógenas}: Datos meteorológicos (temperatura, precipitación, humedad) y variables contextuales (actividad promocional).
-    \item \textbf{Identificadores Estáticos}: Variables categóricas que representan la jerarquía del producto y la ubicación de la tienda.
-\end{itemize}
-
-\subsection{Construcción Operativa de Variables}
-La función de ingeniería de características transforma el panel diario en una matriz supervisada manteniendo una correspondencia uno-a-uno entre cada fila y un origen de predicción $(s,t)$. La Tabla~\ref{tab:feature_engineering_variables} resume las familias de variables construidas, sus nombres representativos y la restricción temporal aplicada.
-
-\begin{table}[htbp]
-    \centering
-    \small
-    \begin{tabular}{>{\raggedright\arraybackslash}p{0.23\textwidth} >{\raggedright\arraybackslash}p{0.34\textwidth} >{\raggedright\arraybackslash}p{0.34\textwidth}}
-        \toprule
-        \textbf{Familia} & \textbf{Variables generadas} & \textbf{Criterio temporal} \\
-        \midrule
-        Calendario &
-        \texttt{day\_of\_week}, \texttt{day\_of\_month}, \texttt{month}, \texttt{week\_of\_year}, \texttt{is\_weekend}, \texttt{holiday\_flag}, \texttt{activity\_flag} &
-        Disponibles en el origen de predicción; no dependen de demanda futura. \\
-        \addlinespace
-        Demanda histórica &
-        \texttt{demand\_lag\_1}, \texttt{demand\_lag\_7}, \texttt{demand\_lag\_14}, \texttt{demand\_lag\_28} &
-        Se calculan con retardos positivos por \texttt{series\_id}; en $t$ solo se usan valores $y_{s,t-k}$. \\
-        \addlinespace
-        Ventanas móviles de demanda &
-        \texttt{demand\_roll\_mean\_*}, \texttt{demand\_roll\_sum\_*}, \texttt{demand\_roll\_std\_*} &
-        Antes del rolling se aplica \texttt{shift(1)}, por lo que la ventana termina en $t-1$ y excluye la demanda del día evaluado. \\
-        \addlinespace
-        Promoción y disponibilidad &
-        \texttt{discount\_lag\_*}, \texttt{stockout\_lag\_*}, \texttt{stockout\_roll\_mean\_*} &
-        Entran únicamente como información histórica. Los \textit{stockouts} realizados no se usan contemporáneamente para predecir el mismo origen. \\
-        \addlinespace
-        Meteorología &
-        \texttt{precpt\_lag\_*}, \texttt{avg\_temperature\_lag\_*}, \texttt{avg\_humidity\_lag\_*}, \texttt{avg\_wind\_level\_lag\_*} &
-        Se incorporan con retardos positivos para evitar usar observaciones exógenas realizadas después del origen temporal. \\
-        \addlinespace
-        Identificadores estáticos &
-        \texttt{city\_id}, \texttt{store\_id}, \texttt{management\_group\_id}, \texttt{first\_category\_id}, \texttt{second\_category\_id}, \texttt{third\_category\_id}, \texttt{product\_id} &
-        Son atributos fijos de tienda, producto o jerarquía comercial; no introducen información futura. \\
-        \bottomrule
-    \end{tabular}
-    \caption{Familias de variables construidas durante la ingeniería de características.}
-    \label{tab:feature_engineering_variables}
-\end{table}
-
-Los retardos y ventanas concretos se parametrizan desde la configuración del experimento, lo que permite comparar distintas granularidades históricas sin alterar el código. En la configuración base se utilizan retardos de 1, 7, 14 y 28 días, junto con ventanas móviles de 7 y 28 días, capturando tanto memoria de muy corto plazo como patrones semanales.
-
-Después de construir estas variables, se eliminan las filas que no disponen de historial suficiente para calcular los retardos o ventanas requeridas. Esta eliminación se realiza de forma independiente por \texttt{series\_id}. Por ejemplo, con un retardo máximo de 28 días y una ventana móvil máxima de 28 días, las primeras 28 observaciones de cada serie tienda-producto no pueden utilizarse como filas supervisadas, ya que todavía no existe historial completo hasta $t-1$. También se eliminan las filas sin \texttt{target\_lead\_time\_demand}, normalmente situadas al final de cada serie por falta de horizonte futuro completo.
-
-En la configuración base, el horizonte de predicción es $H=7$. Por tanto, además de las primeras 28 observaciones descartadas por construcción de variables históricas, las últimas $H-1=6$ observaciones de cada serie no tienen etiqueta futura completa. Con el mínimo configurado de 70 días de historial por serie, el número mínimo teórico de orígenes supervisados utilizables es:
-
-\begin{equation}
-    70 - 28 - (7 - 1) = 36
-\end{equation}
-
-Este recorte temporal no constituye una pérdida arbitraria de datos, sino una consecuencia necesaria de formular un problema supervisado sin fuga de información futura. Finalmente, la columna objetivo queda excluida explícitamente del conjunto \texttt{feature\_columns}; de este modo, la matriz de entrada contiene solo información disponible en el origen de predicción, mientras que la demanda futura acumulada se conserva únicamente como etiqueta supervisada.
-
-\section{Validación Walk-Forward}
-Dada la naturaleza temporal de los datos, no es posible utilizar una validación cruzada aleatoria tradicional, ya que violaría la estructura causal del tiempo. En su lugar, se implementa un esquema de \textbf{validación temporal \textit{walk-forward}} con ventanas expansivas.
-
-El proceso se divide en $N$ pliegues (\textit{folds}). Para cada pliegue:
-\begin{enumerate}
-    \item El conjunto de entrenamiento incluye todos los datos desde el inicio hasta una fecha de corte $T_{train}$.
-    \item Se deja un \textit{gap} de seguridad igual al horizonte de predicción $H$ para evitar que información del futuro se filtre en las variables retardadas.
-    \item El conjunto de validación comprende los datos en el intervalo $[T_{train} + H, T_{train} + H + \Delta]$, donde $\Delta$ es el tamaño de la ventana de validación.
-\end{enumerate}
-
-La construcción de los pliegues exige un número mínimo de fechas distintas en el panel. Si $D_0$ es el número de días iniciales de entrenamiento, $N$ el número de pliegues, $\Delta$ el tamaño de cada ventana de validación y $H$ el horizonte de predicción, el requisito operativo es:
-
-\begin{equation}
-    D_{min} = D_0 + N \cdot \Delta + H - 1
-\end{equation}
-
-El término asociado al horizonte garantiza que el último origen de validación tenga suficiente futuro observado para calcular la demanda acumulada del horizonte. En la configuración base, este requisito toma el valor $45 + 3 \cdot 7 + 7 - 1 = 72$ fechas distintas.
-
-Operativamente, los pliegues se construyen sobre el calendario global de fechas únicas del panel, no sobre cada serie individual. El primer pliegue comienza tras $D_0$ fechas de entrenamiento inicial y cada pliegue posterior desplaza el inicio de validación $\Delta$ fechas hacia delante. Para el pliegue $j$, el índice inicial de validación es $D_0 + j \cdot \Delta$ y el índice final es $D_0 + (j+1)\cdot\Delta - 1$. El último índice admisible es $D - H$, donde $D$ es el número total de fechas únicas; de este modo, el último origen de validación aún dispone de $H$ observaciones futuras, incluyendo el propio día de origen, para construir la etiqueta de demanda acumulada.
-
-La optimización de hiperparámetros sigue una política temporal coherente con este esquema. Antes del \textit{backtesting} oficial, el sistema ejecuta una única fase de sintonización con Optuna utilizando exclusivamente observaciones anteriores al final del entrenamiento del primer pliegue oficial. Dentro de ese subconjunto se aplica, a su vez, una partición temporal interna para medir el error de validación de cada prueba. Los hiperparámetros seleccionados quedan fijados después para todos los pliegues \textit{walk-forward}. Esta decisión evita fuga de información desde las ventanas oficiales de validación y reduce el coste computacional frente a una estrategia más estricta, pero mucho más cara, en la que se volvería a sintonizar el modelo dentro de cada pliegue.
-
-Sobre este mismo flujo temporal, el sistema incorpora un mecanismo ligero de vigilancia adaptativa del rendimiento. Tras cada pliegue se monitoriza el MAE del modelo global de \textit{boosting} mediante un detector secuencial de Page-Hinkley parametrizado por un umbral, una tolerancia $\delta$ y un número mínimo de observaciones. Si la degradación acumulada del error supera el umbral configurado, el evento se registra como posible \textit{performance drift}. Cuando la configuración experimental activa esta opción, la alerta no modifica retrospectivamente el pliegue actual, pero sí fuerza el reentrenamiento del modelo en el siguiente pliegue, preservando la causalidad temporal del protocolo.
-
-Este esquema garantiza que el modelo se evalúe siempre sobre datos que nunca ha visto y que son cronológicamente posteriores a su entrenamiento, simulando un despliegue real en producción.
-
-\section{Cuantificación de la Incertidumbre y Calibración}
-El sistema no genera únicamente una predicción puntual, sino un conjunto de cuantiles operativos ($\tau \in \{0.1, 0.5, 0.9\}$) para soportar la toma de decisiones bajo riesgo. Para asegurar que estos cuantiles sean estadísticamente válidos, se integra un marco de \textbf{Conformal Prediction}.
-
-\subsection{El Problema de los Cuantiles Crudos}
-Los modelos de \textit{Gradient Boosting} (como CatBoost o LightGBM) pueden entrenarse utilizando una función de pérdida de \textit{Pinball}, lo que les permite estimar cuantiles. Sin embargo, en la práctica, estos cuantiles suelen estar mal calibrados debido al \textit{overfitting} o a cambios en la distribución de los datos, lo que significa que un intervalo del $80\%$ nominal podría cubrir solo el $65\%$ de los datos reales.
-
-\subsection{Marco de Conformal Prediction}
-Para corregir este sesgo, se implementa una variante del método de \textit{Split Conformal Prediction}. El proceso se formaliza de la siguiente manera:
+Para abordar este problema, el sistema implementa una **Búsqueda de Hiperparámetros Multi-Objetivo** utilizando \textit{Optuna}. Durante la fase de sintonización, el algoritmo evolutivo (basado en NSGA-II) optimiza simultáneamente dos funciones de pérdida en conflicto:
 
 \begin{enumerate}
-    \item \textbf{Corte de Calibración}: Se reserva un conjunto de datos de calibración ($\mathcal{D}_{cal}$) que no ha sido utilizado durante el entrenamiento del modelo. En este sistema, se utilizan los últimos 21 días del conjunto de entrenamiento para este fin.
-    \item \textbf{Score de No-Conformidad}: Para cada observación en $\mathcal{D}_{cal}$, se calcula un \textit{score} de error que mide la discrepancia entre el valor real $y_i$ y el intervalo predicho. Cuando el modelo base ofrece cuantiles, se usa un score de tipo CQR basado en la máxima desviación respecto a los extremos del intervalo; cuando solo ofrece predicción puntual, se usa el residuo absoluto.
-    \item \textbf{Ajuste de Cuantiles}: Se calcula el percentil corregido de los errores observados en el conjunto de calibración. El cuantil final para una nueva observación $x_{test}$ se define como:
-    \begin{equation}
-        q_{final} = \hat{q}_{\tau}(x_{test}) + Q(1-\alpha, \{E_i\}_{i \in \mathcal{D}_{cal}})
-    \end{equation}
-    donde $Q$ es la función de cuantil empírico sobre los errores de calibración.
+    \item \textbf{Precisión Puntual (MAE)}: Penaliza la magnitud absoluta del error de la predicción central. Representa la eficiencia a largo plazo del modelo.
+    \item \textbf{Nitidez Probabilística (Winkler Score)}: Penaliza simultáneamente la amplitud de los intervalos de confianza predichos (penalizando intervalos vagos o excesivamente anchos) y la penalización asimétrica si el valor real cae fuera del intervalo (asegurando cobertura empírica).
 \end{enumerate}
 
-Este enfoque garantiza, bajo la asunción de intercambiabilidad de los datos, que el error de cobertura esté acotado teóricamente, proporcionando intervalos de confianza robustos que se ensanchan automáticamente en periodos de alta incertidumbre y se estrechan cuando el modelo es preciso.
+El resultado no es una única configuración de hiperparámetros "óptima", sino un **Frente de Pareto** donde cada punto representa un compromiso inmejorable entre la precisión económica esperada y la fiabilidad de las cotas de incertidumbre estimadas. El orquestador selecciona automáticamente la configuración más equilibrada antes de iniciar el \textit{backtesting} global.
 
-\section{Marco de Evaluación Multi-Objetivo}
-La evaluación del sistema se realiza en tres niveles complementarios:
+\section{Cuantificación de la Incertidumbre: Mondrian Conformal Prediction}
+Para soportar la toma de decisiones bajo riesgo, el sistema requiere garantías matemáticas sobre los intervalos de confianza generados. Aunque técnicas previas como el \textit{Split Conformal Prediction} ofrecen garantías de cobertura \textit{marginal} (ej. 80\% de acierto en media para todo el conjunto de datos), esta propiedad suele enmascarar desigualdades críticas en \textit{retail}: el modelo podría estar acertando el 95\% de las veces en productos estables y fallando estrepitosamente en productos intermitentes o estacionales.
 
+Para solucionar este sesgo estructural, se ha implementado \textbf{Mondrian Conformal Prediction}. Este marco extiende la calibración de manera condicional:
+
+\begin{enumerate}
+    \item \textbf{Partición Taxonómica}: Las series temporales se agrupan en categorías homogéneas (ej. mediante su identificador categórico de jerarquía \texttt{third\_category\_id}).
+    \item \textbf{Score de No-Conformidad Local}: En lugar de calcular una única cota de corrección ($q\_hat$) global, el sistema calcula una cota independiente para cada grupo en el conjunto de calibración.
+    \item \textbf{Ajuste Condicional de Cuantiles}: El cuantil ajustado final garantiza que el error de cobertura esté acotado teóricamente dentro de \textit{cada categoría}, asegurando que tanto los productos de alta rotación (cuya incertidumbre es baja) como los lentos y ruidosos reciben el nivel de servicio deseado, ensanchando o contrayendo los intervalos de forma justa y localizada.
+\end{enumerate}
+
+\section{El Gemelo Digital Logístico: Simulación Dinámica (s, S)}
+La evaluación tradicional en forecasting asume modelos estáticos (o de un solo periodo), como el modelo básico del \textit{Newsvendor}. Sin embargo, este supuesto ignora el hecho físico de que el inventario no vendido un día permanece en la estantería al día siguiente.
+
+El proyecto rompe con esta limitación mediante el desarrollo de una \textbf{Simulación Dinámica de Política Order-Up-To}. Para cada \textit{fold} de la validación cruzada temporal, el simulador mantiene el estado físico de cada SKU, incluyendo:
 \begin{itemize}
-    \item \textbf{Métricas Predictivas}: MAE (\textit{Mean Absolute Error}) para medir la precisión central y RMSE (\textit{Root Mean Squared Error}) para penalizar grandes desviaciones.
-    \item \textbf{Métricas Probabilísticas}: \textit{Pinball Loss} para evaluar la calidad de los cuantiles y \textit{Coverage} para verificar si el porcentaje de datos que caen dentro del intervalo de confianza coincide con el nivel de confianza teórico.
-    \item \textbf{Métricas Económicas}: Se utiliza el modelo del \textit{Newsvendor} para calcular el coste total operativo:
-    \begin{equation}
-        Coste_{s,t} = (c_{o,s} \times Overstock_{s,t}) + (c_{u,s} \times Stockout_{s,t})
-    \end{equation}
-    donde $c_{o,s}$ es el coste unitario por exceso de stock de la serie $s$ y $c_{u,s}$ el coste de oportunidad por venta perdida para esa misma serie.
+    \item \textbf{Stock Remanente (\textit{On-Hand})}: Unidades físicas disponibles.
+    \item \textbf{Pedidos en Curso (\textit{On-Order})}: Unidades compradas que aún no han llegado debido al \textit{lead time}.
+    \item \textbf{Demanda Diferida (\textit{Backlog})}: Unidades demandadas que no se pudieron servir y generan penalización o pérdida de fidelidad.
 \end{itemize}
 
-En la versión actual del sistema, estos costes no son constantes globales para todo el panel, sino perfiles sintéticos dependientes de la combinación tienda-producto. En particular, $c_{o,s}$ aumenta cuando una serie presenta mayor perecibilidad sintética o un patrón de baja rotación, mientras que $c_{u,s}$ aumenta cuando la serie muestra mayor intensidad de demanda o mayor tensión histórica de \textit{stockout}. De este modo, el fractil crítico del modelo del \textit{Newsvendor} deja de ser único para todo el sistema y pasa a adaptarse a la criticidad operativa de cada serie individual.
+Bajo esta simulación, la orden sugerida $Q$ se ajusta restando la \textit{Posición del Inventario} actual del nivel óptimo sugerido por el cuantil del pronóstico probabilístico $S$. De este modo, la evaluación de costes operativos en la memoria captura fielmente el impacto devastador a largo plazo de errores correlacionados y del "efecto látigo".
+
+\section{Resolución de Conflictos: Optimización Global por Programación Lineal}
+Las recomendaciones individuales de cada SKU pueden ser matemáticamente óptimas a nivel aislado, pero el despliegue en un supermercado real está sujeto a severas restricciones de volumen físico de almacenaje o de capital presupuestario.
+
+Para cerrar la brecha entre Machine Learning e Investigación de Operaciones (OR), la decisión final se orquesta a través de un \textbf{Módulo de Programación Lineal (LP)}. El problema se plantea como un \textit{Continuous Knapsack}:
+
+\begin{itemize}
+    \item \textbf{Variables de Decisión}: Cantidad a pedir de cada SKU.
+    \item \textbf{Función Objetivo}: Maximizar la utilidad marginal (evitar el coste de oportunidad por rotura, fuertemente penalizado por la criticidad del producto).
+    \item \textbf{Restricciones}: La suma total de unidades pedidas en el catálogo no debe exceder una constante $C_{max}$ (ej. Límite del camión logístico).
+\end{itemize}
+
+El motor utiliza el \textit{solver} moderno \texttt{highs} de \textit{SciPy} para recortar inventario inteligentemente allí donde el impacto económico de la rotura sea menor, dotando al sistema de total capacidad de actuación bajo estrés operativo real.

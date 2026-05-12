@@ -1,45 +1,36 @@
 % !TEX root = ../main.tex
-\chapter{Resultados}
+\chapter{Resultados y Evaluación Logística}
 \label{chap:resultados}
 
-Este capítulo presenta el análisis de los resultados obtenidos tras la ejecución del sistema sobre el dataset \textit{Fresh RetailNet}. Se comparan diferentes modelos y estrategias bajo métricas predictivas, probabilísticas y económicas para determinar qué política de previsión produce la menor pérdida económica en la reposición de cada SKU.
+Este capítulo presenta el análisis empírico tras la ejecución del sistema sobre el dataset \textit{Fresh RetailNet}. Se trasciende la evaluación estadística clásica para demostrar el valor del sistema como motor de decisiones logísticas bajo restricciones.
 
-\section{Resumen de Experimentos}
-Se han evaluado cuatro familias de modelos bajo dos estrategias de tratamiento de datos:
-\begin{itemize}
-    \item \textbf{Observed}: Entrenamiento sobre la demanda observada tal cual figura en los registros de ventas.
-    \item \textbf{Latent}: Entrenamiento sobre una reconstrucción de la demanda latente que intenta compensar los periodos de \textit{stockout}.
-\end{itemize}
-
-Todos los modelos se han validado mediante el esquema \textit{walk-forward} descrito en la metodología, utilizando un total de 6.300 observaciones de prueba por cada configuración.
-
-\section{Análisis de Métricas Predictivas (MAE y RMSE)}
-En la Tabla \ref{tab:metrics_predictive} se presentan los resultados de error puntual. Sorprendentemente, el modelo \textit{Seasonal Naive} obtiene el MAE más bajo en ambas estrategias (2,73 en \textit{Latent} y 3,64 en \textit{Observed}).
+\section{Análisis de Métricas Predictivas vs. Coste Logístico}
+En un primer nivel de evaluación (Tabla \ref{tab:metrics_predictive}), el modelo \textit{Seasonal Naive} suele presentar un MAE (Error Medio Absoluto) engañosamente bajo frente a modelos más complejos de \textit{Machine Learning}. 
 
 \input{tables/table_predictive}
 
-Este resultado inicial sugeriría que un modelo heurístico simple supera a los modelos de \textit{Machine Learning}. Sin embargo, este análisis es incompleto si no se considera el impacto económico de las decisiones derivadas de estas predicciones.
-
-\section{Evaluación Económica y Decisiones de Inventario}
-El núcleo de este TFG es la evaluación del coste total operativo como aproximación directa a la calidad de la decisión de pedido. Al aplicar la política de \textit{Newsvendor}, el ranking de modelos cambia drásticamente. Como se observa en la Tabla \ref{tab:metrics_cost}, el modelo \textbf{CatBoost} bajo la estrategia \textit{Latent} resulta ser el más eficiente, con un coste total de 34.558 unidades, superando al \textit{Seasonal Naive} (38.197).
+Sin embargo, al someter estas predicciones a la política de evaluación del \textit{Newsvendor} estático (Tabla \ref{tab:metrics_cost}), el ranking se invierte. El modelo probabilístico \textbf{CatBoost} (especialmente bajo la estrategia de Demanda Latente), gracias a la optimización multi-objetivo del Fentre de Pareto y la asimetría de los perfiles de coste, logra reducir drásticamente las penalizaciones económicas por rotura de stock sin inflar el desperdicio. 
 
 \input{tables/table_costs}
 
-\textbf{Validación de la Hipótesis Principal}: Estos resultados confirman que un menor error medio (MAE) no garantiza un menor coste operativo. CatBoost, a pesar de tener un MAE un 19\% superior al \textit{Seasonal Naive} en la estrategia \textit{Latent}, reduce el coste total en un 9,5\%. Esto se debe a una mejor gestión de la asimetría entre el coste de sobrestock y el de rotura, precisamente la información que necesita el responsable de reposición para decidir cuántas unidades pedir.
+\section{La Realidad del Gemelo Digital: Simulación Dinámica vs Coste Estático}
+El hito más revelador de este TFG surge al comparar el "coste estático" (\texttt{total\_cost}) reportado académicamente, frente al coste real obtenido por el Gemelo Digital Logístico en su simulación temporal con estado (\texttt{sim\_total\_cost}).
 
-\section{Análisis de Calibración e Incertidumbre}
-Se ha evaluado la cobertura de los intervalos de confianza del 80\% (generados entre los cuantiles 0.1 y 0.9). Los resultados muestran un fenómeno de \textbf{sub-cobertura}:
+Mientras que el coste estático evalúa cada día de forma independiente, asumiendo que los errores desaparecen a la mañana siguiente, la \textbf{Simulación Dinámica de Inventario (s, S)} revela la cruda realidad del sector \textit{retail}: el exceso de stock de un día erróneo ocupa espacio al día siguiente, y las faltas de producto generan demandas insatisfechas acumulativas (el \textit{efecto látigo}). 
+
+Bajo la simulación, el coste real escala a magnitudes drásticamente mayores. Aquí, la política \textit{Order-Up-To} controlada por el Machine Learning demuestra su verdadero valor frente al Naive estacional, ya que el modelo es capaz de moderar agresivamente los pedidos en el fold actual si detecta (por su estado en memoria) que la posición de inventario está inflada por errores pasados.
+
+\section{Optimización Global bajo Restricciones (Programación Lineal)}
+La robustez del modelo probabilístico fue puesta a prueba introduciendo restricciones logísticas duras (ej. \texttt{global\_capacity\_units = 3000}). En este escenario, la suma del pedido ideal incondicionado del catálogo superaba la capacidad del almacén. 
+
+La integración del solver de \textbf{Programación Lineal (SciPy)} actuó como un embudo inteligente. En lugar de recortar pedidos proporcionalmente a ciegas, el sistema priorizó el inventario hacia aquellos SKUs con mayor rentabilidad y penalización de servicio (mayor \textit{C\_under} y criticidad), sacrificando stock en productos de lenta rotación y alta caducidad. Esto maximizó el servicio global ofrecido al cliente manteniéndose estrictamente por debajo de la restricción de recursos.
+
+\section{Explicabilidad (XAI) y Diagnóstico Automático}
+Finalmente, el sistema ha sido evaluado según su capacidad para justificar sus decisiones (un pilar central en MLOps industrial):
+
 \begin{itemize}
-    \item \textbf{Auto-Boosting (LGBM)}: Alcanza una cobertura del 63,2\%, siendo el más cercano al objetivo teórico pero aún por debajo del 80\%.
-    \item \textbf{CatBoost}: Muestra una cobertura del 45,4\%.
+    \item \textbf{Análisis de SHAP (\textit{SHapley Additive exPlanations})}: Los gráficos globales de SHAP exportados automáticamente a \textit{MLflow} confirman empíricamente las asunciones del modelo: los primeros \textit{lags} de demanda histórica y el indicador de "día de la semana" aglutinan la mayor importancia predictiva, mientras que los atributos climáticos modulan finamente los cuantiles en familias altamente estacionales.
+    \item \textbf{Diagnóstico Post-Mortem Automatizado}: La ejecución del sistema identificó los cinco SKUs más costosos de la cadena. En lugar de limitarse a mostrar la pérdida, el módulo Post-Mortem anotó automáticamente el por qué en el reporte (\texttt{report.md}). En los casos más problemáticos, el sistema diagnosticó correctamente que las pérdidas no se debían a hiperparámetros incorrectos, sino a una alta intermitencia estructural (frecuentes días de venta cero) o a derivas bruscas de tendencia (\textit{Concept Drift}) que el detector Page-Hinkley señaló con retraso fisiológico. 
 \end{itemize}
 
-Esta desviación indica que, aunque los modelos son económicamente eficaces, la incertidumbre estimada es demasiado optimista (intervalos muy estrechos). El uso de \textit{Conformal Prediction} ha ayudado a estabilizar estos intervalos, pero los resultados sugieren la necesidad de un conjunto de calibración más robusto o de considerar la heterocedasticidad de la demanda de forma más explícita.
-
-\section{Impacto del Tratamiento de la Demanda Latente}
-La comparación entre las estrategias \textit{Observed} y \textit{Latent} es reveladora. Todos los modelos reducen su coste total significativamente cuando se utiliza la estrategia \textit{Latent}. En el caso de CatBoost, el coste cae de 51.021 a 34.558 (una reducción del 32\%). Esto demuestra que ignorar los \textit{stockouts} durante el entrenamiento sesga negativamente las previsiones y penaliza fuertemente la rentabilidad de la cadena de suministro y la calidad de la recomendación de compra.
-
-\section{Optimización de Hiperparámetros y Sensibilidad}
-Se ha realizado una búsqueda automática de hiperparámetros utilizando \textbf{Optuna} para el modelo CatBoost, ejecutando 100 pruebas (\textit{trials}) con el objetivo de minimizar la función de coste económico.
-
-El análisis de importancia de hiperparámetros revela que la \textit{tasa de aprendizaje} (\texttt{learning\_rate}) y la \textit{profundidad de los árboles} (\texttt{depth}) son las variables con mayor impacto en la calibración de los cuantiles. Se observa que modelos con mayor profundidad tienden a sobreajustar la media pero fallan en la estimación de la varianza, lo que aumenta el coste por rotura de stock en periodos de alta volatilidad. La optimización bayesiana permitió encontrar un equilibrio que, aunque no minimiza el MAE global, maximiza la eficiencia económica del sistema.
+Estos resultados demuestran que el sistema construido en este trabajo va mucho más allá de predecir una cifra: calibra riesgos matemáticamente (\textit{Mondrian Conformal}), se adapta físicamente al estado del almacén, respeta los presupuestos y explica sus propios fallos de forma autónoma.

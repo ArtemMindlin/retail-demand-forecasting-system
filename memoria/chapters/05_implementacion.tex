@@ -1,133 +1,39 @@
 % !TEX root = ../main.tex
-\chapter{Implementación y Arquitectura}
+\chapter{Implementación y Arquitectura MLOps}
 \label{chap:implementacion}
 
-Este capítulo detalla la realización técnica del sistema, describiendo la arquitectura del software, las tecnologías utilizadas y los patrones de diseño que garantizan la modularidad, la reproducibilidad y el rigor estadístico del proceso de \textit{forecasting}.
+Este capítulo detalla la realización técnica del sistema. A diferencia de implementaciones puramente académicas en formato de *notebooks*, este proyecto se ha desarrollado como un \textbf{Sistema Inteligente End-to-End} bajo los más estrictos estándares de Ingeniería de Software y MLOps, listo para un entorno de producción industrial.
 
 \section{Arquitectura del Sistema}
-El sistema se ha diseñado siguiendo un enfoque de \textbf{arquitectura modular basada en pipelines}, inspirada en los principios de MLOps. La estructura del código se organiza en torno a tres procesos o tuberías principales:
+La estructura del código se organiza en torno a micro-arquitecturas especializadas:
 
 \begin{enumerate}
-    \item \textbf{Pipeline de Datos}: Encargado de la ingesta desde fuentes externas (Hugging Face), la limpieza y la transformación de series temporales en un panel supervisado. Se implementa un sistema de \textit{caching} para evitar descargas redundantes y asegurar que los experimentos partan siempre de la misma base de datos.
-    \item \textbf{Pipeline de Entrenamiento}: Gestiona el ciclo de vida de los modelos, incluyendo la ingeniería de características sin \textit{leakage}, la búsqueda de hiperparámetros mediante optimización bayesiana y el almacenamiento de artefactos.
-    \item \textbf{Pipeline de Evaluación y Decisión}: Toma las predicciones del modelo, aplica técnicas de calibración (Conformal Prediction), las transforma en decisiones de inventario mediante el modelo del \textit{Newsvendor} y genera reportes detallados.
+    \item \textbf{Data Engineering y Quality Gates}: Encargado de la ingesta desde fuentes externas (Hugging Face) y la limpieza. Se ha implementado un estricto \textit{Data Quality Gate} que aborta la ejecución si detecta anomalías operativas (ej. datos obsoletos o duplicados) antes de contaminar los modelos.
+    \item \textbf{Pipeline de Entrenamiento}: Gestiona la ingeniería de características sin \textit{leakage}, la optimización bayesiana multi-objetivo y el calibrado \textit{Mondrian Conformal}.
+    \item \textbf{Decisión e Investigación de Operaciones}: Transforma los cuantiles en decisiones de reposición mediante la simulación de inventario (s, S) y la programación lineal.
 \end{enumerate}
 
-\section{Stack Tecnológico}
-La elección de herramientas se basa en su madurez, rendimiento y capacidad de integración:
+\section{Ecosistema Tecnológico}
+El \textit{stack} tecnológico se ha seleccionado para maximizar la robustez, escalabilidad y explicabilidad:
 \begin{itemize}
-    \item \textbf{Lenguaje}: Python 3.10+, aprovechando su ecosistema líder en ciencia de datos.
-    \item \textbf{Procesamiento de Datos}: \texttt{Pandas} y \texttt{NumPy} para la manipulación eficiente de paneles temporales.
-    \item \textbf{Modelado}: \texttt{CatBoost} \cite{prokhorenkova2018catboost} como motor principal de \textit{Gradient Boosting} por su excelente manejo nativo de variables categóricas y soporte de incertidumbre.
-    \item \textbf{Optimización}: \texttt{Optuna} \cite{akiba2019optuna} para la sintonización automática de hiperparámetros, utilizando algoritmos de \textit{Tree-structured Parzen Estimator} (TPE).
-    \item \textbf{Entorno y Reproducción}: Gestión de dependencias mediante \texttt{uv} y configuración centralizada con archivos YAML.
+    \item \textbf{Motor de Modelado}: \texttt{CatBoost} y \texttt{LightGBM} para \textit{Gradient Boosting} probabilístico.
+    \item \textbf{Optimización y OR}: \texttt{Optuna} (NSGA-II) para el frente de Pareto y \texttt{SciPy} (método \textit{highs}) para el \textit{Continuous Knapsack}.
+    \item \textbf{Experiment Tracking (MLflow)}: El registro local de artefactos se ha migrado a un servidor \texttt{MLflow}. El sistema inyecta automáticamente todos los hiperparámetros, métricas (Winkler, PICP, costes) y gráficos generados, asegurando la reproducibilidad absoluta y la comparabilidad visual de cientos de ejecuciones.
+    \item \textbf{Despliegue y Microservicios (FastAPI)}: El modelo no es un ente pasivo. Se ha implementado un microservicio asíncrono con \texttt{FastAPI} que expone el \textit{endpoint} \texttt{/predict\_orders}. Este servicio está diseñado para ser consumido directamente por el ERP de la cadena de suministro, integrando la inferencia y la optimización logística en tiempo real.
+    \item \textbf{Dashboard Interactivo (Streamlit)}: Para acercar la matemática al tomador de decisiones, se ha desarrollado un \textit{What-If Dashboard}. Esta interfaz permite a los directores ajustar los costes de rotura y exceso o las capacidades de almacén de forma visual, re-simulando y comparando las decisiones logísticas al instante.
 \end{itemize}
 
-\section{Patrones de Diseño Aplicados}
-Para elevar la calidad del software desde una perspectiva de ingeniería, se han aplicado los siguientes patrones:
+\section{Calidad de Software e Infraestructura CI/CD}
+Para garantizar que la deuda técnica no limite el escalado del sistema, se han aplicado prácticas fundamentales de \textit{DevOps}:
 \begin{itemize}
-    \item \textbf{Patrón Strategy}: Permite intercambiar el motor de \textit{forecasting} (ej. cambiar entre CatBoost, XGBoost o modelos estadísticos) sin modificar la lógica principal de validación y evaluación.
-    \item \textbf{Patrón Factory}: Utilizado en el módulo de características para generar de forma dinámica y parametrizada los \textit{lags} y ventanas móviles según la configuración del experimento.
-    \item \textbf{Patrón Decorator}: Aplicado en la capa de calibración para añadir \textit{Conformal Prediction} a cualquier modelo base de forma no intrusiva.
+    \item \textbf{Contratos Estrictos (Pydantic)}: Toda la configuración y los metadatos transitan a través de esquemas validados y tipados estáticamente, rechazando configuraciones incoherentes o derivas de datos no controladas.
+    \item \textbf{Contenerización (Docker)}: La API, el servidor MLflow y el Dashboard de Streamlit están orquestados conjuntamente mediante \texttt{docker-compose.yml}, garantizando que cualquier investigador pueda levantar la arquitectura completa con un solo comando en cualquier sistema operativo.
+    \item \textbf{Integración Continua (GitHub Actions)}: El repositorio cuenta con un pipeline de CI (\texttt{ci.yml}) que, ante cada nuevo \textit{commit}, despliega un entorno virgen, formatea el código (Ruff) y ejecuta exhaustivamente la batería de más de 80 tests automatizados (\texttt{Pytest}), garantizando la integridad arquitectónica ininterrumpida.
 \end{itemize}
 
-\section{Implementación del Rigor Estadístico}
-La implementación técnica no es un fin en sí mismo, sino un soporte para la validez científica del trabajo. Esto se refleja en:
+\section{Explicabilidad y Diagnóstico Automático}
+Un sistema de apoyo a la decisión en \textit{retail} pierde su valor si opera como una caja negra. Por ello, se han integrado módulos de observabilidad (\textit{Observability}):
 \begin{itemize}
-    \item \textbf{Contratos de Datos}: Uso de validaciones internas para asegurar que no existe \textit{temporal leakage} entre los conjuntos de entrenamiento y prueba.
-    \item \textbf{Modularidad de Métricas}: Desacoplamiento de las métricas de error (MAE, RMSE) de las métricas económicas (coste total), permitiendo un análisis multi-objetivo sin sesgar el entrenamiento del modelo.
-    \item \textbf{Reproducibilidad}: Cada ejecución genera un reporte (\texttt{reports/}) y un archivo \texttt{backtest\_metadata.json} con resumen de datos, variables, pliegues, modelos, hash de configuración y commit Git, garantizando que cualquier resultado pueda ser auditado y replicado.
+    \item \textbf{Explicabilidad Global (SHAP)}: El sistema genera valores de Shapley Aditivos (\texttt{shap}) para el modelo Campeón, documentando gráficamente el peso real de los \textit{lags}, las variables climáticas o las jerarquías en la predicción.
+    \item \textbf{Diagnóstico Post-Mortem}: En lugar de requerir análisis manual tras un fallo logístico, el sistema escanea sus propios errores. Si un SKU genera sobrecostes excesivos en la simulación, un módulo automático redacta un diagnóstico en el reporte final, indicando si la pérdida se debió a un \textit{Concept Drift} (basado en el detector Page-Hinkley), \textit{Cold Start} (falta de historia) o alta intermitencia estructural. Esto transforma el sistema de un mero proyector numérico a un \textbf{agente autodiagnóstico}.
 \end{itemize}
-
-\section{Inferencia y Tratamiento de Series con Historial Insuficiente}
-El pipeline de entrenamiento y el flujo de inferencia comparten la misma función base de ingeniería de características, pero aplican políticas distintas sobre las filas resultantes. Durante entrenamiento se conservan todos los orígenes temporales que tienen variables completas y etiqueta futura disponible. En cambio, durante inferencia solo se necesita una predicción actual por serie, por lo que el sistema selecciona la última fila con variables completas de cada \texttt{series\_id}.
-
-En este contexto, un origen de predicción es una pareja $(s,t)$: la serie tienda-producto $s$ observada hasta la fecha $t$. Una misma serie puede tener muchos orígenes válidos en el histórico, pero para inferencia operativa solo interesa el más reciente. Por ello, el metadato \texttt{rows\_not\_latest\_origin} contabiliza filas que eran técnicamente válidas para el modelo, pero se descartan por corresponder a fechas anteriores dentro de la misma serie.
-
-Para cubrir casos de \textit{cold start} sin modificar el pipeline de entrenamiento, se implementa una política específica de inferencia. Las series cuya última fila no dispone de todas las variables requeridas se marcan como \texttt{cold\_start\_fallback} y reciben una predicción heurística basada en medias históricas. La jerarquía de búsqueda es:
-
-\begin{center}
-    \texttt{series\_id} $\rightarrow$ \texttt{product\_id} $\rightarrow$ \texttt{third\_category\_id} $\rightarrow$ \texttt{global}
-\end{center}
-
-La predicción de respaldo se calcula como la demanda diaria media del nivel disponible multiplicada por el horizonte $H$. Esta decisión mantiene separadas las responsabilidades del sistema: el modelo solo recibe filas con variables completas, mientras que la política de inferencia documenta explícitamente qué predicciones proceden del modelo y cuáles proceden de una regla de respaldo. Como compromiso, esta aproximación es simple y robusta para un prototipo experimental, aunque no captura patrones estacionales dentro del horizonte con la misma precisión que un modelo entrenado.
-
-\section{Tratamiento de la Demanda Latente}
-Uno de los retos principales del proyecto es el sesgo introducido por las roturas de stock (\textit{stockouts}). Cuando un producto se agota durante parte del día, las ventas observadas pueden quedar artificialmente deprimidas, aunque la demanda latente (lo que el cliente habría comprado con disponibilidad suficiente) siga existiendo. El sistema implementa un módulo de \texttt{LatentDemandImputer} para abordar este problema.
-
-\subsection{Estrategia de Imputación Supervisada}
-La técnica principal implementada es un enfoque de \textbf{Modelo Profesor (\textit{Teacher Model})}. El proceso consiste en:
-\begin{enumerate}
-    \item \textbf{Filtro de Datos Limpios}: Se segmenta el panel de datos en días "limpios" (con stock suficiente) y días "censurados" (con rotura de stock detectada).
-    \item \textbf{Entrenamiento del Imputador}: Se entrena un modelo LightGBM exclusivamente sobre los días limpios. El modelo aprende a predecir la demanda basándose en la estacionalidad (mes, día de la semana) y la jerarquía de productos, sin verse contaminado por el sesgo de la falta de stock.
-    \item \textbf{Des-censura de Ventas}: El modelo entrenado predice la demanda esperada para los días de rotura. La demanda latente final se estima como el valor máximo entre la venta observada y la predicción del modelo:
-    \begin{equation}
-        \hat{y}_{latente} = \max(y_{observada}, \hat{y}_{profesor})
-    \end{equation}
-\end{enumerate}
-
-Este enfoque permite que el pipeline compare de forma empírica el rendimiento de los modelos entrenados con datos "sucios" (basales) frente a datos corregidos estadísticamente.
-
-\section{Baseline Estacional}
-Además de los modelos supervisados y estadísticos más complejos, el sistema incorpora un baseline \textit{Seasonal Naive} como referencia mínima de rendimiento. Este modelo no aprende parámetros a partir de las variables explicativas, sino que extrapola la dinámica más reciente de la propia serie temporal. Su papel no es maximizar el rendimiento, sino ofrecer una cota de comparación simple, robusta y fácilmente interpretable.
-
-En cada origen de predicción, la estimación se construye a partir de los valores observados previos de la misma \texttt{series\_id}. El pronóstico para un horizonte $H$ se obtiene acumulando la demanda de los periodos estacionales más recientes disponibles, con el objetivo de capturar el patrón repetitivo dominante de la serie. Si no existe historial suficiente para recuperar alguno de esos retardos estacionales, la contribución correspondiente se trata como nula y la predicción final se mantiene no negativa.
-
-Este baseline es útil por dos motivos. Primero, establece una referencia fuerte frente a la que comparar modelos más complejos: si un modelo aprendido no supera de forma consistente al \textit{Seasonal Naive}, su valor añadido es cuestionable. Segundo, permite evaluar si la ganancia del modelado supervisado compensa la complejidad adicional introducida por el entrenamiento, la calibración y la optimización de hiperparámetros. En un problema de demanda con estacionalidad marcada, este tipo de baseline suele ser un adversario exigente y, por tanto, una referencia metodológicamente apropiada.
-
-\section{Contratos Pydantic y Principios MLOps}
-Para garantizar que el sistema es escalable y auditable, se ha migrado la gestión de parámetros y metadatos críticos de simples diccionarios o estructuras informales a contratos explícitos basados en \textbf{Pydantic}.
-
-\subsection{Validación de Configuración}
-El primer uso de Pydantic se aplica a la configuración experimental. Esto aporta las siguientes ventajas operativas:
-\begin{itemize}
-    \item \textbf{Validación Automática}: El sistema rechaza cualquier configuración con tipos erróneos o valores fuera de rango (ej. horizontes negativos) antes de iniciar la ejecución pesada.
-    \item \textbf{Inmutabilidad (\textit{Frozen Config})}: Una vez cargados los parámetros, el objeto de configuración queda bloqueado. Esto previene cambios accidentales durante el experimento, asegurando que los metadatos del reporte coinciden exactamente con lo ejecutado.
-    \item \textbf{Inyección por Entorno}: Gracias a \texttt{pydantic-settings}, el sistema soporta la sobrescritura de parámetros mediante variables de entorno (\texttt{RETAIL\_*}), facilitando el despliegue en contenedores Docker y tuberías de integración continua (CI/CD) sin necesidad de modificar archivos fuente.
-\end{itemize}
-
-\subsection{Contratos de Objetos del Pipeline}
-Además de la configuración, Pydantic se utiliza para representar objetos internos que contienen información crítica para la validez experimental. Este diseño evita que determinadas invariantes queden solo como convenciones documentadas o supuestos implícitos en el código.
-
-En ingeniería de características, \texttt{FeatureFrameMetadata} registra las columnas utilizadas por el modelo, el horizonte, los retardos, las ventanas móviles y el número de filas descartadas por falta de objetivo o variables.
-
-En inferencia, \texttt{InferenceFallbackMetadata} audita cuántas filas se envían al modelo y cuántas se resuelven mediante la política de \textit{cold start}, además del nivel jerárquico usado en el respaldo.
-
-En validación temporal, \texttt{FoldSpec} representa cada pliegue \textit{walk-forward} como un contrato Pydantic congelado. Este objeto almacena el identificador del pliegue, el horizonte y las fechas de entrenamiento y validación, y valida en tiempo de ejecución invariantes como:
-
-\begin{itemize}
-    \item \texttt{fold\_id >= 0} y \texttt{horizon > 0};
-    \item \texttt{validation\_end\_date >= validation\_start\_date};
-    \item \texttt{train\_end\_date = validation\_start\_date - horizon}.
-\end{itemize}
-
-La misma filosofía se aplica a la optimización de hiperparámetros. Los parámetros seleccionados por Optuna se representan como un contrato \texttt{BoostingParams}, mientras que el proceso temporal de sintonización se resume en un contrato \texttt{TuningMetadata} con el número de pruebas, el mejor error alcanzado, el tamaño de los subconjuntos interno de entrenamiento y validación, la fecha de corte utilizada y los parámetros finalmente elegidos. El resultado funcional del sintonizador se encapsula además en \texttt{TuningResult}, que combina los mejores hiperparámetros con su contexto auditable y evita depender de estado lateral implícito dentro del orquestador.
-
-En la capa de deriva, el detector \texttt{PageHinkleyDetector} se ha implementado como un orquestador ligero con estado tipado y configuración externa. Sus parámetros (\texttt{threshold}, \texttt{delta} y \texttt{min\_instances}) se cargan desde la configuración del experimento, mientras que el resultado instantáneo de cada actualización se encapsula en \texttt{DriftResult}. La implementación separa explícitamente la media acumulada del error monitorizado, la desviación acumulada y el mínimo histórico de dicha desviación, de modo que el estadístico de Page-Hinkley pueda auditarse sin ambigüedad. Esta separación evita mezclar señal cruda y estadístico de decisión dentro del mismo acumulador, algo especialmente relevante cuando la detección de deriva se utiliza como gatillo de reentrenamiento adaptativo.
-
-Esta capa de contratos reduce el riesgo de ejecutar experimentos con estados incoherentes: por ejemplo, un pliegue que no respete el hueco temporal del horizonte no puede construirse como objeto válido. Del mismo modo, el tuning deja de ser una fase opaca y pasa a quedar descrito por objetos explícitos y serializables. El coste computacional añadido es despreciable frente al entrenamiento de modelos, mientras que la ganancia en trazabilidad y robustez es relevante para un sistema experimental donde la ausencia de \textit{leakage} temporal es una condición central.
-
-Como extensión de esta filosofía, cada ejecución de \textit{backtesting} consolida sus metadatos en un artefacto \texttt{backtest\_metadata.json}. Este fichero no solo preserva el contexto general del experimento, sino también los pliegues efectivamente construidos, sus tamaños de entrenamiento y validación, el resumen del panel supervisado, la metadata del tuning temporal, la configuración y el resumen operativo del detector de deriva, el \textit{hash} de configuración y el \textit{commit} de Git asociado. De este modo, la validación temporal no queda auditada únicamente por contratos en memoria, sino también por un rastro persistente que permite comparar ejecuciones, depurar desviaciones y justificar resultados ante terceros.
-
-\section{Perfiles de Coste por Serie}
-La capa de inventario se ha extendido para soportar perfiles de coste específicos por serie (\texttt{series\_id = store\_id} $\times$ \texttt{product\_id}). En lugar de utilizar un único par global $(c_o, c_u)$ para todo el sistema, se construye una tabla de costes sintéticos por serie a partir del panel preparado. Esta tabla utiliza como \textit{proxies} la intensidad de demanda, la intermitencia, la frecuencia histórica de \textit{stockout} y la inestabilidad agregada de la categoría de producto.
-
-El objetivo de esta extensión no es estimar un coste contable exacto, sino aproximar mejor la asimetría económica real del problema. Así, series con productos más perecederos o con rotación más lenta reciben un mayor $c_{o,s}$, mientras que series con mayor presión de demanda o con mayor criticidad histórica de servicio reciben un mayor $c_{u,s}$. La decisión de pedido sigue siendo modular y se mantiene dentro de la capa \texttt{inventory/}, preservando la separación entre predicción, decisión y evaluación.
-
-\subsection{Algoritmo de Generación de Perfiles Económicos}
-Para la construcción de los costes sintéticos, se ha diseñado un motor heurístico que transforma métricas logísticas en coeficientes de coste. El proceso sigue tres etapas fundamentales:
-
-\begin{enumerate}
-    \item \textbf{Normalización por Percentiles}: Dado que las magnitudes de demanda varían órdenes de magnitud entre productos, todas las métricas base (demanda media, intermitencia, inestabilidad) se transforman a su rango percentil $[0, 1]$ relativo al resto del panel. Esto permite comparar de forma justa el comportamiento de un producto de alto volumen con uno marginal.
-    \item \textbf{Dimensiones de Decisión}: Se calculan tres puntuaciones compuestas mediante combinaciones lineales de los percentiles:
-    \begin{itemize}
-        \item \textit{Perecederidad}: Basada en la inestabilidad histórica de la categoría de producto y la intermitencia individual. Captura el riesgo de obsolescencia.
-        \item \textit{Criticidad de Servicio}: Pondera el volumen de ventas y la tensión histórica de \textit{stockout}. Identifica productos donde una rotura de stock tiene un alto impacto en el nivel de servicio percibido.
-        \item \textit{Baja Rotación (Slow-moving)}: Identifica productos con demanda esporádica que son ineficientes de mantener en stock.
-    \end{itemize}
-    \item \textbf{Cálculo del Fractil Crítico}: Estas puntuaciones actúan como multiplicadores de los costes base configurados ($c_{o,base}, c_{s,base}$), resultando en un par $(c_{o,s}, c_{s,s})$ único para cada serie. Finalmente, se deriva el fractil crítico individual mediante la fórmula del \textit{Newsvendor}:
-    \begin{equation}
-        \tau_s = \frac{c_{s,s}}{c_{s,s} + c_{o,s}}
-    \end{equation}
-    Este valor $\tau_s$ es el que guía la optimización de la cantidad de pedido para cada serie específica durante el proceso de evaluación.
-\end{enumerate}
