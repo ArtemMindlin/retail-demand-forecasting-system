@@ -1807,6 +1807,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyyaml" },
     { name = "scikit-learn" },
+    { name = "scipy" },
     { name = "shap" },
     { name = "streamlit" },
 ]
@@ -1843,6 +1844,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "scikit-learn", specifier = ">=1.5.0" },
+    { name = "scipy", specifier = ">=1.11.0" },
     { name = "shap", specifier = ">=0.45.0" },
     { name = "streamlit", specifier = ">=1.56.0" },
     { name = "xgboost", marker = "extra == 'ml'", specifier = ">=2.1.0" },

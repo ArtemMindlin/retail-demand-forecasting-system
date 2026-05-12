@@ -20,6 +20,7 @@ dependencies = [
   "pyarrow>=16.1.0",
   "PyYAML>=6.0.2",
   "scikit-learn>=1.5.0",
+  "scipy>=1.11.0",
   "shap>=0.45.0",
   "streamlit>=1.56.0",
   "optuna>=4.0.0",

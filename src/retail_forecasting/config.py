@@ -172,6 +172,7 @@ class InventoryConfig(BaseModel):
     synthetic_cost_config: SyntheticCostConfig = Field(
         default_factory=SyntheticCostConfig
     )
+    global_capacity_units: int | None = Field(default=None, gt=0)
 
     @field_validator("pareto_order_scales")
     @classmethod
