@@ -47,6 +47,36 @@ Explicacion oral:
 > guarda la semilla aleatoria, que permite que modelos y tuning sean mas
 > reproducibles.
 
+### `run_mode`
+
+Modo de ejecucion principal del pipeline.
+
+Valores permitidos:
+
+```yaml
+run_mode: backtest
+```
+
+o:
+
+```yaml
+run_mode: retrain
+```
+
+o:
+
+```yaml
+run_mode: score_daily
+```
+
+Semantica:
+
+- `backtest`: conserva el conjunto completo de artefactos experimentales;
+- `retrain`: mantiene el mismo conjunto rico de artefactos, pero representa un
+  ciclo de reentrenamiento gobernado operacionalmente;
+- `score_daily`: escribe solo artefactos operativos de negocio y metadata
+  ligera, sin `report.md`, sin `predictions.csv` y sin `backtest_metadata.json`.
+
 ## `DatasetConfig`
 
 Controla de donde salen los datos, como se cachean y que subconjunto se usa.

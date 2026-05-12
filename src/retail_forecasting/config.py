@@ -17,6 +17,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ProjectConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     random_seed: int = 42
+    run_mode: Literal["backtest", "retrain", "score_daily"] = "backtest"
 
 
 class DatasetConfig(BaseModel):

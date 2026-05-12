@@ -258,6 +258,15 @@ eleccion sirve para validacion, pero no sustituye la politica operacional: el
 modelo champion debe cambiar solo cuando un challenger supera los criterios de
 promocion definidos.
 
+Para hacer explicita esa separacion, el repo soporta `project.run_mode` con
+tres valores:
+
+- `backtest`: corrida experimental completa;
+- `retrain`: corrida de reentrenamiento con artefactos ricos;
+- `score_daily`: corrida operativa que escribe solo recomendaciones,
+  excepciones, `promotion_decision.json`, `champion_registry.json` y
+  `operational_run_metadata.json`.
+
 ## 10. Simulacion / decision de inventario
 
 La v2 implementa una capa de decision newsvendor por periodo:
@@ -291,6 +300,7 @@ Cada corrida genera:
 - tablas de coste agregado;
 - frontera de Pareto de politicas candidatas;
 - predicciones por fold;
+- `champion_registry.json` con el champion operativo vigente entre corridas;
 - `backtest_metadata.json` con dataset, features, folds, modelos, hash de configuracion y commit Git;
 - graficos simples de coste y trade-off error-coste;
 - un reporte Markdown final en `reports/`.

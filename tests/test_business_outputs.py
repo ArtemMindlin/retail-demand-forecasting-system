@@ -3,12 +3,14 @@ from __future__ import annotations
 import pandas as pd
 
 from retail_forecasting.config import BusinessConfig, Settings
+from retail_forecasting.contracts.business import ChampionRecord, ChampionRegistry
 from retail_forecasting.contracts.drift import DriftEvent
 from retail_forecasting.evaluation.reporting import (
     RunArtifacts,
     build_promotion_decision,
     build_exceptions_frame,
     build_reorder_recommendations,
+    update_champion_registry,
 )
 
 
@@ -250,3 +252,103 @@ def test_build_promotion_decision_blocks_promotion_when_service_level_degrades_t
     assert decision is not None
     assert decision.promote is False
     assert decision.challenger_model_name == "auto_boosting"
+
+
+def test_build_promotion_decision_uses_registry_when_available() -> None:
+    artifacts = RunArtifacts(
+        prepared_panel=pd.DataFrame(),
+        supervised_frame=pd.DataFrame(),
+        predictions=pd.DataFrame(),
+        metrics_summary=pd.DataFrame(),
+        fold_metrics=pd.DataFrame(),
+        cost_summary=pd.DataFrame(
+            {
+                "data_strategy": ["Observed", "Observed", "Latent_supervised"],
+                "model_name": ["seasonal_naive", "catboost", "auto_boosting"],
+                "backend_name": ["heuristic", "catboost", "lightgbm"],
+                "observations": [10, 10, 10],
+                "mean_order_quantity": [10.0, 11.0, 10.5],
+                "total_overstock_units": [8.0, 5.0, 4.0],
+                "total_stockout_units": [7.0, 4.0, 3.0],
+                "total_overstock_cost": [8.0, 5.0, 4.0],
+                "total_stockout_cost": [28.0, 16.0, 12.0],
+                "total_cost": [36.0, 21.0, 18.0],
+                "mean_cost": [3.6, 2.1, 1.8],
+                "service_level": [0.70, 0.80, 0.79],
+                "fill_rate": [0.85, 0.92, 0.94],
+            }
+        ),
+    )
+    settings = Settings(
+        business=BusinessConfig(
+            champion_data_strategy="Observed",
+            champion_model_name="catboost",
+            champion_backend_name="catboost",
+            champion_min_cost_improvement_pct=10.0,
+            champion_max_service_level_degradation=0.02,
+        )
+    )
+    registry = ChampionRegistry(
+        updated_at="2026-05-12T07:00:00+00:00",
+        current_champion=ChampionRecord(
+            data_strategy="Observed",
+            model_name="seasonal_naive",
+            backend_name="heuristic",
+            promoted_at="2026-05-12T07:00:00+00:00",
+            run_name="prior_run",
+            git_commit="abc1234",
+            config_hash="hash",
+            reason="Prior champion",
+        ),
+    )
+
+    decision = build_promotion_decision(artifacts, settings, registry)
+
+    assert decision is not None
+    assert decision.champion_source == "registry"
+    assert decision.champion_model_name == "seasonal_naive"
+
+
+def test_update_champion_registry_bootstraps_from_first_run() -> None:
+    artifacts = RunArtifacts(
+        prepared_panel=pd.DataFrame(),
+        supervised_frame=pd.DataFrame(),
+        predictions=pd.DataFrame(),
+        metrics_summary=pd.DataFrame(),
+        fold_metrics=pd.DataFrame(),
+        cost_summary=pd.DataFrame(
+            {
+                "data_strategy": ["Observed", "Observed"],
+                "model_name": ["catboost", "seasonal_naive"],
+                "backend_name": ["catboost", "heuristic"],
+                "observations": [10, 10],
+                "mean_order_quantity": [11.0, 10.0],
+                "total_overstock_units": [5.0, 8.0],
+                "total_stockout_units": [4.0, 7.0],
+                "total_overstock_cost": [5.0, 8.0],
+                "total_stockout_cost": [16.0, 28.0],
+                "total_cost": [21.0, 36.0],
+                "mean_cost": [2.1, 3.6],
+                "service_level": [0.80, 0.70],
+                "fill_rate": [0.92, 0.85],
+            }
+        ),
+    )
+    settings = Settings(
+        business=BusinessConfig(
+            champion_data_strategy="Observed",
+            champion_model_name="catboost",
+            champion_backend_name="catboost",
+        )
+    )
+
+    registry = update_champion_registry(
+        artifacts=artifacts,
+        settings=settings,
+        current_registry=None,
+        promotion_decision=None,
+    )
+
+    assert registry is not None
+    assert registry.current_champion.model_name == "catboost"
+    assert registry.current_champion.backend_name == "catboost"

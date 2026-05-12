@@ -6,13 +6,14 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
 from retail_forecasting.config import Settings
 from retail_forecasting.contracts.backtesting import FoldRunMetadata
+from retail_forecasting.contracts.business import ChampionRecord, ChampionRegistry
 from retail_forecasting.contracts.drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.tuning import TuningMetadata
 from retail_forecasting.utils.io import (
@@ -69,6 +70,7 @@ class ModelRunMetadata(BaseModel):
 class PromotionDecisionMetadata(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    champion_source: Literal["config", "registry"]
     champion_data_strategy: str | None
     champion_model_name: str
     champion_backend_name: str
@@ -85,6 +87,22 @@ class PromotionDecisionMetadata(BaseModel):
     max_service_level_degradation: float = Field(ge=0.0, le=1.0)
     promote: bool
     decision_reason: str
+
+
+class OperationalRunMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    run_name: str
+    run_mode: Literal["backtest", "retrain", "score_daily"]
+    created_at: str
+    git_commit: str | None
+    config_hash: str
+    recommendation_rows: int = Field(ge=0)
+    exception_rows: int = Field(ge=0)
+    champion_model_name: str | None = None
+    champion_backend_name: str | None = None
+    promotion_executed: bool
+    promotion_approved: bool | None = None
 
 
 class BacktestMetadata(BaseModel):
@@ -117,6 +135,8 @@ class RunArtifacts:
     reorder_recommendations: pd.DataFrame | None = None
     exceptions: pd.DataFrame | None = None
     promotion_decision: PromotionDecisionMetadata | None = None
+    champion_registry: ChampionRegistry | None = None
+    operational_metadata: OperationalRunMetadata | None = None
     drifts: list[DriftEvent] = field(default_factory=list)
     report_extra: str = ""
     backtest_metadata: BacktestMetadata | None = None
@@ -131,16 +151,29 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
 
     reorder_recommendations = build_reorder_recommendations(artifacts, settings)
     exceptions = build_exceptions_frame(reorder_recommendations)
-    promotion_decision = build_promotion_decision(artifacts, settings)
+    registry_path = champion_registry_path(settings)
+    champion_registry = load_champion_registry(registry_path)
+    promotion_decision = build_promotion_decision(
+        artifacts, settings, champion_registry
+    )
+    champion_registry = update_champion_registry(
+        artifacts=artifacts,
+        settings=settings,
+        current_registry=champion_registry,
+        promotion_decision=promotion_decision,
+    )
     if artifacts.backtest_metadata is not None:
         artifacts.backtest_metadata = artifacts.backtest_metadata.model_copy(
             update={"promotion": promotion_decision}
         )
+    operational_metadata = build_operational_run_metadata(
+        settings=settings,
+        reorder_recommendations=reorder_recommendations,
+        exceptions=exceptions,
+        champion_registry=champion_registry,
+        promotion_decision=promotion_decision,
+    )
 
-    artifacts.predictions.to_csv(run_dir / "predictions.csv", index=False)
-    artifacts.metrics_summary.to_csv(run_dir / "metrics_summary.csv", index=False)
-    artifacts.fold_metrics.to_csv(run_dir / "fold_metrics.csv", index=False)
-    artifacts.cost_summary.to_csv(run_dir / "cost_summary.csv", index=False)
     reorder_recommendations.to_csv(run_dir / "reorder_recommendations.csv", index=False)
     exceptions.to_csv(run_dir / "exceptions.csv", index=False)
     if promotion_decision is not None:
@@ -148,27 +181,48 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
             promotion_decision.model_dump_json(indent=2),
             encoding="utf-8",
         )
-
-    if artifacts.sensitivity_summary is not None:
-        artifacts.sensitivity_summary.to_csv(
-            run_dir / "sensitivity_summary.csv", index=False
+    if champion_registry is not None:
+        registry_path.write_text(
+            champion_registry.model_dump_json(indent=2),
+            encoding="utf-8",
         )
-    if artifacts.pareto_frontier is not None:
-        artifacts.pareto_frontier.to_csv(run_dir / "pareto_frontier.csv", index=False)
-    if settings.reporting.make_plots:
-        render_standard_plots(
-            metrics_summary=artifacts.metrics_summary,
-            cost_summary=artifacts.cost_summary,
-            output_dir=run_dir,
+    if settings.project.run_mode == "score_daily":
+        (run_dir / "operational_run_metadata.json").write_text(
+            operational_metadata.model_dump_json(indent=2),
+            encoding="utf-8",
         )
+    else:
+        artifacts.predictions.to_csv(run_dir / "predictions.csv", index=False)
+        artifacts.metrics_summary.to_csv(run_dir / "metrics_summary.csv", index=False)
+        artifacts.fold_metrics.to_csv(run_dir / "fold_metrics.csv", index=False)
+        artifacts.cost_summary.to_csv(run_dir / "cost_summary.csv", index=False)
+        if artifacts.sensitivity_summary is not None:
+            artifacts.sensitivity_summary.to_csv(
+                run_dir / "sensitivity_summary.csv", index=False
+            )
+        if artifacts.pareto_frontier is not None:
+            artifacts.pareto_frontier.to_csv(
+                run_dir / "pareto_frontier.csv", index=False
+            )
+        if settings.reporting.make_plots:
+            render_standard_plots(
+                metrics_summary=artifacts.metrics_summary,
+                cost_summary=artifacts.cost_summary,
+                output_dir=run_dir,
+            )
 
-    report_text = build_markdown_report(artifacts=artifacts, settings=settings)
-    (run_dir / "report.md").write_text(report_text, encoding="utf-8")
+        report_text = build_markdown_report(artifacts=artifacts, settings=settings)
+        (run_dir / "report.md").write_text(report_text, encoding="utf-8")
 
     artifacts.reorder_recommendations = reorder_recommendations
     artifacts.exceptions = exceptions
     artifacts.promotion_decision = promotion_decision
-    if artifacts.backtest_metadata is not None:
+    artifacts.champion_registry = champion_registry
+    artifacts.operational_metadata = operational_metadata
+    if (
+        artifacts.backtest_metadata is not None
+        and settings.project.run_mode != "score_daily"
+    ):
         (run_dir / "backtest_metadata.json").write_text(
             artifacts.backtest_metadata.model_dump_json(indent=2),
             encoding="utf-8",
@@ -413,7 +467,9 @@ def build_exceptions_frame(recommendations: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_promotion_decision(
-    artifacts: RunArtifacts, settings: Settings
+    artifacts: RunArtifacts,
+    settings: Settings,
+    champion_registry: ChampionRegistry | None = None,
 ) -> PromotionDecisionMetadata | None:
     cost_summary = artifacts.cost_summary
     if cost_summary.empty:
@@ -429,18 +485,8 @@ def build_promotion_decision(
     if not required_columns.issubset(summary.columns):
         return None
 
-    champion_mask = (summary["model_name"] == settings.business.champion_model_name) & (
-        summary["backend_name"] == settings.business.champion_backend_name
-    )
-    if (
-        "data_strategy" in summary.columns
-        and settings.business.champion_data_strategy is not None
-    ):
-        champion_mask &= (
-            summary["data_strategy"] == settings.business.champion_data_strategy
-        )
-
-    champion_rows = summary.loc[champion_mask].copy()
+    champion_reference = resolve_champion_reference(settings, champion_registry)
+    champion_rows = summary.loc[_champion_mask(summary, champion_reference)].copy()
     if champion_rows.empty:
         return None
 
@@ -489,6 +535,7 @@ def build_promotion_decision(
         promote = False
 
     return PromotionDecisionMetadata(
+        champion_source=champion_reference.source,
         champion_data_strategy=_optional_string(champion.get("data_strategy")),
         champion_model_name=str(champion["model_name"]),
         champion_backend_name=str(champion["backend_name"]),
@@ -506,6 +553,139 @@ def build_promotion_decision(
         promote=promote,
         decision_reason=decision_reason,
     )
+
+
+def build_operational_run_metadata(
+    settings: Settings,
+    reorder_recommendations: pd.DataFrame,
+    exceptions: pd.DataFrame,
+    champion_registry: ChampionRegistry | None,
+    promotion_decision: PromotionDecisionMetadata | None,
+) -> OperationalRunMetadata:
+    current_champion = champion_registry.current_champion if champion_registry else None
+    return OperationalRunMetadata(
+        run_name=settings.reporting.run_name,
+        run_mode=settings.project.run_mode,
+        created_at=utc_timestamp(),
+        git_commit=get_git_commit(),
+        config_hash=build_config_hash(settings),
+        recommendation_rows=len(reorder_recommendations),
+        exception_rows=len(exceptions),
+        champion_model_name=(
+            current_champion.model_name if current_champion is not None else None
+        ),
+        champion_backend_name=(
+            current_champion.backend_name if current_champion is not None else None
+        ),
+        promotion_executed=promotion_decision is not None,
+        promotion_approved=(
+            promotion_decision.promote if promotion_decision is not None else None
+        ),
+    )
+
+
+def champion_registry_path(settings: Settings) -> Path:
+    return settings.reporting.output_dir / "champion_registry.json"
+
+
+def load_champion_registry(path: Path) -> ChampionRegistry | None:
+    if not path.exists():
+        return None
+    return ChampionRegistry.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def update_champion_registry(
+    artifacts: RunArtifacts,
+    settings: Settings,
+    current_registry: ChampionRegistry | None,
+    promotion_decision: PromotionDecisionMetadata | None,
+) -> ChampionRegistry | None:
+    if current_registry is not None and (
+        promotion_decision is None or not promotion_decision.promote
+    ):
+        return current_registry
+
+    reference = resolve_champion_reference(settings, current_registry)
+    champion_rows = artifacts.cost_summary.loc[
+        _champion_mask(artifacts.cost_summary, reference)
+    ].copy()
+    if champion_rows.empty:
+        return current_registry
+
+    base_row = champion_rows.sort_values("total_cost").iloc[0]
+    promoted_row = base_row
+    reason = "Registry bootstrapped from configured champion."
+
+    if promotion_decision is not None and promotion_decision.promote:
+        promoted_rows = artifacts.cost_summary.loc[
+            _candidate_mask_from_decision(artifacts.cost_summary, promotion_decision)
+        ].copy()
+        if not promoted_rows.empty:
+            promoted_row = promoted_rows.sort_values("total_cost").iloc[0]
+            reason = promotion_decision.decision_reason
+
+    return ChampionRegistry(
+        updated_at=utc_timestamp(),
+        current_champion=ChampionRecord(
+            data_strategy=_optional_string(promoted_row.get("data_strategy")),
+            model_name=str(promoted_row["model_name"]),
+            backend_name=str(promoted_row["backend_name"]),
+            promoted_at=utc_timestamp(),
+            run_name=settings.reporting.run_name,
+            git_commit=get_git_commit(),
+            config_hash=build_config_hash(settings),
+            reason=reason,
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class _ChampionReference:
+    source: Literal["config", "registry"]
+    data_strategy: str | None
+    model_name: str
+    backend_name: str
+
+
+def resolve_champion_reference(
+    settings: Settings, champion_registry: ChampionRegistry | None
+) -> _ChampionReference:
+    if champion_registry is not None:
+        return _ChampionReference(
+            source="registry",
+            data_strategy=champion_registry.current_champion.data_strategy,
+            model_name=champion_registry.current_champion.model_name,
+            backend_name=champion_registry.current_champion.backend_name,
+        )
+    return _ChampionReference(
+        source="config",
+        data_strategy=settings.business.champion_data_strategy,
+        model_name=settings.business.champion_model_name,
+        backend_name=settings.business.champion_backend_name,
+    )
+
+
+def _champion_mask(summary: pd.DataFrame, reference: _ChampionReference) -> pd.Series:
+    mask = (summary["model_name"] == reference.model_name) & (
+        summary["backend_name"] == reference.backend_name
+    )
+    if "data_strategy" in summary.columns and reference.data_strategy is not None:
+        mask &= summary["data_strategy"] == reference.data_strategy
+    return mask
+
+
+def _candidate_mask_from_decision(
+    summary: pd.DataFrame, decision: PromotionDecisionMetadata
+) -> pd.Series:
+    mask = (summary["model_name"] == decision.challenger_model_name) & (
+        summary["backend_name"] == decision.challenger_backend_name
+    )
+    if (
+        "data_strategy" in summary.columns
+        and decision.challenger_data_strategy is not None
+    ):
+        mask &= summary["data_strategy"] == decision.challenger_data_strategy
+    return mask
 
 
 def _optional_string(value: object) -> str | None:

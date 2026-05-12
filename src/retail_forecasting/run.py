@@ -33,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional override for the experiment run name.",
     )
+    parser.add_argument(
+        "--run-mode",
+        default=None,
+        choices=["backtest", "retrain", "score_daily"],
+        help="Optional override for the execution mode.",
+    )
     return parser
 
 
@@ -60,16 +66,28 @@ def main() -> None:
         reporting_updates["output_dir"] = Path(args.output_dir)
     if args.run_name is not None:
         reporting_updates["run_name"] = args.run_name
+    project_updates = {}
+    if args.run_mode is not None:
+        project_updates["run_mode"] = args.run_mode
 
     if reporting_updates:
         new_reporting = settings.reporting.model_copy(update=reporting_updates)
         settings = settings.model_copy(update={"reporting": new_reporting})
+    if project_updates:
+        new_project = settings.project.model_copy(update=project_updates)
+        settings = settings.model_copy(update={"project": new_project})
 
     artifacts = run_experiment(settings)
     if artifacts.run_directory is None:
         raise RuntimeError("Run finished without a report directory.")
 
-    print(f"Report written to: {artifacts.run_directory / 'report.md'}")
+    if settings.project.run_mode == "score_daily":
+        print(
+            "Operational outputs written to: "
+            f"{artifacts.run_directory / 'reorder_recommendations.csv'}"
+        )
+    else:
+        print(f"Report written to: {artifacts.run_directory / 'report.md'}")
 
 
 def _format_validation_error(exc: ValidationError) -> str:

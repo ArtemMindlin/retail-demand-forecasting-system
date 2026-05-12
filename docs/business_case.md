@@ -239,6 +239,11 @@ Default business retraining policy:
 3. no automatic promotion unless the challenger outperforms the current
    champion on business KPIs.
 
+The operational state of the current champion is persisted in
+`champion_registry.json`. This registry stores the currently approved model
+identity and allows future runs to evaluate challengers against the actually
+deployed champion rather than only against static config defaults.
+
 This keeps retraining tied to operational outcomes rather than arbitrary model
 refreshes.
 
@@ -262,6 +267,7 @@ Champion:
 Challenger:
 
 - newly trained candidate evaluated against the champion before promotion
+- persistent `champion_registry.json` tracking the active approved model
 
 Promotion rule:
 

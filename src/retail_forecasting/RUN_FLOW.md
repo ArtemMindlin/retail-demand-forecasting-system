@@ -8,7 +8,7 @@ This diagram strictly represents the operations contained within the system's ma
   'flowchart': { 'htmlLabels': false }
 } }%%
 graph TD
-    Start(["Start"]) --> ParseArgs["build_parser: Process CLI Arguments<br/>--config, --output-dir, --run-name"]
+    Start(["Start"]) --> ParseArgs["build_parser: Process CLI Arguments<br/>--config, --output-dir, --run-name, --run-mode"]
     ParseArgs --> LoadConfig["load_config: Load YAML and Environment"]
     
     LoadConfig -- "Error: Validation Failure" --> ExitError["Terminate: raise SystemExit"]
@@ -23,7 +23,7 @@ graph TD
     RunExperiment --> CheckArtifacts{"Report directory exists?"}
     
     CheckArtifacts -- "No" --> RunError["Terminate: raise RuntimeError"]
-    CheckArtifacts -- "Yes" --> PrintResult["Print report path"]
+    CheckArtifacts -- "Yes" --> PrintResult["Print report path or operational output path"]
     
     PrintResult --> End(["End"])
 

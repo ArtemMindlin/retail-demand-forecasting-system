@@ -27,6 +27,7 @@ def test_default_config_preserves_experimental_guardrails() -> None:
     settings = load_config(CONFIG_PATH)
 
     assert settings.dataset.source == "fresh_retailnet"
+    assert settings.project.run_mode in {"backtest", "retrain", "score_daily"}
     assert settings.dataset.use_eval_as_holdout is False
     assert settings.dataset.horizon > 0
     assert settings.dataset.min_history_days >= settings.dataset.horizon

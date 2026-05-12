@@ -1,5 +1,6 @@
 project:
   random_seed: 42
+  run_mode: backtest
 
 dataset:
   source: fresh_retailnet
