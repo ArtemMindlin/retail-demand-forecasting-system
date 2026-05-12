@@ -36,9 +36,9 @@ from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
     run_sensitivity_analysis,
-    simulate_inventory_policy,
     summarize_pareto_frontier,
 )
+from retail_forecasting.inventory.simulation import simulate_inventory_policy
 from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
 from retail_forecasting.models.boosting import AutoBoostingModel
 from retail_forecasting.models.optimization import HyperparameterTuner

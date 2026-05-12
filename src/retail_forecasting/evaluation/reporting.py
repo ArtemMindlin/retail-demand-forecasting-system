@@ -280,6 +280,10 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         for section, values in serializable_settings.items()
     ]
 
+    from retail_forecasting.evaluation.post_mortem import generate_post_mortem_report
+
+    post_mortem_text = generate_post_mortem_report(artifacts, settings)
+
     report = [
         "# Experiment Report",
         "",
@@ -287,6 +291,10 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         "",
         "This report compares forecasting systems under predictive, probabilistic, and economic criteria. "
         "The primary ranking uses total operating cost under a single-period newsvendor policy.",
+        "",
+        "## Post-Mortem Analysis (Top 5 Problematic SKUs)",
+        "",
+        post_mortem_text,
         "",
         "## Configuration",
         "",

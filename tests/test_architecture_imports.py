@@ -32,7 +32,7 @@ ALLOWED_LAYER_IMPORTS = {
     "models": {"config", "contracts", "utils"},
     "run": {"config", "contracts", "forecasting"},
     "utils": set(),
-    "visualization": {"utils"},
+    "visualization": {"config", "evaluation", "inventory", "utils"},
 }
 
 
