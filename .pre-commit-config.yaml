@@ -16,3 +16,4 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
         args: ['--maxkb=500']
+      - id: detect-private-key
