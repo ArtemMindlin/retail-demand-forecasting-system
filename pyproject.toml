@@ -23,6 +23,8 @@ dependencies = [
   "scipy>=1.11.0",
   "shap>=0.45.0",
   "streamlit>=1.56.0",
+  "fastapi>=0.110.0",
+  "uvicorn>=0.29.0",
   "optuna>=4.0.0",
   "pydantic>=2.10.0",
   "pydantic-settings>=2.7.0",
@@ -54,4 +56,5 @@ pythonpath = ["src"]
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "httpx>=0.27.0",
 ]
