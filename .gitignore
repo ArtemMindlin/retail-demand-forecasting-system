@@ -234,3 +234,7 @@ memoria/.build/*
 !memoria/.build/.gitkeep
 memoria/figures/eda/*
 !memoria/figures/eda/.gitkeep
+
+# MLflow
+mlruns/
+mlflow.db

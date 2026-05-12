@@ -131,7 +131,16 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         backtest_metadata=combined_metadata,
     )
 
-    return write_run_artifacts(final_artifacts, settings)
+    artifacts_with_files = write_run_artifacts(final_artifacts, settings)
+
+    try:
+        from retail_forecasting.evaluation.mlflow_logger import log_experiment_to_mlflow
+
+        log_experiment_to_mlflow(artifacts_with_files, settings)
+    except ImportError as e:
+        print(f"MLflow logging skipped: {e}")
+
+    return artifacts_with_files
 
 
 def run_experiment_from_frame(
