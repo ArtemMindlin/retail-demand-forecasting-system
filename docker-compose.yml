@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # 1. FastAPI Model Serving
+  api:
+    build: .
+    container_name: retail_forecasting_api
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "retail_forecasting.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    volumes:
+      - ./configs:/app/configs
+      - ./data:/app/data
+      - ./reports:/app/reports
+    environment:
+      - RETAIL_PROJECT__RUN_MODE=score_daily
+
+  # 2. MLflow Tracking Server
+  mlflow:
+    build: .
+    container_name: retail_forecasting_mlflow
+    ports:
+      - "5000:5000"
+    command: ["mlflow", "ui", "--host", "0.0.0.0", "--port", "5000"]
+    volumes:
+      - ./mlruns:/app/mlruns
+      - ./mlflow.db:/app/mlflow.db
+
+  # 3. Streamlit What-If Dashboard
+  dashboard:
+    build: .
+    container_name: retail_forecasting_dashboard
+    ports:
+      - "8501:8501"
+    command: ["streamlit", "run", "src/retail_forecasting/visualization/dashboard.py", "--server.address", "0.0.0.0"]
+    volumes:
+      - ./src:/app/src
+      - ./configs:/app/configs
+      - ./reports:/app/reports
+    depends_on:
+      - api
