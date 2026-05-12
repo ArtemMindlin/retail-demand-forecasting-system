@@ -6,7 +6,7 @@ PYTEST = uv run pytest
 CONFIG = configs/default.yaml
 DASHBOARD = src/retail_forecasting/visualization/dashboard.py
 
-.PHONY: help install run eda dashboard test test-harness lint format clean
+.PHONY: help install run eda dashboard api mlflow up test test-harness lint format clean
 
 help: ## Muestra este mensaje de ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -22,6 +22,15 @@ eda: ## Ejecuta el modulo de EDA reproducible sobre el panel preparado
 
 dashboard: ## Lanza el dashboard interactivo de Streamlit
 	uv run streamlit run $(DASHBOARD)
+
+api: ## Levanta el microservicio FastAPI
+	uv run uvicorn retail_forecasting.api.main:app --reload
+
+mlflow: ## Levanta la interfaz visual de MLflow
+	uv run mlflow ui
+
+up: ## Levanta todo el ecosistema con Docker Compose
+	docker compose up --build
 
 test: ## Ejecuta la suite completa de tests
 	$(PYTEST)

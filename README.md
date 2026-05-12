@@ -1,49 +1,69 @@
-# Forecasting Probabilístico bajo condiciones de Stockout
+# Sistema Inteligente de Soporte a la Decisión (DSS) para Retail
 
-Este repositorio contiene un sistema de forecasting de demanda retail de nivel investigación para un TFG. El proyecto se centra en la toma de decisiones de inventario bajo incertidumbre, roturas de stock (*stockouts*) y cambios de régimen (*drift*). Utiliza `FreshRetailNet-50K` como dataset base y optimiza el impacto económico mediante políticas de inventario probabilísticas.
+Este repositorio contiene un sistema de nivel industrial para el forecasting de demanda y la optimización de reposición en retail, desarrollado para un TFG. El proyecto evoluciona desde el aprendizaje automático estadístico hasta un **Sistema de Apoyo a la Decisión (DSS) End-to-End** que resuelve problemas de inventario bajo restricciones reales, incertidumbre calibrada y estándares MLOps.
 
-## Resumen Ejecutivo
+## Arquitectura del Sistema
 
-En el sector retail, los *stockouts* generan señales de demanda censuradas que sesgan los modelos convencionales. Este sistema resuelve dicho problema mediante un pipeline de **forecasting probabilístico** que cuantifica la incertidumbre y una capa de **recuperación de demanda latente** que corrige las ventas observadas. El sistema no solo busca minimizar el error predictivo (MAE/RMSE), sino optimizar el coste operativo total bajo una política *Newsvendor*. Las pruebas demuestran una reducción de hasta el **25% en costes operativos** frente a modelos que ignoran la naturaleza censurada de los datos.
+```mermaid
+graph TD
+    Data[Fresh RetailNet Dataset] --> Quality[Data Quality Gate]
+    Quality --> Impute[Latent Demand Imputation]
+    Impute --> Train[Multi-Objective Hyperparameter Tuning]
+    Train --> Calib[Mondrian Conformal Prediction]
+    Calib --> Decision[Dynamic Order-Up-To Simulation]
+    Decision --> LP[Linear Programming Optimization]
+    LP --> API[FastAPI Microservice]
+    LP --> Dashboard[Streamlit What-If Analysis]
+    API --> MLflow[MLflow Experiment Tracking]
+```
 
-## Estructura del Proyecto
+## Características de Excelencia Académica e Industrial
 
-- `configs/`: Configuración centralizada de experimentos.
-- `data/`: Caché local de datos raw y procesados.
-- `docs/`: Documentación metodológica, propuesta y especificaciones técnicas.
-- `src/`: Paquete central `retail_forecasting`.
-- `tests/`: Suite de tests de integridad, contratos y arquitectura.
-- `reports/`: Artefactos generados (Métricas, Costes, Gráficos y Reportes MD).
+1.  **Mondrian Conformal Prediction:** Garantías matemáticas de cobertura de intervalos de confianza condicionadas por categoría de producto, asegurando equidad en el pronóstico.
+2.  **Optimización Multi-Objetivo (NSGA-II):** Sintonización con Optuna buscando el Frente de Pareto entre precisión puntual (MAE) y nitidez probabilística (Winkler Score).
+3.  **Simulación Dinámica (s, S):** Gemelo digital logístico que arrastra el stock remanente y pendientes (*backlog*) entre periodos para medir el verdadero impacto económico (Efecto Látigo).
+4.  **Optimización bajo Restricciones:** Resolución de escasez global de presupuesto o volumen mediante Programación Lineal (*Continuous Knapsack*) utilizando SciPy.
+5.  **Ecosistema MLOps Profesional:**
+    *   **MLflow:** Registro automático de experimentos, parámetros y artefactos visuales (SHAP, Pareto).
+    *   **FastAPI:** Despliegue como microservicio productivo para integración con ERPs.
+    *   **Post-Mortem Analysis:** Módulo de autodiagnóstico algorítmico que explica fallos por drift, intermitencia o ruido.
+    *   **Docker & CI/CD:** Arquitectura 100% reproducible y protegida por GitHub Actions.
 
-## Inicio Rápido
+## Inicio Rápido con Docker (Recomendado)
 
-El proyecto utiliza `uv` para la gestión de dependencias y un `Makefile` para estandarizar los comandos principales.
+Levanta todo el ecosistema (API + Dashboard + MLflow) con un solo comando:
+
+```bash
+docker compose up
+```
+
+- **Dashboard What-If:** `http://localhost:8501`
+- **MLflow Tracking:** `http://localhost:5000`
+- **API Documentation:** `http://localhost:8000/docs`
+
+## Instalación Local (Desarrollo)
+
+El proyecto utiliza `uv` para la gestión de dependencias.
 
 ```bash
 # 1. Instalar dependencias
 make install
 
-# 2. Ejecutar EDA reproducible sobre el panel preparado
-make eda
-
-# 3. Ejecutar experimento completo (Observed vs Latent)
+# 2. Ejecutar experimento completo y registrar en MLflow
 make run
 
-# 4. Lanzar dashboard interactivo
-make dashboard
-
-# 5. Ejecutar tests de integridad
-make test-harness
+# 3. Lanzar servicios individualmente
+make api        # Levanta FastAPI
+make dashboard  # Levanta Streamlit
+make mlflow     # Levanta UI de MLflow
 ```
 
-## Características Principales
+## Suite de Verificación
 
-1.  **Imputación de Demanda Latente:** Soporte modular para estrategias supervisadas (LGBM) y baselines estadísticos para corregir la censura por stockout.
-2.  **Forecasting Probabilístico:** Wrapper de *Conformal Prediction* para garantizar cobertura de intervalos de confianza.
-3.  **Retraining Adaptativo por Drift:** Detección de degradación del modelo vía Page-Hinkley que dispara reentrenamientos dinámicos.
-4.  **Evaluación Económica:** Simulación de costes de inventario y análisis de sensibilidad de la razón de costes (Cs/Co).
-5.  **Optimización Científica:** Sintonización automática de hiperparámetros mediante búsqueda bayesiana con **Optuna**, optimizando la precisión operativa en cada estrategia de datos.
-6.  **Arquitectura por Contratos:** Suite de tests que garantizan la ausencia de *temporal leakage* y la integridad de los dataframes.
+```bash
+# Ejecutar los 83 tests automatizados
+make test
+```
 
 ---
-*Este proyecto es parte de un Trabajo de Fin de Grado (TFG).*
+*Este proyecto es parte de un Trabajo de Fin de Grado (TFG) centrado en la excelencia en ingeniería y rigor estadístico.*
