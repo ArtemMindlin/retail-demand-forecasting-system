@@ -38,5 +38,8 @@ jobs:
       - name: Run Ruff Formatter check
         run: ruff format --check .
 
+      - name: Run Mypy Type Check
+        run: mypy src/
+
       - name: Run Pytest
         run: pytest
