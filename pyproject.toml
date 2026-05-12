@@ -54,6 +54,12 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 
+[tool.ruff]
+extend-exclude = ["notebooks/*.ipynb"]
+
+[tool.ruff.lint]
+extend-ignore = ["E402"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
