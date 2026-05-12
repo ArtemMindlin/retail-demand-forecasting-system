@@ -17,3 +17,12 @@ repos:
       - id: check-added-large-files
         args: ['--maxkb=500']
       - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        args: [--ignore-missing-imports]
