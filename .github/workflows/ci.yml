@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --all-extras --dev
-          uv pip install ruff pytest mypy
+          # uv pip install ruff pytest mypy
 
       - name: Run Ruff Linter
         run: uv run ruff check .
