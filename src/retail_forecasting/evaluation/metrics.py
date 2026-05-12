@@ -110,14 +110,26 @@ def _build_metric_record(
         )
 
     if len(quantile_pairs) >= 2:
-        _, lower_column = quantile_pairs[0]
-        _, upper_column = quantile_pairs[-1]
-        record[f"coverage_{lower_column}_{upper_column}"] = float(
-            (
-                (predictions["y_true"] >= predictions[lower_column])
-                & (predictions["y_true"] <= predictions[upper_column])
-            ).mean()
-        )
+        # Use the outermost quantiles to evaluate the prediction interval
+        lower_q, lower_column = quantile_pairs[0]
+        upper_q, upper_column = quantile_pairs[-1]
+        alpha = lower_q + (1.0 - upper_q)
+
+        y_true = predictions["y_true"]
+        lower = predictions[lower_column]
+        upper = predictions[upper_column]
+
+        # PICP: Prediction Interval Coverage Probability
+        coverage_val = float(((y_true >= lower) & (y_true <= upper)).mean())
+        record["interval_coverage"] = coverage_val
+        # Legacy name for backward compatibility with existing tests
+        record[f"coverage_{lower_column}_{upper_column}"] = coverage_val
+
+        # MPIW: Mean Prediction Interval Width
+        record["interval_width"] = float((upper - lower).mean())
+
+        # Winkler Score
+        record["winkler_score"] = winkler_score(y_true, lower, upper, alpha)
 
     return record
 
@@ -139,3 +151,18 @@ def pinball_loss(actual: pd.Series, predicted: pd.Series, quantile: float) -> fl
     diff = actual - predicted
     loss = np.maximum(quantile * diff, (quantile - 1.0) * diff)
     return float(np.mean(loss))
+
+
+def winkler_score(
+    actual: pd.Series, lower: pd.Series, upper: pd.Series, alpha: float
+) -> float:
+    """
+    Calculate the Winkler Score for prediction intervals.
+    A proper scoring rule that penalizes both wide intervals and values outside the interval.
+    Lower is better.
+    """
+    width = upper - lower
+    under_penalty = (2.0 / alpha) * (lower - actual) * (actual < lower)
+    over_penalty = (2.0 / alpha) * (actual - upper) * (actual > upper)
+    score = width + under_penalty + over_penalty
+    return float(np.mean(score))

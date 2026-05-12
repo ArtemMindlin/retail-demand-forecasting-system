@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 import pandas as pd
+import shap
 from pydantic import BaseModel, ConfigDict, Field
 
 from retail_forecasting.config import Settings
@@ -144,6 +145,7 @@ class RunArtifacts:
     report_extra: str = ""
     backtest_metadata: BacktestMetadata | None = None
     run_directory: Path | None = None
+    shap_values: shap.Explanation | None = None
 
 
 def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtifacts:
@@ -221,6 +223,13 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
                 cost_summary=artifacts.cost_summary,
                 output_dir=run_dir,
             )
+            if artifacts.shap_values is not None:
+                from retail_forecasting.visualization.plots import render_shap_summary
+
+                render_shap_summary(
+                    shap_values=artifacts.shap_values,
+                    output_path=run_dir / "shap_summary.png",
+                )
 
         report_text = build_markdown_report(artifacts=artifacts, settings=settings)
         (run_dir / "report.md").write_text(report_text, encoding="utf-8")
@@ -334,6 +343,9 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         "",
         "- `MAE` and `RMSE` are included as diagnostics, not as the primary decision criterion.",
         "- `pinball_*` columns evaluate quantile quality when quantile forecasts are available.",
+        "- `interval_coverage` (PICP): Fraction of observations within the P10-P90 interval. Ideally ~0.80.",
+        "- `interval_width` (MPIW): Average width of the prediction interval. Narrower is more precise.",
+        "- `winkler_score`: A proper scoring rule for intervals. Penalizes both width and miscoverage. Lower is better.",
         "- `total_cost` is the main ranking metric because the TFG focuses on inventory decisions.",
     ]
 

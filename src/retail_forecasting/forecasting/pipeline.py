@@ -27,6 +27,7 @@ from retail_forecasting.evaluation.reporting import (
     utc_timestamp,
     write_run_artifacts,
 )
+from retail_forecasting.evaluation.xai import calculate_shap_values
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
 from retail_forecasting.features.engineering import (
     build_supervised_frame,
@@ -411,6 +412,19 @@ def run_experiment_from_frame(
         ),
     )
 
+    # 6. Optional: Explainability (SHAP)
+    shap_values = None
+    if settings.reporting.make_plots:
+        # We explain the last trained model (trained on the most data)
+        # using a sample from the supervised frame
+        model_to_explain = cat_model if cat_model is not None else boosting_model
+        if model_to_explain is not None:
+            print(f"--- Calculating SHAP values for {model_to_explain.model_name} ---")
+            shap_values = calculate_shap_values(
+                model=model_to_explain,
+                X=supervised_frame.loc[:, feature_columns],
+            )
+
     artifacts = RunArtifacts(
         prepared_panel=prepared_panel,
         supervised_frame=supervised_frame,
@@ -424,6 +438,7 @@ def run_experiment_from_frame(
         drifts=detected_drifts,
         report_extra=report_extra,
         backtest_metadata=backtest_metadata,
+        shap_values=shap_values,
     )
     return write_run_artifacts(artifacts, settings)
 

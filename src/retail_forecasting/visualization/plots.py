@@ -8,6 +8,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import shap
 
 from retail_forecasting.utils.io import ensure_directory
 
@@ -19,7 +20,24 @@ def render_standard_plots(
 ) -> None:
     target_dir = ensure_directory(output_dir)
     _plot_total_cost(cost_summary, target_dir / "cost_by_model.png")
-    _plot_error_cost_tradeoff(metrics_summary, cost_summary, target_dir / "error_cost_tradeoff.png")
+    _plot_error_cost_tradeoff(
+        metrics_summary, cost_summary, target_dir / "error_cost_tradeoff.png"
+    )
+
+
+def render_shap_summary(
+    shap_values: shap.Explanation,
+    output_path: Path,
+) -> None:
+    """
+    Render a SHAP summary plot (dot plot) and save it to disk.
+    """
+    plt.figure(figsize=(10, 6))
+    shap.summary_plot(shap_values, show=False)
+    plt.title("SHAP Feature Importance (Global)")
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
 
 
 def _plot_total_cost(cost_summary: pd.DataFrame, output_path: Path) -> None:
