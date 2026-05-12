@@ -52,7 +52,7 @@ def generate_post_mortem_report(artifacts: Any, settings: Settings) -> str:
         zero_demand_pct = (sku_data["y_true"] == 0).mean()
         if zero_demand_pct > 0.6:
             diagnostics.append(
-                f"🛑 **Alta Intermitencia:** El {zero_demand_pct*100:.0f}% de los periodos tuvieron demanda cero. El modelo sobre-pronostica sistemáticamente."
+                f"🛑 **Alta Intermitencia:** El {zero_demand_pct * 100:.0f}% de los periodos tuvieron demanda cero. El modelo sobre-pronostica sistemáticamente."
             )
 
         # 3. High Error (Low predictability)
@@ -69,7 +69,7 @@ def generate_post_mortem_report(artifacts: Any, settings: Settings) -> str:
             service_level = sku_data["sim_service_level_hit"].mean()
             if service_level < 0.8:
                 diagnostics.append(
-                    f"📦 **Riesgo Crítico de Rotura:** El nivel de servicio dinámico cayó al {service_level*100:.1f}%. El modelo es demasiado conservador para la varianza real."
+                    f"📦 **Riesgo Crítico de Rotura:** El nivel de servicio dinámico cayó al {service_level * 100:.1f}%. El modelo es demasiado conservador para la varianza real."
                 )
 
         if not diagnostics:

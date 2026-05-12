@@ -33,7 +33,7 @@ class AutoBoostingModel:
     learning_rate: float
     max_depth: int
     overstock_cost: float = 1.0
-    stockout_cost: float = 0.0 # 0.0 means standard regression
+    stockout_cost: float = 0.0  # 0.0 means standard regression
     model_name: str = "auto_boosting"
     backend_name: str = field(init=False, default="unknown")
 
@@ -65,7 +65,9 @@ class AutoBoostingModel:
         ordered_quantiles = sorted(self.quantile_models_.keys())
         raw_predictions = [
             np.maximum(
-                np.asarray(self.quantile_models_[quantile].predict(features), dtype=float),
+                np.asarray(
+                    self.quantile_models_[quantile].predict(features), dtype=float
+                ),
                 0.0,
             )
             for quantile in ordered_quantiles
@@ -78,13 +80,18 @@ class AutoBoostingModel:
     def _build_point_model(self) -> object:
         # Calculate critical fractil if costs are provided
         if self.stockout_cost > 0:
-            critical_fractil = self.stockout_cost / (self.stockout_cost + self.overstock_cost)
-            print(f"🎯 Cost-Aware Training: Optimizing point model for critical fractil τ = {critical_fractil:.4f}")
+            critical_fractil = self.stockout_cost / (
+                self.stockout_cost + self.overstock_cost
+            )
+            print(
+                f"🎯 Cost-Aware Training: Optimizing point model for critical fractil τ = {critical_fractil:.4f}"
+            )
             return self._build_quantile_model(critical_fractil)
 
         # Default to standard regression (MSE-like)
         if _lightgbm_available():
             import lightgbm as lgb
+
             self.backend_name = "lightgbm"
             return lgb.LGBMRegressor(
                 objective="regression",
@@ -101,6 +108,7 @@ class AutoBoostingModel:
 
         if _xgboost_available():
             from xgboost import XGBRegressor
+
             self.backend_name = "xgboost"
             return XGBRegressor(
                 objective="reg:squarederror",
@@ -123,7 +131,10 @@ class AutoBoostingModel:
     def _build_quantile_model(self, quantile: float) -> object:
         if _lightgbm_available():
             import lightgbm as lgb
-            self.backend_name = "lightgbm" # Ensure backend name is set even if only quantiles used
+
+            self.backend_name = (
+                "lightgbm"  # Ensure backend name is set even if only quantiles used
+            )
             return lgb.LGBMRegressor(
                 objective="quantile",
                 alpha=quantile,

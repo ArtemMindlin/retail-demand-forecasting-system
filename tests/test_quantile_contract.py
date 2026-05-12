@@ -6,7 +6,9 @@ import pandas as pd
 from retail_forecasting.evaluation.metrics import summarize_predictions
 
 
-def test_coverage_uses_available_quantile_bounds_instead_of_hardcoded_defaults() -> None:
+def test_coverage_uses_available_quantile_bounds_instead_of_hardcoded_defaults() -> (
+    None
+):
     predictions = _prediction_frame().assign(
         q_0_2=[0.0, 2.0, 8.0],
         q_0_5=[1.0, 3.0, 10.0],

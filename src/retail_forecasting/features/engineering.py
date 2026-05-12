@@ -107,19 +107,19 @@ def build_feature_frame(
         sum_column = f"demand_roll_sum_{window}"
         std_column = f"demand_roll_std_{window}"
         frame[mean_column] = grouped["observed_demand"].transform(
-            lambda series: series.shift(1)
-            .rolling(window=window, min_periods=window)
-            .mean()
+            lambda series: (
+                series.shift(1).rolling(window=window, min_periods=window).mean()
+            )
         )
         frame[sum_column] = grouped["observed_demand"].transform(
-            lambda series: series.shift(1)
-            .rolling(window=window, min_periods=window)
-            .sum()
+            lambda series: (
+                series.shift(1).rolling(window=window, min_periods=window).sum()
+            )
         )
         frame[std_column] = grouped["observed_demand"].transform(
-            lambda series: series.shift(1)
-            .rolling(window=window, min_periods=window)
-            .std()
+            lambda series: (
+                series.shift(1).rolling(window=window, min_periods=window).std()
+            )
         )
         frame[std_column] = frame[std_column].fillna(0.0)
         feature_columns.extend([mean_column, sum_column, std_column])
@@ -138,9 +138,9 @@ def build_feature_frame(
         for window in sorted(set(feature_config.rolling_windows)):
             column = f"stockout_roll_mean_{window}"
             frame[column] = grouped["stockout_hours"].transform(
-                lambda series: series.shift(1)
-                .rolling(window=window, min_periods=window)
-                .mean()
+                lambda series: (
+                    series.shift(1).rolling(window=window, min_periods=window).mean()
+                )
             )
             feature_columns.append(column)
 

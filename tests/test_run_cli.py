@@ -35,5 +35,5 @@ models:
         main()
 
     assert str(exc_info.value) == (
-        "Invalid configuration:\n" "- models.seasonal_period must be greater than 0."
+        "Invalid configuration:\n- models.seasonal_period must be greater than 0."
     )

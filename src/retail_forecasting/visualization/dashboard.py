@@ -147,7 +147,7 @@ with col3:
         if pd.isna(coverage):
             st.metric("Interval Coverage", "N/A")
         else:
-            st.metric("Interval Coverage (80% target)", f"{coverage*100:.1f}%")
+            st.metric("Interval Coverage (80% target)", f"{coverage * 100:.1f}%")
 with col4:
     if what_if_costs is not None:
         base_sl = costs[costs["model_name"] == selected_model][
@@ -156,8 +156,8 @@ with col4:
         new_sl = what_if_costs["sim_service_level"].mean()
         st.metric(
             "Service Level",
-            f"{new_sl*100:.1f}%",
-            delta=f"{(new_sl - base_sl)*100:.1f}%",
+            f"{new_sl * 100:.1f}%",
+            delta=f"{(new_sl - base_sl) * 100:.1f}%",
         )
     else:
         st.info(f"Model: {selected_model}")

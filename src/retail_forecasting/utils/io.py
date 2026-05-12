@@ -56,7 +56,9 @@ def quantile_column_name(quantile: float) -> str:
     return f"q_{normalized}"
 
 
-def dataframe_to_markdown(frame: pd.DataFrame, columns: Iterable[str] | None = None) -> str:
+def dataframe_to_markdown(
+    frame: pd.DataFrame, columns: Iterable[str] | None = None
+) -> str:
     """Render a DataFrame as a simple Markdown table.
 
     Args:
@@ -85,7 +87,9 @@ def dataframe_to_markdown(frame: pd.DataFrame, columns: Iterable[str] | None = N
         " | ".join(str(value) for value in row)
         for row in text_frame.itertuples(index=False, name=None)
     ]
-    return "\n".join([f"| {headers} |", f"| {separator} |", *[f"| {row} |" for row in rows]])
+    return "\n".join(
+        [f"| {headers} |", f"| {separator} |", *[f"| {row} |" for row in rows]]
+    )
 
 
 def _format_markdown_value(value: object) -> object:
