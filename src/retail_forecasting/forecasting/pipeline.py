@@ -221,10 +221,14 @@ def run_experiment_from_frame(
             sub_train_frame = train_frame
             calib_frame = pd.DataFrame()
 
+        # Mondrian grouping variable for calibration
+        calib_group_ids = None
+        if not calib_frame.empty and "third_category_id" in calib_frame.columns:
+            calib_group_ids = calib_frame["third_category_id"]
+
         # Reset force_retrain if it was active
         current_fold_retrained = force_retrain
         force_retrain = False
-
         # 1. Seasonal Naive Baseline
         fold_predictions.append(
             _build_baseline_predictions(
@@ -270,7 +274,9 @@ def run_experiment_from_frame(
                     calib_frame.loc[:, feature_columns],
                     calib_frame["target_lead_time_demand"],
                     alpha=settings.models.quantiles[0] * 2,
+                    group_ids=calib_group_ids,
                 )
+
         boosting_preds = _build_model_predictions(
             validation_frame=validation_frame,
             feature_columns=feature_columns,
@@ -305,7 +311,9 @@ def run_experiment_from_frame(
                     calib_frame.loc[:, feature_columns],
                     calib_frame["target_lead_time_demand"],
                     alpha=settings.models.quantiles[0] * 2,
+                    group_ids=calib_group_ids,
                 )
+
         fold_predictions.append(
             _build_model_predictions(
                 validation_frame=validation_frame,
@@ -524,8 +532,14 @@ def _build_model_predictions(
     prediction_frame["fold_id"] = fold_id
     prediction_frame["data_strategy"] = data_strategy
 
+    # Mondrian grouping variable: third_category_id is a strong candidate for retail
+    group_ids = None
+    if "third_category_id" in validation_frame.columns:
+        group_ids = validation_frame["third_category_id"]
+
     quantile_predictions = model.predict_quantiles(
-        validation_frame.loc[:, feature_columns]
+        validation_frame.loc[:, feature_columns],
+        group_ids=group_ids,
     )
 
     quantile_columns = []

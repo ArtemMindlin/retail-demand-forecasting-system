@@ -90,3 +90,48 @@ def test_conformal_interval_widening():
     preds = conformal.predict_quantiles(X_cal)
     assert preds["q_0_1"][0] < 4.5
     assert preds["q_0_9"][0] > 5.5
+
+
+def test_mondrian_conformal_calibration():
+    class DummyModel:
+        def predict(self, X):
+            return np.array([10.0] * len(X))
+
+        def predict_quantiles(self, X):
+            return {
+                "q_0_1": np.array([8.0] * len(X)),
+                "q_0_9": np.array([12.0] * len(X)),
+            }
+
+        @property
+        def backend_name(self):
+            return "dummy"
+
+        @property
+        def model_name(self):
+            return "dummy"
+
+    # Calibration data:
+    # Group A: Target is 10 (perfect fit, score = 0)
+    # Group B: Target is 20 (large error, score = 8)
+    X_cal = pd.DataFrame({"feat": range(10)})
+    y_cal = pd.Series([10.0] * 5 + [20.0] * 5)
+    groups = pd.Series(["A"] * 5 + ["B"] * 5)
+
+    conformal = ConformalForecaster(DummyModel())
+    conformal.calibrate(X_cal, y_cal, alpha=0.2, group_ids=groups)
+
+    # Check that Mondrian q_hats are different
+    assert "A" in conformal.mondrian_q_hat
+    assert "B" in conformal.mondrian_q_hat
+    assert conformal.mondrian_q_hat["A"] < conformal.mondrian_q_hat["B"]
+
+    # Check predictions with groups
+    X_test = pd.DataFrame({"feat": [1, 2]})
+    test_groups = pd.Series(["A", "B"])
+    preds = conformal.predict_quantiles(X_test, group_ids=test_groups)
+
+    # Group A should have narrower intervals than Group B
+    width_A = preds["q_0_9"][0] - preds["q_0_1"][0]
+    width_B = preds["q_0_9"][1] - preds["q_0_1"][1]
+    assert width_A < width_B
