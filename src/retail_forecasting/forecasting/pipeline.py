@@ -8,6 +8,10 @@ from retail_forecasting.contracts.backtesting import FoldRunMetadata
 from retail_forecasting.contracts.tuning import BoostingParams
 from retail_forecasting.data.censorship import LatentDemandImputer
 from retail_forecasting.data.fresh_retailnet import load_prepared_panel
+from retail_forecasting.data.quality import (
+    raise_on_blocking_data_quality,
+    validate_prepared_panel,
+)
 from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.drift.detectors import PageHinkleyDetector
 from retail_forecasting.evaluation.metrics import summarize_costs, summarize_predictions
@@ -50,6 +54,8 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         preprocessing_config=settings.preprocessing,
         split="train",
     )
+    quality_report = validate_prepared_panel(raw_panel, settings)
+    raise_on_blocking_data_quality(quality_report)
 
     # 2. Run Strategy A: Observed Demand (Baseline)
     print("--- Running Strategy A: Observed Demand ---")
@@ -102,6 +108,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         cost_summary=merged_costs,
         sensitivity_summary=merged_sens,
         pareto_frontier=merged_pareto,
+        data_quality_report=quality_report,
         drifts=artifacts_obs.drifts,
         backtest_metadata=combined_metadata,
     )
@@ -113,6 +120,8 @@ def run_experiment_from_frame(
     panel: pd.DataFrame, settings: Settings, data_strategy: str = "Observed"
 ) -> RunArtifacts:
     """Run the full backtesting pipeline from an in-memory panel."""
+    quality_report = validate_prepared_panel(panel, settings)
+    raise_on_blocking_data_quality(quality_report)
     prepared_panel = label_stockout_regime(panel)
     series_cost_profile = None
     if settings.inventory.use_series_costs:
@@ -411,6 +420,7 @@ def run_experiment_from_frame(
         cost_summary=cost_summary,
         sensitivity_summary=sensitivity_summary,
         pareto_frontier=pareto_frontier,
+        data_quality_report=quality_report,
         drifts=detected_drifts,
         report_extra=report_extra,
         backtest_metadata=backtest_metadata,

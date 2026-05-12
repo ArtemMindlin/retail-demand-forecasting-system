@@ -301,6 +301,8 @@ Cada corrida genera:
 - frontera de Pareto de politicas candidatas;
 - predicciones por fold;
 - `champion_registry.json` con el champion operativo vigente entre corridas;
+- `data_quality_report.json` con warnings y errores bloqueantes del gate de
+  calidad de datos;
 - `backtest_metadata.json` con dataset, features, folds, modelos, hash de configuracion y commit Git;
 - graficos simples de coste y trade-off error-coste;
 - un reporte Markdown final en `reports/`.

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from retail_forecasting.config import Settings
 from retail_forecasting.contracts.backtesting import FoldRunMetadata
 from retail_forecasting.contracts.business import ChampionRecord, ChampionRegistry
+from retail_forecasting.contracts.data_quality import DataQualityReport
 from retail_forecasting.contracts.drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.tuning import TuningMetadata
 from retail_forecasting.utils.io import (
@@ -120,6 +121,7 @@ class BacktestMetadata(BaseModel):
     tuning: TuningMetadata | None = None
     drift: DriftDetectorMetadata
     promotion: PromotionDecisionMetadata | None = None
+    data_quality: DataQualityReport | None = None
 
 
 @dataclass
@@ -137,6 +139,7 @@ class RunArtifacts:
     promotion_decision: PromotionDecisionMetadata | None = None
     champion_registry: ChampionRegistry | None = None
     operational_metadata: OperationalRunMetadata | None = None
+    data_quality_report: DataQualityReport | None = None
     drifts: list[DriftEvent] = field(default_factory=list)
     report_extra: str = ""
     backtest_metadata: BacktestMetadata | None = None
@@ -164,7 +167,10 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
     )
     if artifacts.backtest_metadata is not None:
         artifacts.backtest_metadata = artifacts.backtest_metadata.model_copy(
-            update={"promotion": promotion_decision}
+            update={
+                "promotion": promotion_decision,
+                "data_quality": artifacts.data_quality_report,
+            }
         )
     operational_metadata = build_operational_run_metadata(
         settings=settings,
@@ -184,6 +190,11 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
     if champion_registry is not None:
         registry_path.write_text(
             champion_registry.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+    if artifacts.data_quality_report is not None:
+        (run_dir / "data_quality_report.json").write_text(
+            artifacts.data_quality_report.model_dump_json(indent=2),
             encoding="utf-8",
         )
     if settings.project.run_mode == "score_daily":

@@ -43,6 +43,10 @@ drift:
   delta: 0.005
   min_instances: 2
 
+data_quality:
+  max_missing_fraction_warning: 0.05
+  max_data_age_days: null
+
 models:
   quantiles: [0.1, 0.5, 0.9]
   seasonal_period: 7

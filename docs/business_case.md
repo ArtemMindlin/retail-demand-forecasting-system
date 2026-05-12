@@ -158,6 +158,15 @@ Minimum exception types:
 - `data_quality_warning`
 - `extreme_order_quantity`
 
+Before recommendations are emitted, the runtime data-quality gate validates:
+
+- required canonical columns;
+- duplicated `series_id + date`;
+- nulls in key identifiers and target signal;
+- date ordering within each series;
+- minimum history per series;
+- stale data in operational modes when freshness thresholds are configured.
+
 Operational expectation:
 
 - non-flagged SKUs can be bulk-approved;

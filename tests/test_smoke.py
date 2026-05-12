@@ -32,6 +32,7 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
     artifacts = run_experiment_from_frame(panel, settings)
 
     assert artifacts.run_directory is not None
+    assert (artifacts.run_directory / "data_quality_report.json").exists()
     assert (artifacts.run_directory / "report.md").exists()
     assert (artifacts.run_directory / "reorder_recommendations.csv").exists()
     assert (artifacts.run_directory / "exceptions.csv").exists()
@@ -46,9 +47,11 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
     assert artifacts.promotion_decision is not None
     assert artifacts.champion_registry is not None
     assert artifacts.backtest_metadata is not None
+    assert artifacts.data_quality_report is not None
     assert artifacts.backtest_metadata.features.supervised_rows == len(
         artifacts.supervised_frame
     )
+    assert artifacts.backtest_metadata.data_quality is not None
     assert artifacts.backtest_metadata.drift.detector_name == "PageHinkleyDetector"
     assert (
         artifacts.backtest_metadata.drift.observations_seen
@@ -62,6 +65,7 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
     assert metadata["drift"]["detector_name"] == "PageHinkleyDetector"
     assert metadata["drift"]["threshold"] == settings.drift.threshold
     assert metadata["promotion"]["champion_model_name"] == "catboost"
+    assert metadata["data_quality"]["passed"] is True
     recommendation_columns = {
         "decision_date",
         "series_id",
@@ -165,6 +169,7 @@ def test_score_daily_run_writes_operational_artifacts_only(tmp_path: Path) -> No
     assert artifacts.run_directory is not None
     assert (artifacts.run_directory / "reorder_recommendations.csv").exists()
     assert (artifacts.run_directory / "exceptions.csv").exists()
+    assert (artifacts.run_directory / "data_quality_report.json").exists()
     assert (artifacts.run_directory / "operational_run_metadata.json").exists()
     assert (artifacts.run_directory / "promotion_decision.json").exists()
     assert not (artifacts.run_directory / "report.md").exists()

@@ -98,6 +98,12 @@ class DriftConfig(BaseModel):
     min_instances: int = Field(default=2, gt=0)
 
 
+class DataQualityConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    max_missing_fraction_warning: float = Field(default=0.05, ge=0.0, le=1.0)
+    max_data_age_days: int | None = Field(default=None, ge=0)
+
+
 class ModelConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     quantiles: list[float] = Field(
@@ -220,6 +226,7 @@ class Settings(BaseSettings):
     features: FeatureConfig = Field(default_factory=FeatureConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     drift: DriftConfig = Field(default_factory=DriftConfig)
+    data_quality: DataQualityConfig = Field(default_factory=DataQualityConfig)
     models: ModelConfig = Field(default_factory=ModelConfig)
     inventory: InventoryConfig = Field(default_factory=InventoryConfig)
     business: BusinessConfig = Field(default_factory=BusinessConfig)

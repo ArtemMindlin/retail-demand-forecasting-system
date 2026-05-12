@@ -21,6 +21,7 @@ YAML
 - `preprocessing`
 - `features`
 - `validation`
+- `data_quality`
 - `models`
 - `inventory`
 - `reporting`
@@ -108,6 +109,44 @@ Se usa para construir una ruta remota como:
 ```text
 hf://datasets/Dingdong-Inc/FreshRetailNet-50K/data/train.parquet
 ```
+
+## `DataQualityConfig`
+
+Controla las comprobaciones runtime que se ejecutan antes del pipeline de
+forecasting e inventario.
+
+### `max_missing_fraction_warning`
+
+Umbral de missingness a partir del cual una columna genera un warning.
+
+Ejemplo:
+
+```yaml
+max_missing_fraction_warning: 0.05
+```
+
+Interpretacion:
+
+- `0.05` significa avisar cuando una columna supera el 5% de valores nulos;
+- no bloquea por si mismo la corrida;
+- debe estar entre `0` y `1`.
+
+### `max_data_age_days`
+
+Limite opcional de antiguedad del dato mas reciente para `score_daily` y
+`retrain`.
+
+Ejemplo:
+
+```yaml
+max_data_age_days: 2
+```
+
+Interpretacion:
+
+- si es `null`, no se aplica control de frescura temporal;
+- si tiene valor, una corrida operacional falla cuando el `date` maximo del
+  panel supera ese numero de dias respecto a la fecha actual.
 
 ### `splits`
 

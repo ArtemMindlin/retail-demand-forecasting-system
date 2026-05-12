@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from retail_forecasting.config import (
     BusinessConfig,
+    DataQualityConfig,
     DatasetConfig,
     InventoryConfig,
     ModelConfig,
@@ -37,6 +38,7 @@ def test_default_config_preserves_experimental_guardrails() -> None:
     assert settings.drift.threshold > 0
     assert settings.drift.delta >= 0
     assert settings.drift.min_instances > 0
+    assert 0.0 <= settings.data_quality.max_missing_fraction_warning <= 1.0
     assert 0.0 < settings.business.high_uncertainty_interval_quantile < 1.0
     assert 0.0 < settings.business.extreme_order_quantity_quantile < 1.0
     assert settings.business.champion_model_name
@@ -120,6 +122,9 @@ def test_settings_instantiation_rejects_invalid_business_thresholds() -> None:
 
     with pytest.raises(ValidationError, match="champion_max_service_level_degradation"):
         Settings(business=BusinessConfig(champion_max_service_level_degradation=1.1))
+
+    with pytest.raises(ValidationError, match="max_missing_fraction_warning"):
+        Settings(data_quality=DataQualityConfig(max_missing_fraction_warning=1.1))
 
 
 def test_settings_instantiation_rejects_invalid_synthetic_cost_weights() -> None:
