@@ -3,6 +3,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from pathlib import Path
 
+from retail_forecasting.config import InventoryConfig
+from retail_forecasting.inventory.simulation import simulate_inventory_policy
+from retail_forecasting.evaluation.metrics import summarize_costs
+
 st.set_page_config(page_title="Retail Forecasting TFG Dashboard", layout="wide")
 
 
@@ -68,29 +72,95 @@ selected_series = st.sidebar.selectbox("Seleccionar Producto/Tienda", all_series
 all_models = sorted(preds["model_name"].unique())
 selected_model = st.sidebar.selectbox("Seleccionar Modelo", all_models)
 
+# --- What-If Analysis ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔬 What-If Scenario Planning")
+st.sidebar.markdown("Modifica parámetros para re-simular decisiones en tiempo real.")
+
+with st.sidebar.expander("Parámetros de Coste Global", expanded=True):
+    new_c_over = st.slider("Coste de Exceso (C_over)", 0.1, 5.0, 1.0, 0.1)
+    new_c_under = st.slider("Coste de Rotura (C_under)", 0.5, 20.0, 4.0, 0.5)
+
+with st.sidebar.expander("Restricciones Logísticas", expanded=True):
+    use_capacity = st.checkbox("Aplicar Límite de Capacidad", value=True)
+    new_capacity = (
+        st.slider("Capacidad Global (Unidades)", 500, 10000, 3000, 100)
+        if use_capacity
+        else None
+    )
+
+run_what_if = st.sidebar.button("▶️ Simular Escenario")
+
+what_if_preds = None
+what_if_costs = None
+
+if run_what_if:
+    sim_preds = preds[preds["model_name"] == selected_model].copy()
+    # Overwrite costs for the What-If scenario
+    sim_preds["c_over"] = new_c_over
+    sim_preds["c_under"] = new_c_under
+    sim_preds["critical_fractile"] = new_c_under / (new_c_under + new_c_over)
+
+    custom_config = InventoryConfig(
+        overstock_cost=new_c_over,
+        stockout_cost=new_c_under,
+        use_series_costs=False,  # Force global costs for the what-if to see pure effect
+        global_capacity_units=new_capacity,
+    )
+
+    with st.spinner("Simulando escenario logístico (LP Optimization)..."):
+        what_if_preds = simulate_inventory_policy(
+            predictions=sim_preds,
+            inventory_config=custom_config,
+            series_cost_profile=None,
+        )
+        what_if_costs = summarize_costs(what_if_preds)
+    st.sidebar.success("Escenario Simulado!")
+
 # --- Main Layout ---
 st.title(f"📊 Análisis de Resultados: {selected_run.name}")
 
 # Metrics Row
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Total Cost", f"${costs['total_cost'].sum():,.2f}")
+    base_cost = costs[costs["model_name"] == selected_model]["sim_total_cost"].sum()
+    if what_if_costs is not None:
+        new_cost = what_if_costs["sim_total_cost"].sum()
+        st.metric(
+            "Total Cost (Simulated)",
+            f"${new_cost:,.2f}",
+            delta=f"${new_cost - base_cost:,.2f}",
+            delta_color="inverse",
+        )
+    else:
+        st.metric("Total Cost (Base)", f"${base_cost:,.2f}")
 with col2:
-    # Filter metrics for the selected model
     model_metrics = metrics[metrics["model_name"] == selected_model]
     if not model_metrics.empty:
         mae = model_metrics.iloc[0]["mae"]
         st.metric(f"MAE ({selected_model})", f"{mae:.2f}")
 with col3:
     if not model_metrics.empty:
-        coverage = model_metrics.iloc[0].get("coverage_q_0_1_q_0_9", 0)
-        # Handle nan coverage for naive
+        coverage = model_metrics.iloc[0].get(
+            "interval_coverage", model_metrics.iloc[0].get("coverage_q_0_1_q_0_9", 0)
+        )
         if pd.isna(coverage):
             st.metric("Interval Coverage", "N/A")
         else:
             st.metric("Interval Coverage (80% target)", f"{coverage*100:.1f}%")
 with col4:
-    st.info(f"Model: {selected_model}")
+    if what_if_costs is not None:
+        base_sl = costs[costs["model_name"] == selected_model][
+            "sim_service_level"
+        ].mean()
+        new_sl = what_if_costs["sim_service_level"].mean()
+        st.metric(
+            "Service Level",
+            f"{new_sl*100:.1f}%",
+            delta=f"{(new_sl - base_sl)*100:.1f}%",
+        )
+    else:
+        st.info(f"Model: {selected_model}")
 
 # Drift Alerts
 if "ALERT" in drift_info:
@@ -136,18 +206,6 @@ fig.add_trace(
     )
 )
 
-# Plot Daily Observed Demand (Context for Imputation)
-if "original_observed_demand" in series_data.columns:
-    fig.add_trace(
-        go.Scatter(
-            x=series_data["date"],
-            y=series_data["original_observed_demand"],
-            mode="lines",
-            name="Venta Diaria (Observada)",
-            line=dict(color="grey", width=1, dash="dot"),
-        )
-    )
-
 # Plot Prediction
 fig.add_trace(
     go.Scatter(
@@ -159,37 +217,36 @@ fig.add_trace(
     )
 )
 
-# Plot Latent Demand Recovery (Only where imputed)
-if "is_imputed" in series_data.columns:
-    # Fill NA with False to avoid masking error if column exists but has nulls
-    imputed_mask = series_data["is_imputed"].fillna(False).astype(bool)
-    if imputed_mask.any():
-        imputed_points = series_data[imputed_mask]
-        fig.add_trace(
-            go.Scatter(
-                x=imputed_points["date"],
-                y=imputed_points["latent_demand_est"],
-                mode="markers",
-                name="Demanda Latente Recuperada",
-                marker=dict(
-                    symbol="star",
-                    size=12,
-                    color="purple",
-                    line=dict(width=1, color="white"),
-                ),
-            )
-        )
-
-# Plot Order Quantity
+# Plot Base Order Quantity
 fig.add_trace(
     go.Scatter(
         x=series_data["date"],
         y=series_data["order_quantity"],
         mode="markers",
-        name="Decisión de Inventario",
+        name="Decisión de Inventario (Base)",
         marker=dict(symbol="diamond", size=10, color="red"),
     )
 )
+
+# Plot What-If Order Quantity if available
+if what_if_preds is not None:
+    wi_series_data = what_if_preds[
+        what_if_preds["series_id"] == selected_series
+    ].sort_values("date")
+    fig.add_trace(
+        go.Scatter(
+            x=wi_series_data["date"],
+            y=wi_series_data["order_quantity"],
+            mode="markers",
+            name="Decisión (What-If)",
+            marker=dict(
+                symbol="star",
+                size=14,
+                color="orange",
+                line=dict(width=1, color="black"),
+            ),
+        )
+    )
 
 fig.update_layout(
     xaxis_title="Fecha",
@@ -236,8 +293,20 @@ with c1:
     st.dataframe(metrics, use_container_width=True)
 
 with c2:
-    st.write("Costes de Inventario")
-    st.dataframe(costs, use_container_width=True)
+    if what_if_costs is not None:
+        st.write("Costes de Inventario (Escenario What-If vs Base)")
+        comparison = pd.merge(
+            costs[costs["model_name"] == selected_model][
+                ["backend_name", "sim_total_cost", "sim_service_level"]
+            ],
+            what_if_costs[["backend_name", "sim_total_cost", "sim_service_level"]],
+            on="backend_name",
+            suffixes=("_base", "_whatif"),
+        )
+        st.dataframe(comparison, use_container_width=True)
+    else:
+        st.write("Costes de Inventario (Globales)")
+        st.dataframe(costs, use_container_width=True)
 
 st.markdown("---")
 st.caption(
