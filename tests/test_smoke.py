@@ -142,7 +142,7 @@ def test_smoke_run_serializes_tuning_metadata(tmp_path: Path) -> None:
     metadata = json.loads(
         (artifacts.run_directory / "backtest_metadata.json").read_text(encoding="utf-8")
     )
-    assert metadata["tuning"]["strategy"] == "optuna_temporal_holdout"
+    assert metadata["tuning"]["strategy"] == "optuna_multiobjective_pareto"
     assert metadata["tuning"]["n_trials_requested"] == 2
     assert metadata["tuning"]["best_params"]["n_estimators"] > 0
     assert metadata["drift"]["min_instances"] == settings.drift.min_instances
