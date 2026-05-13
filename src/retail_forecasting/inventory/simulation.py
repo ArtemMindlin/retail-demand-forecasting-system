@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import pandas as pd
-from typing import Any
+
+from retail_forecasting.config import InventoryConfig
 
 
 @dataclass
@@ -20,9 +21,9 @@ class InventoryState:
     c_under: float = 4.0
 
     # History for tracking
-    history: list[dict] = field(default_factory=list)
+    history: list[dict[str, float]] = field(default_factory=list)
 
-    def step(self, demand: float, order_quantity: float, arrivals: float):
+    def step(self, demand: float, order_quantity: float, arrivals: float) -> None:
         """Advances the simulation by one decision period (fold)."""
         # 1. Update on-hand with arrivals
         self.on_hand += arrivals
@@ -64,7 +65,7 @@ class InventoryState:
 
 def simulate_inventory_policy(
     predictions: pd.DataFrame,
-    inventory_config: Any,
+    inventory_config: InventoryConfig,
     series_cost_profile: pd.DataFrame | None = None,
     initial_on_hand: float = 0.0,
 ) -> pd.DataFrame:
@@ -101,8 +102,8 @@ def simulate_inventory_policy(
 
     for model_keys, model_subset in predictions.groupby(model_group_cols):
         # Initialize state for all series in this model strategy
-        states = {}
-        pending_orders = {}
+        states: dict[str, InventoryState] = {}
+        pending_orders: dict[str, list[tuple[int, float]]] = {}
         for series_id in model_subset["series_id"].unique():
             series_subset = model_subset[model_subset["series_id"] == series_id]
             states[series_id] = InventoryState(

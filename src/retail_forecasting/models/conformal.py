@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typing import Any, Protocol, runtime_checkable, Optional, cast
+
 import numpy as np
 import pandas as pd
-from typing import Optional, Any, Protocol, runtime_checkable
 
 from retail_forecasting.utils.io import quantile_column_name
 
@@ -33,7 +34,7 @@ class ConformalForecaster:
         self.confidence_level: Optional[float] = None
         self.alpha: Optional[float] = None
 
-    def fit(self, features: Any, target: pd.Series) -> "ConformalForecaster":
+    def fit(self, features: Any, target: pd.Series) -> ConformalForecaster:
         """Fit the underlying base model."""
         self.base_model.fit(features, target)
         return self
@@ -44,15 +45,8 @@ class ConformalForecaster:
         target: pd.Series,
         alpha: float = 0.2,
         group_ids: Optional[pd.Series] = None,
-    ) -> "ConformalForecaster":
-        """Calculate the conformal correction factor (q_hat) using a calibration set.
-
-        Args:
-            features: Features/Panel from a set the model hasn't seen during fit.
-            target: True values for the calibration set.
-            alpha: Significance level (1 - alpha = desired coverage).
-            group_ids: Optional series for Mondrian Conformal Prediction.
-        """
+    ) -> ConformalForecaster:
+        """Calculate the conformal correction factor (q_hat) using a calibration set."""
         self.alpha = alpha
         self.confidence_level = 1 - alpha
 
@@ -79,7 +73,6 @@ class ConformalForecaster:
     def _calculate_conformity_scores(
         self, features: Any, y_true: np.ndarray
     ) -> np.ndarray:
-        # Check if base model supports quantiles
         if hasattr(self.base_model, "predict_quantiles"):
             alpha = self.alpha if self.alpha is not None else 0.2
             q_low_level = alpha / 2
@@ -92,11 +85,11 @@ class ConformalForecaster:
             if low_col in preds and high_col in preds:
                 y_low = preds[low_col]
                 y_high = preds[high_col]
-                return np.maximum(y_low - y_true, y_true - y_high)
+                return cast(np.ndarray, np.maximum(y_low - y_true, y_true - y_high))
 
         # Fallback to absolute residual
-        y_pred = self.base_model.predict(features)
-        return np.abs(y_true - y_pred)
+        y_pred = np.asarray(self.base_model.predict(features))
+        return cast(np.ndarray, np.abs(y_true - y_pred))
 
     def _compute_q_hat(self, scores: np.ndarray, alpha: float) -> float:
         n = len(scores)
@@ -109,58 +102,63 @@ class ConformalForecaster:
 
     def predict(self, features: Any) -> np.ndarray:
         """Standard point prediction from base model."""
-        return self.base_model.predict(features)
+        return np.asarray(self.base_model.predict(features))
 
     def predict_quantiles(
         self, features: Any, group_ids: Optional[pd.Series] = None
     ) -> dict[str, np.ndarray]:
         """Predict adjusted (conformalized) quantiles."""
-        y_pred = self.base_model.predict(features)
+        y_pred = np.asarray(self.base_model.predict(features))
 
         alpha = self.alpha if self.alpha is not None else 0.2
         q_low_level = alpha / 2
         q_high_level = 1 - (alpha / 2)
 
-        low_col = quantile_column_name(q_low_level)
         mid_col = quantile_column_name(0.5)
-        high_col = quantile_column_name(q_high_level)
 
         if self.q_hat is None:
             if hasattr(self.base_model, "predict_quantiles"):
-                return self.base_model.predict_quantiles(features)
+                return {
+                    str(k): np.asarray(v)
+                    for k, v in self.base_model.predict_quantiles(features).items()
+                }
             return {mid_col: y_pred}
 
         # Select q_hat values
         if group_ids is not None and self.mondrian_q_hat:
-            # Vectorized selection of q_hat
-            # Fallback to global q_hat for unknown groups
-            q_hat_vec = group_ids.map(self.mondrian_q_hat).fillna(self.q_hat).values
+            q_hat_vec = cast(
+                np.ndarray,
+                group_ids.map(self.mondrian_q_hat).fillna(self.q_hat).values,
+            )
         else:
             q_hat_vec = np.full(len(y_pred), self.q_hat)
 
         if hasattr(self.base_model, "predict_quantiles"):
             raw_preds = self.base_model.predict_quantiles(features)
-            adjusted_preds = {}
+            adjusted_preds: dict[str, np.ndarray] = {}
             for col, values in raw_preds.items():
                 quantile_val = float(col.replace("q_", "").replace("_", "."))
+                vals = np.asarray(values)
                 if quantile_val < 0.5:
-                    adjusted_preds[col] = np.maximum(values - q_hat_vec, 0.0)
+                    adjusted_preds[col] = np.maximum(vals - q_hat_vec, 0.0)
                 elif quantile_val > 0.5:
-                    adjusted_preds[col] = np.maximum(values + q_hat_vec, 0.0)
+                    adjusted_preds[col] = np.maximum(vals + q_hat_vec, 0.0)
                 else:
-                    adjusted_preds[col] = values
+                    adjusted_preds[col] = vals
             return adjusted_preds
         else:
+            low_col = quantile_column_name(q_low_level)
+            high_col = quantile_column_name(q_high_level)
             return {
-                low_col: np.maximum(y_pred - q_hat_vec, 0.0),
+                low_col: cast(np.ndarray, np.maximum(y_pred - q_hat_vec, 0.0)),
                 mid_col: y_pred,
-                high_col: np.maximum(y_pred + q_hat_vec, 0.0),
+                high_col: cast(np.ndarray, np.maximum(y_pred + q_hat_vec, 0.0)),
             }
 
     @property
     def backend_name(self) -> str:
-        return f"conformal_{self.base_model.backend_name}"
+        return str(f"conformal_{self.base_model.backend_name}")
 
     @property
     def model_name(self) -> str:
-        return self.base_model.model_name
+        return str(self.base_model.model_name)

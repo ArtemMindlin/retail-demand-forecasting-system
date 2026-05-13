@@ -6,7 +6,7 @@ from retail_forecasting.config import Settings
 from retail_forecasting.evaluation.reporting import RunArtifacts
 
 
-def log_experiment_to_mlflow(artifacts: RunArtifacts, settings: Settings):
+def log_experiment_to_mlflow(artifacts: RunArtifacts, settings: Settings) -> None:
     """
     Logs the experiment parameters, metrics, and artifacts to MLflow.
     """
@@ -19,7 +19,7 @@ def log_experiment_to_mlflow(artifacts: RunArtifacts, settings: Settings):
     ):
         # 1. Log Configuration Parameters
         # Flatten settings for MLflow
-        params = {}
+        params: dict[str, str] = {}
         for section_name, section_config in settings.model_dump().items():
             if isinstance(section_config, dict):
                 for k, v in section_config.items():

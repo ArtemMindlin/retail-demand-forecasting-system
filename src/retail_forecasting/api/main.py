@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 from retail_forecasting.config import load_config
 from retail_forecasting.forecasting.pipeline import run_experiment
@@ -21,7 +21,7 @@ class ScoreRequest(BaseModel):
         default="configs/default.yaml",
         description="Path to the base configuration YAML.",
     )
-    run_name: Optional[str] = Field(
+    run_name: str | None = Field(
         default=None, description="Custom run name for the operational output."
     )
 
@@ -30,17 +30,17 @@ class ScoreResponse(BaseModel):
     status: str
     run_directory: str
     recommendations_generated: int
-    recommendations: list[dict]
+    recommendations: list[dict[str, Any]]
 
 
 @app.get("/health")
-def health_check():
+def health_check() -> dict[str, str]:
     """Verify that the API is up and running."""
     return {"status": "ok", "service": "Retail Forecasting API"}
 
 
 @app.post("/predict_orders", response_model=ScoreResponse)
-def predict_orders(request: ScoreRequest):
+def predict_orders(request: ScoreRequest) -> ScoreResponse:
     """
     Trigger the operational scoring pipeline.
 

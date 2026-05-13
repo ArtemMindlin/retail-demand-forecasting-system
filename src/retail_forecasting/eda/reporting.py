@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import shutil
+from typing import Protocol
 
 import pandas as pd
 
@@ -136,12 +137,23 @@ class EdaArtifacts:
     run_directory: Path | None = None
 
 
+class EdaPlotRenderer(Protocol):
+    def __call__(
+        self,
+        *,
+        panel: pd.DataFrame,
+        weekday_summary: pd.DataFrame,
+        series_summary: pd.DataFrame,
+        output_dir: Path,
+    ) -> None: ...
+
+
 def write_eda_artifacts(
     artifacts: EdaArtifacts,
     output_dir: str | Path,
     run_name: str,
     make_plots: bool,
-    render_plots: callable | None = None,
+    render_plots: EdaPlotRenderer | None = None,
     memoria_dir: str | Path | None = None,
 ) -> EdaArtifacts:
     """Persist EDA summaries, plots, and a Markdown report."""

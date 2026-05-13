@@ -129,9 +129,10 @@ def build_config_alignment_summary(
     )
     expected_max_series = dataset_config.top_n_series
 
-    top_n_matches = (
-        expected_max_series in (None, 0) or actual_unique_series <= expected_max_series
-    )
+    if expected_max_series is None or expected_max_series == 0:
+        top_n_matches = True
+    else:
+        top_n_matches = actual_unique_series <= expected_max_series
     min_history_matches = actual_min_history_days >= dataset_config.min_history_days
 
     summary = pd.DataFrame(

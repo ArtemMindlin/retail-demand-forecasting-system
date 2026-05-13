@@ -3,7 +3,13 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 import lightgbm as lgb
-from typing import Literal
+from typing import Literal, Protocol, cast
+
+
+class RegressorProtocol(Protocol):
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> object: ...
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray: ...
 
 
 class LatentDemandImputer:
@@ -26,7 +32,7 @@ class LatentDemandImputer:
         self.stockout_col = stockout_col
         self.target_col = target_col
         self.scaling_factor = scaling_factor
-        self.model = None
+        self.model: RegressorProtocol | None = None
 
     def impute(self, panel: pd.DataFrame) -> pd.DataFrame:
         """Correct censored demand in the input panel based on selected strategy.
@@ -105,12 +111,15 @@ class LatentDemandImputer:
         self, df: pd.DataFrame, is_clean: pd.Series, is_censored: pd.Series
     ) -> pd.DataFrame:
         """Baseline: Impute using the historical mean of clean days for each series."""
-        means = df[is_clean].groupby("series_id")[self.target_col].mean().to_dict()
+        means = cast(
+            dict[object, float],
+            df[is_clean].groupby("series_id")[self.target_col].mean().to_dict(),
+        )
 
         # Default to global mean if a series has NO clean days
-        global_mean = df[is_clean][self.target_col].mean()
+        global_mean = float(df[is_clean][self.target_col].mean())
 
-        def get_mean(series_id):
+        def get_mean(series_id: object) -> float:
             return means.get(series_id, global_mean)
 
         df.loc[is_censored, "latent_demand_est"] = np.maximum(

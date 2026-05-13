@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
 from catboost import CatBoostRegressor
+from typing import cast
 
 from retail_forecasting.utils.io import quantile_column_name
 
@@ -64,10 +65,10 @@ class CatBoostingModel:
 
     def predict(self, features: pd.DataFrame) -> np.ndarray:
         predictions = self.point_model_.predict(features)
-        return np.maximum(np.asarray(predictions, dtype=float), 0.0)
+        return cast(np.ndarray, np.maximum(np.asarray(predictions, dtype=float), 0.0))
 
     def predict_quantiles(self, features: pd.DataFrame) -> dict[str, np.ndarray]:
-        quantile_predictions = {}
+        quantile_predictions: dict[str, np.ndarray] = {}
         ordered_quantiles = sorted(self.quantile_models_.keys())
 
         raw_predictions = [

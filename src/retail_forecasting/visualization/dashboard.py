@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.graph_objects as go  # type: ignore[import-untyped]
 from pathlib import Path
 
 from retail_forecasting.config import InventoryConfig
@@ -10,7 +10,7 @@ from retail_forecasting.evaluation.metrics import summarize_costs
 st.set_page_config(page_title="Retail Forecasting TFG Dashboard", layout="wide")
 
 
-def get_report_dirs():
+def get_report_dirs() -> list[Path]:
     reports_path = Path("reports")
     if not reports_path.exists():
         return []
@@ -19,7 +19,7 @@ def get_report_dirs():
     return sorted(dirs, key=lambda x: x.stat().st_mtime, reverse=True)
 
 
-def parse_report_md(report_path):
+def parse_report_md(report_path: Path) -> str:
     if not report_path.exists():
         return "No report.md found."
     content = report_path.read_text()
@@ -51,7 +51,9 @@ selected_run = st.sidebar.selectbox(
 
 # --- Load Data ---
 @st.cache_data
-def load_data(run_path):
+def load_data(
+    run_path: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str, pd.DataFrame | None]:
     preds = pd.read_csv(run_path / "predictions.csv")
     metrics = pd.read_csv(run_path / "metrics_summary.csv")
     costs = pd.read_csv(run_path / "cost_summary.csv")
