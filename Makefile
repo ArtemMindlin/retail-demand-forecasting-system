@@ -8,43 +8,43 @@ DASHBOARD = src/retail_forecasting/visualization/dashboard.py
 
 .PHONY: help install run eda dashboard api mlflow up test test-harness lint format clean
 
-help: ## Muestra este mensaje de ayuda
+help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-install: ## Instala dependencias y crea el entorno virtual con uv
+install: ## Install dependencies and create virtual environment with uv
 	uv sync --extra ml --extra dev
 
-run: ## Ejecuta el experimento completo con la configuración por defecto
+run: ## Run the full experiment with default configuration
 	$(PYTHON) -m retail_forecasting.run --config $(CONFIG)
 
-eda: ## Ejecuta el modulo de EDA reproducible sobre el panel preparado
+eda: ## Run the reproducible EDA module on the prepared panel
 	$(PYTHON) -m retail_forecasting.eda.run --config $(CONFIG)
 
-dashboard: ## Lanza el dashboard interactivo de Streamlit
+dashboard: ## Launch the interactive Streamlit dashboard
 	uv run streamlit run $(DASHBOARD)
 
-api: ## Levanta el microservicio FastAPI
+api: ## Start the FastAPI microservice
 	uv run uvicorn retail_forecasting.api.main:app --reload
 
-mlflow: ## Levanta la interfaz visual de MLflow
+mlflow: ## Start the MLflow UI
 	uv run mlflow ui
 
-up: ## Levanta todo el ecosistema con Docker Compose
+up: ## Start the entire ecosystem with Docker Compose
 	docker compose up --build
 
-test: ## Ejecuta la suite completa de tests
+test: ## Run the full test suite
 	$(PYTEST)
 
-test-harness: ## Ejecuta solo los tests de contratos y arquitectura (rápidos)
+test-harness: ## Run only contract and architecture tests (fast)
 	$(PYTEST) tests/test_architecture_imports.py tests/test_temporal_leakage_contract.py tests/test_quantile_contract.py tests/test_dataframe_contracts.py tests/test_raw_column_boundaries.py tests/test_config_contract.py tests/test_generated_artifact_boundaries.py
 
-lint: ## Ejecuta el linter (ruff)
+lint: ## Run the linter (ruff)
 	uv run ruff check .
 
-format: ## Formatea el código (ruff)
+format: ## Format the code (ruff)
 	uv run ruff format .
 
-clean: ## Limpia archivos temporales y cachés de Python
+clean: ## Clean temporary files and Python caches
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +
 	rm -rf .uv-cache

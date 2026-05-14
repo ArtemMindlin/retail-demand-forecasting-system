@@ -1,45 +1,27 @@
-fail_fast: true
 repos:
-  - repo: local
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
     hooks:
-      - id: ruff
-        name: ruff
-        entry: ruff check --fix
-        language: system
-        types: [python]
-      - id: ruff-format
-        name: ruff-format
-        entry: ruff format
-        language: system
-        types: [python]
       - id: trailing-whitespace
-        name: trailing-whitespace
-        entry: .venv/bin/trailing-whitespace-fixer
-        language: system
-        types: [python, yaml, markdown]
       - id: end-of-file-fixer
-        name: end-of-file-fixer
-        entry: .venv/bin/end-of-file-fixer
-        language: system
-        types: [python, yaml, markdown]
       - id: check-yaml
-        name: check-yaml
-        entry: .venv/bin/check-yaml
-        language: system
-        types: [yaml]
       - id: check-added-large-files
-        name: check-added-large-files
-        entry: .venv/bin/check-added-large-files
-        language: system
         args: ['--maxkb=500']
       - id: detect-private-key
-        name: detect-private-key
-        entry: .venv/bin/detect-private-key
-        language: system
-        types: [text]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
       - id: mypy
         name: mypy
-        entry: .venv/bin/mypy
+        entry: uv run mypy
         language: system
         types: [python]
-        args: [--ignore-missing-imports]
+        pass_filenames: false
+        args: ["src"]
