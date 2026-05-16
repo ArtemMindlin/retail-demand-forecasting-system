@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from retail_forecasting.config import ValidationConfig
+from retail_forecasting.drift.detectors import PageHinkleyDetector
 from retail_forecasting.forecasting.backtesting import (
     FoldSpec,
     build_walk_forward_folds,
@@ -40,6 +41,25 @@ def test_walk_forward_folds_require_enough_dates_for_last_target() -> None:
 
     with pytest.raises(ValueError, match="Need at least 14, found 13"):
         build_walk_forward_folds(panel, validation, horizon=4)
+
+
+def test_page_hinkley_detects_sudden_error_increase() -> None:
+    detector = PageHinkleyDetector(threshold=5.0, min_instances=10)
+
+    for _ in range(20):
+        detector.update(1.0)
+
+    drift_detected = False
+    for _ in range(10):
+        result = detector.update(10.0)
+        if result.is_drift:
+            drift_detected = True
+            break
+
+    assert drift_detected is True
+    assert 21 <= detector.observations_seen <= 30
+    assert detector.current_mean_error > 0
+    assert detector.cumulative_deviation >= detector.min_cumulative_deviation
 
 
 def test_fold_spec_validates_temporal_contract() -> None:
