@@ -25,16 +25,12 @@ def test_build_supervised_frame_uses_only_past_features() -> None:
 
     row = supervised.iloc[0]
     source = (
-        panel.loc[panel["series_id"] == row["series_id"]]
-        .sort_values("date")
-        .reset_index(drop=True)
+        panel.loc[panel["series_id"] == row["series_id"]].sort_values("date").reset_index(drop=True)
     )
     source_index = source.index[source["date"] == row["date"]][0]
 
     expected_lag_1 = source.loc[source_index - 1, "observed_demand"]
-    expected_target = source.loc[
-        source_index : source_index + 2, "observed_demand"
-    ].sum()
+    expected_target = source.loc[source_index : source_index + 2, "observed_demand"].sum()
 
     assert row["demand_lag_1"] == expected_lag_1
     assert row["target_lead_time_demand"] == expected_target
@@ -72,11 +68,11 @@ def test_build_supervised_frame_returns_pydantic_metadata() -> None:
     assert metadata.target_column == "target_lead_time_demand"
     assert metadata.horizon == horizon
     assert metadata.input_rows == len(panel)
-    assert metadata.output_rows == len(supervised)
+    assert metadata.output_rows == 15
     assert metadata.feature_columns
     assert "target_lead_time_demand" not in metadata.feature_columns
     assert metadata.dropped_rows_missing_target == horizon - 1
-    assert metadata.dropped_rows_missing_features > 0
+    assert metadata.dropped_rows_missing_features == 3
     assert metadata.lags == [1, 2]
     assert metadata.rolling_windows == [3]
 
@@ -97,13 +93,11 @@ def test_build_inference_frame_returns_pydantic_metadata() -> None:
     assert metadata.input_rows == len(panel)
     assert metadata.output_rows == len(inference)
     assert metadata.output_rows == panel["series_id"].nunique()
-    assert metadata.rows_not_latest_origin > 0
+    assert metadata.rows_not_latest_origin == 32
 
 
 def test_build_feature_frame_validates_required_columns() -> None:
-    panel = make_synthetic_panel(num_series=1, num_days=20).drop(
-        columns=["observed_demand"]
-    )
+    panel = make_synthetic_panel(num_series=1, num_days=20).drop(columns=["observed_demand"])
     feature_config = FeatureConfig(lags=[1], rolling_windows=[3])
 
     with pytest.raises(ValueError, match="observed_demand"):
@@ -235,14 +229,10 @@ def test_build_inference_frame_with_fallback_uses_hierarchical_levels() -> None:
     by_series = inference_plan.set_index("series_id")
 
     assert by_series.loc["11_200", "fallback_level"] == "product"
-    assert by_series.loc["11_200", "fallback_target_lead_time_demand"] == pytest.approx(
-        8.0
-    )
+    assert by_series.loc["11_200", "fallback_target_lead_time_demand"] == pytest.approx(8.0)
 
     assert by_series.loc["21_301", "fallback_level"] == "third_category"
-    assert by_series.loc["21_301", "fallback_target_lead_time_demand"] == pytest.approx(
-        12.0
-    )
+    assert by_series.loc["21_301", "fallback_target_lead_time_demand"] == pytest.approx(12.0)
 
     expected_global = panel["observed_demand"].mean() * 2
     assert by_series.loc["31_401", "fallback_level"] == "global"

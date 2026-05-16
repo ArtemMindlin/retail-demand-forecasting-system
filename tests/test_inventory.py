@@ -40,7 +40,7 @@ def test_newsvendor_costs_follow_critical_fractile() -> None:
     )
 
     assert critical_fractile(inventory) == 0.8
-    assert float(order_quantity.iloc[0]) > 10.0
+    assert 10.0 < float(order_quantity.iloc[0]) <= 12.0
     assert float(evaluated["total_cost"].iloc[0]) >= 0.0
 
 
@@ -151,9 +151,7 @@ def test_attach_series_costs_falls_back_to_global_costs() -> None:
 
 
 def test_attach_series_costs_reuses_existing_series_cost_columns() -> None:
-    inventory = InventoryConfig(
-        use_series_costs=True, series_cost_strategy="synthetic_series"
-    )
+    inventory = InventoryConfig(use_series_costs=True, series_cost_strategy="synthetic_series")
     predictions = pd.DataFrame(
         {
             "series_id": ["a"],

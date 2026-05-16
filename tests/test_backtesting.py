@@ -32,6 +32,9 @@ def test_walk_forward_folds_allow_last_complete_target_origin() -> None:
     folds = build_walk_forward_folds(panel, validation, horizon=4)
 
     assert len(folds) == 2
+    assert folds[0].horizon == 4
+    assert (folds[0].validation_start_date - folds[0].train_end_date).days == 4
+    assert (folds[1].train_end_date - folds[0].train_end_date).days == 3
     assert folds[-1].validation_end_date == panel["date"].max() - pd.Timedelta(days=3)
 
 

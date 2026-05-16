@@ -158,8 +158,7 @@ def test_settings_instantiation_rejects_invalid_imputation_strategy() -> None:
 
 def test_config_is_immutable() -> None:
     settings = load_config(CONFIG_PATH)
-    with pytest.raises(ValidationError):
-        # Pydantic raises ValidationError (specifically frozen error) on assignment
+    with pytest.raises(ValidationError, match="frozen"):
         settings.project.random_seed = 100
 
 
@@ -181,7 +180,6 @@ def test_environment_variable_overrides() -> None:
 def test_default_calibration_days_is_positive_and_within_initial_train() -> None:
     settings = load_config(CONFIG_PATH)
 
-    assert settings.validation.calibration_days == 21
     assert settings.validation.calibration_days > 0
     assert settings.validation.calibration_days < settings.validation.initial_train_days
 

@@ -301,6 +301,7 @@ def test_build_promotion_decision_uses_registry_when_available() -> None:
     decision = build_promotion_decision(artifacts, settings, registry)
 
     assert decision is not None
+    assert decision.promote is True
     assert decision.champion_source == "registry"
     assert decision.champion_model_name == "seasonal_naive"
 
