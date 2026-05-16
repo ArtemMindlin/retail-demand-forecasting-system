@@ -16,7 +16,6 @@ dataset:
   min_history_days: 70
   max_rows: null
   horizon: 7
-  use_eval_as_holdout: false
 
 preprocessing:
   drop_negative_sales: true
@@ -35,6 +34,7 @@ validation:
   initial_train_days: 45
   n_folds: 3
   fold_size_days: 7
+  calibration_days: 21
   retrain_each_fold: true
   drift_triggered_retrain: true
 
