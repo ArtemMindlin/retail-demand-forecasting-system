@@ -29,6 +29,7 @@ from retail_forecasting.evaluation.reporting import (
 )
 from retail_forecasting.evaluation.xai import calculate_shap_values
 from retail_forecasting.features.engineering import (
+    build_inference_frame_with_fallback,
     build_supervised_frame,
 )
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
@@ -389,6 +390,8 @@ def run_experiment_from_frame(
                 force_retrain = True
 
     # 4. Final Holdout Evaluation (Unseen data)
+    holdout_boosting_model: ConformalForecaster | None = None
+    holdout_cat_model: ConformalForecaster | None = None
     if holdout_supervised_frame is not None and not holdout_supervised_frame.empty:
         print(f"📊 Retraining on full train set before holdout evaluation ({data_strategy})...")
         holdout_frame = holdout_supervised_frame
@@ -488,6 +491,15 @@ def run_experiment_from_frame(
                     series_cost_profile=series_cost_profile,
                 )
             )
+
+    # Persist final models to the stable models directory for operational serving
+    _lgb_to_save = holdout_boosting_model if holdout_boosting_model is not None else boosting_model
+    _cat_to_save = holdout_cat_model if holdout_cat_model is not None else cat_model
+    _models_dir = settings.reporting.output_dir / "models"
+    _models_dir.mkdir(parents=True, exist_ok=True)
+    for _m in [_lgb_to_save, _cat_to_save]:
+        if _m is not None:
+            _m.save(_models_dir / f"{_m.backend_name}.pkl")
 
     if not fold_predictions:
         raise ValueError("Backtest did not produce any validation predictions.")
@@ -698,4 +710,108 @@ def _build_model_predictions(
         prediction_frame,
         settings.inventory,
         series_cost_profile=series_cost_profile,
+    )
+
+
+def run_scoring(settings: Settings) -> RunArtifacts:
+    """Operational scoring using a pre-trained model — no retraining."""
+    raw_panel = load_prepared_panel(
+        dataset_config=settings.dataset,
+        preprocessing_config=settings.preprocessing,
+        split="train",
+    )
+    quality_report = validate_prepared_panel(raw_panel, settings)
+    raise_on_blocking_data_quality(quality_report)
+
+    models_dir = settings.reporting.output_dir / "models"
+    champion_backend = settings.business.champion_backend_name
+    model_path = models_dir / f"{champion_backend}.pkl"
+    if not model_path.exists():
+        raise FileNotFoundError(f"No saved model at {model_path}. Run a backtest or retrain first.")
+    model = ConformalForecaster.load(model_path)
+    print(f"✅ Loaded champion model: {model.backend_name} from {model_path}")
+
+    prepared_panel = label_stockout_regime(raw_panel)
+    series_cost_profile = None
+    if settings.inventory.use_series_costs:
+        series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)
+
+    inference_frame, inference_metadata = build_inference_frame_with_fallback(
+        prepared_panel,
+        settings.features,
+        horizon=settings.dataset.horizon,
+    )
+
+    predictions = _build_scoring_predictions(
+        inference_frame=inference_frame,
+        feature_columns=inference_metadata.feature_columns,
+        model=model,
+        settings=settings,
+        series_cost_profile=series_cost_profile,
+    )
+
+    artifacts = RunArtifacts(
+        prepared_panel=prepared_panel,
+        supervised_frame=pd.DataFrame(),
+        predictions=predictions,
+        metrics_summary=pd.DataFrame(),
+        fold_metrics=pd.DataFrame(),
+        cost_summary=pd.DataFrame(),
+        data_quality_report=quality_report,
+    )
+    return write_run_artifacts(artifacts, settings)
+
+
+def _build_scoring_predictions(
+    inference_frame: pd.DataFrame,
+    feature_columns: list[str],
+    model: ConformalForecaster,
+    settings: Settings,
+    series_cost_profile: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Generate operational predictions from an inference frame without y_true."""
+    frame = inference_frame.copy()
+    model_mask = frame["prediction_source"] == "model"
+
+    frame["y_pred"] = float("nan")
+    frame["y_true"] = float("nan")
+    frame["model_name"] = model.model_name
+    frame["backend_name"] = model.backend_name
+    frame["fold_id"] = 0
+    frame["data_strategy"] = "Observed"
+
+    if model_mask.any():
+        model_features = frame.loc[model_mask, feature_columns]
+        frame.loc[model_mask, "y_pred"] = model.predict(model_features)
+
+        group_ids = None
+        if "third_category_id" in frame.columns:
+            group_ids = frame.loc[model_mask, "third_category_id"]
+
+        quantile_preds = model.predict_quantiles(model_features, group_ids=group_ids)
+        for quantile in settings.models.quantiles:
+            col = quantile_column_name(quantile)
+            if col not in frame.columns:
+                frame[col] = float("nan")
+            if col in quantile_preds:
+                frame.loc[model_mask, col] = quantile_preds[col]
+
+    cold_mask = ~model_mask
+    if cold_mask.any() and "fallback_target_lead_time_demand" in frame.columns:
+        frame.loc[cold_mask, "y_pred"] = frame.loc[cold_mask, "fallback_target_lead_time_demand"]
+
+    quantile_columns = [
+        quantile_column_name(q)
+        for q in settings.models.quantiles
+        if quantile_column_name(q) in frame.columns
+    ]
+    frame["order_quantity"] = choose_order_quantity(
+        predictions=frame,
+        inventory_config=settings.inventory,
+        quantile_columns=quantile_columns,
+        quantile_levels=[float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns],
+        series_cost_profile=series_cost_profile,
+    )
+    return attach_inventory_costs(
+        frame, settings.inventory, series_cost_profile=series_cost_profile
     )

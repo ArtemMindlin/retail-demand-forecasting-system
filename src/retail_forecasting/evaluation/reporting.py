@@ -6,7 +6,7 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import pandas as pd
 import shap
@@ -133,8 +133,8 @@ class RunArtifacts:
     metrics_summary: pd.DataFrame
     fold_metrics: pd.DataFrame
     cost_summary: pd.DataFrame
-    sensitivity_summary: Optional[pd.DataFrame] = None
-    pareto_frontier: Optional[pd.DataFrame] = None
+    sensitivity_summary: pd.DataFrame | None = None
+    pareto_frontier: pd.DataFrame | None = None
     reorder_recommendations: pd.DataFrame | None = None
     exceptions: pd.DataFrame | None = None
     promotion_decision: PromotionDecisionMetadata | None = None
@@ -149,18 +149,14 @@ class RunArtifacts:
 
 
 def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtifacts:
-    run_dir = make_run_directory(
-        settings.reporting.output_dir, settings.reporting.run_name
-    )
+    run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
     ensure_directory(run_dir)
 
     reorder_recommendations = build_reorder_recommendations(artifacts, settings)
     exceptions = build_exceptions_frame(reorder_recommendations)
     registry_path = champion_registry_path(settings)
     champion_registry = load_champion_registry(registry_path)
-    promotion_decision = build_promotion_decision(
-        artifacts, settings, champion_registry
-    )
+    promotion_decision = build_promotion_decision(artifacts, settings, champion_registry)
     champion_registry = update_champion_registry(
         artifacts=artifacts,
         settings=settings,
@@ -210,13 +206,9 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
         artifacts.fold_metrics.to_csv(run_dir / "fold_metrics.csv", index=False)
         artifacts.cost_summary.to_csv(run_dir / "cost_summary.csv", index=False)
         if artifacts.sensitivity_summary is not None:
-            artifacts.sensitivity_summary.to_csv(
-                run_dir / "sensitivity_summary.csv", index=False
-            )
+            artifacts.sensitivity_summary.to_csv(run_dir / "sensitivity_summary.csv", index=False)
         if artifacts.pareto_frontier is not None:
-            artifacts.pareto_frontier.to_csv(
-                run_dir / "pareto_frontier.csv", index=False
-            )
+            artifacts.pareto_frontier.to_csv(run_dir / "pareto_frontier.csv", index=False)
         if settings.reporting.make_plots:
             render_standard_plots(
                 metrics_summary=artifacts.metrics_summary,
@@ -239,10 +231,7 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
     artifacts.promotion_decision = promotion_decision
     artifacts.champion_registry = champion_registry
     artifacts.operational_metadata = operational_metadata
-    if (
-        artifacts.backtest_metadata is not None
-        and settings.project.run_mode != "score_daily"
-    ):
+    if artifacts.backtest_metadata is not None and settings.project.run_mode != "score_daily":
         (run_dir / "backtest_metadata.json").write_text(
             artifacts.backtest_metadata.model_dump_json(indent=2),
             encoding="utf-8",
@@ -276,8 +265,7 @@ def utc_timestamp() -> str:
 def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
     serializable_settings = settings.model_dump()
     settings_lines = [
-        f"- `{section}`: `{values}`"
-        for section, values in serializable_settings.items()
+        f"- `{section}`: `{values}`" for section, values in serializable_settings.items()
     ]
 
     from retail_forecasting.evaluation.post_mortem import generate_post_mortem_report
@@ -289,8 +277,8 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         "",
         "## Executive Summary",
         "",
-        "This report compares forecasting systems under predictive, probabilistic, and economic criteria. "
-        "The primary ranking uses total operating cost under a single-period newsvendor policy.",
+        "This report compares forecasting systems under predictive, probabilistic, and economic"
+        " criteria. The primary ranking uses total operating cost under a newsvendor policy.",
         "",
         "## Post-Mortem Analysis (Top 5 Problematic SKUs)",
         "",
@@ -305,7 +293,8 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         f"- Rows in prepared panel: `{len(artifacts.prepared_panel)}`",
         f"- Rows in supervised frame: `{len(artifacts.supervised_frame)}`",
         f"- Unique series: `{artifacts.prepared_panel['series_id'].nunique()}`",
-        f"- Date range: `{artifacts.prepared_panel['date'].min().date()}` to `{artifacts.prepared_panel['date'].max().date()}`",
+        f"- Date range: `{artifacts.prepared_panel['date'].min().date()}`"
+        f" to `{artifacts.prepared_panel['date'].max().date()}`",
         "",
         "## Metrics Summary",
         "",
@@ -323,7 +312,8 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         "",
         *(
             [
-                f"- **ALERT**: Detected drift on `{event.date}` (Score: `{event.score:.2f}`, Threshold: `{event.threshold:.2f}`)"
+                f"- **ALERT**: Detected drift on `{event.date}`"
+                f" (Score: `{event.score:.2f}`, Threshold: `{event.threshold:.2f}`)"
                 for event in artifacts.drifts
             ]
             if artifacts.drifts
@@ -340,8 +330,8 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         "",
         "## Pareto Frontier",
         "",
-        "Candidate inventory policies are generated by scaling each model's selected order quantity. "
-        "Pareto-efficient rows are not dominated simultaneously on economic cost, overstock units, and stockout units.",
+        "Candidate inventory policies are generated by scaling each model's order quantity."
+        " Pareto-efficient rows are not dominated on cost, overstock, and stockout units.",
         "",
         dataframe_to_markdown(artifacts.pareto_frontier)
         if artifacts.pareto_frontier is not None
@@ -351,11 +341,11 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         "",
         "- `MAE` and `RMSE` are included as diagnostics, not as the primary decision criterion.",
         "- `pinball_*` columns evaluate quantile quality when quantile forecasts are available.",
-        "- `interval_coverage` (PICP): Fraction of observations within the P10-P90 interval. Ideally ~0.80.",
-        "- `interval_width` (MPIW): Average width of the prediction interval. Narrower is more precise.",
-        "- `winkler_score`: A proper scoring rule for intervals. Penalizes both width and miscoverage. Lower is better.",
-        "- `total_cost`: Static single-period inventory cost (Newsvendor). Good for SKU-level ranking.",
-        "- `sim_total_cost`: Dynamic multi-period inventory cost. Accounts for carry-over stock and backlog across folds.",
+        "- `interval_coverage` (PICP): Fraction of observations in the P10-P90 interval. ~0.80.",
+        "- `interval_width` (MPIW): Average width of the prediction interval. Narrower is better.",
+        "- `winkler_score`: Proper scoring rule for intervals. Penalizes width and miscoverage.",
+        "- `total_cost`: Static single-period inventory cost (Newsvendor). Good for SKU ranking.",
+        "- `sim_total_cost`: Dynamic multi-period cost. Accounts for carry-over stock and backlog.",
         "- `sim_service_level`: Service level achieved in the dynamic simulation.",
         "- `total_cost` is the main ranking metric because the TFG focuses on inventory decisions.",
     ]
@@ -363,16 +353,12 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
     return "\n".join(report)
 
 
-def build_reorder_recommendations(
-    artifacts: RunArtifacts, settings: Settings
-) -> pd.DataFrame:
+def build_reorder_recommendations(artifacts: RunArtifacts, settings: Settings) -> pd.DataFrame:
     recommendations = artifacts.predictions.copy()
     recommendations["decision_date"] = recommendations["date"]
     recommendations["predicted_lead_time_demand"] = recommendations["y_pred"]
 
-    series_parts = (
-        recommendations["series_id"].astype(str).str.split("_", n=1, expand=True)
-    )
+    series_parts = recommendations["series_id"].astype(str).str.split("_", n=1, expand=True)
     recommendations["store_id"] = series_parts[0]
     recommendations["product_id"] = series_parts[1]
 
@@ -383,12 +369,8 @@ def build_reorder_recommendations(
             pd.NA, index=recommendations.index, dtype="object"
         )
 
-    recommendations["risk_flag"] = pd.Series(
-        pd.NA, index=recommendations.index, dtype="object"
-    )
-    recommendations["notes"] = pd.Series(
-        pd.NA, index=recommendations.index, dtype="object"
-    )
+    recommendations["risk_flag"] = pd.Series(pd.NA, index=recommendations.index, dtype="object")
+    recommendations["notes"] = pd.Series(pd.NA, index=recommendations.index, dtype="object")
 
     if settings.business.flag_cold_start:
         cold_start_mask = recommendations["prediction_source"] == "cold_start_fallback"
@@ -400,8 +382,7 @@ def build_reorder_recommendations(
     if settings.business.flag_drift_watch and artifacts.drifts:
         drift_fold_ids = {event.fold_id for event in artifacts.drifts}
         drift_mask = (
-            recommendations["fold_id"].isin(drift_fold_ids)
-            & recommendations["risk_flag"].isna()
+            recommendations["fold_id"].isin(drift_fold_ids) & recommendations["risk_flag"].isna()
         )
         recommendations.loc[drift_mask, "risk_flag"] = "drift_watch"
         recommendations.loc[drift_mask, "notes"] = (
@@ -415,19 +396,15 @@ def build_reorder_recommendations(
         and lower_quantile in recommendations.columns
         and upper_quantile in recommendations.columns
     ):
-        interval_width = (
-            recommendations[upper_quantile] - recommendations[lower_quantile]
-        )
+        interval_width = recommendations[upper_quantile] - recommendations[lower_quantile]
         positive_width = interval_width[interval_width > 0]
         if not positive_width.empty:
             width_threshold = float(
-                positive_width.quantile(
-                    settings.business.high_uncertainty_interval_quantile
-                )
+                positive_width.quantile(settings.business.high_uncertainty_interval_quantile)
             )
-            high_uncertainty_mask = (
-                interval_width >= width_threshold
-            ) & recommendations["risk_flag"].isna()
+            high_uncertainty_mask = (interval_width >= width_threshold) & recommendations[
+                "risk_flag"
+            ].isna()
             recommendations.loc[high_uncertainty_mask, "risk_flag"] = "high_uncertainty"
             recommendations.loc[high_uncertainty_mask, "notes"] = (
                 "Prediction interval width exceeds the configured review threshold."
@@ -468,9 +445,7 @@ def build_reorder_recommendations(
         "q_0_5",
         upper_quantile,
     ]
-    output_columns = [
-        column for column in preferred_columns if column in recommendations.columns
-    ]
+    output_columns = [column for column in preferred_columns if column in recommendations.columns]
     return recommendations.loc[:, output_columns]
 
 
@@ -494,9 +469,7 @@ def build_exceptions_frame(recommendations: pd.DataFrame) -> pd.DataFrame:
         "q_0_5",
         "q_0_9",
     ]
-    output_columns = [
-        column for column in preferred_columns if column in exceptions.columns
-    ]
+    output_columns = [column for column in preferred_columns if column in exceptions.columns]
     return exceptions.loc[:, output_columns]
 
 
@@ -545,8 +518,7 @@ def build_promotion_decision(
         challengers["service_level"].astype(float) - champion_service_level
     )
     challengers["promote"] = (
-        challengers["cost_improvement_pct"]
-        >= settings.business.champion_min_cost_improvement_pct
+        challengers["cost_improvement_pct"] >= settings.business.champion_min_cost_improvement_pct
     ) & (
         challengers["service_level_delta"]
         >= -settings.business.champion_max_service_level_degradation
@@ -558,14 +530,18 @@ def build_promotion_decision(
             ["total_cost", "service_level"],
             ascending=[True, False],
         ).iloc[0]
-        decision_reason = "Challenger improves total cost and respects the configured service-level tolerance."
+        decision_reason = (
+            "Challenger improves total cost and respects the configured service-level tolerance."
+        )
         promote = True
     else:
         selected = challengers.sort_values(
             ["total_cost", "service_level"],
             ascending=[True, False],
         ).iloc[0]
-        decision_reason = "No challenger satisfied both the minimum cost improvement and service-level guardrail."
+        decision_reason = (
+            "No challenger satisfied both the minimum cost improvement and service-level guardrail."
+        )
         promote = False
 
     return PromotionDecisionMetadata(
@@ -605,16 +581,12 @@ def build_operational_run_metadata(
         config_hash=build_config_hash(settings),
         recommendation_rows=len(reorder_recommendations),
         exception_rows=len(exceptions),
-        champion_model_name=(
-            current_champion.model_name if current_champion is not None else None
-        ),
+        champion_model_name=(current_champion.model_name if current_champion is not None else None),
         champion_backend_name=(
             current_champion.backend_name if current_champion is not None else None
         ),
         promotion_executed=promotion_decision is not None,
-        promotion_approved=(
-            promotion_decision.promote if promotion_decision is not None else None
-        ),
+        promotion_approved=(promotion_decision.promote if promotion_decision is not None else None),
     )
 
 
@@ -658,17 +630,20 @@ def update_champion_registry(
             promoted_row = promoted_rows.sort_values("total_cost").iloc[0]
             reason = promotion_decision.decision_reason
 
+    _backend = str(promoted_row["backend_name"])
+    _model_file = settings.reporting.output_dir / "models" / f"{_backend}.pkl"
     return ChampionRegistry(
         updated_at=utc_timestamp(),
         current_champion=ChampionRecord(
             data_strategy=_optional_string(promoted_row.get("data_strategy")),
             model_name=str(promoted_row["model_name"]),
-            backend_name=str(promoted_row["backend_name"]),
+            backend_name=_backend,
             promoted_at=utc_timestamp(),
             run_name=settings.reporting.run_name,
             git_commit=get_git_commit(),
             config_hash=build_config_hash(settings),
             reason=reason,
+            model_path=str(_model_file) if _model_file.exists() else None,
         ),
     )
 
@@ -714,10 +689,7 @@ def _candidate_mask_from_decision(
     mask = (summary["model_name"] == decision.challenger_model_name) & (
         summary["backend_name"] == decision.challenger_backend_name
     )
-    if (
-        "data_strategy" in summary.columns
-        and decision.challenger_data_strategy is not None
-    ):
+    if "data_strategy" in summary.columns and decision.challenger_data_strategy is not None:
         mask &= summary["data_strategy"] == decision.challenger_data_strategy
     return mask
 

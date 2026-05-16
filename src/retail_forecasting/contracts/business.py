@@ -14,6 +14,7 @@ class ChampionRecord(BaseModel):
     git_commit: str | None
     config_hash: str
     reason: str
+    model_path: str | None = None
 
 
 class ChampionRegistry(BaseModel):

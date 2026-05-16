@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from retail_forecasting.config import load_config
-from retail_forecasting.forecasting.pipeline import run_experiment
+from retail_forecasting.forecasting.pipeline import run_experiment, run_scoring
 
 app = FastAPI(
     title="Retail Demand Forecasting API",
@@ -62,7 +62,10 @@ def predict_orders(request: ScoreRequest) -> ScoreResponse:
             new_reporting = settings.reporting.model_copy(update={"run_name": request.run_name})
             settings = settings.model_copy(update={"reporting": new_reporting})
 
-        artifacts = run_experiment(settings)
+        try:
+            artifacts = run_scoring(settings)
+        except FileNotFoundError:
+            artifacts = run_experiment(settings)
 
         if artifacts.run_directory is None or artifacts.reorder_recommendations is None:
             raise HTTPException(

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable, Optional, cast
+from pathlib import Path
+from typing import Any, Protocol, cast, runtime_checkable
 
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -29,10 +31,10 @@ class ConformalForecaster:
 
     def __init__(self, base_model: Any):
         self.base_model = base_model
-        self.q_hat: Optional[float] = None
+        self.q_hat: float | None = None
         self.mondrian_q_hat: dict[Any, float] = {}
-        self.confidence_level: Optional[float] = None
-        self.alpha: Optional[float] = None
+        self.confidence_level: float | None = None
+        self.alpha: float | None = None
 
     def fit(self, features: Any, target: pd.Series) -> ConformalForecaster:
         """Fit the underlying base model."""
@@ -44,7 +46,7 @@ class ConformalForecaster:
         features: Any,
         target: pd.Series,
         alpha: float = 0.2,
-        group_ids: Optional[pd.Series] = None,
+        group_ids: pd.Series | None = None,
     ) -> ConformalForecaster:
         """Calculate the conformal correction factor (q_hat) using a calibration set."""
         self.alpha = alpha
@@ -64,15 +66,11 @@ class ConformalForecaster:
                 group_mask = group_ids_arr == group
                 if np.any(group_mask):
                     group_scores = scores[group_mask]
-                    self.mondrian_q_hat[group] = self._compute_q_hat(
-                        group_scores, alpha
-                    )
+                    self.mondrian_q_hat[group] = self._compute_q_hat(group_scores, alpha)
 
         return self
 
-    def _calculate_conformity_scores(
-        self, features: Any, y_true: np.ndarray
-    ) -> np.ndarray:
+    def _calculate_conformity_scores(self, features: Any, y_true: np.ndarray) -> np.ndarray:
         if hasattr(self.base_model, "predict_quantiles"):
             alpha = self.alpha if self.alpha is not None else 0.2
             q_low_level = alpha / 2
@@ -105,7 +103,7 @@ class ConformalForecaster:
         return np.asarray(self.base_model.predict(features))
 
     def predict_quantiles(
-        self, features: Any, group_ids: Optional[pd.Series] = None
+        self, features: Any, group_ids: pd.Series | None = None
     ) -> dict[str, np.ndarray]:
         """Predict adjusted (conformalized) quantiles."""
         y_pred = np.asarray(self.base_model.predict(features))
@@ -154,6 +152,19 @@ class ConformalForecaster:
                 mid_col: y_pred,
                 high_col: cast(np.ndarray, np.maximum(y_pred + q_hat_vec, 0.0)),
             }
+
+    def save(self, path: Path) -> None:
+        """Persist the full forecaster state (base model + conformal calibration) to disk."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(self, path)
+
+    @classmethod
+    def load(cls, path: Path) -> ConformalForecaster:
+        """Load a previously saved ConformalForecaster from disk."""
+        obj = joblib.load(path)
+        if not isinstance(obj, cls):
+            raise TypeError(f"Expected ConformalForecaster, got {type(obj)}")
+        return obj
 
     @property
     def backend_name(self) -> str:
