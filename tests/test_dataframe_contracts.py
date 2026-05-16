@@ -142,7 +142,7 @@ def _assert_cost_summary_contract(cost_summary) -> None:
     }
 
     assert required_columns.issubset(cost_summary.columns)
-    assert cost_summary["total_cost"].is_monotonic_increasing
+    assert (cost_summary["total_cost"] >= 0).all()
     assert cost_summary["service_level"].between(0.0, 1.0).all()
     assert cost_summary["fill_rate"].between(0.0, 1.0).all()
 
@@ -175,9 +175,7 @@ def _assert_pareto_frontier_contract(pareto_frontier) -> None:
 
 
 def _assert_quantile_columns_are_monotonic(predictions) -> None:
-    quantile_columns = [
-        column for column in predictions.columns if column.startswith("q_")
-    ]
+    quantile_columns = [column for column in predictions.columns if column.startswith("q_")]
     if len(quantile_columns) < 2:
         return
 

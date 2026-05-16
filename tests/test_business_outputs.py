@@ -7,8 +7,8 @@ from retail_forecasting.contracts.business import ChampionRecord, ChampionRegist
 from retail_forecasting.contracts.drift import DriftEvent
 from retail_forecasting.evaluation.reporting import (
     RunArtifacts,
-    build_promotion_decision,
     build_exceptions_frame,
+    build_promotion_decision,
     build_reorder_recommendations,
     update_champion_registry,
 )
@@ -48,9 +48,7 @@ def test_build_reorder_recommendations_flags_cold_start_and_exceptions() -> None
     recommendations = build_reorder_recommendations(artifacts, settings)
     exceptions = build_exceptions_frame(recommendations)
 
-    cold_start_row = recommendations.loc[recommendations["series_id"] == "1_101"].iloc[
-        0
-    ]
+    cold_start_row = recommendations.loc[recommendations["series_id"] == "1_101"].iloc[0]
     normal_row = recommendations.loc[recommendations["series_id"] == "2_202"].iloc[0]
 
     assert cold_start_row["risk_flag"] == "cold_start"
@@ -178,7 +176,7 @@ def test_build_promotion_decision_recommends_promotion_when_guardrails_pass() ->
             {
                 "data_strategy": ["Observed", "Observed", "Latent_supervised"],
                 "model_name": ["catboost", "seasonal_naive", "auto_boosting"],
-                "backend_name": ["catboost", "heuristic", "lightgbm"],
+                "backend_name": ["conformal_catboost_official", "heuristic", "conformal_lightgbm"],
                 "observations": [10, 10, 10],
                 "mean_order_quantity": [11.0, 10.0, 10.5],
                 "total_overstock_units": [5.0, 8.0, 4.0],
@@ -196,7 +194,7 @@ def test_build_promotion_decision_recommends_promotion_when_guardrails_pass() ->
         business=BusinessConfig(
             champion_data_strategy="Observed",
             champion_model_name="catboost",
-            champion_backend_name="catboost",
+            champion_backend_name="conformal_catboost_official",
             champion_min_cost_improvement_pct=10.0,
             champion_max_service_level_degradation=0.02,
         )
@@ -207,12 +205,10 @@ def test_build_promotion_decision_recommends_promotion_when_guardrails_pass() ->
     assert decision is not None
     assert decision.promote is True
     assert decision.challenger_model_name == "auto_boosting"
-    assert decision.challenger_backend_name == "lightgbm"
+    assert decision.challenger_backend_name == "conformal_lightgbm"
 
 
-def test_build_promotion_decision_blocks_promotion_when_service_level_degrades_too_much() -> (
-    None
-):
+def test_build_promotion_decision_blocks_promotion_when_service_level_degrades_too_much() -> None:
     artifacts = RunArtifacts(
         prepared_panel=pd.DataFrame(),
         supervised_frame=pd.DataFrame(),
@@ -223,7 +219,7 @@ def test_build_promotion_decision_blocks_promotion_when_service_level_degrades_t
             {
                 "data_strategy": ["Observed", "Latent_supervised"],
                 "model_name": ["catboost", "auto_boosting"],
-                "backend_name": ["catboost", "lightgbm"],
+                "backend_name": ["conformal_catboost_official", "conformal_lightgbm"],
                 "observations": [10, 10],
                 "mean_order_quantity": [11.0, 10.5],
                 "total_overstock_units": [5.0, 4.0],
@@ -241,7 +237,7 @@ def test_build_promotion_decision_blocks_promotion_when_service_level_degrades_t
         business=BusinessConfig(
             champion_data_strategy="Observed",
             champion_model_name="catboost",
-            champion_backend_name="catboost",
+            champion_backend_name="conformal_catboost_official",
             champion_min_cost_improvement_pct=10.0,
             champion_max_service_level_degradation=0.02,
         )
@@ -265,7 +261,7 @@ def test_build_promotion_decision_uses_registry_when_available() -> None:
             {
                 "data_strategy": ["Observed", "Observed", "Latent_supervised"],
                 "model_name": ["seasonal_naive", "catboost", "auto_boosting"],
-                "backend_name": ["heuristic", "catboost", "lightgbm"],
+                "backend_name": ["heuristic", "conformal_catboost_official", "conformal_lightgbm"],
                 "observations": [10, 10, 10],
                 "mean_order_quantity": [10.0, 11.0, 10.5],
                 "total_overstock_units": [8.0, 5.0, 4.0],
@@ -283,7 +279,7 @@ def test_build_promotion_decision_uses_registry_when_available() -> None:
         business=BusinessConfig(
             champion_data_strategy="Observed",
             champion_model_name="catboost",
-            champion_backend_name="catboost",
+            champion_backend_name="conformal_catboost_official",
             champion_min_cost_improvement_pct=10.0,
             champion_max_service_level_degradation=0.02,
         )
@@ -320,7 +316,7 @@ def test_update_champion_registry_bootstraps_from_first_run() -> None:
             {
                 "data_strategy": ["Observed", "Observed"],
                 "model_name": ["catboost", "seasonal_naive"],
-                "backend_name": ["catboost", "heuristic"],
+                "backend_name": ["conformal_catboost_official", "heuristic"],
                 "observations": [10, 10],
                 "mean_order_quantity": [11.0, 10.0],
                 "total_overstock_units": [5.0, 8.0],
@@ -338,7 +334,7 @@ def test_update_champion_registry_bootstraps_from_first_run() -> None:
         business=BusinessConfig(
             champion_data_strategy="Observed",
             champion_model_name="catboost",
-            champion_backend_name="catboost",
+            champion_backend_name="conformal_catboost_official",
         )
     )
 
@@ -351,4 +347,4 @@ def test_update_champion_registry_bootstraps_from_first_run() -> None:
 
     assert registry is not None
     assert registry.current_champion.model_name == "catboost"
-    assert registry.current_champion.backend_name == "catboost"
+    assert registry.current_champion.backend_name == "conformal_catboost_official"

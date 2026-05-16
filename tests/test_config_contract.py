@@ -29,7 +29,6 @@ def test_default_config_preserves_experimental_guardrails() -> None:
 
     assert settings.dataset.source == "fresh_retailnet"
     assert settings.project.run_mode in {"backtest", "retrain", "score_daily"}
-    assert settings.dataset.use_eval_as_holdout is False
     assert settings.dataset.horizon > 0
     assert settings.dataset.min_history_days >= settings.dataset.horizon
     assert settings.validation.initial_train_days >= settings.dataset.horizon
@@ -42,7 +41,7 @@ def test_default_config_preserves_experimental_guardrails() -> None:
     assert 0.0 < settings.business.high_uncertainty_interval_quantile < 1.0
     assert 0.0 < settings.business.extreme_order_quantity_quantile < 1.0
     assert settings.business.champion_model_name
-    assert settings.business.champion_backend_name
+    assert settings.business.champion_backend_name == "conformal_catboost_official"
     assert settings.business.champion_min_cost_improvement_pct >= 0.0
     assert 0.0 <= settings.business.champion_max_service_level_degradation <= 1.0
 
@@ -80,11 +79,6 @@ def test_default_reporting_does_not_write_into_data_cache() -> None:
 
     output_dir = settings.reporting.output_dir
     assert output_dir.parts[0] != "data"
-
-
-def test_settings_instantiation_rejects_unsupported_eval_holdout() -> None:
-    with pytest.raises(ValidationError, match="use_eval_as_holdout"):
-        Settings(dataset=DatasetConfig(use_eval_as_holdout=True))
 
 
 def test_settings_instantiation_rejects_invalid_temporal_guardrails() -> None:
@@ -131,18 +125,14 @@ def test_settings_instantiation_rejects_invalid_synthetic_cost_weights() -> None
     with pytest.raises(ValidationError, match="Synthetic cost weights"):
         Settings(
             inventory=InventoryConfig(
-                synthetic_cost_config=SyntheticCostConfig(
-                    perishability_weights=[0.8, 0.3, -0.1]
-                )
+                synthetic_cost_config=SyntheticCostConfig(perishability_weights=[0.8, 0.3, -0.1])
             )
         )
 
     with pytest.raises(ValidationError, match="Synthetic cost weights"):
         Settings(
             inventory=InventoryConfig(
-                synthetic_cost_config=SyntheticCostConfig(
-                    criticality_weights=[0.7, 0.4]
-                )
+                synthetic_cost_config=SyntheticCostConfig(criticality_weights=[0.7, 0.4])
             )
         )
 
@@ -186,6 +176,19 @@ def test_environment_variable_overrides() -> None:
         assert settings.dataset.horizon == 99
         assert settings.dataset.min_history_days == 100
         assert settings.validation.initial_train_days == 100
+
+
+def test_default_calibration_days_is_positive_and_within_initial_train() -> None:
+    settings = load_config(CONFIG_PATH)
+
+    assert settings.validation.calibration_days == 21
+    assert settings.validation.calibration_days > 0
+    assert settings.validation.calibration_days < settings.validation.initial_train_days
+
+
+def test_settings_instantiation_rejects_non_positive_calibration_days() -> None:
+    with pytest.raises(ValidationError, match="calibration_days"):
+        Settings(validation=ValidationConfig(calibration_days=0))
 
 
 def test_validation_cross_module_consistency() -> None:

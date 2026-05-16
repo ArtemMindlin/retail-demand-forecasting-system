@@ -48,15 +48,10 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
     assert artifacts.champion_registry is not None
     assert artifacts.backtest_metadata is not None
     assert artifacts.data_quality_report is not None
-    assert artifacts.backtest_metadata.features.supervised_rows == len(
-        artifacts.supervised_frame
-    )
+    assert artifacts.backtest_metadata.features.supervised_rows == len(artifacts.supervised_frame)
     assert artifacts.backtest_metadata.data_quality is not None
     assert artifacts.backtest_metadata.drift.detector_name == "PageHinkleyDetector"
-    assert (
-        artifacts.backtest_metadata.drift.observations_seen
-        == settings.validation.n_folds
-    )
+    assert artifacts.backtest_metadata.drift.observations_seen == settings.validation.n_folds
     assert artifacts.backtest_metadata.drift.alerts_detected == len(artifacts.drifts)
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert metadata["features"]["supervised_rows"] == len(artifacts.supervised_frame)
@@ -65,6 +60,7 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
     assert metadata["drift"]["detector_name"] == "PageHinkleyDetector"
     assert metadata["drift"]["threshold"] == settings.drift.threshold
     assert metadata["promotion"]["champion_model_name"] == "catboost"
+    assert metadata["promotion"]["champion_backend_name"] == "conformal_catboost_official"
     assert metadata["data_quality"]["passed"] is True
     recommendation_columns = {
         "decision_date",
@@ -79,8 +75,7 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
     }
     assert recommendation_columns.issubset(artifacts.reorder_recommendations.columns)
     assert set(artifacts.exceptions.columns).issubset(
-        set(artifacts.reorder_recommendations.columns)
-        | {"risk_flag", "prediction_source", "notes"}
+        set(artifacts.reorder_recommendations.columns) | {"risk_flag", "prediction_source", "notes"}
     )
     assert artifacts.exceptions["risk_flag"].notna().all()
 
@@ -109,7 +104,9 @@ def test_smoke_run_bootstraps_registry_and_reuses_it(tmp_path: Path) -> None:
     assert first_registry is not None
     assert second_registry is not None
     assert first_registry.current_champion.model_name == "catboost"
+    assert first_registry.current_champion.backend_name == "conformal_catboost_official"
     assert second_registry.current_champion.model_name == "catboost"
+    assert second_registry.current_champion.backend_name == "conformal_catboost_official"
     assert second_artifacts.promotion_decision is not None
     assert second_artifacts.promotion_decision.champion_source == "registry"
 
@@ -178,9 +175,7 @@ def test_score_daily_run_writes_operational_artifacts_only(tmp_path: Path) -> No
     assert not (artifacts.run_directory / "backtest_metadata.json").exists()
 
     metadata = json.loads(
-        (artifacts.run_directory / "operational_run_metadata.json").read_text(
-            encoding="utf-8"
-        )
+        (artifacts.run_directory / "operational_run_metadata.json").read_text(encoding="utf-8")
     )
     assert metadata["run_mode"] == "score_daily"
     assert metadata["recommendation_rows"] == len(artifacts.reorder_recommendations)
