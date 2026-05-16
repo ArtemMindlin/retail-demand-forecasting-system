@@ -12,8 +12,8 @@ from retail_forecasting.utils.io import quantile_column_name
 
 @runtime_checkable
 class BaseRegressor(Protocol):
-    def fit(self, X: Any, y: Any) -> Any: ...
-    def predict(self, X: Any) -> np.ndarray: ...
+    def fit(self, x: Any, y: Any) -> Any: ...
+    def predict(self, x: Any) -> np.ndarray: ...
 
 
 def _lightgbm_available() -> bool:
@@ -44,11 +44,9 @@ class AutoBoostingModel:
     model_name: str = "auto_boosting"
     backend_name: str = field(init=False, default="unknown")
     point_model_: BaseRegressor | None = field(init=False, default=None)
-    quantile_models_: dict[float, BaseRegressor] = field(
-        init=False, default_factory=dict
-    )
+    quantile_models_: dict[float, BaseRegressor] = field(init=False, default_factory=dict)
 
-    def fit(self, features: pd.DataFrame, target: pd.Series) -> "AutoBoostingModel":
+    def fit(self, features: pd.DataFrame, target: pd.Series) -> AutoBoostingModel:
         # Build the main point model.
         # If stockout_cost > 0, we use a cost-aware objective (pinball loss at critical fractil)
         self.point_model_ = self._build_point_model()
@@ -75,9 +73,7 @@ class AutoBoostingModel:
         ordered_quantiles = sorted(self.quantile_models_.keys())
         raw_predictions = [
             np.maximum(
-                np.asarray(
-                    self.quantile_models_[quantile].predict(features), dtype=float
-                ),
+                np.asarray(self.quantile_models_[quantile].predict(features), dtype=float),
                 0.0,
             )
             for quantile in ordered_quantiles
@@ -90,12 +86,11 @@ class AutoBoostingModel:
     def _build_point_model(self) -> BaseRegressor:
         # Calculate critical fractil if costs are provided
         if self.stockout_cost > 0:
-            critical_fractil = self.stockout_cost / (
-                self.stockout_cost + self.overstock_cost
-            )
+            critical_fractil = self.stockout_cost / (self.stockout_cost + self.overstock_cost)
             print(
-                f"🎯 Cost-Aware Training: Optimizing point model for critical fractil τ = {critical_fractil:.4f}"
+                f"🎯 Cost-Aware Training: Optimizing point model for critical fractil τ = {critical_fractil:.4f}"  # noqa: E501
             )
+            self.backend_name = "lightgbm" if _lightgbm_available() else "sklearn_gradient_boosting"
             return self._build_quantile_model(critical_fractil)
 
         # Default to standard regression (MSE-like)
@@ -147,7 +142,6 @@ class AutoBoostingModel:
         if _lightgbm_available():
             import lightgbm as lgb
 
-            self.backend_name = "lightgbm"
             return cast(
                 BaseRegressor,
                 lgb.LGBMRegressor(

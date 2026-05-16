@@ -3,8 +3,8 @@ from __future__ import annotations
 import pandas as pd
 
 from retail_forecasting.config import Settings
-from retail_forecasting.contracts.drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.backtesting import FoldRunMetadata
+from retail_forecasting.contracts.drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.tuning import BoostingParams
 from retail_forecasting.data.censorship import LatentDemandImputer
 from retail_forecasting.data.fresh_retailnet import load_prepared_panel
@@ -12,8 +12,8 @@ from retail_forecasting.data.quality import (
     raise_on_blocking_data_quality,
     validate_prepared_panel,
 )
-from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.drift.detectors import PageHinkleyDetector
+from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.evaluation.metrics import summarize_costs, summarize_predictions
 from retail_forecasting.evaluation.reporting import (
     BacktestMetadata,
@@ -28,10 +28,11 @@ from retail_forecasting.evaluation.reporting import (
     write_run_artifacts,
 )
 from retail_forecasting.evaluation.xai import calculate_shap_values
-from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
 from retail_forecasting.features.engineering import (
     build_supervised_frame,
 )
+from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
+from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
 from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
@@ -39,12 +40,11 @@ from retail_forecasting.inventory.newsvendor import (
     summarize_pareto_frontier,
 )
 from retail_forecasting.inventory.simulation import simulate_inventory_policy
-from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
 from retail_forecasting.models.boosting import AutoBoostingModel
-from retail_forecasting.models.optimization import HyperparameterTuner
 from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
+from retail_forecasting.models.optimization import HyperparameterTuner
 from retail_forecasting.utils.io import quantile_column_name
 
 
@@ -59,10 +59,18 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     quality_report = validate_prepared_panel(raw_panel, settings)
     raise_on_blocking_data_quality(quality_report)
 
+    # Load external holdout (eval) split
+    print("📥 Loading external holdout (eval) split...")
+    holdout_panel = load_prepared_panel(
+        dataset_config=settings.dataset,
+        preprocessing_config=settings.preprocessing,
+        split="eval",
+    )
+
     # 2. Run Strategy A: Observed Demand (Baseline)
     print("--- Running Strategy A: Observed Demand ---")
     artifacts_obs = run_experiment_from_frame(
-        raw_panel, settings, data_strategy="Observed"
+        raw_panel, settings, data_strategy="Observed", holdout_panel=holdout_panel
     )
 
     # 3. Run Strategy B: Latent Demand (Imputed)
@@ -70,8 +78,16 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     print(f"--- Running Strategy B: Latent Demand (Strategy: {strategy_name}) ---")
     imputer = LatentDemandImputer(strategy=strategy_name)
     imputed_panel = imputer.impute(raw_panel)
+
+    imputed_holdout = None
+    if holdout_panel is not None:
+        imputed_holdout = imputer.impute(holdout_panel)
+
     artifacts_latent = run_experiment_from_frame(
-        imputed_panel, settings, data_strategy=f"Latent_{strategy_name}"
+        imputed_panel,
+        settings,
+        data_strategy=f"Latent_{strategy_name}",
+        holdout_panel=imputed_holdout,
     )
 
     # 4. Merge Artifacts
@@ -83,9 +99,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     # This is safe as the synthetic cost profile is built from the same initial panel
     sample_series_cost_profile = None
     if settings.inventory.use_series_costs:
-        sample_series_cost_profile = build_series_cost_profile(
-            raw_panel, settings.inventory
-        )
+        sample_series_cost_profile = build_series_cost_profile(raw_panel, settings.inventory)
 
     # Run dynamic inventory simulation on merged results
     merged_predictions = simulate_inventory_policy(
@@ -106,9 +120,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
                 "data_strategy": f"Observed+Latent_{strategy_name}",
                 "created_at": utc_timestamp(),
                 "models": ModelRunMetadata(
-                    models_run=sorted(
-                        merged_predictions["model_name"].dropna().unique().tolist()
-                    ),
+                    models_run=sorted(merged_predictions["model_name"].dropna().unique().tolist()),
                     quantiles=settings.models.quantiles,
                     optimize_for_cost=settings.models.optimize_for_cost,
                     use_tuning=settings.models.use_tuning,
@@ -144,17 +156,19 @@ def run_experiment(settings: Settings) -> RunArtifacts:
 
 
 def run_experiment_from_frame(
-    panel: pd.DataFrame, settings: Settings, data_strategy: str = "Observed"
+    panel: pd.DataFrame,
+    settings: Settings,
+    data_strategy: str = "Observed",
+    holdout_panel: pd.DataFrame | None = None,
 ) -> RunArtifacts:
     """Run the full backtesting pipeline from an in-memory panel."""
     quality_report = validate_prepared_panel(panel, settings)
     raise_on_blocking_data_quality(quality_report)
+
     prepared_panel = label_stockout_regime(panel)
     series_cost_profile = None
     if settings.inventory.use_series_costs:
-        series_cost_profile = build_series_cost_profile(
-            prepared_panel, settings.inventory
-        )
+        series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)
     supervised_frame, feature_metadata = build_supervised_frame(
         panel=prepared_panel,
         feature_config=settings.features,
@@ -162,9 +176,26 @@ def run_experiment_from_frame(
     )
     feature_columns = feature_metadata.feature_columns
 
-    # Build walk-forward folds
+    # Build holdout supervised frame separately. Concatenating panel+holdout gives the
+    # holdout rows correct lag history, but we only keep holdout-date rows in the result.
+    # This prevents holdout demand from entering training targets via shift(-horizon).
+    holdout_supervised_frame: pd.DataFrame | None = None
+    if holdout_panel is not None:
+        combined_panel = pd.concat([panel, holdout_panel], ignore_index=True)
+        combined_prepared = label_stockout_regime(combined_panel)
+        full_supervised, _ = build_supervised_frame(
+            panel=combined_prepared,
+            feature_config=settings.features,
+            horizon=settings.dataset.horizon,
+        )
+        holdout_dates = set(holdout_panel["date"].unique())
+        holdout_supervised_frame = full_supervised[
+            full_supervised["date"].isin(holdout_dates)
+        ].copy()
+
+    # Build walk-forward folds (only on the original panel dates)
     folds = build_walk_forward_folds(
-        panel=prepared_panel,
+        panel=panel,
         validation_config=settings.validation,
         horizon=settings.dataset.horizon,
     )
@@ -182,9 +213,8 @@ def run_experiment_from_frame(
     tuning_metadata = None
     if settings.models.use_tuning:
         print(f"🔍 Starting Optuna Tuning for {data_strategy} strategy...")
-        tuning_train_frame = supervised_frame[
-            supervised_frame["date"] <= folds[0].train_end_date
-        ]
+        # Tuning only uses data available in the first fold's training set
+        tuning_train_frame = supervised_frame[supervised_frame["date"] <= folds[0].train_end_date]
         tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
         tuning_result = tuner.tune_boosting(tuning_train_frame, feature_columns)
         best_boosting_params = tuning_result.best_params
@@ -207,7 +237,7 @@ def run_experiment_from_frame(
     baseline_model = SeasonalNaiveModel(
         seasonal_period=settings.models.seasonal_period,
         horizon=settings.dataset.horizon,
-    ).fit(prepared_panel)
+    ).fit(panel)
 
     for fold in folds:
         # Prepare training and validation frames
@@ -234,9 +264,8 @@ def run_experiment_from_frame(
         )
 
         # Calibration split for conformal methods
-        calib_days = 21
         max_train_date = train_frame["date"].max()
-        calib_cutoff = max_train_date - pd.Timedelta(days=calib_days)
+        calib_cutoff = max_train_date - pd.Timedelta(days=settings.validation.calibration_days)
         sub_train_frame = train_frame[train_frame["date"] <= calib_cutoff].copy()
         calib_frame = train_frame[train_frame["date"] > calib_cutoff].copy()
         if sub_train_frame.empty:
@@ -276,14 +305,10 @@ def run_experiment_from_frame(
                 learning_rate=best_boosting_params.learning_rate,
                 max_depth=best_boosting_params.max_depth,
                 overstock_cost=(
-                    settings.inventory.overstock_cost
-                    if settings.models.optimize_for_cost
-                    else 1.0
+                    settings.inventory.overstock_cost if settings.models.optimize_for_cost else 1.0
                 ),
                 stockout_cost=(
-                    settings.inventory.stockout_cost
-                    if settings.models.optimize_for_cost
-                    else 0.0
+                    settings.inventory.stockout_cost if settings.models.optimize_for_cost else 0.0
                 ),
             )
             base_lgb.fit(
@@ -311,11 +336,7 @@ def run_experiment_from_frame(
         fold_predictions.append(boosting_preds)
 
         # 3. CatBoost (Boosting)
-        if (
-            cat_model is None
-            or settings.validation.retrain_each_fold
-            or current_fold_retrained
-        ):
+        if cat_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
             base_cat = CatBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
@@ -349,10 +370,7 @@ def run_experiment_from_frame(
         )
 
         # Update drift detector with current fold MAE
-        boosting_fold_preds = fold_predictions[-2]
-        fold_mae = (
-            (boosting_fold_preds["y_true"] - boosting_fold_preds["y_pred"]).abs().mean()
-        )
+        fold_mae = (boosting_preds["y_true"] - boosting_preds["y_pred"]).abs().mean()
         drift_status = drift_detector.update(fold_mae)
         last_drift_score = drift_status.score
         max_drift_score = max(max_drift_score, drift_status.score)
@@ -367,10 +385,109 @@ def run_experiment_from_frame(
                 )
             )
             if settings.validation.drift_triggered_retrain:
-                print(
-                    f"⚠️ DRIFT DETECTED in Fold {fold.fold_id}. Forcing retrain for next fold."
-                )
+                print(f"⚠️ DRIFT DETECTED in Fold {fold.fold_id}. Forcing retrain for next fold.")
                 force_retrain = True
+
+    # 4. Final Holdout Evaluation (Unseen data)
+    if holdout_supervised_frame is not None and not holdout_supervised_frame.empty:
+        print(f"📊 Retraining on full train set before holdout evaluation ({data_strategy})...")
+        holdout_frame = holdout_supervised_frame
+
+        # Retrain both models on the entire supervised_frame so the holdout is evaluated
+        # by a model that has seen all available training data, not just up to the last fold.
+        calib_cutoff = supervised_frame["date"].max() - pd.Timedelta(
+            days=settings.validation.calibration_days
+        )
+        full_sub_train = supervised_frame[supervised_frame["date"] <= calib_cutoff].copy()
+        full_calib = supervised_frame[supervised_frame["date"] > calib_cutoff].copy()
+        if full_sub_train.empty:
+            full_sub_train = supervised_frame
+            full_calib = pd.DataFrame()
+
+        full_calib_group_ids = None
+        if not full_calib.empty and "third_category_id" in full_calib.columns:
+            full_calib_group_ids = full_calib["third_category_id"]
+
+        base_lgb_final = AutoBoostingModel(
+            quantiles=settings.models.quantiles,
+            random_seed=settings.project.random_seed,
+            n_estimators=best_boosting_params.n_estimators,
+            learning_rate=best_boosting_params.learning_rate,
+            max_depth=best_boosting_params.max_depth,
+            overstock_cost=(
+                settings.inventory.overstock_cost if settings.models.optimize_for_cost else 1.0
+            ),
+            stockout_cost=(
+                settings.inventory.stockout_cost if settings.models.optimize_for_cost else 0.0
+            ),
+        )
+        base_lgb_final.fit(
+            full_sub_train.loc[:, feature_columns],
+            full_sub_train["target_lead_time_demand"],
+        )
+        holdout_boosting_model = ConformalForecaster(base_lgb_final)
+        if not full_calib.empty:
+            holdout_boosting_model.calibrate(
+                full_calib.loc[:, feature_columns],
+                full_calib["target_lead_time_demand"],
+                alpha=settings.models.quantiles[0] * 2,
+                group_ids=full_calib_group_ids,
+            )
+
+        base_cat_final = CatBoostingModel(
+            quantiles=settings.models.quantiles,
+            random_seed=settings.project.random_seed,
+            n_estimators=best_boosting_params.n_estimators,
+            learning_rate=best_boosting_params.learning_rate,
+            max_depth=best_boosting_params.max_depth,
+        )
+        base_cat_final.fit(
+            full_sub_train.loc[:, feature_columns],
+            full_sub_train["target_lead_time_demand"],
+        )
+        holdout_cat_model = ConformalForecaster(base_cat_final)
+        if not full_calib.empty:
+            holdout_cat_model.calibrate(
+                full_calib.loc[:, feature_columns],
+                full_calib["target_lead_time_demand"],
+                alpha=settings.models.quantiles[0] * 2,
+                group_ids=full_calib_group_ids,
+            )
+
+        if not holdout_frame.empty:
+            # Baseline on holdout
+            fold_predictions.append(
+                _build_baseline_predictions(
+                    validation_frame=holdout_frame,
+                    baseline_model=baseline_model,
+                    fold_id=999,  # Conventional ID for holdout
+                    settings=settings,
+                    data_strategy=data_strategy,
+                    series_cost_profile=series_cost_profile,
+                )
+            )
+            fold_predictions.append(
+                _build_model_predictions(
+                    validation_frame=holdout_frame,
+                    feature_columns=feature_columns,
+                    model=holdout_boosting_model,
+                    fold_id=999,
+                    settings=settings,
+                    data_strategy=data_strategy,
+                    series_cost_profile=series_cost_profile,
+                )
+            )
+            fold_predictions.append(
+                _build_model_predictions(
+                    validation_frame=holdout_frame,
+                    feature_columns=feature_columns,
+                    model=holdout_cat_model,
+                    fold_id=999,
+                    settings=settings,
+                    data_strategy=data_strategy,
+                    series_cost_profile=series_cost_profile,
+                )
+            )
 
     if not fold_predictions:
         raise ValueError("Backtest did not produce any validation predictions.")
@@ -395,12 +512,11 @@ def run_experiment_from_frame(
     report_extra = ""
     if detected_drifts:
         drift_str = ", ".join(
-            [
-                f"Fold {event.fold_id} (score={event.score:.2f})"
-                for event in detected_drifts
-            ]
+            [f"Fold {event.fold_id} (score={event.score:.2f})" for event in detected_drifts]
         )
-        report_extra = f"**ALERT**: Concept drift detected and triggered adaptive retrains at: {drift_str}"
+        report_extra = (
+            f"**ALERT**: Concept drift detected and triggered adaptive retrains at: {drift_str}"
+        )
 
     backtest_metadata = BacktestMetadata(
         run_name=settings.reporting.run_name,
@@ -501,9 +617,7 @@ def _build_baseline_predictions(
         "stockout_regime",
     ]
     if "latent_demand_est" in validation_frame.columns:
-        cols_to_keep.extend(
-            ["latent_demand_est", "is_imputed", "original_observed_demand"]
-        )
+        cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
 
     prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
@@ -544,9 +658,7 @@ def _build_model_predictions(
         "stockout_regime",
     ]
     if "latent_demand_est" in validation_frame.columns:
-        cols_to_keep.extend(
-            ["latent_demand_est", "is_imputed", "original_observed_demand"]
-        )
+        cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
 
     prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
@@ -579,9 +691,7 @@ def _build_model_predictions(
         predictions=prediction_frame,
         inventory_config=settings.inventory,
         quantile_columns=quantile_columns,
-        quantile_levels=[
-            float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns
-        ],
+        quantile_levels=[float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns],
         series_cost_profile=series_cost_profile,
     )
     return attach_inventory_costs(

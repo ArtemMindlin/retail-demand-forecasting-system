@@ -38,16 +38,6 @@ class DatasetConfig(BaseModel):
     min_history_days: int = Field(default=70, ge=0)
     max_rows: int | None = Field(default=None, gt=0)
     horizon: int = Field(default=7, gt=0)
-    use_eval_as_holdout: bool = False
-
-    @field_validator("use_eval_as_holdout")
-    @classmethod
-    def validate_holdout_semantics(cls, v: bool) -> bool:
-        if v:
-            raise ValueError(
-                "use_eval_as_holdout must remain false until eval split temporal semantics are verified."
-            )
-        return v
 
     @model_validator(mode="after")
     def validate_temporal_consistency(self) -> DatasetConfig:
@@ -60,9 +50,9 @@ class PreprocessingConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     drop_negative_sales: bool = True
     fill_missing_values: bool = True
-    imputation_strategy: Literal[
-        "supervised", "historical_mean", "clipped_scaling", "none"
-    ] = "supervised"
+    imputation_strategy: Literal["supervised", "historical_mean", "clipped_scaling", "none"] = (
+        "supervised"
+    )
 
 
 class FeatureConfig(BaseModel):
@@ -87,6 +77,7 @@ class ValidationConfig(BaseModel):
     initial_train_days: int = Field(default=56, gt=0)
     n_folds: int = Field(default=3, gt=0)
     fold_size_days: int = Field(default=7, gt=0)
+    calibration_days: int = Field(default=21, gt=0)
     retrain_each_fold: bool = True
     drift_triggered_retrain: bool = False
 
@@ -106,9 +97,7 @@ class DataQualityConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-    quantiles: list[float] = Field(
-        default_factory=lambda: [0.1, 0.5, 0.9], min_length=1
-    )
+    quantiles: list[float] = Field(default_factory=lambda: [0.1, 0.5, 0.9], min_length=1)
     seasonal_period: int = Field(default=7, gt=0)
     n_estimators: int = Field(default=200, gt=0)
     learning_rate: float = Field(default=0.05, gt=0)
@@ -147,9 +136,7 @@ class SyntheticCostConfig(BaseModel):
     service_criticality_base: float = Field(default=0.9, gt=0)
     service_criticality_multiplier: float = Field(default=0.5, ge=0)
 
-    @field_validator(
-        "perishability_weights", "slow_moving_weights", "criticality_weights"
-    )
+    @field_validator("perishability_weights", "slow_moving_weights", "criticality_weights")
     @classmethod
     def validate_weights_sum(cls, v: list[float]) -> list[float]:
         if any(weight < 0.0 for weight in v):
@@ -169,18 +156,14 @@ class InventoryConfig(BaseModel):
     pareto_order_scales: list[float] = Field(
         default_factory=lambda: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3], min_length=1
     )
-    synthetic_cost_config: SyntheticCostConfig = Field(
-        default_factory=SyntheticCostConfig
-    )
+    synthetic_cost_config: SyntheticCostConfig = Field(default_factory=SyntheticCostConfig)
     global_capacity_units: int | None = Field(default=None, gt=0)
 
     @field_validator("pareto_order_scales")
     @classmethod
     def validate_scales(cls, v: list[float]) -> list[float]:
         if any(scale < 0.0 for scale in v):
-            raise ValueError(
-                "inventory.pareto_order_scales must contain only non-negative scales."
-            )
+            raise ValueError("inventory.pareto_order_scales must contain only non-negative scales.")
         return v
 
 
@@ -236,9 +219,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_cross_module_consistency(self) -> Settings:
         if self.validation.initial_train_days < self.dataset.horizon:
-            raise ValueError(
-                "validation.initial_train_days must be at least dataset.horizon."
-            )
+            raise ValueError("validation.initial_train_days must be at least dataset.horizon.")
         return self
 
 

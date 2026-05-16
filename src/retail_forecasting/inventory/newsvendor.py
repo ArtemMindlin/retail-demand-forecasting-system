@@ -7,14 +7,12 @@ from retail_forecasting.config import InventoryConfig
 from retail_forecasting.inventory.cost_profiles import attach_series_costs
 
 
-# The critical fractile is calculated to find the quantile of the demand distribution that minimizes expected costs, and order quantities are chosen accordingly.
 def critical_fractile(inventory_config: InventoryConfig) -> float:
     return inventory_config.stockout_cost / (
         inventory_config.stockout_cost + inventory_config.overstock_cost
     )
 
 
-# The order quantity is determined by either directly using the point forecast or interpolating between quantile forecasts based on the critical fractile, which represents the optimal service level for the newsvendor problem.
 def choose_order_quantity(
     predictions: pd.DataFrame,
     inventory_config: InventoryConfig,
@@ -40,7 +38,7 @@ def choose_order_quantity(
     # 1. Determine the 'Order-Up-To' level (S) based on lead-time demand distribution
     if quantile_columns:
         sorted_pairs = sorted(
-            zip(quantile_levels, quantile_columns), key=lambda item: item[0]
+            zip(quantile_levels, quantile_columns, strict=False), key=lambda item: item[0]
         )
         levels = np.asarray([pair[0] for pair in sorted_pairs], dtype=float)
         values = enriched[[pair[1] for pair in sorted_pairs]].to_numpy(dtype=float)
@@ -59,9 +57,7 @@ def choose_order_quantity(
     # Note: In our simulation context, 'current_stock' represents On-Hand minus Backlog
     inventory_position = np.zeros_like(s_levels)
     if current_stock is not None:
-        inventory_position += (
-            current_stock.reindex(predictions.index).fillna(0.0).to_numpy()
-        )
+        inventory_position += current_stock.reindex(predictions.index).fillna(0.0).to_numpy()
     if on_order is not None:
         inventory_position += on_order.reindex(predictions.index).fillna(0.0).to_numpy()
 
@@ -174,9 +170,7 @@ def summarize_pareto_frontier(
                     "policy_name": f"order_scale_{order_scale:g}",
                     "order_scale": order_scale,
                     "observations": int(len(candidate)),
-                    "mean_order_quantity": float(
-                        candidate["candidate_order_quantity"].mean()
-                    ),
+                    "mean_order_quantity": float(candidate["candidate_order_quantity"].mean()),
                     "total_overstock_units": float(overstock_units.sum()),
                     "total_stockout_units": float(stockout_units.sum()),
                     "total_overstock_cost": float(overstock_cost.sum()),
@@ -185,9 +179,7 @@ def summarize_pareto_frontier(
                     "mean_cost": float((overstock_cost + stockout_cost).mean()),
                     "service_level": float((stockout_units <= 0.0).mean()),
                     "fill_rate": float(
-                        filled_units.sum() / demand_denominator
-                        if demand_denominator > 0.0
-                        else 1.0
+                        filled_units.sum() / demand_denominator if demand_denominator > 0.0 else 1.0
                     ),
                 }
             )
@@ -212,9 +204,7 @@ def summarize_pareto_frontier(
     ).reset_index(drop=True)
 
 
-def _interpolate_quantile(
-    levels: np.ndarray, values: np.ndarray, target_level: float
-) -> float:
+def _interpolate_quantile(levels: np.ndarray, values: np.ndarray, target_level: float) -> float:
     if target_level <= levels[0]:
         return float(values[0])
     if target_level >= levels[-1]:
@@ -267,9 +257,7 @@ def run_sensitivity_analysis(
 
     # Identify available quantile columns
     quantile_columns = [c for c in predictions.columns if c.startswith("q_")]
-    quantile_levels = [
-        float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns
-    ]
+    quantile_levels = [float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns]
 
     results = []
     for ratio in ratios:
@@ -289,34 +277,28 @@ def run_sensitivity_analysis(
             adjusted_series_cost_profile["c_under"] = (
                 adjusted_series_cost_profile["c_under"] * stockout_scale
             )
-            adjusted_series_cost_profile["critical_fractile"] = (
-                adjusted_series_cost_profile["c_under"]
-                / (
-                    adjusted_series_cost_profile["c_under"]
-                    + adjusted_series_cost_profile["c_over"]
-                )
-            )
+            adjusted_series_cost_profile["critical_fractile"] = adjusted_series_cost_profile[
+                "c_under"
+            ] / (adjusted_series_cost_profile["c_under"] + adjusted_series_cost_profile["c_over"])
 
         for model_name in predictions["model_name"].unique():
             model_preds = predictions[predictions["model_name"] == model_name].copy()
             if (
                 adjusted_series_cost_profile is None
                 and temp_config.use_series_costs
-                and {"c_over", "c_under", "critical_fractile"}.issubset(
-                    model_preds.columns
-                )
+                and {"c_over", "c_under", "critical_fractile"}.issubset(model_preds.columns)
             ):
                 target_stockout_cost = base_inventory_config.overstock_cost * ratio
-                stockout_scale = (
-                    target_stockout_cost / base_inventory_config.stockout_cost
-                )
+                stockout_scale = target_stockout_cost / base_inventory_config.stockout_cost
                 model_preds["c_under"] = model_preds["c_under"] * stockout_scale
                 model_preds["critical_fractile"] = model_preds["c_under"] / (
                     model_preds["c_under"] + model_preds["c_over"]
                 )
 
-            # Identify if this model has quantiles
-            has_quantiles = model_name in ["auto_boosting", "catboost"]
+            # Identify if this model has quantiles with actual (non-null) values
+            has_quantiles = any(
+                c.startswith("q_") and model_preds[c].notna().any() for c in model_preds.columns
+            )
 
             # Recalculate order quantity for this specific ratio
             model_preds["order_quantity"] = choose_order_quantity(
