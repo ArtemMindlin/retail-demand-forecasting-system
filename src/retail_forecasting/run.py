@@ -95,7 +95,8 @@ def _format_validation_error(exc: ValidationError) -> str:
     for error in exc.errors():
         location = ".".join(str(part) for part in error["loc"])
         if error["type"] == "greater_than":
-            message = f"{location} must be greater than {error['ctx']['gt']}."
+            ctx = error.get("ctx") or {}
+            message = f"{location} must be greater than {ctx.get('gt', '?')}."
         else:
             message = f"{location}: {error['msg']}"
         messages.append(f"- {message}")
