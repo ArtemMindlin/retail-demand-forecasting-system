@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
 from retail_forecasting.config import Settings
@@ -713,8 +715,87 @@ def _build_model_predictions(
     )
 
 
-def run_scoring(settings: Settings) -> RunArtifacts:
-    """Operational scoring using a pre-trained model — no retraining."""
+def _instantiate_champion_base_model(settings: Settings) -> CatBoostingModel | AutoBoostingModel:
+    backend = settings.business.champion_backend_name
+    if backend == "conformal_catboost_official":
+        return CatBoostingModel(
+            quantiles=settings.models.quantiles,
+            random_seed=settings.project.random_seed,
+            n_estimators=settings.models.n_estimators,
+            learning_rate=settings.models.learning_rate,
+            max_depth=settings.models.max_depth,
+        )
+    return AutoBoostingModel(
+        quantiles=settings.models.quantiles,
+        random_seed=settings.project.random_seed,
+        n_estimators=settings.models.n_estimators,
+        learning_rate=settings.models.learning_rate,
+        max_depth=settings.models.max_depth,
+        overstock_cost=(
+            settings.inventory.overstock_cost if settings.models.optimize_for_cost else 1.0
+        ),
+        stockout_cost=(
+            settings.inventory.stockout_cost if settings.models.optimize_for_cost else 0.0
+        ),
+    )
+
+
+def train_and_save_champion(
+    settings: Settings,
+    panel: pd.DataFrame,
+    models_dir: Path | None = None,
+) -> Path:
+    """Fit the configured champion model on the full panel and persist it to disk.
+
+    No fold-based evaluation is performed; the last ``calibration_days`` of the
+    panel are reserved for conformal calibration. The wrapped ConformalForecaster
+    is saved to ``models_dir/<backend_name>.pkl``.
+    """
+    prepared_panel = label_stockout_regime(panel)
+    supervised_frame, feature_metadata = build_supervised_frame(
+        panel=prepared_panel,
+        feature_config=settings.features,
+        horizon=settings.dataset.horizon,
+    )
+    feature_columns = feature_metadata.feature_columns
+
+    calib_cutoff = supervised_frame["date"].max() - pd.Timedelta(
+        days=settings.validation.calibration_days
+    )
+    train_frame = supervised_frame[supervised_frame["date"] <= calib_cutoff].copy()
+    calib_frame = supervised_frame[supervised_frame["date"] > calib_cutoff].copy()
+    if train_frame.empty:
+        train_frame = supervised_frame
+        calib_frame = pd.DataFrame()
+
+    base_model = _instantiate_champion_base_model(settings)
+    base_model.fit(
+        train_frame.loc[:, feature_columns],
+        train_frame["target_lead_time_demand"],
+    )
+    conformal = ConformalForecaster(base_model)
+    if not calib_frame.empty:
+        calib_group_ids = None
+        if "third_category_id" in calib_frame.columns:
+            calib_group_ids = calib_frame["third_category_id"]
+        conformal.calibrate(
+            calib_frame.loc[:, feature_columns],
+            calib_frame["target_lead_time_demand"],
+            alpha=settings.models.quantiles[0] * 2,
+            group_ids=calib_group_ids,
+        )
+
+    resolved_dir = (
+        models_dir if models_dir is not None else settings.reporting.output_dir / "models"
+    )
+    resolved_dir.mkdir(parents=True, exist_ok=True)
+    model_path = resolved_dir / f"{conformal.backend_name}.pkl"
+    conformal.save(model_path)
+    return model_path
+
+
+def run_retrain(settings: Settings) -> Path:
+    """Load data, train champion on all of it, and write the model to disk."""
     raw_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
@@ -722,16 +803,43 @@ def run_scoring(settings: Settings) -> RunArtifacts:
     )
     quality_report = validate_prepared_panel(raw_panel, settings)
     raise_on_blocking_data_quality(quality_report)
+    model_path = train_and_save_champion(settings, raw_panel)
+    print(f"✅ Champion retrained and saved to {model_path}")
+    return model_path
 
-    models_dir = settings.reporting.output_dir / "models"
-    champion_backend = settings.business.champion_backend_name
-    model_path = models_dir / f"{champion_backend}.pkl"
+
+def run_scoring(
+    settings: Settings,
+    panel: pd.DataFrame | None = None,
+    model_path: Path | None = None,
+) -> RunArtifacts:
+    """Operational scoring using a pre-trained model — no retraining.
+
+    When ``panel`` or ``model_path`` are provided they override the defaults
+    (train split + champion model on disk), enabling reuse from the streaming
+    simulation without duplicating the inference plumbing.
+    """
+    if panel is None:
+        panel = load_prepared_panel(
+            dataset_config=settings.dataset,
+            preprocessing_config=settings.preprocessing,
+            split="train",
+        )
+        quality_report = validate_prepared_panel(panel, settings)
+        raise_on_blocking_data_quality(quality_report)
+    else:
+        quality_report = None
+
+    if model_path is None:
+        models_dir = settings.reporting.output_dir / "models"
+        champion_backend = settings.business.champion_backend_name
+        model_path = models_dir / f"{champion_backend}.pkl"
     if not model_path.exists():
         raise FileNotFoundError(f"No saved model at {model_path}. Run a backtest or retrain first.")
     model = ConformalForecaster.load(model_path)
     print(f"✅ Loaded champion model: {model.backend_name} from {model_path}")
 
-    prepared_panel = label_stockout_regime(raw_panel)
+    prepared_panel = label_stockout_regime(panel)
     series_cost_profile = None
     if settings.inventory.use_series_costs:
         series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)

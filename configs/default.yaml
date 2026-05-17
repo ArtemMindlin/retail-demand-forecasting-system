@@ -1,6 +1,6 @@
 project:
   random_seed: 42
-  run_mode: backtest
+  run_mode: experiment
 
 dataset:
   source: fresh_retailnet
@@ -93,4 +93,9 @@ business:
 reporting:
   output_dir: reports
   run_name: fresh_retailnet_v2
+  make_plots: true
+
+simulation:
+  retrain_cadences: [null, 7, 1]
+  simulation_days: null
   make_plots: true

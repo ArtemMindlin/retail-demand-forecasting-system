@@ -24,9 +24,7 @@ class DataQualityError(ValueError):
     """Raised when the prepared panel fails blocking runtime quality checks."""
 
 
-def validate_prepared_panel(
-    panel: pd.DataFrame, settings: Settings
-) -> DataQualityReport:
+def validate_prepared_panel(panel: pd.DataFrame, settings: Settings) -> DataQualityReport:
     warnings: list[DataQualityIssue] = []
     blocking_errors: list[DataQualityIssue] = []
 
@@ -37,8 +35,7 @@ def validate_prepared_panel(
                 severity="blocking",
                 code="missing_required_columns",
                 message=(
-                    "Prepared panel is missing required columns: "
-                    f"{', '.join(missing_columns)}."
+                    f"Prepared panel is missing required columns: {', '.join(missing_columns)}."
                 ),
             )
         )
@@ -51,8 +48,7 @@ def validate_prepared_panel(
                 severity="blocking",
                 code="duplicate_series_date_rows",
                 message=(
-                    "Prepared panel contains duplicate `series_id + date` rows: "
-                    f"{duplicate_rows}."
+                    f"Prepared panel contains duplicate `series_id + date` rows: {duplicate_rows}."
                 ),
             )
         )
@@ -70,8 +66,7 @@ def validate_prepared_panel(
                 message=(
                     "Prepared panel contains nulls in key columns: "
                     + ", ".join(
-                        f"{column}={count}"
-                        for column, count in sorted(null_key_counts.items())
+                        f"{column}={count}" for column, count in sorted(null_key_counts.items())
                     )
                     + "."
                 ),
@@ -143,7 +138,7 @@ def validate_prepared_panel(
 
     if (
         settings.data_quality.max_data_age_days is not None
-        and settings.project.run_mode != "backtest"
+        and settings.project.run_mode != "experiment"
         and invalid_dates == 0
         and not parsed_dates.empty
     ):
@@ -188,9 +183,7 @@ def _build_report(
     return DataQualityReport(
         run_mode=settings.project.run_mode,
         checked_rows=len(panel),
-        checked_series=(
-            int(panel["series_id"].nunique()) if "series_id" in panel.columns else 0
-        ),
+        checked_series=(int(panel["series_id"].nunique()) if "series_id" in panel.columns else 0),
         date_min=date_min,
         date_max=date_max,
         warning_count=len(warnings),

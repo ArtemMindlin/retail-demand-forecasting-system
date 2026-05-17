@@ -17,7 +17,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ProjectConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     random_seed: int = 42
-    run_mode: Literal["backtest", "retrain", "score_daily"] = "backtest"
+    run_mode: Literal["experiment", "retrain", "score_daily", "simulate_ops"] = "experiment"
 
 
 class DatasetConfig(BaseModel):
@@ -182,6 +182,29 @@ class BusinessConfig(BaseModel):
     champion_max_service_level_degradation: float = Field(default=0.02, ge=0.0, le=1.0)
 
 
+class SimulationConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    retrain_cadences: list[int | None] = Field(
+        default_factory=lambda: [None, 7, 1],
+        min_length=1,
+        description="Days between retrains per cadence; None means never retrain (baseline).",
+    )
+    simulation_days: int | None = Field(default=None, gt=0)
+    make_plots: bool = True
+
+    @field_validator("retrain_cadences")
+    @classmethod
+    def validate_cadences(cls, v: list[int | None]) -> list[int | None]:
+        if any(item is not None and item <= 0 for item in v):
+            raise ValueError("simulation.retrain_cadences must contain positive ints or None.")
+        seen: set[int | None] = set()
+        for item in v:
+            if item in seen:
+                raise ValueError("simulation.retrain_cadences must be unique.")
+            seen.add(item)
+        return v
+
+
 class ReportingConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     output_dir: Path = Path("reports")
@@ -215,6 +238,7 @@ class Settings(BaseSettings):
     inventory: InventoryConfig = Field(default_factory=InventoryConfig)
     business: BusinessConfig = Field(default_factory=BusinessConfig)
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
+    simulation: SimulationConfig = Field(default_factory=SimulationConfig)
 
     @model_validator(mode="after")
     def validate_cross_module_consistency(self) -> Settings:

@@ -95,7 +95,7 @@ class OperationalRunMetadata(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     run_name: str
-    run_mode: Literal["backtest", "retrain", "score_daily"]
+    run_mode: Literal["experiment", "retrain", "score_daily", "simulate_ops"]
     created_at: str
     git_commit: str | None
     config_hash: str

@@ -30,7 +30,16 @@ ALLOWED_LAYER_IMPORTS = {
     },
     "inventory": {"config"},
     "models": {"config", "contracts", "utils"},
-    "run": {"config", "contracts", "forecasting"},
+    "run": {"config", "contracts", "forecasting", "simulation"},
+    "simulation": {
+        "config",
+        "data",
+        "drift",
+        "features",
+        "forecasting",
+        "inventory",
+        "models",
+    },
     "utils": set(),
     "visualization": {"config", "evaluation", "inventory", "utils"},
 }

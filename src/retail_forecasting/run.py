@@ -6,7 +6,12 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from retail_forecasting.config import load_config
-from retail_forecasting.forecasting.pipeline import run_experiment
+from retail_forecasting.forecasting.pipeline import (
+    run_experiment,
+    run_retrain,
+    run_scoring,
+)
+from retail_forecasting.simulation import run_operational_simulation
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--run-mode",
         default=None,
-        choices=["backtest", "retrain", "score_daily"],
+        choices=["experiment", "retrain", "score_daily", "simulate_ops"],
         help="Optional override for the execution mode.",
     )
     return parser
@@ -77,11 +82,23 @@ def main() -> None:
         new_project = settings.project.model_copy(update=project_updates)
         settings = settings.model_copy(update={"project": new_project})
 
-    artifacts = run_experiment(settings)
+    mode = settings.project.run_mode
+    if mode == "retrain":
+        run_retrain(settings)
+        return
+    if mode == "simulate_ops":
+        sim_artifacts = run_operational_simulation(settings)
+        print(f"Simulation outputs written to: {sim_artifacts.run_directory}")
+        return
+    if mode == "score_daily":
+        artifacts = run_scoring(settings)
+    else:
+        artifacts = run_experiment(settings)
+
     if artifacts.run_directory is None:
         raise RuntimeError("Run finished without a report directory.")
 
-    if settings.project.run_mode == "score_daily":
+    if mode == "score_daily":
         print(
             "Operational outputs written to: "
             f"{artifacts.run_directory / 'reorder_recommendations.csv'}"
