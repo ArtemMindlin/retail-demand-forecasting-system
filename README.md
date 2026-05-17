@@ -2,20 +2,60 @@
 
 Este repositorio contiene un sistema de nivel industrial para el forecasting de demanda y la optimización de reposición en retail, desarrollado para un TFG. El proyecto evoluciona desde el aprendizaje automático estadístico hasta un **Sistema de Apoyo a la Decisión (DSS) End-to-End** que resuelve problemas de inventario bajo restricciones reales, incertidumbre calibrada y estándares MLOps.
 
-## Arquitectura del Sistema
+## Mapa general del sistema
+
+El pipeline transforma datos brutos de ventas en recomendaciones operacionales de reposición. Cada bloque resuelve un problema concreto del dominio retail, no es código por código:
 
 ```mermaid
-graph TD
-    Data[Fresh RetailNet Dataset] --> Quality[Data Quality Gate]
-    Quality --> Impute[Latent Demand Imputation]
-    Impute --> Train[Multi-Objective Hyperparameter Tuning]
-    Train --> Calib[Mondrian Conformal Prediction]
-    Calib --> Decision[Dynamic Order-Up-To Simulation]
-    Decision --> LP[Linear Programming Optimization]
-    LP --> API[FastAPI Microservice]
-    LP --> Dashboard[Streamlit What-If Analysis]
-    API --> MLflow[MLflow Experiment Tracking]
+flowchart TB
+    subgraph dataLayer["1. Datos"]
+        ds["FreshRetailNet-50K<br/>(Hugging Face)"]
+        panel["Panel diario por SKU-tienda<br/>+ imputación de demanda latente<br/>(corrige stockouts censurados)"]
+        ds --> panel
+    end
+
+    subgraph featureLayer["2. Feature engineering (sin leakage temporal)"]
+        feats["Lags · rolling windows · calendario<br/>weather · discount · stockout"]
+    end
+
+    subgraph modelLayer["3. Modelado probabilístico"]
+        champ["Champion: CatBoost / LightGBM<br/>(selección automática vía promotion logic)"]
+        conf["Conformal Prediction (Mondrian)<br/>intervalos calibrados q_0.1 / q_0.5 / q_0.9"]
+        champ --> conf
+    end
+
+    subgraph decisionLayer["4. Decisión de inventario"]
+        nv["Newsvendor / Order-Up-To<br/>order_quantity óptima dado<br/>overstock_cost vs stockout_cost"]
+        sim["Simulación dinámica<br/>arrastre de stock entre periodos"]
+        nv --> sim
+    end
+
+    subgraph modes["5. Modos de ejecución"]
+        exp["experiment<br/>backtest walk-forward + champion"]
+        rt["retrain<br/>refresco operacional rápido"]
+        sd["score_daily<br/>recomendaciones diarias"]
+        so["simulate_ops<br/>streaming del eval, comparativa<br/>de cadencias de reentrenamiento"]
+    end
+
+    panel --> feats --> champ
+    conf --> nv
+    sim --> exp
+    sim --> rt
+    sim --> sd
+    sim --> so
+
+    exp -.->|"reports/&lt;run&gt;/report.md<br/>champion_registry.json"| outputs[(Outputs)]
+    sd -.->|"reorder_recommendations.csv"| outputs
+    so -.->|"simulation/cumulative_cost.png<br/>cadence_summary.csv"| outputs
 ```
+
+**Decisiones de diseño clave** (la sustancia académica del TFG):
+
+1. **Demanda latente vs observada** — cuando una serie se queda sin stock, las ventas observadas subestiman la demanda real. El imputador corrige este sesgo de censura.
+2. **Conformal prediction** — los modelos boosting no producen intervalos calibrados de fábrica. La capa conformal añade garantías estadísticas de cobertura sin reentrenar.
+3. **Target = lead-time demand agregada** — el modelo predice la demanda *acumulada* en los próximos H días, no un valor por día. Alinea el output con la decisión real (reposición) en lugar de optimizar MAPE diario.
+4. **Newsvendor con critical fractile** — la cantidad óptima a pedir no es la media; se calcula del cuantil que minimiza el coste esperado dado el ratio overstock/stockout.
+5. **Cuatro modos de ejecución** — separación entre investigación (`experiment`, `simulate_ops`) y producción (`retrain`, `score_daily`) siguiendo prácticas MLOps estándar.
 
 ## Características de Excelencia Académica e Industrial
 
