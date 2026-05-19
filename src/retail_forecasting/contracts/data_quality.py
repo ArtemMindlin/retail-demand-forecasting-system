@@ -11,6 +11,10 @@ class DataQualityIssue(BaseModel):
     message: str
 
 
+class DataQualityError(ValueError):
+    """Raised when the prepared panel fails blocking runtime quality checks."""
+
+
 class DataQualityReport(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 

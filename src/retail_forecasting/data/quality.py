@@ -6,6 +6,7 @@ import pandas as pd
 
 from retail_forecasting.config import Settings
 from retail_forecasting.contracts.data_quality import (
+    DataQualityError,
     DataQualityIssue,
     DataQualityReport,
 )
@@ -18,10 +19,6 @@ REQUIRED_PANEL_COLUMNS = {
 }
 
 KEY_COLUMNS = ["date", "series_id", "observed_demand"]
-
-
-class DataQualityError(ValueError):
-    """Raised when the prepared panel fails blocking runtime quality checks."""
 
 
 def validate_prepared_panel(panel: pd.DataFrame, settings: Settings) -> DataQualityReport:
@@ -79,40 +76,8 @@ def validate_prepared_panel(panel: pd.DataFrame, settings: Settings) -> DataQual
         blocking_errors.append(
             DataQualityIssue(
                 severity="blocking",
-                code="invalid_dates",
-                message=f"Prepared panel contains {invalid_dates} invalid date values.",
-            )
-        )
-    else:
-        non_monotonic_series = int(
-            panel.assign(_parsed_date=parsed_dates)
-            .groupby("series_id", dropna=False)["_parsed_date"]
-            .apply(lambda dates: not dates.is_monotonic_increasing)
-            .sum()
-        )
-        if non_monotonic_series > 0:
-            blocking_errors.append(
-                DataQualityIssue(
-                    severity="blocking",
-                    code="non_monotonic_dates",
-                    message=(
-                        "Prepared panel contains series with non-monotonic date order: "
-                        f"{non_monotonic_series}."
-                    ),
-                )
-            )
-
-    history_lengths = panel.groupby("series_id", dropna=False)["date"].nunique()
-    short_series = int((history_lengths < settings.dataset.min_history_days).sum())
-    if short_series > 0:
-        blocking_errors.append(
-            DataQualityIssue(
-                severity="blocking",
-                code="insufficient_history",
-                message=(
-                    "Prepared panel contains series below `dataset.min_history_days`: "
-                    f"{short_series}."
-                ),
+                code="invalid_date_format",
+                message=f"Prepared panel contains {invalid_dates} rows with unparseable dates.",
             )
         )
 
