@@ -27,7 +27,9 @@ CONFIG_PATH = Path("configs/default.yaml")
 def test_default_config_preserves_experimental_guardrails() -> None:
     settings = load_config(CONFIG_PATH)
 
-    assert settings.dataset.source == "fresh_retailnet"
+    assert settings.dataset.hf_dataset_id == "Dingdong-Inc/FreshRetailNet-50K"
+    assert settings.dataset.processed_panel_dir == Path("data/processed")
+    assert settings.dataset.use_cache is True
     assert settings.project.run_mode in {"experiment", "retrain", "score_daily"}
     assert settings.dataset.horizon > 0
     assert settings.dataset.min_history_days >= settings.dataset.horizon

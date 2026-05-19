@@ -3,15 +3,13 @@ project:
   run_mode: experiment
 
 dataset:
-  source: fresh_retailnet
   hf_dataset_id: Dingdong-Inc/FreshRetailNet-50K
   splits:
     train: data/train.parquet
     eval: data/eval.parquet
   local_cache_dir: data/raw/fresh_retailnet
-  processed_panel_path: data/processed/fresh_retailnet_train.parquet
-  use_local_cache: true
-  refresh_processed_cache: false
+  processed_panel_dir: data/processed
+  use_cache: true
   top_n_series: 50
   min_history_days: 70
   max_rows: null
