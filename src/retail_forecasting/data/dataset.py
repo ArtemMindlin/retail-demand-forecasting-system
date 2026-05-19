@@ -78,9 +78,10 @@ def prepare_daily_panel(
         A cleaned daily panel ready for feature engineering.
     """
 
-    panel = frame.copy()
     if dataset_config.max_rows:
-        panel = panel.head(dataset_config.max_rows).copy()
+        panel = frame.head(dataset_config.max_rows).copy()
+    else:
+        panel = frame.copy()
 
     panel = panel.rename(
         columns={
