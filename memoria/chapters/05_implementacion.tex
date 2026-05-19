@@ -23,6 +23,27 @@ El \textit{stack} tecnológico se ha seleccionado para maximizar la robustez, es
     \item \textbf{Dashboard Interactivo (Streamlit)}: Para acercar la matemática al tomador de decisiones, se ha desarrollado un \textit{What-If Dashboard}. Esta interfaz permite a los directores ajustar los costes de rotura y exceso o las capacidades de almacén de forma visual, re-simulando y comparando las decisiones logísticas al instante.
 \end{itemize}
 
+\section{Modos de Ejecución y Ciclo Operacional}
+\label{sec:run_modes}
+
+El sistema distingue explícitamente entre operaciones de investigación y operaciones de producción mediante cuatro modos de ejecución configurables a través del parámetro \texttt{run\_mode}:
+
+\begin{enumerate}
+    \item \textbf{\texttt{experiment}}: Modo de investigación completo. Ejecuta el \textit{backtesting walk-forward} con múltiples \textit{folds} temporales, compara las estrategias de demanda observada y latente, selecciona el modelo \textit{champion} mediante \textit{promotion logic} y genera artefactos de análisis exhaustivos (\texttt{report.md}, \texttt{champion\_registry.json}, gráficos de Pareto). Es el modo utilizado para validar el sistema antes de su despliegue.
+
+    \item \textbf{\texttt{retrain}}: Modo de refresco operacional. Entrena el modelo \textit{champion} sobre la totalidad de los datos disponibles sin realizar evaluación por \textit{folds}. Guarda el modelo en disco en formato \texttt{.pkl}. Se ejecuta periódicamente en producción para mantener el modelo actualizado con los datos más recientes.
+
+    \item \textbf{\texttt{score\_daily}}: Modo de producción diario. Carga el modelo \textit{champion} guardado, construye el \textit{inference frame} con los datos más recientes y genera \texttt{reorder\_recommendations.csv}: una fila por par tienda-producto con la \texttt{order\_quantity} óptima para el horizonte $H$, los tres cuantiles calibrados (\texttt{q\_0.1}, \texttt{q\_0.5}, \texttt{q\_0.9}) y la fecha de decisión. Este fichero es el entregable que consumiría el sistema de compras o el responsable de reposición.
+
+    \item \textbf{\texttt{simulate\_ops}}: Modo de investigación MLOps. Ejecuta la simulación operacional en \textit{streaming} descrita en la Sección~\ref{sec:simulate_ops}, comparando múltiples cadencias de reentrenamiento sobre el split de evaluación.
+\end{enumerate}
+
+\subsection{Política Champion/Challenger y Promotion Logic}
+
+El sistema implementa el patrón estándar de MLOps para la gestión del ciclo de vida de modelos. El \textbf{champion} es el modelo vigente en producción, registrado en \texttt{champion\_registry.json}. Un \textbf{challenger} es un candidato nuevo entrenado con datos más recientes o con una configuración diferente.
+
+La \textbf{promotion logic} define los criterios bajo los cuales el challenger puede reemplazar al champion. El challenger solo es promovido si supera al champion en coste total de inventario sobre el \textit{holdout} y mantiene el nivel de servicio por encima del umbral mínimo configurado. Esta política garantiza que el modelo en producción nunca se degrada por un reentrenamiento deficiente: el champion permanece activo hasta que un challenger lo derrota de forma inequívoca según los criterios de negocio, no únicamente según métricas estadísticas.
+
 \section{Calidad de Software e Infraestructura CI/CD}
 Para garantizar que la deuda técnica no limite el escalado del sistema, se han aplicado prácticas fundamentales de \textit{DevOps}:
 \begin{itemize}

@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from retail_forecasting.config import DatasetConfig, Settings, load_config
-from retail_forecasting.data.fresh_retailnet import load_prepared_panel
+from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.eda.plots import render_eda_plots
 from retail_forecasting.eda.profiling import (
     build_dataset_summary,
@@ -95,13 +95,9 @@ def build_correlation_summary(panel: pd.DataFrame) -> pd.DataFrame:
     """Compute numeric correlations against observed demand."""
     numeric_columns = panel.select_dtypes(include=["number"]).columns.tolist()
     if "observed_demand" not in numeric_columns:
-        return pd.DataFrame(
-            columns=["feature_name", "correlation_with_observed_demand"]
-        )
+        return pd.DataFrame(columns=["feature_name", "correlation_with_observed_demand"])
 
-    correlations = panel.loc[:, numeric_columns].corr(numeric_only=True)[
-        "observed_demand"
-    ]
+    correlations = panel.loc[:, numeric_columns].corr(numeric_only=True)["observed_demand"]
     correlation_summary = (
         correlations.drop(labels=["observed_demand"])
         .rename("correlation_with_observed_demand")
@@ -124,9 +120,7 @@ def build_config_alignment_summary(
     """Check whether the loaded prepared panel matches key dataset settings."""
     actual_unique_series = int(panel["series_id"].nunique())
     history_lengths = panel.groupby("series_id")["date"].nunique()
-    actual_min_history_days = (
-        int(history_lengths.min()) if not history_lengths.empty else 0
-    )
+    actual_min_history_days = int(history_lengths.min()) if not history_lengths.empty else 0
     expected_max_series = dataset_config.top_n_series
 
     if expected_max_series is None or expected_max_series == 0:
@@ -138,8 +132,8 @@ def build_config_alignment_summary(
     summary = pd.DataFrame(
         [
             {
-                "processed_panel_path": str(dataset_config.processed_panel_path),
-                "refresh_processed_cache": dataset_config.refresh_processed_cache,
+                "processed_panel_dir": str(dataset_config.processed_panel_dir),
+                "use_cache": dataset_config.use_cache,
                 "configured_top_n_series": expected_max_series,
                 "actual_unique_series": actual_unique_series,
                 "top_n_series_matches_config": top_n_matches,
@@ -186,9 +180,7 @@ def main() -> None:
         settings.reporting.output_dir = Path(args.output_dir)
 
     artifacts = run_eda(settings=settings, split=args.split)
-    if artifacts.run_directory is None:
-        raise RuntimeError("EDA run finished without a report directory.")
-
+    assert artifacts.run_directory is not None
     print(f"EDA report written to: {artifacts.run_directory / 'eda_report.md'}")
 
 

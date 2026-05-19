@@ -10,19 +10,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import shap
 
-from retail_forecasting.utils.io import ensure_directory
-
 
 def render_standard_plots(
     metrics_summary: pd.DataFrame,
     cost_summary: pd.DataFrame,
     output_dir: str | Path,
 ) -> None:
-    target_dir = ensure_directory(output_dir)
+    target_dir = Path(output_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
     _plot_total_cost(cost_summary, target_dir / "cost_by_model.png")
-    _plot_error_cost_tradeoff(
-        metrics_summary, cost_summary, target_dir / "error_cost_tradeoff.png"
-    )
+    _plot_error_cost_tradeoff(metrics_summary, cost_summary, target_dir / "error_cost_tradeoff.png")
 
 
 def render_shap_summary(

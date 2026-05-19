@@ -6,7 +6,7 @@ PYTEST = uv run pytest
 CONFIG = configs/default.yaml
 DASHBOARD = src/retail_forecasting/visualization/dashboard.py
 
-.PHONY: help install run eda dashboard api mlflow up test test-harness lint format clean
+.PHONY: help install run retrain score simulate eda dashboard api mlflow up test test-harness lint format clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -15,7 +15,16 @@ install: ## Install dependencies and create virtual environment with uv
 	uv sync --extra ml --extra dev
 
 run: ## Run the full experiment with default configuration
-	$(PYTHON) -m retail_forecasting.run --config $(CONFIG)
+	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode experiment
+
+retrain: ## Retrain champion model on all available data
+	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode retrain
+
+score: ## Generate daily reorder recommendations (production mode)
+	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode score_daily
+
+simulate: ## Run operational simulation comparing retrain cadences
+	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode simulate_ops
 
 eda: ## Run the reproducible EDA module on the prepared panel
 	$(PYTHON) -m retail_forecasting.eda.run --config $(CONFIG)

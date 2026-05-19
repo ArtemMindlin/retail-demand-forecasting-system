@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-import shutil
 from typing import Protocol
 
 import pandas as pd
 
 from retail_forecasting.utils.io import (
     dataframe_to_markdown,
-    ensure_directory,
     make_run_directory,
 )
 
@@ -19,9 +18,9 @@ MEMORIA_FIGURE_EXPORTS = [
         "caption": "Distribución global de la demanda observada en el panel preparado.",
         "label": "fig:eda_observed_demand_distribution",
         "interpretation": (
-            "Interpretación. La distribución de la demanda observada muestra concentración en rangos "
-            "bajos y una cola hacia valores mayores, lo que es coherente con un problema retail "
-            "heterogéneo y alejado de una distribución gaussiana simple."
+            "Interpretación. La distribución de la demanda observada muestra concentración en "
+            "rangos bajos y una cola hacia valores mayores, lo que es coherente con un problema "
+            "retail heterogéneo y alejado de una distribución gaussiana simple."
         ),
     },
     {
@@ -30,8 +29,8 @@ MEMORIA_FIGURE_EXPORTS = [
         "label": "fig:eda_observed_demand_boxplot",
         "interpretation": (
             "Interpretación. Incluso entre las series de mayor volumen persisten diferencias "
-            "relevantes en nivel medio y variabilidad, lo que refuerza la conveniencia de incorporar "
-            "contexto de serie en el modelado."
+            "relevantes en nivel medio y variabilidad, lo que refuerza la conveniencia de "
+            "incorporar contexto de serie en el modelado."
         ),
     },
     {
@@ -40,7 +39,8 @@ MEMORIA_FIGURE_EXPORTS = [
         "label": "fig:eda_coverage_heatmap",
         "interpretation": (
             "Interpretación. La cobertura uniforme indica que el panel preparado es balanceado "
-            "tras el filtrado, sin huecos internos ni series truncadas dentro del horizonte analizado."
+            "tras el filtrado, sin huecos internos ni series truncadas dentro del horizonte "
+            "analizado."
         ),
     },
     {
@@ -48,8 +48,8 @@ MEMORIA_FIGURE_EXPORTS = [
         "caption": "Perfil semanal de demanda observada con media y mediana.",
         "label": "fig:eda_weekday_profile",
         "interpretation": (
-            "Interpretación. El patrón semanal visible justifica el uso de variables de calendario "
-            "y retardos de 7 días en la etapa de ingeniería de características."
+            "Interpretación. El patrón semanal visible justifica el uso de variables de "
+            "calendario y retardos de 7 días en la etapa de ingeniería de características."
         ),
     },
     {
@@ -57,8 +57,9 @@ MEMORIA_FIGURE_EXPORTS = [
         "caption": "Series mas intermitentes segun su proporcion de demanda cero.",
         "label": "fig:eda_zero_demand_rate",
         "interpretation": (
-            "Interpretación. La intermitencia no es homogénea entre series, por lo que el problema "
-            "no debe interpretarse como uniforme para todas las combinaciones tienda-producto."
+            "Interpretación. La intermitencia no es homogénea entre series, por lo que el "
+            "problema no debe interpretarse como uniforme para todas las combinaciones "
+            "tienda-producto."
         ),
     },
     {
@@ -75,8 +76,8 @@ MEMORIA_FIGURE_EXPORTS = [
         "caption": "Demanda media y numero de observaciones por banda de stockout.",
         "label": "fig:eda_stockout_band_demand",
         "interpretation": (
-            "Interpretación. La caída de la demanda observada bajo stockouts severos es consistente "
-            "con la hipótesis de censura operativa por falta de disponibilidad."
+            "Interpretación. La caída de la demanda observada bajo stockouts severos es "
+            "consistente con la hipótesis de censura operativa por falta de disponibilidad."
         ),
     },
     {
@@ -85,7 +86,8 @@ MEMORIA_FIGURE_EXPORTS = [
         "label": "fig:eda_stockout_vs_demand",
         "interpretation": (
             "Interpretación. La tendencia agregada negativa sugiere que las horas de stockout "
-            "aportan señal contextual relevante, aunque con elevada dispersión entre observaciones."
+            "aportan señal contextual relevante, aunque con elevada dispersión entre "
+            "observaciones."
         ),
     },
     {
@@ -93,8 +95,9 @@ MEMORIA_FIGURE_EXPORTS = [
         "caption": "Mapa de correlaciones entre variables numericas del panel preparado.",
         "label": "fig:eda_correlation_heatmap",
         "interpretation": (
-            "Interpretación. Las asociaciones marginales son en general moderadas, lo que respalda "
-            "el uso de modelos flexibles capaces de capturar interacciones y no linealidades."
+            "Interpretación. Las asociaciones marginales son en general moderadas, lo que "
+            "respalda el uso de modelos flexibles capaces de capturar interacciones y no "
+            "linealidades."
         ),
     },
     {
@@ -103,7 +106,8 @@ MEMORIA_FIGURE_EXPORTS = [
         "label": "fig:eda_covariates_vs_demand",
         "interpretation": (
             "Interpretación. Las covariables exógenas muestran señal descriptiva, pero su efecto "
-            "no es simple ni uniforme, por lo que conviene analizarlas junto con el contexto temporal y de serie."
+            "no es simple ni uniforme, por lo que conviene analizarlas junto con el contexto "
+            "temporal y de serie."
         ),
     },
     {
@@ -111,8 +115,9 @@ MEMORIA_FIGURE_EXPORTS = [
         "caption": "Series representativas con demanda observada y overlay de stockout.",
         "label": "fig:eda_representative_series",
         "interpretation": (
-            "Interpretación. La visualización conjunta de demanda y stockout resume la complejidad "
-            "del problema: estacionalidad, heterogeneidad entre series y posible compresión de ventas observadas."
+            "Interpretación. La visualización conjunta de demanda y stockout resume la "
+            "complejidad del problema: estacionalidad, heterogeneidad entre series y posible "
+            "compresión de ventas observadas."
         ),
     },
 ]
@@ -158,7 +163,7 @@ def write_eda_artifacts(
 ) -> EdaArtifacts:
     """Persist EDA summaries, plots, and a Markdown report."""
     run_dir = make_run_directory(output_dir, run_name)
-    ensure_directory(run_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     outputs = {
         "dataset_summary.csv": artifacts.dataset_summary,
@@ -287,7 +292,8 @@ def export_figures_to_memoria(
     """Copy selected EDA figures into the memoria tree and emit a LaTeX fragment."""
     run_dir = Path(run_directory)
     memoria_root = Path(memoria_dir)
-    target_dir = ensure_directory(memoria_root / "figures" / "eda")
+    target_dir = memoria_root / "figures" / "eda"
+    target_dir.mkdir(parents=True, exist_ok=True)
 
     for figure in MEMORIA_FIGURE_EXPORTS:
         source = run_dir / figure["filename"]

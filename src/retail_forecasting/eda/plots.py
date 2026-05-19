@@ -10,8 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from retail_forecasting.utils.io import ensure_directory
-
 TOP_SERIES_PLOT_COUNT = 12
 MAX_HEATMAP_SERIES = 120
 SCATTER_SAMPLE_SIZE = 5000
@@ -25,7 +23,8 @@ def render_eda_plots(
     output_dir: str | Path,
 ) -> None:
     """Render a comprehensive static plot set for EDA runs."""
-    target_dir = ensure_directory(output_dir)
+    target_dir = Path(output_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
 
     _plot_observed_demand_distribution(
         panel,
@@ -438,9 +437,7 @@ def _plot_representative_series_panels(
     series_summary: pd.DataFrame,
     output_path: Path,
 ) -> None:
-    selected_series = series_summary.head(REPRESENTATIVE_SERIES_COUNT)[
-        "series_id"
-    ].tolist()
+    selected_series = series_summary.head(REPRESENTATIVE_SERIES_COUNT)["series_id"].tolist()
     if not selected_series:
         return
 

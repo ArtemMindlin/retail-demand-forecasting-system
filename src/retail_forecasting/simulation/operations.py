@@ -29,7 +29,7 @@ from typing import Any
 import pandas as pd
 
 from retail_forecasting.config import Settings
-from retail_forecasting.data.fresh_retailnet import load_prepared_panel
+from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.data.quality import (
     raise_on_blocking_data_quality,
     validate_prepared_panel,

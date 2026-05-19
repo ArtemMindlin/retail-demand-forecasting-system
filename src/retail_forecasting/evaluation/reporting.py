@@ -20,7 +20,6 @@ from retail_forecasting.contracts.drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.tuning import TuningMetadata
 from retail_forecasting.utils.io import (
     dataframe_to_markdown,
-    ensure_directory,
     make_run_directory,
 )
 from retail_forecasting.visualization.plots import render_standard_plots
@@ -150,7 +149,7 @@ class RunArtifacts:
 
 def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtifacts:
     run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
-    ensure_directory(run_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     reorder_recommendations = build_reorder_recommendations(artifacts, settings)
     exceptions = build_exceptions_frame(reorder_recommendations)

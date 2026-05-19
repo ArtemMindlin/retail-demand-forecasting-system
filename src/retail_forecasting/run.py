@@ -67,11 +67,11 @@ def main() -> None:
 
     # Handle Reporting overrides (output_dir and run_name)
     reporting_updates = {}
+    project_updates = {}
     if args.output_dir is not None:
         reporting_updates["output_dir"] = Path(args.output_dir)
     if args.run_name is not None:
         reporting_updates["run_name"] = args.run_name
-    project_updates = {}
     if args.run_mode is not None:
         project_updates["run_mode"] = args.run_mode
 
@@ -92,18 +92,14 @@ def main() -> None:
         return
     if mode == "score_daily":
         artifacts = run_scoring(settings)
-    else:
-        artifacts = run_experiment(settings)
-
-    if artifacts.run_directory is None:
-        raise RuntimeError("Run finished without a report directory.")
-
-    if mode == "score_daily":
+        assert artifacts.run_directory is not None
         print(
             "Operational outputs written to: "
             f"{artifacts.run_directory / 'reorder_recommendations.csv'}"
         )
     else:
+        artifacts = run_experiment(settings)
+        assert artifacts.run_directory is not None
         print(f"Report written to: {artifacts.run_directory / 'report.md'}")
 
 

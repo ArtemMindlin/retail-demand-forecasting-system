@@ -9,7 +9,7 @@ from retail_forecasting.contracts.backtesting import FoldRunMetadata
 from retail_forecasting.contracts.drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.tuning import BoostingParams
 from retail_forecasting.data.censorship import LatentDemandImputer
-from retail_forecasting.data.fresh_retailnet import load_prepared_panel
+from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.data.quality import (
     raise_on_blocking_data_quality,
     validate_prepared_panel,
@@ -796,11 +796,16 @@ def train_and_save_champion(
 
 def run_retrain(settings: Settings) -> Path:
     """Load data, train champion on all of it, and write the model to disk."""
-    raw_panel = load_prepared_panel(
-        dataset_config=settings.dataset,
-        preprocessing_config=settings.preprocessing,
-        split="train",
-    )
+    splits = []
+    for split in settings.dataset.splits:
+        splits.append(
+            load_prepared_panel(
+                dataset_config=settings.dataset,
+                preprocessing_config=settings.preprocessing,
+                split=split,
+            )
+        )
+    raw_panel = pd.concat(splits, ignore_index=True)
     quality_report = validate_prepared_panel(raw_panel, settings)
     raise_on_blocking_data_quality(quality_report)
     model_path = train_and_save_champion(settings, raw_panel)

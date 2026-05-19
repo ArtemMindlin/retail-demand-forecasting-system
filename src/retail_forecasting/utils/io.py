@@ -1,27 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 import pandas as pd
-
-
-def ensure_directory(path: str | Path) -> Path:
-    """Create a directory if needed and return it as a Path.
-
-    Args:
-        path: Directory path to create or normalize.
-
-    Returns:
-        The normalized directory path.
-
-    Notes:
-        The directory is created with ``parents=True`` and ``exist_ok=True``.
-    """
-    directory = path if isinstance(path, Path) else Path(path)
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory
 
 
 def make_run_directory(base_dir: str | Path, run_name: str) -> Path:
@@ -39,7 +22,8 @@ def make_run_directory(base_dir: str | Path, run_name: str) -> Path:
         time-based uniqueness across runs.
     """
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-    run_dir = ensure_directory(Path(base_dir) / f"{run_name}_{timestamp}")
+    run_dir = Path(base_dir) / f"{run_name}_{timestamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
 
@@ -56,9 +40,7 @@ def quantile_column_name(quantile: float) -> str:
     return f"q_{normalized}"
 
 
-def dataframe_to_markdown(
-    frame: pd.DataFrame, columns: Iterable[str] | None = None
-) -> str:
+def dataframe_to_markdown(frame: pd.DataFrame, columns: Iterable[str] | None = None) -> str:
     """Render a DataFrame as a simple Markdown table.
 
     Args:
@@ -87,9 +69,7 @@ def dataframe_to_markdown(
         " | ".join(str(value) for value in row)
         for row in text_frame.itertuples(index=False, name=None)
     ]
-    return "\n".join(
-        [f"| {headers} |", f"| {separator} |", *[f"| {row} |" for row in rows]]
-    )
+    return "\n".join([f"| {headers} |", f"| {separator} |", *[f"| {row} |" for row in rows]])
 
 
 def _format_markdown_value(value: object) -> object:

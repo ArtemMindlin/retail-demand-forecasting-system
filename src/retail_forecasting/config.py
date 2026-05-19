@@ -22,7 +22,6 @@ class ProjectConfig(BaseModel):
 
 class DatasetConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-    source: Literal["fresh_retailnet"] = "fresh_retailnet"
     hf_dataset_id: str = "Dingdong-Inc/FreshRetailNet-50K"
     splits: dict[str, str] = Field(
         default_factory=lambda: {
@@ -31,9 +30,8 @@ class DatasetConfig(BaseModel):
         }
     )
     local_cache_dir: Path = Path("data/raw/fresh_retailnet")
-    processed_panel_path: Path = Path("data/processed/fresh_retailnet_train.parquet")
-    use_local_cache: bool = True
-    refresh_processed_cache: bool = False
+    processed_panel_dir: Path = Path("data/processed")
+    use_cache: bool = True
     top_n_series: int | None = Field(default=100, gt=0)
     min_history_days: int = Field(default=70, ge=0)
     max_rows: int | None = Field(default=None, gt=0)

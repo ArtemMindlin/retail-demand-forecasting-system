@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 
 from retail_forecasting.config import DatasetConfig, PreprocessingConfig
-from retail_forecasting.utils.io import ensure_directory
 
 STATIC_ID_COLUMNS = [
     "city_id",
@@ -32,35 +29,6 @@ RAW_COLUMNS = [
 ]
 
 
-def build_hf_uri(dataset_id: str, split_path: str) -> str:
-    """Build the Hugging Face parquet URI for a dataset split.
-
-    Args:
-        dataset_id: Hugging Face dataset identifier.
-        split_path: Relative parquet path for the target split.
-
-    Returns:
-        The fully qualified ``hf://`` URI.
-    """
-    return f"hf://datasets/{dataset_id}/{split_path}"
-
-
-def processed_panel_path(dataset_config: DatasetConfig, split: str) -> Path:
-    """Resolve the processed panel path for a dataset split.
-
-    Args:
-        dataset_config: Dataset-level configuration values.
-        split: Dataset split name.
-
-    Returns:
-        The output path used for the processed panel of the split.
-    """
-    base_path = dataset_config.processed_panel_path
-    if split == "train":
-        return base_path
-    return base_path.with_name(f"{base_path.stem}_{split}{base_path.suffix}")
-
-
 def load_raw_split(
     dataset_config: DatasetConfig,
     split: str = "train",
@@ -75,26 +43,20 @@ def load_raw_split(
 
     Returns:
         The raw split as a DataFrame.
-
-    Notes:
-        The function prefers a cached local parquet file when enabled and
-        available. Remote reads use the configured Hugging Face dataset URI.
     """
+
     selected_columns = columns or RAW_COLUMNS
     split_path = dataset_config.splits[split]
-    cache_dir = ensure_directory(dataset_config.local_cache_dir)
-    local_path = cache_dir / f"{split}.parquet"
+    local_path = dataset_config.local_cache_dir / f"{split}.parquet"
+    local_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if dataset_config.use_local_cache and local_path.exists():
+    if dataset_config.use_cache and local_path.exists():
         return pd.read_parquet(local_path, columns=selected_columns)
 
-    remote_uri = build_hf_uri(dataset_config.hf_dataset_id, split_path)
+    remote_uri = f"hf://datasets/{dataset_config.hf_dataset_id}/{split_path}"
     frame = pd.read_parquet(remote_uri, columns=selected_columns)
 
-    if dataset_config.max_rows is not None:
-        frame = frame.head(dataset_config.max_rows).copy()
-
-    if dataset_config.use_local_cache:
+    if dataset_config.use_cache:
         frame.to_parquet(local_path, index=False)
 
     return frame
@@ -114,12 +76,12 @@ def prepare_daily_panel(
 
     Returns:
         A cleaned daily panel ready for feature engineering.
-
-    Notes:
-        The panel is filtered to sufficiently long series and optionally reduced
-        to the top series by observed demand volume.
     """
+
     panel = frame.copy()
+    if dataset_config.max_rows:
+        panel = panel.head(dataset_config.max_rows).copy()
+
     panel = panel.rename(
         columns={
             "dt": "date",
@@ -133,15 +95,11 @@ def prepare_daily_panel(
         panel = panel.loc[panel["observed_demand"] >= 0].copy()
 
     panel = panel.drop_duplicates(subset=["store_id", "product_id", "date"])
-    panel["series_id"] = (
-        panel["store_id"].astype(str) + "_" + panel["product_id"].astype(str)
-    )
+    panel["series_id"] = panel["store_id"].astype(str) + "_" + panel["product_id"].astype(str)
     panel = panel.sort_values(["series_id", "date"]).reset_index(drop=True)
 
     history_lengths = panel.groupby("series_id")["date"].nunique()
-    valid_series = history_lengths.loc[
-        history_lengths >= dataset_config.min_history_days
-    ].index
+    valid_series = history_lengths.loc[history_lengths >= dataset_config.min_history_days].index
     panel = panel.loc[panel["series_id"].isin(valid_series)].copy()
 
     if dataset_config.top_n_series:
@@ -189,14 +147,12 @@ def load_prepared_panel(
 
     Returns:
         The processed panel as a DataFrame.
-
-    Notes:
-        When a processed parquet already exists and refresh is disabled, the cached panel is returned without rebuilding it.
     """
-    target_path = processed_panel_path(dataset_config, split)
-    ensure_directory(target_path.parent)
 
-    if target_path.exists() and not dataset_config.refresh_processed_cache:
+    target_path = dataset_config.processed_panel_dir / f"{split}.parquet"
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if dataset_config.use_cache and target_path.exists():
         return pd.read_parquet(target_path)
 
     raw_frame = load_raw_split(dataset_config=dataset_config, split=split)

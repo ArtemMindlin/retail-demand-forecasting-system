@@ -48,6 +48,28 @@ El proyecto rompe con esta limitación mediante el desarrollo de una \textbf{Sim
 
 Bajo esta simulación, la orden sugerida $Q$ se ajusta restando la \textit{Posición del Inventario} actual del nivel óptimo sugerido por el cuantil del pronóstico probabilístico $S$. De este modo, la evaluación de costes operativos en la memoria captura fielmente el impacto devastador a largo plazo de errores correlacionados y del "efecto látigo".
 
+\section{Simulación Operacional en Streaming: Evaluación de Cadencias de Reentrenamiento}
+\label{sec:simulate_ops}
+
+La validación cruzada temporal (\textit{walk-forward backtesting}) estima el rendimiento del modelo en condiciones experimentales controladas. Sin embargo, en producción surge una pregunta adicional de naturaleza MLOps: \emph{¿con qué frecuencia debe reentrenarse el modelo a medida que llegan datos nuevos?} Reentrenar demasiado frecuentemente supone un coste computacional elevado; hacerlo demasiado esporádicamente puede degradar las predicciones conforme el modelo queda desactualizado respecto a los patrones recientes.
+
+Para responder esta pregunta de forma empírica sobre datos genuinamente no vistos, el sistema implementa una \textbf{Simulación Operacional en Streaming} sobre el split de evaluación. El procedimiento es el siguiente:
+
+\begin{enumerate}
+    \item Se entrena un modelo \textit{champion} inicial exclusivamente sobre el split de entrenamiento. Este modelo representa el estado del sistema en el día de despliegue, antes de que llegue ningún dato del periodo de evaluación.
+    \item Se define un conjunto de \textbf{cadencias de reentrenamiento} $K = \{k_1, k_2, \ldots, k_n, \text{nunca}\}$, donde cada $k_i$ representa el número de días entre dos reentrenamientos consecutivos. La cadencia \textit{nunca} sirve como \textit{baseline}: el modelo inicial nunca se actualiza.
+    \item Se itera día a día sobre el split de evaluación. Para cada fecha de decisión $t$ y cada cadencia $k$:
+    \begin{itemize}
+        \item Se construye la \textbf{historia disponible} $\mathcal{H}_t = \text{train} \cup \text{eval}[\text{date} < t]$, garantizando ausencia de \textit{leakage}.
+        \item Si $(t_{\text{index}} + 1) \bmod k = 0$, se reentrena el modelo de esa cadencia sobre $\mathcal{H}_t$, incluyendo recalibración conformal.
+        \item El modelo genera predicciones para el horizonte $[t, t+H-1]$.
+        \item Se revelan los datos reales del periodo y se calcula el coste de inventario realizado mediante el modelo Newsvendor.
+    \end{itemize}
+    \item Al finalizar el streaming, se dispone de curvas de \textbf{coste acumulado} por cadencia sobre el mismo periodo y los mismos datos, lo que permite una comparación directa y equitativa.
+\end{enumerate}
+
+Los artefactos generados incluyen \texttt{cadence\_summary.csv} con métricas agregadas por cadencia (coste total, nivel de servicio, \textit{fill rate}, número de reentrenamientos) y \texttt{cumulative\_cost.png} con la evolución temporal del coste para cada política. Esta simulación constituye la evidencia empírica para justificar la política de reentrenamiento operacional del sistema.
+
 \section{Resolución de Conflictos: Optimización Global por Programación Lineal}
 Las recomendaciones individuales de cada SKU pueden ser matemáticamente óptimas a nivel aislado, pero el despliegue en un supermercado real está sujeto a severas restricciones de volumen físico de almacenaje o de capital presupuestario.
 
