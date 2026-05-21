@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from fastapi import BackgroundTasks, FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from retail_forecasting.config import load_config
@@ -107,10 +107,12 @@ def get_category(series_id: str) -> str:
     return CATEGORIES[val % len(CATEGORIES)]
 
 
-def load_latest_predictions() -> pd.DataFrame:
-    """Find the latest run in reports/ with predictions.csv and cache it."""
-    if "df" in _PREDICTIONS_CACHE:
-        return _PREDICTIONS_CACHE["df"]
+def _get_latest_run_path() -> Path:
+    """Find the latest run in reports/ containing predictions.csv."""
+    if "run_path" in _PREDICTIONS_CACHE:
+        val = _PREDICTIONS_CACHE["run_path"]
+        if isinstance(val, Path):
+            return val
 
     reports_dir = Path("reports")
     if not reports_dir.exists():
@@ -125,9 +127,18 @@ def load_latest_predictions() -> pd.DataFrame:
     if not runs:
         raise FileNotFoundError("No runs with predictions.csv found in reports/.")
 
-    # Sort runs alphabetically descending
     runs.sort(key=lambda x: x.name, reverse=True)
     latest_run = runs[0]
+    _PREDICTIONS_CACHE["run_path"] = latest_run
+    return latest_run
+
+
+def load_latest_predictions() -> pd.DataFrame:
+    """Find the latest run in reports/ with predictions.csv and cache it."""
+    if "df" in _PREDICTIONS_CACHE:
+        return _PREDICTIONS_CACHE["df"]
+
+    latest_run = _get_latest_run_path()
 
     usecols = ["date", "series_id", "y_true", "y_pred", "data_strategy"]
     try:
@@ -136,7 +147,6 @@ def load_latest_predictions() -> pd.DataFrame:
         df = pd.read_csv(latest_run / "predictions.csv")
 
     _PREDICTIONS_CACHE["df"] = df
-    _PREDICTIONS_CACHE["run_path"] = latest_run
     _PREDICTIONS_CACHE["grouped"] = {sku: group for sku, group in df.groupby("series_id")}
 
     return df
@@ -208,6 +218,62 @@ def get_run_status() -> dict[str, Any]:
         "error": _RUN_STATE["error"],
         "logs": logs,
     }
+
+
+@app.get("/api/download/predictions")
+def download_predictions() -> FileResponse:
+    """Download the predictions.csv file from the latest run."""
+    try:
+        latest_run = _get_latest_run_path()
+        file_path = latest_run / "predictions.csv"
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="predictions.csv not found in the latest run.",
+            )
+        return FileResponse(
+            path=file_path,
+            filename="predictions.csv",
+            media_type="text/csv",
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to download predictions: {e}",
+        ) from e
+
+
+@app.get("/api/download/costs")
+def download_costs() -> FileResponse:
+    """Download the cost_summary.csv file from the latest run."""
+    try:
+        latest_run = _get_latest_run_path()
+        file_path = latest_run / "cost_summary.csv"
+        if not file_path.exists():
+            file_path = latest_run / "costs.csv"
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="Cost summary CSV file not found in the latest run.",
+            )
+        return FileResponse(
+            path=file_path,
+            filename="costs.csv",
+            media_type="text/csv",
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to download costs: {e}",
+        ) from e
 
 
 @app.get("/health")

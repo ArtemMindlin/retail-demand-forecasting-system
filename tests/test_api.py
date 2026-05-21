@@ -209,3 +209,79 @@ def test_api_run_status() -> None:
         assert data["status"] == "success"
         assert data["error"] is None
         assert "Pipeline Execution logs mock" in data["logs"]
+
+
+def test_api_download_predictions_success(tmp_path: pytest.TempPath) -> None:
+    from retail_forecasting.api.main import _PREDICTIONS_CACHE
+
+    _PREDICTIONS_CACHE.clear()
+
+    pred_file = tmp_path / "predictions.csv"
+    pred_file.write_text("date,series_id,observed_demand\n2026-05-01,SKU-100,10.0\n")
+
+    with mock.patch("retail_forecasting.api.main._get_latest_run_path", return_value=tmp_path):
+        response = client.get("/api/download/predictions")
+        assert response.status_code == 200
+        assert "text/csv" in response.headers["content-type"]
+        disp = response.headers["content-disposition"]
+        assert 'attachment; filename="predictions.csv"' in disp
+        assert response.text == "date,series_id,observed_demand\n2026-05-01,SKU-100,10.0\n"
+
+
+def test_api_download_costs_success(tmp_path: pytest.TempPath) -> None:
+    from retail_forecasting.api.main import _PREDICTIONS_CACHE
+
+    _PREDICTIONS_CACHE.clear()
+
+    cost_file = tmp_path / "cost_summary.csv"
+    cost_file.write_text("series_id,holding_cost,shortage_cost\nSKU-100,2.0,15.0\n")
+
+    with mock.patch("retail_forecasting.api.main._get_latest_run_path", return_value=tmp_path):
+        response = client.get("/api/download/costs")
+        assert response.status_code == 200
+        assert "text/csv" in response.headers["content-type"]
+        disp = response.headers["content-disposition"]
+        assert 'attachment; filename="costs.csv"' in disp
+        assert response.text == "series_id,holding_cost,shortage_cost\nSKU-100,2.0,15.0\n"
+
+
+def test_api_download_costs_fallback_success(tmp_path: pytest.TempPath) -> None:
+    from retail_forecasting.api.main import _PREDICTIONS_CACHE
+
+    _PREDICTIONS_CACHE.clear()
+
+    cost_file = tmp_path / "costs.csv"
+    cost_file.write_text("series_id,holding_cost,shortage_cost\nSKU-100,2.0,15.0\n")
+
+    with mock.patch("retail_forecasting.api.main._get_latest_run_path", return_value=tmp_path):
+        response = client.get("/api/download/costs")
+        assert response.status_code == 200
+        assert "text/csv" in response.headers["content-type"]
+        disp = response.headers["content-disposition"]
+        assert 'attachment; filename="costs.csv"' in disp
+        assert response.text == "series_id,holding_cost,shortage_cost\nSKU-100,2.0,15.0\n"
+
+
+def test_api_download_not_found() -> None:
+    from retail_forecasting.api.main import _PREDICTIONS_CACHE
+
+    _PREDICTIONS_CACHE.clear()
+
+    with mock.patch(
+        "retail_forecasting.api.main._get_latest_run_path",
+        side_effect=FileNotFoundError("No runs found"),
+    ):
+        response = client.get("/api/download/predictions")
+        assert response.status_code == 404
+        assert "No runs found" in response.json()["detail"]
+
+
+def test_api_download_file_missing(tmp_path: pytest.TempPath) -> None:
+    from retail_forecasting.api.main import _PREDICTIONS_CACHE
+
+    _PREDICTIONS_CACHE.clear()
+
+    with mock.patch("retail_forecasting.api.main._get_latest_run_path", return_value=tmp_path):
+        response = client.get("/api/download/predictions")
+        assert response.status_code == 404
+        assert "predictions.csv not found" in response.json()["detail"]
