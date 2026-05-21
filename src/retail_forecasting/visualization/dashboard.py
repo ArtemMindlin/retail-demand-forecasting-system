@@ -420,14 +420,14 @@ base_sl = (
 new_sl = what_if_costs["sim_service_level"].mean() if what_if_costs is not None else None
 
 # Format variables for custom HTML rendering
-cost_val = f"${new_cost:,.2f}" if new_cost is not None else f"${base_cost:,.2f}"
+cost_val = f"&#36;{new_cost:,.2f}" if new_cost is not None else f"&#36;{base_cost:,.2f}"
 cost_delta_html = ""
 if new_cost is not None:
     diff = new_cost - base_cost
     arrow = "↓" if diff < 0 else "↑"
     cls = "positive" if diff < 0 else "negative"  # lower cost is positive
     cost_delta_html = (
-        f'<div class="kpi-delta {cls}"><span>{arrow}</span> ${abs(diff):,.2f} vs Base</div>'
+        f'<div class="kpi-delta {cls}"><span>{arrow}</span> &#36;{abs(diff):,.2f} vs Base</div>'
     )
 
 mae_val = f"{mae:.2f}"
