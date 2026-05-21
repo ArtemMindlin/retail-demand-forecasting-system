@@ -3,7 +3,21 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Retail Forecasting · Decision Dashboard</title>
+<title>Forecast.ai · Retail Demand Forecasting System</title>
+<link
+  rel="icon"
+  type="image/svg+xml"
+  href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
+    <linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='%238b5cf6'/>
+      <stop offset='100%' stop-color='%233b82f6'/>
+    </linearGradient>
+    <rect width='100' height='100' rx='25' fill='url(%23g)'/>
+    <path d='M30,70 L45,55 L58,63 L75,35' stroke='white' stroke-width='8'
+          stroke-linecap='round' stroke-linejoin='round' fill='none'/>
+    <circle cx='75' cy='35' r='8' fill='white'/>
+  </svg>"
+/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -329,6 +343,7 @@
   }
 
   .canvas {
+    position: relative;
     padding: 28px 32px 56px;
     max-width: 1440px;
   }
@@ -861,6 +876,50 @@
     padding: 12px 18px;
     background: rgba(0, 0, 0, 0.4);
     border-top: 1px solid var(--border);
+  }
+
+  /* Transition effect for tabs / SKU changes */
+  .canvas-content {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                filter 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .canvas-transitioning {
+    opacity: 0.15;
+    filter: blur(6px);
+    transform: translateY(8px);
+    pointer-events: none;
+  }
+
+  /* Giga-premium custom loading bar at the top of the canvas */
+  .premium-loading-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(
+      90deg,
+      var(--c-ai),
+      var(--c-inv),
+      var(--c-conf),
+      var(--c-ai)
+    );
+    background-size: 200% 100%;
+    z-index: 999;
+    animation: loadingBarGlow 1.2s infinite linear;
+    opacity: 0;
+    transition: opacity 0.15s ease-in-out;
+  }
+  .premium-loading-bar.active {
+    opacity: 1;
+  }
+  @keyframes loadingBarGlow {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
   }
 </style>
 
@@ -3740,7 +3799,19 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const [alertsOpen, setAlertsOpen] = useState(false);
       const [activeTab, setActiveTab] = useState("dashboard");
       const [selectedSkuId, setSelectedSkuId] = useState(null);
+      const [tabTransitioning, setTabTransitioning] = useState(false);
       const debounceRef = useRef(null);
+
+      const changeTab = (tabId) => {
+        if (tabId === activeTab) return;
+        setTabTransitioning(true);
+        setTimeout(() => {
+          setActiveTab(tabId);
+          setTimeout(() => {
+            setTabTransitioning(false);
+          }, 60);
+        }, 180);
+      };
 
       const [toasts, setToasts] = useState([]);
       const [pipelineRunning, setPipelineRunning] = useState(false);
@@ -3959,7 +4030,9 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             dataStatus={data?.status}
           />
           <main className="canvas canvas-bg">
-            <TopBar
+            <div className={`premium-loading-bar ${tabTransitioning ? "active" : ""}`} />
+            <div className={`canvas-content ${tabTransitioning ? "canvas-transitioning" : ""}`}>
+              <TopBar
               params={params}
               lastRunAt={lastRunAt}
               unreadAlerts={unreadAlerts}
@@ -3991,7 +4064,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     <button
                       key={t.id}
                       className={`filter-tab ${activeTab === t.id ? "active" : ""}`}
-                      onClick={() => setActiveTab(t.id)}
+                      onClick={() => changeTab(t.id)}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -4042,10 +4115,16 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     loading={loading}
                     selectedSkuId={selectedSkuId}
                     onSelectSku={(skuId) => {
-                      setSelectedSkuId(skuId);
-                      if (skuId) {
-                        setActiveTab("dashboard");
-                      }
+                      setTabTransitioning(true);
+                      setTimeout(() => {
+                        setSelectedSkuId(skuId);
+                        if (skuId) {
+                          setActiveTab("dashboard");
+                        }
+                        setTimeout(() => {
+                          setTabTransitioning(false);
+                        }, 60);
+                      }, 180);
                     }}
                   />
                 )}
@@ -4074,7 +4153,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 fastapi 0.110 · uvicorn · python 3.11
               </span>
             </div>
-          </main>
+          </div>
+        </main>
 
           {alertsOpen && (
             <AlertsPanel
