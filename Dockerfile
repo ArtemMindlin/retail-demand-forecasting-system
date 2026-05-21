@@ -25,5 +25,5 @@ COPY . .
 # Expose ports for FastAPI (8000), MLflow (5000), and Streamlit (8501)
 EXPOSE 8000 5000 8501
 
-# The default command will just keep the container alive or can be overridden by docker-compose
-CMD ["bash"]
+# Start FastAPI with uvicorn, using PORT env var injected by Railway (default 8000 locally)
+CMD ["sh", "-c", "uvicorn retail_forecasting.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
