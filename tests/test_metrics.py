@@ -1,6 +1,8 @@
 from __future__ import annotations
-import pytest
+
 import pandas as pd
+import pytest
+
 from retail_forecasting.evaluation.metrics import _build_metric_record, winkler_score
 
 

@@ -2,15 +2,15 @@
 
 from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
 from retail_forecasting.contracts.contracts_business import ChampionRecord, ChampionRegistry
-from retail_forecasting.contracts.contracts_quality import (
-    DataQualityError,
-    DataQualityIssue,
-    DataQualityReport,
-)
 from retail_forecasting.contracts.contracts_drift import (
     DriftDetectorMetadata,
     DriftEvent,
     DriftResult,
+)
+from retail_forecasting.contracts.contracts_quality import (
+    DataQualityError,
+    DataQualityIssue,
+    DataQualityReport,
 )
 from retail_forecasting.contracts.contracts_tuning import (
     BoostingParams,
@@ -23,6 +23,7 @@ __all__ = [
     "BoostingParams",
     "ChampionRecord",
     "ChampionRegistry",
+    "DataQualityError",
     "DataQualityIssue",
     "DataQualityReport",
     "DriftDetectorMetadata",

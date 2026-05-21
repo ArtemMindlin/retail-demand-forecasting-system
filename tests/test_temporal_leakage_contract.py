@@ -49,9 +49,7 @@ def test_historical_features_exclude_current_row_values() -> None:
     row = supervised.iloc[0]
     source = _series_source(panel, row["series_id"])
     source_index = _source_index_for_date(source, row["date"])
-    past_demand_window = source.loc[
-        source_index - 3 : source_index - 1, "observed_demand"
-    ]
+    past_demand_window = source.loc[source_index - 3 : source_index - 1, "observed_demand"]
 
     assert row["demand_lag_1"] == source.loc[source_index - 1, "observed_demand"]
     assert row["demand_lag_2"] == source.loc[source_index - 2, "observed_demand"]
@@ -126,11 +124,7 @@ def test_walk_forward_folds_leave_horizon_gap_before_validation() -> None:
 
 
 def _series_source(panel: pd.DataFrame, series_id: str) -> pd.DataFrame:
-    return (
-        panel.loc[panel["series_id"] == series_id]
-        .sort_values("date")
-        .reset_index(drop=True)
-    )
+    return panel.loc[panel["series_id"] == series_id].sort_values("date").reset_index(drop=True)
 
 
 def _source_index_for_date(source: pd.DataFrame, date: pd.Timestamp) -> int:

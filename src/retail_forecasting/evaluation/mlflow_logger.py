@@ -13,9 +13,7 @@ def log_experiment_to_mlflow(artifacts: RunArtifacts, settings: Settings) -> Non
     mlflow.set_experiment(settings.reporting.run_name)
 
     with mlflow.start_run(
-        run_name=f"run_{artifacts.run_directory.name}"
-        if artifacts.run_directory
-        else None
+        run_name=f"run_{artifacts.run_directory.name}" if artifacts.run_directory else None
     ):
         # 1. Log Configuration Parameters
         # Flatten settings for MLflow
@@ -36,12 +34,8 @@ def log_experiment_to_mlflow(artifacts: RunArtifacts, settings: Settings) -> Non
             best_model_idx = artifacts.cost_summary["sim_total_cost"].idxmin()
             best_model_row = artifacts.cost_summary.loc[best_model_idx]
 
-            mlflow.log_metric(
-                "champion_sim_total_cost", best_model_row["sim_total_cost"]
-            )
-            mlflow.log_metric(
-                "champion_sim_service_level", best_model_row["sim_service_level"]
-            )
+            mlflow.log_metric("champion_sim_total_cost", best_model_row["sim_total_cost"])
+            mlflow.log_metric("champion_sim_service_level", best_model_row["sim_service_level"])
             mlflow.log_metric("champion_total_cost", best_model_row["total_cost"])
             mlflow.log_metric("champion_service_level", best_model_row["service_level"])
 
@@ -67,14 +61,10 @@ def log_experiment_to_mlflow(artifacts: RunArtifacts, settings: Settings) -> Non
                 if "winkler_score" in m:
                     mlflow.log_metric("champion_winkler_score", m["winkler_score"])
                 if "interval_coverage" in m:
-                    mlflow.log_metric(
-                        "champion_interval_coverage", m["interval_coverage"]
-                    )
+                    mlflow.log_metric("champion_interval_coverage", m["interval_coverage"])
                 if "mae" in m:
                     mlflow.log_metric("champion_mae", m["mae"])
 
         # 3. Log Artifacts
         if artifacts.run_directory and artifacts.run_directory.exists():
-            mlflow.log_artifacts(
-                str(artifacts.run_directory), artifact_path="run_outputs"
-            )
+            mlflow.log_artifacts(str(artifacts.run_directory), artifact_path="run_outputs")

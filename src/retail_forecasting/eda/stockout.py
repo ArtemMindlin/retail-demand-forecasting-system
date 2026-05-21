@@ -15,9 +15,7 @@ def build_stockout_summary(panel: pd.DataFrame) -> pd.DataFrame:
                 "stockout_row_rate": stockout_mask.mean(),
                 "mean_stockout_hours_all_rows": panel["stockout_hours"].mean(),
                 "mean_stockout_hours_stockout_rows": (
-                    stockout_panel["stockout_hours"].mean()
-                    if not stockout_panel.empty
-                    else 0.0
+                    stockout_panel["stockout_hours"].mean() if not stockout_panel.empty else 0.0
                 ),
                 "zero_demand_rate_stockout_rows": (
                     (stockout_panel["observed_demand"] == 0).mean()

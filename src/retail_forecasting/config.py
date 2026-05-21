@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from retail_forecasting.contracts.configuration import (
+from retail_forecasting.contracts.contracts_config import (
     BusinessConfig,
     DataQualityConfig,
     DatasetConfig,
@@ -20,6 +20,24 @@ from retail_forecasting.contracts.configuration import (
     SyntheticCostConfig,
     ValidationConfig,
 )
+
+__all__ = [
+    "BusinessConfig",
+    "DataQualityConfig",
+    "DatasetConfig",
+    "DriftConfig",
+    "FeatureConfig",
+    "InventoryConfig",
+    "ModelConfig",
+    "PreprocessingConfig",
+    "ProjectConfig",
+    "ReportingConfig",
+    "Settings",
+    "SimulationConfig",
+    "SyntheticCostConfig",
+    "ValidationConfig",
+    "load_config",
+]
 
 
 def load_config(path: str | Path) -> Settings:

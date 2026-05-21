@@ -50,9 +50,9 @@ def build_series_cost_profile(
     )
     series_summary["demand_std"] = series_summary["demand_std"].fillna(0.0)
     denominator = series_summary["mean_observed_demand"].replace(0.0, np.nan)
-    series_summary["coefficient_variation"] = (
-        series_summary["demand_std"] / denominator
-    ).fillna(0.0)
+    series_summary["coefficient_variation"] = (series_summary["demand_std"] / denominator).fillna(
+        0.0
+    )
 
     category_summary = (
         series_summary.groupby("third_category_id")
@@ -65,9 +65,7 @@ def build_series_cost_profile(
     category_summary["category_zero_rank"] = _percentile_rank(
         category_summary["category_zero_demand_rate"]
     )
-    category_summary["category_cv_rank"] = _percentile_rank(
-        category_summary["category_cv"]
-    )
+    category_summary["category_cv_rank"] = _percentile_rank(category_summary["category_cv"])
 
     profile = series_summary.merge(
         category_summary[
@@ -109,8 +107,7 @@ def build_series_cost_profile(
         + conf.perishability_multiplier * profile["synthetic_perishability_score"]
     )
     profile["slow_moving_factor"] = (
-        conf.slow_moving_base
-        + conf.slow_moving_multiplier * profile["slow_moving_score"]
+        conf.slow_moving_base + conf.slow_moving_multiplier * profile["slow_moving_score"]
     )
     profile["service_criticality_factor"] = (
         conf.service_criticality_base
@@ -122,12 +119,8 @@ def build_series_cost_profile(
         * profile["perishability_factor"]
         * profile["slow_moving_factor"]
     )
-    profile["c_under"] = (
-        inventory_config.stockout_cost * profile["service_criticality_factor"]
-    )
-    profile["critical_fractile"] = profile["c_under"] / (
-        profile["c_under"] + profile["c_over"]
-    )
+    profile["c_under"] = inventory_config.stockout_cost * profile["service_criticality_factor"]
+    profile["critical_fractile"] = profile["c_under"] / (profile["c_under"] + profile["c_over"])
 
     return profile[
         [
@@ -166,9 +159,7 @@ def attach_series_costs(
                 "Series cost profiles are enabled but no `series_cost_profile` was provided."
             )
         if "series_id" not in enriched.columns:
-            raise ValueError(
-                "Series cost profiles require a `series_id` column in predictions."
-            )
+            raise ValueError("Series cost profiles require a `series_id` column in predictions.")
 
         enriched = enriched.merge(
             series_cost_profile,
@@ -177,15 +168,11 @@ def attach_series_costs(
             validate="many_to_one",
         )
         if enriched[["c_over", "c_under", "critical_fractile"]].isna().any().any():
-            raise ValueError(
-                "Missing cost profile values after merging `series_id` costs."
-            )
+            raise ValueError("Missing cost profile values after merging `series_id` costs.")
         return enriched
 
     cost_columns = required_cost_columns + optional_cost_columns
-    existing_cost_columns = [
-        column for column in cost_columns if column in enriched.columns
-    ]
+    existing_cost_columns = [column for column in cost_columns if column in enriched.columns]
     if existing_cost_columns:
         enriched = enriched.drop(columns=existing_cost_columns)
 

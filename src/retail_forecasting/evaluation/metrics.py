@@ -166,9 +166,7 @@ def pinball_loss(actual: pd.Series, predicted: pd.Series, quantile: float) -> fl
     return float(np.mean(loss))
 
 
-def winkler_score(
-    actual: pd.Series, lower: pd.Series, upper: pd.Series, alpha: float
-) -> float:
+def winkler_score(actual: pd.Series, lower: pd.Series, upper: pd.Series, alpha: float) -> float:
     """
     Calculate the Winkler Score for prediction intervals.
     A proper scoring rule that penalizes both wide intervals and values outside the interval.

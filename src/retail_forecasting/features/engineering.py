@@ -107,19 +107,13 @@ def build_feature_frame(
         sum_column = f"demand_roll_sum_{window}"
         std_column = f"demand_roll_std_{window}"
         frame[mean_column] = grouped["observed_demand"].transform(
-            lambda series: (
-                series.shift(1).rolling(window=window, min_periods=window).mean()
-            )
+            lambda series, w=window: series.shift(1).rolling(window=w, min_periods=w).mean()
         )
         frame[sum_column] = grouped["observed_demand"].transform(
-            lambda series: (
-                series.shift(1).rolling(window=window, min_periods=window).sum()
-            )
+            lambda series, w=window: series.shift(1).rolling(window=w, min_periods=w).sum()
         )
         frame[std_column] = grouped["observed_demand"].transform(
-            lambda series: (
-                series.shift(1).rolling(window=window, min_periods=window).std()
-            )
+            lambda series, w=window: series.shift(1).rolling(window=w, min_periods=w).std()
         )
         frame[std_column] = frame[std_column].fillna(0.0)
         feature_columns.extend([mean_column, sum_column, std_column])
@@ -138,9 +132,7 @@ def build_feature_frame(
         for window in sorted(set(feature_config.rolling_windows)):
             column = f"stockout_roll_mean_{window}"
             frame[column] = grouped["stockout_hours"].transform(
-                lambda series: (
-                    series.shift(1).rolling(window=window, min_periods=window).mean()
-                )
+                lambda series, w=window: series.shift(1).rolling(window=w, min_periods=w).mean()
             )
             feature_columns.append(column)
 
@@ -202,9 +194,7 @@ def build_supervised_frame(
     feature_columns = feature_metadata.feature_columns
     grouped = frame.groupby("series_id", sort=False)
 
-    frame["target_lead_time_demand"] = _build_target(
-        grouped["observed_demand"], horizon
-    )
+    frame["target_lead_time_demand"] = _build_target(grouped["observed_demand"], horizon)
     frame["target_horizon_days"] = horizon
 
     before_target_drop = len(frame)
@@ -310,9 +300,7 @@ def build_inference_frame_with_fallback(
     feature_complete_mask = latest_rows[feature_columns].notna().all(axis=1)
 
     latest_rows["prediction_source"] = "model"
-    latest_rows["fallback_level"] = pd.Series(
-        pd.NA, index=latest_rows.index, dtype="object"
-    )
+    latest_rows["fallback_level"] = pd.Series(pd.NA, index=latest_rows.index, dtype="object")
     latest_rows["fallback_target_lead_time_demand"] = pd.NA
 
     cold_start_mask = ~feature_complete_mask
@@ -326,9 +314,9 @@ def build_inference_frame_with_fallback(
         latest_rows.loc[cold_start_mask, "fallback_level"] = fallback_assignments[
             "fallback_level"
         ].to_numpy()
-        latest_rows.loc[cold_start_mask, "fallback_target_lead_time_demand"] = (
-            fallback_assignments["fallback_target_lead_time_demand"].to_numpy()
-        )
+        latest_rows.loc[cold_start_mask, "fallback_target_lead_time_demand"] = fallback_assignments[
+            "fallback_target_lead_time_demand"
+        ].to_numpy()
 
     latest_rows = latest_rows.reset_index(drop=True)
     _raise_if_empty(latest_rows, mode="inference")
@@ -345,9 +333,7 @@ def build_inference_frame_with_fallback(
         input_rows=feature_metadata.input_rows,
         output_rows=len(latest_rows),
         model_rows=int((latest_rows["prediction_source"] == "model").sum()),
-        cold_start_rows=int(
-            (latest_rows["prediction_source"] == "cold_start_fallback").sum()
-        ),
+        cold_start_rows=int((latest_rows["prediction_source"] == "cold_start_fallback").sum()),
         fallback_rows_series=int(fallback_counts.get("series", 0)),
         fallback_rows_product=int(fallback_counts.get("product", 0)),
         fallback_rows_third_category=int(fallback_counts.get("third_category", 0)),
@@ -493,10 +479,6 @@ def _warn_on_large_drop(step: str, input_rows: int, dropped_rows: int) -> None:
         )
 
 
-def _raise_if_empty(
-    frame: pd.DataFrame, mode: Literal["supervised", "inference"]
-) -> None:
+def _raise_if_empty(frame: pd.DataFrame, mode: Literal["supervised", "inference"]) -> None:
     if frame.empty:
-        raise ValueError(
-            f"Feature engineering produced no usable rows for {mode} mode."
-        )
+        raise ValueError(f"Feature engineering produced no usable rows for {mode} mode.")

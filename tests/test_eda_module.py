@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 
 from retail_forecasting.config import DatasetConfig
-from retail_forecasting.eda.reporting import EdaArtifacts, write_eda_artifacts
 from retail_forecasting.eda.profiling import (
     build_dataset_summary,
     build_missingness_summary,
     build_numeric_summary,
     build_series_summary,
 )
+from retail_forecasting.eda.reporting import EdaArtifacts, write_eda_artifacts
 from retail_forecasting.eda.run import (
     build_config_alignment_summary,
     build_correlation_summary,
@@ -58,15 +58,10 @@ def test_eda_summaries_cover_prepared_panel_contract() -> None:
     assert set(["column_name", "mean", "median"]).issubset(numeric_summary.columns)
     assert series_summary["series_id"].nunique() == panel["series_id"].nunique()
     assert temporal_summary.loc[0, "duplicate_series_date_rows"] == 0
-    assert list(weekday_summary["weekday"]) == sorted(
-        weekday_summary["weekday"].tolist()
-    )
+    assert list(weekday_summary["weekday"]) == sorted(weekday_summary["weekday"].tolist())
     assert (series_gap_summary["missing_days_within_span"] == 0).all()
     assert 0.0 <= stockout_summary.loc[0, "stockout_row_rate"] <= 1.0
-    assert (
-        stockout_by_series_summary["series_id"].nunique()
-        == panel["series_id"].nunique()
-    )
+    assert stockout_by_series_summary["series_id"].nunique() == panel["series_id"].nunique()
     assert set(stockout_demand_bands["stockout_band"].astype(str)) == {
         "0",
         "0-2",
@@ -199,9 +194,7 @@ def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
     tex_fragment = memoria_dir / "figures" / "eda" / "eda_figures.tex"
     assert tex_fragment.exists()
     assert (memoria_dir / "figures" / "eda" / "coverage_heatmap.png").exists()
-    assert (
-        memoria_dir / "figures" / "eda" / "representative_series_panels.png"
-    ).exists()
+    assert (memoria_dir / "figures" / "eda" / "representative_series_panels.png").exists()
     assert "Interpretación." in tex_fragment.read_text(encoding="utf-8")
 
 

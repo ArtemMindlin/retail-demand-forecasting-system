@@ -18,7 +18,7 @@ class SeasonalNaiveModel:
     horizon: int
     model_name: str = "seasonal_naive"
 
-    def fit(self, panel: pd.DataFrame) -> "SeasonalNaiveModel":
+    def fit(self, panel: pd.DataFrame) -> SeasonalNaiveModel:
         self.history_ = (
             panel.loc[:, ["series_id", "date", "observed_demand"]]
             .sort_values(["series_id", "date"])
@@ -36,13 +36,8 @@ class SeasonalNaiveModel:
             history_by_date = history.set_index("date")["observed_demand"]
             prediction = 0.0
             for step in range(self.horizon):
-                lag = (
-                    math.ceil((step + 1) / self.seasonal_period) * self.seasonal_period
-                    - step
-                )
+                lag = math.ceil((step + 1) / self.seasonal_period) * self.seasonal_period - step
                 reference_date = row_date - pd.Timedelta(days=lag)
                 prediction += float(history_by_date.get(reference_date, np.nan))
-            predictions.append(
-                np.nan if math.isnan(prediction) else max(prediction, 0.0)
-            )
+            predictions.append(np.nan if math.isnan(prediction) else max(prediction, 0.0))
         return np.asarray(predictions, dtype=float)

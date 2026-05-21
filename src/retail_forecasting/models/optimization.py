@@ -7,7 +7,7 @@ import optuna
 import pandas as pd
 
 from retail_forecasting.config import Settings
-from retail_forecasting.contracts.tuning import (
+from retail_forecasting.contracts.contracts_tuning import (
     BoostingParams,
     TuningMetadata,
     TuningResult,
@@ -56,16 +56,12 @@ class HyperparameterTuner:
                 target_col=target_col,
                 best_params=fallback_params,
             )
-            return TuningResult(
-                best_params=fallback_params, metadata=self.tuning_metadata
-            )
+            return TuningResult(best_params=fallback_params, metadata=self.tuning_metadata)
 
         def objective(trial: optuna.Trial) -> tuple[float, float]:
             params = BoostingParams(
                 n_estimators=trial.suggest_int("n_estimators", 50, 800),
-                learning_rate=trial.suggest_float(
-                    "learning_rate", 0.005, 0.2, log=True
-                ),
+                learning_rate=trial.suggest_float("learning_rate", 0.005, 0.2, log=True),
                 max_depth=trial.suggest_int("max_depth", 3, 12),
             )
 
@@ -120,9 +116,7 @@ class HyperparameterTuner:
         # We can pick the one that minimizes the sum of normalized objectives,
         # or simply the one with the lowest MAE on the front for simplicity,
         # but storing the fact it was a multi-objective search.
-        best_trial = min(
-            study.best_trials, key=lambda t: t.values[0] + (t.values[1] * 0.1)
-        )
+        best_trial = min(study.best_trials, key=lambda t: t.values[0] + (t.values[1] * 0.1))
 
         best_params = BoostingParams(
             n_estimators=int(best_trial.params["n_estimators"]),

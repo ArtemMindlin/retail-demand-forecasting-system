@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import cast
+
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass, field
 from catboost import CatBoostRegressor
-from typing import cast
 
 from retail_forecasting.utils.io import quantile_column_name
 
@@ -26,11 +27,9 @@ class CatBoostingModel:
     model_name: str = "catboost"
     backend_name: str = field(init=False, default="catboost_official")
 
-    def fit(self, features: pd.DataFrame, target: pd.Series) -> "CatBoostingModel":
+    def fit(self, features: pd.DataFrame, target: pd.Series) -> CatBoostingModel:
         # Identify categorical features
-        cat_features = features.select_dtypes(
-            include=["category", "object"]
-        ).columns.tolist()
+        cat_features = features.select_dtypes(include=["category", "object"]).columns.tolist()
 
         # 1. Fit Point Model (Root Mean Square Error)
         self.point_model_ = CatBoostRegressor(

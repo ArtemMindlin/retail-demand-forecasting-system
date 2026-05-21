@@ -16,12 +16,8 @@ def build_temporal_summary(panel: pd.DataFrame) -> pd.DataFrame:
                 "date_span_days": date_span_days,
                 "observed_rows": len(panel),
                 "expected_rows_full_grid": expected_rows,
-                "coverage_rate_full_grid": len(panel) / expected_rows
-                if expected_rows
-                else 0.0,
-                "duplicate_series_date_rows": int(
-                    panel.duplicated(["series_id", "date"]).sum()
-                ),
+                "coverage_rate_full_grid": len(panel) / expected_rows if expected_rows else 0.0,
+                "duplicate_series_date_rows": int(panel.duplicated(["series_id", "date"]).sum()),
             }
         ]
     )

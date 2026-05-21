@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+
 import pandas as pd
 
 from retail_forecasting.config import InventoryConfig
@@ -92,15 +93,13 @@ def simulate_inventory_policy(
 
     # Identify available quantile columns for the decider
     quantile_columns = [c for c in predictions.columns if c.startswith("q_")]
-    quantile_levels = [
-        float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns
-    ]
+    quantile_levels = [float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns]
 
     # Process independently for each experimental strategy (data_strategy, model_name, backend_name)
     model_group_cols = ["data_strategy", "model_name", "backend_name"]
     model_group_cols = [c for c in model_group_cols if c in predictions.columns]
 
-    for model_keys, model_subset in predictions.groupby(model_group_cols):
+    for _model_keys, model_subset in predictions.groupby(model_group_cols):
         # Initialize state for all series in this model strategy
         states: dict[str, InventoryState] = {}
         pending_orders: dict[str, list[tuple[int, float]]] = {}
@@ -142,9 +141,7 @@ def simulate_inventory_policy(
                 ]
 
                 decider_input = pd.DataFrame([row])
-                net_stock = pd.Series(
-                    [state.on_hand - state.backlog], index=decider_input.index
-                )
+                net_stock = pd.Series([state.on_hand - state.backlog], index=decider_input.index)
                 on_order_val = sum(q for f, q in pending_orders[series_id])
                 on_order_series = pd.Series([on_order_val], index=decider_input.index)
 

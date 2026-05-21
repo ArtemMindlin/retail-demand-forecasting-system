@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from retail_forecasting.config import Settings
-
 # We will import RunArtifacts inside functions if needed to avoid circular imports,
 # or just type hint it with Any or 'RunArtifacts' if we use TYPE_CHECKING.
 from typing import TYPE_CHECKING, Any
+
+from retail_forecasting.config import Settings
 
 if TYPE_CHECKING:
     pass
@@ -21,9 +21,7 @@ def generate_post_mortem_report(artifacts: Any, settings: Settings) -> str:
 
     # We focus on the worst performing SKUs across all models, or specifically the champion/selected model.
     # Let's aggregate by series_id across the whole run to find the worst offenders.
-    sku_costs = (
-        preds.groupby("series_id")["sim_total_cost"].sum().sort_values(ascending=False)
-    )
+    sku_costs = preds.groupby("series_id")["sim_total_cost"].sum().sort_values(ascending=False)
 
     if sku_costs.empty:
         return "_No cost data to analyze._"

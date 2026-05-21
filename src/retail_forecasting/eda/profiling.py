@@ -78,9 +78,7 @@ def build_series_summary(panel: pd.DataFrame) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
-    series_summary["observed_demand_std"] = series_summary[
-        "observed_demand_std"
-    ].fillna(0.0)
+    series_summary["observed_demand_std"] = series_summary["observed_demand_std"].fillna(0.0)
     return series_summary
 
 

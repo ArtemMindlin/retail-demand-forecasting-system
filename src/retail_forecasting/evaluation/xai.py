@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import pandas as pd
-import shap
 from typing import Any
 
+import pandas as pd
+import shap
 
-def calculate_shap_values(
-    model: Any, X: pd.DataFrame, sample_size: int = 500
-) -> shap.Explanation:
+
+def calculate_shap_values(model: Any, X: pd.DataFrame, sample_size: int = 500) -> shap.Explanation:
     """
     Calculate SHAP values for a given model and feature set.
     Uses TreeExplainer for boosting models if possible.

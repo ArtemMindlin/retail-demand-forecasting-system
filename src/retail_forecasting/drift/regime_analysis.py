@@ -4,9 +4,7 @@ import numpy as np
 import pandas as pd
 
 
-def label_stockout_regime(
-    frame: pd.DataFrame, threshold: float | None = None
-) -> pd.DataFrame:
+def label_stockout_regime(frame: pd.DataFrame, threshold: float | None = None) -> pd.DataFrame:
     """Label rows by stockout regime using a threshold on stockout hours.
 
     Args:
@@ -23,9 +21,7 @@ def label_stockout_regime(
     """
     labeled = frame.copy()
     threshold_value = (
-        threshold
-        if threshold is not None
-        else float(labeled["stockout_hours"].median())
+        threshold if threshold is not None else float(labeled["stockout_hours"].median())
     )
     labeled["stockout_regime"] = np.where(
         labeled["stockout_hours"] >= threshold_value,

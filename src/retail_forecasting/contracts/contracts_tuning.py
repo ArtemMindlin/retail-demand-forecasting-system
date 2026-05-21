@@ -21,9 +21,7 @@ class TuningMetadata(BaseModel):
         arbitrary_types_allowed=True,
     )
 
-    strategy: Literal[
-        "optuna_temporal_holdout", "optuna_multiobjective_pareto", "default_fallback"
-    ]
+    strategy: Literal["optuna_temporal_holdout", "optuna_multiobjective_pareto", "default_fallback"]
     n_trials_requested: int = Field(gt=0)
     best_score: float | None = Field(default=None, ge=0)
     train_rows: int = Field(ge=0)

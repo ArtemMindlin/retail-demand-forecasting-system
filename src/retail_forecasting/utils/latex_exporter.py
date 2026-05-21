@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 
 def export_to_latex(
@@ -18,18 +19,12 @@ def export_to_latex(
     # We filter and format according to the thesis structure
     pred_cols = ["data_strategy", "model_name", "mae", "rmse"]
     # Only keep some representative models to avoid cluttering the table
-    mask = metrics_df["model_name"].isin(
-        ["catboost", "seasonal_naive", "auto_boosting"]
-    )
+    mask = metrics_df["model_name"].isin(["catboost", "seasonal_naive", "auto_boosting"])
     pred_table = metrics_df.loc[mask, pred_cols].sort_values(["data_strategy", "mae"])
 
     # Capitalize and format for beauty
-    pred_table["model_name"] = (
-        pred_table["model_name"].str.replace("_", " ").str.title()
-    )
-    pred_table["data_strategy"] = (
-        pred_table["data_strategy"].str.replace("_", " ").str.title()
-    )
+    pred_table["model_name"] = pred_table["model_name"].str.replace("_", " ").str.title()
+    pred_table["data_strategy"] = pred_table["data_strategy"].str.replace("_", " ").str.title()
 
     latex_pred = pred_table.to_latex(
         index=False,
@@ -44,17 +39,11 @@ def export_to_latex(
 
     # 2. Economic Metrics Table (Total Cost)
     cost_cols = ["data_strategy", "model_name", "total_cost", "mean_cost"]
-    mask_costs = costs_df["model_name"].isin(
-        ["catboost", "seasonal_naive", "auto_boosting"]
-    )
+    mask_costs = costs_df["model_name"].isin(["catboost", "seasonal_naive", "auto_boosting"])
     cost_table = costs_df.loc[mask_costs, cost_cols].sort_values(["total_cost"])
 
-    cost_table["model_name"] = (
-        cost_table["model_name"].str.replace("_", " ").str.title()
-    )
-    cost_table["data_strategy"] = (
-        cost_table["data_strategy"].str.replace("_", " ").str.title()
-    )
+    cost_table["model_name"] = cost_table["model_name"].str.replace("_", " ").str.title()
+    cost_table["data_strategy"] = cost_table["data_strategy"].str.replace("_", " ").str.title()
 
     latex_cost = cost_table.to_latex(
         index=False,

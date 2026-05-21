@@ -35,17 +35,12 @@ class FoldSpec(BaseModel):
     def _validate_temporal_contract(self) -> FoldSpec:
         if self.validation_end_date < self.validation_start_date:
             raise ValueError(
-                "validation_end_date must be greater than or equal to "
-                "validation_start_date."
+                "validation_end_date must be greater than or equal to validation_start_date."
             )
 
-        expected_train_end = self.validation_start_date - pd.Timedelta(
-            days=self.horizon
-        )
+        expected_train_end = self.validation_start_date - pd.Timedelta(days=self.horizon)
         if self.train_end_date != expected_train_end:
-            raise ValueError(
-                "train_end_date must equal validation_start_date - horizon."
-            )
+            raise ValueError("train_end_date must equal validation_start_date - horizon.")
 
         return self
 
@@ -73,12 +68,9 @@ def build_walk_forward_folds(
 
     for fold_id in range(validation_config.n_folds):
         validation_start_index = (
-            validation_config.initial_train_days
-            + fold_id * validation_config.fold_size_days
+            validation_config.initial_train_days + fold_id * validation_config.fold_size_days
         )
-        validation_end_index = (
-            validation_start_index + validation_config.fold_size_days - 1
-        )
+        validation_end_index = validation_start_index + validation_config.fold_size_days - 1
         if validation_end_index > last_valid_index:
             break
 
@@ -97,8 +89,6 @@ def build_walk_forward_folds(
         )
 
     if not folds:
-        raise ValueError(
-            "No valid fold could be created with the current configuration."
-        )
+        raise ValueError("No valid fold could be created with the current configuration.")
 
     return folds
