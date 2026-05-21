@@ -1,11 +1,12 @@
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
 from pathlib import Path
 
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+
 from retail_forecasting.config import InventoryConfig
-from retail_forecasting.inventory.simulation import simulate_inventory_policy
 from retail_forecasting.evaluation.metrics import summarize_costs
+from retail_forecasting.inventory.simulation import simulate_inventory_policy
 
 st.set_page_config(page_title="Retail Forecasting TFG Dashboard", layout="wide")
 
@@ -16,7 +17,8 @@ def get_report_dirs() -> list[Path]:
         return []
     # Return only experiment directories that contain the required CSV files
     dirs = [
-        d for d in reports_path.iterdir()
+        d
+        for d in reports_path.iterdir()
         if d.is_dir()
         and (d / "predictions.csv").exists()
         and (d / "metrics_summary.csv").exists()
@@ -45,9 +47,7 @@ st.sidebar.markdown("Forecasting de Demanda & Decisiones de Inventario")
 
 report_dirs = get_report_dirs()
 if not report_dirs:
-    st.error(
-        "No se encontraron reportes en la carpeta `reports/`. Ejecuta un experimento primero."
-    )
+    st.error("No se encontraron reportes en la carpeta `reports/`. Ejecuta un experimento primero.")
     st.stop()
 
 selected_run = st.sidebar.selectbox(
@@ -85,13 +85,25 @@ else:
 selected_strategy = st.sidebar.selectbox(
     "Estrategia de Datos",
     all_strategies,
-    help="Compara cómo afecta entrenar con datos reales censurados (Observed) vs datos imputados (Latent)"
+    help="Compara cómo afecta entrenar con datos reales censurados (Observed) vs datos imputados (Latent)",
 )
 
 # Apply strategy filter to predictions, metrics and costs for the main displays
-preds_filtered = preds[preds["data_strategy"] == selected_strategy] if "data_strategy" in preds.columns else preds
-metrics_filtered = metrics[metrics["data_strategy"] == selected_strategy] if "data_strategy" in metrics.columns else metrics
-costs_filtered = costs[costs["data_strategy"] == selected_strategy] if "data_strategy" in costs.columns else costs
+preds_filtered = (
+    preds[preds["data_strategy"] == selected_strategy]
+    if "data_strategy" in preds.columns
+    else preds
+)
+metrics_filtered = (
+    metrics[metrics["data_strategy"] == selected_strategy]
+    if "data_strategy" in metrics.columns
+    else metrics
+)
+costs_filtered = (
+    costs[costs["data_strategy"] == selected_strategy]
+    if "data_strategy" in costs.columns
+    else costs
+)
 
 all_series = sorted(preds_filtered["series_id"].unique())
 selected_series = st.sidebar.selectbox("Seleccionar Producto/Tienda", all_series)
@@ -111,9 +123,7 @@ with st.sidebar.expander("Parámetros de Coste Global", expanded=True):
 with st.sidebar.expander("Restricciones Logísticas", expanded=True):
     use_capacity = st.checkbox("Aplicar Límite de Capacidad", value=True)
     new_capacity = (
-        st.slider("Capacidad Global (Unidades)", 500, 10000, 3000, 100)
-        if use_capacity
-        else None
+        st.slider("Capacidad Global (Unidades)", 500, 10000, 3000, 100) if use_capacity else None
     )
 
 run_what_if = st.sidebar.button("▶️ Simular Escenario")
@@ -147,19 +157,19 @@ if run_what_if:
 # --- Main Layout ---
 # Premium styled header for TFG
 st.markdown(
-    """
+    f"""
     <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 25px; border-radius: 15px; margin-bottom: 25px; color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
         <h1 style="margin: 0; font-family: 'Outfit', 'Inter', sans-serif; font-size: 2.2rem; font-weight: 700; color: white;">🚀 Panel de Decisiones de Inventario & Forecasting Probabilístico</h1>
         <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 1.05rem;">Trabajo Fin de Grado (TFG) - Optimización de Inventario Fresco bajo Roturas e Incertidumbre</p>
         <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-            <span style="background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: white;">🔍 Estrategia: <b>{strategy}</b></span>
+            <span style="background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: white;">🔍 Estrategia: <b>{selected_strategy}</b></span>
             <span style="background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: white;">🎯 Conformal Prediction</span>
             <span style="background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: white;">⚖️ Frontera de Pareto</span>
             <span style="background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: white;">📈 Streamlit Pro Edition</span>
         </div>
     </div>
-    """.format(strategy=selected_strategy),
-    unsafe_allow_html=True
+    """,
+    unsafe_allow_html=True,
 )
 
 st.subheader(f"📊 Ejecución seleccionada: {selected_run.name}")
@@ -167,7 +177,9 @@ st.subheader(f"📊 Ejecución seleccionada: {selected_run.name}")
 # Metrics Row
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    base_cost = costs_filtered[costs_filtered["model_name"] == selected_model]["sim_total_cost"].sum()
+    base_cost = costs_filtered[costs_filtered["model_name"] == selected_model][
+        "sim_total_cost"
+    ].sum()
     if what_if_costs is not None:
         new_cost = what_if_costs["sim_total_cost"].sum()
         st.metric(
@@ -204,9 +216,13 @@ with col4:
             delta=f"{(new_sl - base_sl) * 100:.1f}%",
         )
     else:
-        base_sl = costs_filtered[costs_filtered["model_name"] == selected_model][
-            "sim_service_level"
-        ].mean() if "sim_service_level" in costs_filtered.columns else None
+        base_sl = (
+            costs_filtered[costs_filtered["model_name"] == selected_model][
+                "sim_service_level"
+            ].mean()
+            if "sim_service_level" in costs_filtered.columns
+            else None
+        )
         if base_sl is not None and not pd.isna(base_sl):
             st.metric("Nivel de Servicio (Base)", f"{base_sl * 100:.1f}%")
         else:
@@ -216,15 +232,19 @@ with col4:
 if "ALERT" in drift_info:
     st.warning(f"⚠️ **Detección de Drift (Cambio de Régimen):** {drift_info}")
 else:
-    st.success("✅ **Estabilidad Temporal Confirmada:** No se detectó drift significativo en la demanda.")
+    st.success(
+        "✅ **Estabilidad Temporal Confirmada:** No se detectó drift significativo en la demanda."
+    )
 
 # --- Tabbed Navigation ---
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🔮 Pronósticos e Inventario",
-    "🔍 Imputación de Demanda Latente",
-    "🎯 Frontera de Pareto y Sensibilidad",
-    "📘 Marco Teórico y Analógico"
-])
+tab1, tab2, tab3, tab4 = st.tabs(
+    [
+        "🔮 Pronósticos e Inventario",
+        "🔍 Imputación de Demanda Latente",
+        "🎯 Frontera de Pareto y Sensibilidad",
+        "📘 Marco Teórico y Analógico",
+    ]
+)
 
 # --- Tab 1: Forecasting and Base Inventory ---
 with tab1:
@@ -234,7 +254,8 @@ with tab1:
     )
 
     series_data = preds_filtered[
-        (preds_filtered["series_id"] == selected_series) & (preds_filtered["model_name"] == selected_model)
+        (preds_filtered["series_id"] == selected_series)
+        & (preds_filtered["model_name"] == selected_model)
     ].sort_values("date")
 
     fig = go.Figure()
@@ -265,7 +286,7 @@ with tab1:
             mode="lines+markers",
             name="Demanda Real (y_true)",
             line=dict(color="rgb(31, 41, 55)", width=2),
-            marker=dict(size=6)
+            marker=dict(size=6),
         )
     )
 
@@ -293,9 +314,9 @@ with tab1:
 
     # Plot What-If Order Quantity if available
     if what_if_preds is not None:
-        wi_series_data = what_if_preds[
-            what_if_preds["series_id"] == selected_series
-        ].sort_values("date")
+        wi_series_data = what_if_preds[what_if_preds["series_id"] == selected_series].sort_values(
+            "date"
+        )
         fig.add_trace(
             go.Scatter(
                 x=wi_series_data["date"],
@@ -318,7 +339,7 @@ with tab1:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         margin=dict(l=10, r=10, t=30, b=10),
         plot_bgcolor="rgba(243, 244, 246, 0.5)",
-        paper_bgcolor="white"
+        paper_bgcolor="white",
     )
 
     st.plotly_chart(fig, use_container_width=True)
@@ -340,14 +361,16 @@ with tab2:
     )
 
     # Check if there is latent demand data anywhere in the predictions
-    latent_strat = next((s for s in preds["data_strategy"].dropna().unique() if "Latent_" in s), None)
+    latent_strat = next(
+        (s for s in preds["data_strategy"].dropna().unique() if "Latent_" in s), None
+    )
 
     if latent_strat is not None and "original_observed_demand" in preds.columns:
         # Filter for the latent strategy for this series and model
         latent_series_data = preds[
-            (preds["data_strategy"] == latent_strat) &
-            (preds["series_id"] == selected_series) &
-            (preds["model_name"] == selected_model)
+            (preds["data_strategy"] == latent_strat)
+            & (preds["series_id"] == selected_series)
+            & (preds["model_name"] == selected_model)
         ].sort_values("date")
 
         if not latent_series_data.empty:
@@ -360,7 +383,7 @@ with tab2:
                     y=latent_series_data["stockout_hours"],
                     name="Horas de Rotura (Stockout Hours)",
                     marker_color="rgba(245, 158, 11, 0.25)",
-                    yaxis="y2"
+                    yaxis="y2",
                 )
             )
 
@@ -372,7 +395,7 @@ with tab2:
                     mode="lines+markers",
                     name="Venta Real Registrada (Censurada por Stockout)",
                     line=dict(color="rgb(220, 38, 38)", width=2),
-                    marker=dict(size=6, symbol="x")
+                    marker=dict(size=6, symbol="x"),
                 )
             )
 
@@ -384,7 +407,7 @@ with tab2:
                     mode="lines+markers",
                     name="Demanda Latente Imputada (Estimación Real)",
                     line=dict(color="rgb(16, 185, 129)", width=2),
-                    marker=dict(size=6, symbol="circle")
+                    marker=dict(size=6, symbol="circle"),
                 )
             )
 
@@ -396,13 +419,13 @@ with tab2:
                     overlaying="y",
                     side="right",
                     range=[0, 24],
-                    showgrid=False
+                    showgrid=False,
                 ),
                 hovermode="x unified",
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 margin=dict(l=10, r=10, t=30, b=10),
                 plot_bgcolor="rgba(243, 244, 246, 0.5)",
-                paper_bgcolor="white"
+                paper_bgcolor="white",
             )
 
             st.plotly_chart(fig_latent, use_container_width=True)
@@ -435,28 +458,54 @@ with tab3:
         fig_pareto = go.Figure()
 
         # Group Pareto points by strategy and model for scatter
-        for (strategy_name, model_name), group in pareto.groupby(["data_strategy", "model_name"]):
-            fig_pareto.add_trace(
-                go.Scatter(
-                    x=group["total_cost"],
-                    y=group["service_level"] * 100,
-                    mode="markers",
-                    name=f"{model_name} ({strategy_name})",
-                    marker=dict(size=10, opacity=0.8),
-                    hovertemplate=(
-                        "<b>%{text}</b><br><br>"
-                        "Coste Total: $%{x:,.2f}<br>"
-                        "Nivel Servicio: %{y:.2f}%<br>"
-                        "Escala de Orden: %{customdata:.1f}<br>"
-                        "<extra></extra>"
-                    ),
-                    text=[f"{m} - {s}" for m, s in zip(group["model_name"], group["data_strategy"])],
-                    customdata=group["order_scale"]
+        if "data_strategy" in pareto.columns:
+            for (strategy_name, model_name), group in pareto.groupby(["data_strategy", "model_name"]):
+                fig_pareto.add_trace(
+                    go.Scatter(
+                        x=group["total_cost"],
+                        y=group["service_level"] * 100,
+                        mode="markers",
+                        name=f"{model_name} ({strategy_name})",
+                        marker=dict(size=10, opacity=0.8),
+                        hovertemplate=(
+                            "<b>%{text}</b><br><br>"
+                            "Coste Total: $%{x:,.2f}<br>"
+                            "Nivel Servicio: %{y:.2f}%<br>"
+                            "Escala de Orden: %{customdata:.1f}<br>"
+                            "<extra></extra>"
+                        ),
+                        text=[
+                            f"{m} - {s}"
+                            for m, s in zip(group["model_name"], group["data_strategy"], strict=False)
+                        ],
+                        customdata=group["order_scale"],
+                    )
                 )
-            )
+        else:
+            for model_name, group in pareto.groupby("model_name"):
+                fig_pareto.add_trace(
+                    go.Scatter(
+                        x=group["total_cost"],
+                        y=group["service_level"] * 100,
+                        mode="markers",
+                        name=model_name,
+                        marker=dict(size=10, opacity=0.8),
+                        hovertemplate=(
+                            "<b>%{text}</b><br><br>"
+                            "Coste Total: $%{x:,.2f}<br>"
+                            "Nivel Servicio: %{y:.2f}%<br>"
+                            "Escala de Orden: %{customdata:.1f}<br>"
+                            "<extra></extra>"
+                        ),
+                        text=[m for m in group["model_name"]],
+                        customdata=group["order_scale"] if "order_scale" in group.columns else [1.0] * len(group),
+                    )
+                )
 
         # Draw the actual Pareto frontier line (points where is_pareto_efficient == True)
-        pareto["is_pareto_efficient"] = pareto["is_pareto_efficient"].astype(str).str.lower() == "true"
+        pareto["is_pareto_efficient"] = (
+            pareto["is_pareto_efficient"].astype(str).str.lower() == "true"
+        )
         pareto_efficient = pareto[pareto["is_pareto_efficient"]].sort_values("total_cost")
 
         if not pareto_efficient.empty:
@@ -467,7 +516,7 @@ with tab3:
                     mode="lines",
                     name="Frontera de Pareto (Óptimo Eficiente)",
                     line=dict(color="rgb(16, 185, 129)", width=3, dash="dash"),
-                    hoverinfo="skip"
+                    hoverinfo="skip",
                 )
             )
 
@@ -477,7 +526,7 @@ with tab3:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=10, r=10, t=30, b=10),
             plot_bgcolor="rgba(243, 244, 246, 0.5)",
-            paper_bgcolor="white"
+            paper_bgcolor="white",
         )
 
         st.plotly_chart(fig_pareto, use_container_width=True)
@@ -494,24 +543,39 @@ with tab3:
     # Economic Sensitivity plot
     if sens is not None:
         st.markdown("---")
-        st.markdown("### 📊 Sensibilidad a Ratios de Penalización de Rotura ($C_{stockout}/C_{overstock}$)")
+        st.markdown(
+            "### 📊 Sensibilidad a Ratios de Penalización de Rotura ($C_{stockout}/C_{overstock}$)"
+        )
         st.markdown(
             "Muestra cómo escala el coste total de inventario a medida que el negocio penaliza más duramente "
             "las roturas de stock. Un modelo con un buen pronóstico probabilístico (conformal) escala de forma mucho más controlada."
         )
 
         fig_sens = go.Figure()
-        for (strat_name, model_name), group in sens.groupby(["data_strategy", "model_name"]):
-            fig_sens.add_trace(
-                go.Scatter(
-                    x=group["ratio"],
-                    y=group["total_cost"],
-                    mode="lines+markers",
-                    name=f"{model_name} ({strat_name})",
-                    line=dict(width=2),
-                    marker=dict(size=6)
+        if "data_strategy" in sens.columns:
+            for (strat_name, model_name), group in sens.groupby(["data_strategy", "model_name"]):
+                fig_sens.add_trace(
+                    go.Scatter(
+                        x=group["ratio"],
+                        y=group["total_cost"],
+                        mode="lines+markers",
+                        name=f"{model_name} ({strat_name})",
+                        line=dict(width=2),
+                        marker=dict(size=6),
+                    )
                 )
-            )
+        else:
+            for model_name, group in sens.groupby("model_name"):
+                fig_sens.add_trace(
+                    go.Scatter(
+                        x=group["ratio"],
+                        y=group["total_cost"],
+                        mode="lines+markers",
+                        name=model_name,
+                        line=dict(width=2),
+                        marker=dict(size=6),
+                    )
+                )
 
         fig_sens.update_layout(
             xaxis_title="Ratio de Coste Cs/Co",
@@ -520,7 +584,7 @@ with tab3:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=10, r=10, t=30, b=10),
             plot_bgcolor="rgba(243, 244, 246, 0.5)",
-            paper_bgcolor="white"
+            paper_bgcolor="white",
         )
         st.plotly_chart(fig_sens, use_container_width=True)
 
@@ -541,13 +605,13 @@ with tab4:
             <div style="background-color: rgba(59, 130, 246, 0.08); padding: 20px; border-radius: 12px; border-left: 5px solid #3b82f6; margin-bottom: 20px; min-height: 380px;">
                 <h4 style="margin-top: 0; color: #1e3a8a;">🌧️ 1. La Analogía del Meteorólogo (Conformal Prediction)</h4>
                 <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    En el TFG, no usamos intervalos de confianza estadísticos tradicionales (que asumen normalidad y suelen fallar en colas), 
+                    En el TFG, no usamos intervalos de confianza estadísticos tradicionales (que asumen normalidad y suelen fallar en colas),
                     sino <b>Conformal Prediction (CP)</b>, un método no paramétrico moderno que garantiza cobertura real.
                 </p>
                 <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; font-style: italic; background: white; padding: 10px; border-radius: 8px; color: black;">
-                    "Imagina un meteorólogo que dice: 'Mañana lloverá con un 80% de probabilidad'. Si evalúas todas sus predicciones históricas 
-                    y resulta que llovió exactamente en el 80% de los días que hizo este anuncio, el meteorólogo está <b>calibrado</b>. 
-                    Conformal Prediction garantiza ex-ante que nuestros intervalos del 80% contendrán la demanda real exactamente el 80% del tiempo, 
+                    "Imagina un meteorólogo que dice: 'Mañana lloverá con un 80% de probabilidad'. Si evalúas todas sus predicciones históricas
+                    y resulta que llovió exactamente en el 80% de los días que hizo este anuncio, el meteorólogo está <b>calibrado</b>.
+                    Conformal Prediction garantiza ex-ante que nuestros intervalos del 80% contendrán la demanda real exactamente el 80% del tiempo,
                     independientemente de qué tan sesgado esté el estimador base (LGBM o CatBoost)."
                 </p>
                 <p style="font-size: 0.9rem; color: #1d4ed8; font-weight: 600;">
@@ -555,7 +619,7 @@ with tab4:
                 </p>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         st.markdown(
@@ -563,19 +627,19 @@ with tab4:
             <div style="background-color: rgba(16, 185, 129, 0.08); padding: 20px; border-radius: 12px; border-left: 5px solid #10b981; min-height: 300px;">
                 <h4 style="margin-top: 0; color: #065f46;">⚖️ 3. La Frontera Eficiente de Pareto</h4>
                 <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    En logística de frescos, existe una contradicción intrínseca entre coste y servicio. 
-                    La <b>Frontera de Pareto</b> demuestra que no hay una única "decisión perfecta", sino un 
+                    En logística de frescos, existe una contradicción intrínseca entre coste y servicio.
+                    La <b>Frontera de Pareto</b> demuestra que no hay una única "decisión perfecta", sino un
                     <b>conjunto de decisiones óptimas</b>.
                 </p>
                 <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    El algoritmo calcula simulación de inventarios barriendo un factor multiplicativo 
-                    (escala de orden) desde 0.7x hasta 1.3x. La frontera une los puntos donde ya no puedes 
-                    reducir costes sin empeorar el nivel de servicio, dando soporte a decisiones ejecutivas 
+                    El algoritmo calcula simulación de inventarios barriendo un factor multiplicativo
+                    (escala de orden) desde 0.7x hasta 1.3x. La frontera une los puntos donde ya no puedes
+                    reducir costes sin empeorar el nivel de servicio, dando soporte a decisiones ejecutivas
                     estratégicas basadas en presupuesto.
                 </p>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
     with col_t2:
@@ -584,7 +648,7 @@ with tab4:
             <div style="background-color: rgba(239, 68, 68, 0.08); padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 20px; min-height: 380px;">
                 <h4 style="margin-top: 0; color: #991b1b;">📰 2. El Modelo del Vendedor de Periódicos (Newsvendor)</h4>
                 <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    La demanda es una variable aleatoria y pedir la media/predicción puntual es financieramente incorrecto en presencia de asimetrías de costes. 
+                    La demanda es una variable aleatoria y pedir la media/predicción puntual es financieramente incorrecto en presencia de asimetrías de costes.
                     Usamos el formalismo del <b>Fractil Crítico (Critical Fractile)</b>.
                 </p>
                 <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; background: white; padding: 10px; border-radius: 8px; color: black;">
@@ -594,8 +658,8 @@ with tab4:
                         τ* = C_under / (C_under + C_over)
                     </span>
                     <br>
-                    Donde <b>C_under</b> es el coste unitario por quedarnos cortos (rotura) y <b>C_over</b> es el coste de exceso (merma). 
-                    Con Cs=4 y Co=1, el Fractil Crítico τ* es 0.80, lo que significa que el inventario óptimo debe 
+                    Donde <b>C_under</b> es el coste unitario por quedarnos cortos (rotura) y <b>C_over</b> es el coste de exceso (merma).
+                    Con Cs=4 y Co=1, el Fractil Crítico τ* es 0.80, lo que significa que el inventario óptimo debe
                     cubrir el cuantil del 80% de la distribución conformal de demanda para maximizar la rentabilidad esperada.
                 </p>
                 <p style="font-size: 0.9rem; color: #b91c1c; font-weight: 600;">
@@ -603,7 +667,7 @@ with tab4:
                 </p>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         st.markdown(
@@ -611,17 +675,17 @@ with tab4:
             <div style="background-color: rgba(245, 158, 11, 0.08); padding: 20px; border-radius: 12px; border-left: 5px solid #f59e0b; min-height: 300px;">
                 <h4 style="margin-top: 0; color: #78350f;">📦 4. Optimización LP con Capacidad</h4>
                 <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    En el mundo real, los almacenes o camiones tienen una capacidad máxima. Cuando aplicas el modelo Newsvendor 
+                    En el mundo real, los almacenes o camiones tienen una capacidad máxima. Cuando aplicas el modelo Newsvendor
                     independiente a cada SKU, la suma total de órdenes de compra puede exceder el límite físico global.
                 </p>
                 <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    Nuestra plataforma resuelve un **Problema de Programación Lineal (LP)** dinámico cada día. 
-                    Cuando el límite global de capacidad está activo, el sistema redistribuye inteligentemente 
+                    Nuestra plataforma resuelve un **Problema de Programación Lineal (LP)** dinámico cada día.
+                    Cuando el límite global de capacidad está activo, el sistema redistribuye inteligentemente
                     las cuotas de capacidad priorizando los productos con mayor criticidad o mayor penalización por rotura.
                 </p>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
 

@@ -281,8 +281,19 @@ def run_sensitivity_analysis(
                 "c_under"
             ] / (adjusted_series_cost_profile["c_under"] + adjusted_series_cost_profile["c_over"])
 
-        for model_name in predictions["model_name"].unique():
-            model_preds = predictions[predictions["model_name"] == model_name].copy()
+        # Determine grouping keys based on column presence
+        group_cols = ["model_name"]
+        if "data_strategy" in predictions.columns:
+            group_cols.append("data_strategy")
+
+        for keys, group_df in predictions.groupby(group_cols):
+            model_preds = group_df.copy()
+            if len(group_cols) == 2:
+                model_name, data_strategy = keys
+            else:
+                model_name = keys
+                data_strategy = None
+
             if (
                 adjusted_series_cost_profile is None
                 and temp_config.use_series_costs
@@ -321,15 +332,16 @@ def run_sensitivity_analysis(
             )
 
             # Summarize
-            results.append(
-                {
-                    "ratio": ratio,
-                    "model_name": model_name,
-                    "total_cost": cost_preds["total_cost"].sum(),
-                    "overstock_cost": cost_preds["overstock_cost"].sum(),
-                    "stockout_cost": cost_preds["stockout_cost"].sum(),
-                    "mean_order_quantity": cost_preds["order_quantity"].mean(),
-                }
-            )
+            res_dict = {
+                "ratio": ratio,
+                "model_name": model_name,
+                "total_cost": cost_preds["total_cost"].sum(),
+                "overstock_cost": cost_preds["overstock_cost"].sum(),
+                "stockout_cost": cost_preds["stockout_cost"].sum(),
+                "mean_order_quantity": cost_preds["order_quantity"].mean(),
+            }
+            if data_strategy is not None:
+                res_dict["data_strategy"] = data_strategy
+            results.append(res_dict)
 
     return pd.DataFrame(results)
