@@ -13,11 +13,11 @@ import shap
 from pydantic import BaseModel, ConfigDict, Field
 
 from retail_forecasting.config import Settings
-from retail_forecasting.contracts.backtesting import FoldRunMetadata
-from retail_forecasting.contracts.business import ChampionRecord, ChampionRegistry
-from retail_forecasting.contracts.data_quality import DataQualityReport
-from retail_forecasting.contracts.drift import DriftDetectorMetadata, DriftEvent
-from retail_forecasting.contracts.tuning import TuningMetadata
+from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
+from retail_forecasting.contracts.contracts_business import ChampionRecord, ChampionRegistry
+from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
+from retail_forecasting.contracts.contracts_quality import DataQualityReport
+from retail_forecasting.contracts.contracts_tuning import TuningMetadata
 from retail_forecasting.utils.io import (
     dataframe_to_markdown,
     make_run_directory,
@@ -590,7 +590,7 @@ def build_operational_run_metadata(
 
 
 def champion_registry_path(settings: Settings) -> Path:
-    return settings.reporting.output_dir / "champion_registry.json"
+    return Path(settings.reporting.output_dir) / "champion_registry.json"
 
 
 def load_champion_registry(path: Path) -> ChampionRegistry | None:

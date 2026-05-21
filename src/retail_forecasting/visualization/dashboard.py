@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +10,229 @@ from retail_forecasting.evaluation.metrics import summarize_costs
 from retail_forecasting.inventory.simulation import simulate_inventory_policy
 
 st.set_page_config(page_title="Retail Forecasting TFG Dashboard", layout="wide")
+
+# --- Inyección de CSS de Alta Gama (SaaS) ---
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+    /* Global Body and Font */
+    html, body, [class*="css"], [data-testid="stAppViewContainer"] {
+        font-family: 'Inter', sans-serif !important;
+        background-color: #f8fafc !important;
+    }
+
+    h1, h2, h3, h4, h5, h6, [class*="Header"] {
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        letter-spacing: -0.02em;
+    }
+
+    /* Modern Tabs styling */
+    button[data-baseweb="tab"] {
+        font-family: 'Outfit', sans-serif !important;
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        color: #64748b !important;
+        border-bottom: 2px solid transparent !important;
+        padding: 12px 20px !important;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    button[data-baseweb="tab"]:hover {
+        color: #2563eb !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #2563eb !important;
+        border-bottom-color: #2563eb !important;
+    }
+
+    /* Sidebar elegant SaaS styling */
+    [data-testid="stSidebar"] {
+        background-color: #0f172a !important;
+        border-right: 1px solid #1e293b !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h1,
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 {
+        color: #f8fafc !important;
+    }
+    [data-testid="stSidebar"] label {
+        color: #94a3b8 !important;
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 500 !important;
+    }
+    [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+        border: 1px solid #334155 !important;
+        border-radius: 8px !important;
+    }
+
+    /* Premium Custom Cards */
+    .kpi-container {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        width: 100%;
+        margin-bottom: 25px;
+        margin-top: 15px;
+    }
+
+    .kpi-card {
+        flex: 1;
+        min-width: 220px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.03), 0 2px 4px -2px rgb(0 0 0 / 0.03);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    .kpi-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 20px -5px rgb(0 0 0 / 0.08), 0 8px 12px -6px rgb(0 0 0 / 0.08);
+        border-color: #cbd5e1;
+    }
+    .kpi-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(to bottom, #3b82f6, #2563eb);
+    }
+    .kpi-card.success::before {
+        background: linear-gradient(to bottom, #10b981, #059669);
+    }
+    .kpi-card.warning::before {
+        background: linear-gradient(to bottom, #f59e0b, #d97706);
+    }
+    .kpi-card.info::before {
+        background: linear-gradient(to bottom, #6366f1, #4f46e5);
+    }
+
+    .kpi-title {
+        font-family: 'Outfit', sans-serif !important;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #64748b;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .kpi-value {
+        font-family: 'Outfit', sans-serif !important;
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+
+    .kpi-delta {
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-top: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .kpi-delta.positive {
+        color: #10b981;
+    }
+    .kpi-delta.negative {
+        color: #ef4444;
+    }
+    .kpi-delta.info {
+        color: #3b82f6;
+    }
+
+    /* Elegant Expanders styling */
+    div[data-testid="stExpander"] {
+        background-color: #1e293b !important;
+        border: 1px solid #334155 !important;
+        border-radius: 12px !important;
+        margin-bottom: 12px !important;
+    }
+    div[data-testid="stExpander"] details {
+        border: none !important;
+    }
+    div[data-testid="stExpander"] summary {
+        color: #f8fafc !important;
+        font-weight: 600 !important;
+        font-family: 'Outfit', sans-serif !important;
+    }
+
+    /* What-if action button */
+    .stButton button {
+        width: 100% !important;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+        color: white !important;
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 600 !important;
+        padding: 10px 20px !important;
+        border-radius: 10px !important;
+        border: none !important;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
+        transition: all 0.2s ease !important;
+    }
+    .stButton button:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 12px -2px rgba(37, 99, 235, 0.3) !important;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+        color: white !important;
+    }
+    .stButton button:active {
+        transform: translateY(1px) !important;
+    }
+
+    /* Didactic Cards animation */
+    .tfg-card {
+        background: white !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 16px !important;
+        padding: 24px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.03) !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        position: relative !important;
+        overflow: hidden !important;
+        margin-bottom: 25px !important;
+    }
+    .tfg-card:hover {
+        transform: translateY(-4px) !important;
+        box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.08), 0 8px 12px -6px rgba(0, 0, 0, 0.08) !important;
+        border-color: #cbd5e1 !important;
+    }
+    .tfg-card::before {
+        content: "" !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 5px !important;
+        height: 100% !important;
+        background: linear-gradient(to bottom, #3b82f6, #2563eb) !important;
+    }
+    .tfg-card.blue::before {
+        background: linear-gradient(to bottom, #3b82f6, #2563eb) !important;
+    }
+    .tfg-card.green::before {
+        background: linear-gradient(to bottom, #10b981, #059669) !important;
+    }
+    .tfg-card.red::before {
+        background: linear-gradient(to bottom, #ef4444, #dc2626) !important;
+    }
+    .tfg-card.orange::before {
+        background: linear-gradient(to bottom, #f59e0b, #d97706) !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 def get_report_dirs() -> list[Path]:
@@ -174,66 +398,104 @@ st.markdown(
 
 st.subheader(f"📊 Ejecución seleccionada: {selected_run.name}")
 
-# Metrics Row
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    base_cost = costs_filtered[costs_filtered["model_name"] == selected_model][
-        "sim_total_cost"
-    ].sum()
-    if what_if_costs is not None:
-        new_cost = what_if_costs["sim_total_cost"].sum()
-        st.metric(
-            "Coste Total (Simulado)",
-            f"${new_cost:,.2f}",
-            delta=f"${new_cost - base_cost:,.2f}",
-            delta_color="inverse",
-        )
-    else:
-        st.metric("Coste Total (Base)", f"${base_cost:,.2f}")
-with col2:
-    model_metrics = metrics_filtered[metrics_filtered["model_name"] == selected_model]
-    if not model_metrics.empty:
-        mae = model_metrics.iloc[0]["mae"]
-        st.metric(f"MAE ({selected_model})", f"{mae:.2f}")
-with col3:
-    if not model_metrics.empty:
-        coverage = model_metrics.iloc[0].get(
-            "interval_coverage", model_metrics.iloc[0].get("coverage_q_0_1_q_0_9", 0)
-        )
-        if pd.isna(coverage):
-            st.metric("Cobertura de Intervalo", "N/A")
-        else:
-            st.metric("Cobertura de Intervalo (80% Target)", f"{coverage * 100:.1f}%")
-with col4:
-    if what_if_costs is not None:
-        base_sl = costs_filtered[costs_filtered["model_name"] == selected_model][
-            "sim_service_level"
-        ].mean()
-        new_sl = what_if_costs["sim_service_level"].mean()
-        st.metric(
-            "Nivel de Servicio",
-            f"{new_sl * 100:.1f}%",
-            delta=f"{(new_sl - base_sl) * 100:.1f}%",
-        )
-    else:
-        base_sl = (
-            costs_filtered[costs_filtered["model_name"] == selected_model][
-                "sim_service_level"
-            ].mean()
-            if "sim_service_level" in costs_filtered.columns
-            else None
-        )
-        if base_sl is not None and not pd.isna(base_sl):
-            st.metric("Nivel de Servicio (Base)", f"{base_sl * 100:.1f}%")
-        else:
-            st.info(f"Modelo: {selected_model}")
+# Metrics Calculation
+base_cost = costs_filtered[costs_filtered["model_name"] == selected_model]["sim_total_cost"].sum()
+
+new_cost = what_if_costs["sim_total_cost"].sum() if what_if_costs is not None else None
+
+model_metrics = metrics_filtered[metrics_filtered["model_name"] == selected_model]
+mae = model_metrics.iloc[0]["mae"] if not model_metrics.empty else 0.0
+
+coverage = 0.0
+if not model_metrics.empty:
+    coverage = model_metrics.iloc[0].get(
+        "interval_coverage", model_metrics.iloc[0].get("coverage_q_0_1_q_0_9", 0)
+    )
+
+base_sl = (
+    costs_filtered[costs_filtered["model_name"] == selected_model]["sim_service_level"].mean()
+    if "sim_service_level" in costs_filtered.columns
+    else 0.0
+)
+new_sl = what_if_costs["sim_service_level"].mean() if what_if_costs is not None else None
+
+# Format variables for custom HTML rendering
+cost_val = f"${new_cost:,.2f}" if new_cost is not None else f"${base_cost:,.2f}"
+cost_delta_html = ""
+if new_cost is not None:
+    diff = new_cost - base_cost
+    arrow = "↓" if diff < 0 else "↑"
+    cls = "positive" if diff < 0 else "negative"  # lower cost is positive
+    cost_delta_html = (
+        f'<div class="kpi-delta {cls}"><span>{arrow}</span> ${abs(diff):,.2f} vs Base</div>'
+    )
+
+mae_val = f"{mae:.2f}"
+coverage_val = "N/A" if pd.isna(coverage) else f"{coverage * 100:.1f}%"
+
+sl_val = (
+    f"{new_sl * 100:.1f}%"
+    if new_sl is not None
+    else (f"{base_sl * 100:.1f}%" if base_sl else "0.0%")
+)
+sl_delta_html = ""
+if new_sl is not None:
+    diff_sl = (new_sl - base_sl) * 100
+    arrow = "↑" if diff_sl > 0 else "↓"
+    cls = "positive" if diff_sl > 0 else "negative"
+    sl_delta_html = (
+        f'<div class="kpi-delta {cls}"><span>{arrow}</span> {abs(diff_sl):.1f}% vs Base</div>'
+    )
+
+# HTML KPI cards render
+st.markdown(
+    f"""
+    <div class="kpi-container">
+        <div class="kpi-card info">
+            <div class="kpi-title">💵 Coste Total de Inventario</div>
+            <div class="kpi-value">{cost_val}</div>
+            {cost_delta_html}
+        </div>
+        <div class="kpi-card warning">
+            <div class="kpi-title">🎯 Precisión de Pronóstico (MAE)</div>
+            <div class="kpi-value">{mae_val}</div>
+            <div class="kpi-delta info">Error absoluto medio</div>
+        </div>
+        <div class="kpi-card success">
+            <div class="kpi-title">🔒 Cobertura Conformal (80% Target)</div>
+            <div class="kpi-value">{coverage_val}</div>
+            <div class="kpi-delta positive">Garantía libre de distribución</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">📈 Nivel de Servicio Realizado</div>
+            <div class="kpi-value">{sl_val}</div>
+            {sl_delta_html}
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Drift Alerts
 if "ALERT" in drift_info:
-    st.warning(f"⚠️ **Detección de Drift (Cambio de Régimen):** {drift_info}")
+    st.markdown(
+        f"""
+        <div style="background-color: rgba(239, 68, 68, 0.08); padding: 16px 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px; color: #0f172a; font-size: 0.95rem;">
+            <span style="font-size: 1.2rem; margin-right: 8px;">⚠️</span>
+            <strong>Detección de Drift (Cambio de Régimen):</strong> {drift_info}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 else:
-    st.success(
-        "✅ **Estabilidad Temporal Confirmada:** No se detectó drift significativo en la demanda."
+    st.markdown(
+        """
+        <div style="background-color: rgba(16, 185, 129, 0.08); padding: 16px 20px; border-radius: 12px; border-left: 5px solid #10b981; margin-bottom: 25px; color: #0f172a; font-size: 0.95rem;">
+            <span style="font-size: 1.2rem; margin-right: 8px;">✅</span>
+            <strong>Estabilidad Temporal Confirmada:</strong> No se detectó drift significativo en la demanda de frescos.
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 # --- Tabbed Navigation ---
@@ -336,10 +598,27 @@ with tab1:
         xaxis_title="Fecha",
         yaxis_title="Unidades de Demanda",
         hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(l=10, r=10, t=30, b=10),
-        plot_bgcolor="rgba(243, 244, 246, 0.5)",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(size=11, family="'Inter', sans-serif"),
+        ),
+        margin=dict(l=20, r=20, t=40, b=20),
+        plot_bgcolor="#f8fafc",
         paper_bgcolor="white",
+        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False),
+        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False),
+        font=dict(family="'Outfit', 'Inter', sans-serif"),
+        hoverlabel=dict(
+            bgcolor="rgba(15, 23, 42, 0.95)",
+            font_size=13,
+            font_family="'Inter', sans-serif",
+            font_color="#f8fafc",
+            bordercolor="#334155",
+        ),
     )
 
     st.plotly_chart(fig, use_container_width=True)
@@ -422,10 +701,27 @@ with tab2:
                     showgrid=False,
                 ),
                 hovermode="x unified",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(l=10, r=10, t=30, b=10),
-                plot_bgcolor="rgba(243, 244, 246, 0.5)",
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1,
+                    font=dict(size=11, family="'Inter', sans-serif"),
+                ),
+                margin=dict(l=20, r=20, t=40, b=20),
+                plot_bgcolor="#f8fafc",
                 paper_bgcolor="white",
+                xaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False),
+                yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False),
+                font=dict(family="'Outfit', 'Inter', sans-serif"),
+                hoverlabel=dict(
+                    bgcolor="rgba(15, 23, 42, 0.95)",
+                    font_size=13,
+                    font_family="'Inter', sans-serif",
+                    font_color="#f8fafc",
+                    bordercolor="#334155",
+                ),
             )
 
             st.plotly_chart(fig_latent, use_container_width=True)
@@ -459,7 +755,9 @@ with tab3:
 
         # Group Pareto points by strategy and model for scatter
         if "data_strategy" in pareto.columns:
-            for (strategy_name, model_name), group in pareto.groupby(["data_strategy", "model_name"]):
+            for (strategy_name, model_name), group in pareto.groupby(
+                ["data_strategy", "model_name"]
+            ):
                 fig_pareto.add_trace(
                     go.Scatter(
                         x=group["total_cost"],
@@ -476,7 +774,9 @@ with tab3:
                         ),
                         text=[
                             f"{m} - {s}"
-                            for m, s in zip(group["model_name"], group["data_strategy"], strict=False)
+                            for m, s in zip(
+                                group["model_name"], group["data_strategy"], strict=False
+                            )
                         ],
                         customdata=group["order_scale"],
                     )
@@ -498,7 +798,9 @@ with tab3:
                             "<extra></extra>"
                         ),
                         text=[m for m in group["model_name"]],
-                        customdata=group["order_scale"] if "order_scale" in group.columns else [1.0] * len(group),
+                        customdata=group["order_scale"]
+                        if "order_scale" in group.columns
+                        else [1.0] * len(group),
                     )
                 )
 
@@ -523,10 +825,27 @@ with tab3:
         fig_pareto.update_layout(
             xaxis_title="Coste Total de Inventario ($)",
             yaxis_title="Nivel de Servicio (%)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=10, r=10, t=30, b=10),
-            plot_bgcolor="rgba(243, 244, 246, 0.5)",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1,
+                font=dict(size=11, family="'Inter', sans-serif"),
+            ),
+            margin=dict(l=20, r=20, t=40, b=20),
+            plot_bgcolor="#f8fafc",
             paper_bgcolor="white",
+            xaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False),
+            yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False),
+            font=dict(family="'Outfit', 'Inter', sans-serif"),
+            hoverlabel=dict(
+                bgcolor="rgba(15, 23, 42, 0.95)",
+                font_size=13,
+                font_family="'Inter', sans-serif",
+                font_color="#f8fafc",
+                bordercolor="#334155",
+            ),
         )
 
         st.plotly_chart(fig_pareto, use_container_width=True)
@@ -581,10 +900,27 @@ with tab3:
             xaxis_title="Ratio de Coste Cs/Co",
             yaxis_title="Coste Total ($)",
             hovermode="x unified",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=10, r=10, t=30, b=10),
-            plot_bgcolor="rgba(243, 244, 246, 0.5)",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1,
+                font=dict(size=11, family="'Inter', sans-serif"),
+            ),
+            margin=dict(l=20, r=20, t=40, b=20),
+            plot_bgcolor="#f8fafc",
             paper_bgcolor="white",
+            xaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False),
+            yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False),
+            font=dict(family="'Outfit', 'Inter', sans-serif"),
+            hoverlabel=dict(
+                bgcolor="rgba(15, 23, 42, 0.95)",
+                font_size=13,
+                font_family="'Inter', sans-serif",
+                font_color="#f8fafc",
+                bordercolor="#334155",
+            ),
         )
         st.plotly_chart(fig_sens, use_container_width=True)
 
@@ -602,20 +938,35 @@ with tab4:
     with col_t1:
         st.markdown(
             """
-            <div style="background-color: rgba(59, 130, 246, 0.08); padding: 20px; border-radius: 12px; border-left: 5px solid #3b82f6; margin-bottom: 20px; min-height: 380px;">
-                <h4 style="margin-top: 0; color: #1e3a8a;">🌧️ 1. La Analogía del Meteorólogo (Conformal Prediction)</h4>
-                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    En el TFG, no usamos intervalos de confianza estadísticos tradicionales (que asumen normalidad y suelen fallar en colas),
-                    sino <b>Conformal Prediction (CP)</b>, un método no paramétrico moderno que garantiza cobertura real.
+            <div class="tfg-card blue" style="min-height: 380px;">
+                <h4 style="margin-top: 0; color: #1e3a8a;
+                           font-family: 'Outfit', sans-serif; font-size: 1.25rem;">
+                    🌧️ 1. La Analogía del Meteorólogo (Conformal Prediction)
+                </h4>
+                <p style="font-size: 0.95rem; text-align: justify;
+                          line-height: 1.6; color: #334155; margin-bottom: 12px;">
+                    En el TFG, no usamos intervalos de confianza estadísticos tradicionales
+                    (que asumen normalidad y suelen fallar en colas), sino
+                    <b>Conformal Prediction (CP)</b>, un método no paramétrico moderno
+                    que garantiza cobertura real.
                 </p>
-                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; font-style: italic; background: white; padding: 10px; border-radius: 8px; color: black;">
-                    "Imagina un meteorólogo que dice: 'Mañana lloverá con un 80% de probabilidad'. Si evalúas todas sus predicciones históricas
-                    y resulta que llovió exactamente en el 80% de los días que hizo este anuncio, el meteorólogo está <b>calibrado</b>.
-                    Conformal Prediction garantiza ex-ante que nuestros intervalos del 80% contendrán la demanda real exactamente el 80% del tiempo,
-                    independientemente de qué tan sesgado esté el estimador base (LGBM o CatBoost)."
+                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.6;
+                          font-style: italic; background: #f8fafc; padding: 12px 16px;
+                          border-radius: 10px; border-left: 3px solid #3b82f6;
+                          color: #475569; margin-bottom: 12px;">
+                    "Imagina un meteorólogo que dice: 'Mañana lloverá con un 80% de
+                    probabilidad'. Si evalúas todas sus predicciones históricas
+                    y resulta que llovió exactamente en el 80% de los días que hizo
+                    este anuncio, el meteorólogo está <b>calibrado</b>.
+                    Conformal Prediction garantiza ex-ante que nuestros intervalos del 80%
+                    contendrán la demanda real exactamente el 80% del tiempo,
+                    independientemente de qué tan sesgado esté el estimador base
+                    (LGBM o CatBoost)."
                 </p>
-                <p style="font-size: 0.9rem; color: #1d4ed8; font-weight: 600;">
-                    💡 Concepto Clave: Calibración Empírica Libre de Distribución.
+                <p style="font-size: 0.9rem; color: #2563eb; font-weight: 600; margin: 0;
+                          display: flex; align-items: center; gap: 6px;">
+                    <span>💡</span> <strong>Concepto Clave:</strong>
+                    Calibración Empírica Libre de Distribución.
                 </p>
             </div>
             """,
@@ -624,17 +975,24 @@ with tab4:
 
         st.markdown(
             """
-            <div style="background-color: rgba(16, 185, 129, 0.08); padding: 20px; border-radius: 12px; border-left: 5px solid #10b981; min-height: 300px;">
-                <h4 style="margin-top: 0; color: #065f46;">⚖️ 3. La Frontera Eficiente de Pareto</h4>
-                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    En logística de frescos, existe una contradicción intrínseca entre coste y servicio.
-                    La <b>Frontera de Pareto</b> demuestra que no hay una única "decisión perfecta", sino un
+            <div class="tfg-card green" style="min-height: 300px;">
+                <h4 style="margin-top: 0; color: #065f46;
+                           font-family: 'Outfit', sans-serif; font-size: 1.25rem;">
+                    ⚖️ 3. La Frontera Eficiente de Pareto
+                </h4>
+                <p style="font-size: 0.95rem; text-align: justify;
+                          line-height: 1.6; color: #334155; margin-bottom: 12px;">
+                    En logística de frescos, existe una contradicción intrínseca
+                    entre coste y servicio. La <b>Frontera de Pareto</b> demuestra
+                    que no hay una única "decisión perfecta", sino un
                     <b>conjunto de decisiones óptimas</b>.
                 </p>
-                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    El algoritmo calcula simulación de inventarios barriendo un factor multiplicativo
-                    (escala de orden) desde 0.7x hasta 1.3x. La frontera une los puntos donde ya no puedes
-                    reducir costes sin empeorar el nivel de servicio, dando soporte a decisiones ejecutivas
+                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.6;
+                          color: #475569; margin: 0;">
+                    El algoritmo calcula simulación de inventarios barriendo un factor
+                    multiplicativo (escala de orden) desde 0.7x hasta 1.3x. La frontera
+                    une los puntos donde ya no puedes reducir costes sin empeorar el
+                    nivel de servicio, dando soporte a decisiones ejecutivas
                     estratégicas basadas en presupuesto.
                 </p>
             </div>
@@ -645,25 +1003,37 @@ with tab4:
     with col_t2:
         st.markdown(
             """
-            <div style="background-color: rgba(239, 68, 68, 0.08); padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 20px; min-height: 380px;">
-                <h4 style="margin-top: 0; color: #991b1b;">📰 2. El Modelo del Vendedor de Periódicos (Newsvendor)</h4>
-                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    La demanda es una variable aleatoria y pedir la media/predicción puntual es financieramente incorrecto en presencia de asimetrías de costes.
+            <div class="tfg-card red" style="min-height: 380px;">
+                <h4 style="margin-top: 0; color: #991b1b;
+                           font-family: 'Outfit', sans-serif; font-size: 1.25rem;">
+                    📰 2. El Modelo del Vendedor de Periódicos (Newsvendor)
+                </h4>
+                <p style="font-size: 0.95rem; text-align: justify;
+                          line-height: 1.6; color: #334155; margin-bottom: 12px;">
+                    La demanda es una variable aleatoria y pedir la media/predicción puntual
+                    es financieramente incorrecto en presencia de asimetrías de costes.
                     Usamos el formalismo del <b>Fractil Crítico (Critical Fractile)</b>.
                 </p>
-                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; background: white; padding: 10px; border-radius: 8px; color: black;">
+                <div style="font-size: 0.95rem; text-align: justify; line-height: 1.6;
+                            background: #f8fafc; padding: 12px 16px; border-radius: 10px;
+                            border-left: 3px solid #ef4444; color: #475569;
+                            margin-bottom: 12px;">
                     La cantidad óptima a pedir es el cuantil de demanda correspondiente a:
-                    <br><br>
-                    <span style="font-family: monospace; font-weight: bold; font-size: 1.1rem; display: block; text-align: center; color: #b91c1c;">
+                    <span style="font-family: monospace; font-weight: 700;
+                                 font-size: 1.15rem; display: block; text-align: center;
+                                 color: #b91c1c; margin: 8px 0;">
                         τ* = C_under / (C_under + C_over)
                     </span>
-                    <br>
-                    Donde <b>C_under</b> es el coste unitario por quedarnos cortos (rotura) y <b>C_over</b> es el coste de exceso (merma).
-                    Con Cs=4 y Co=1, el Fractil Crítico τ* es 0.80, lo que significa que el inventario óptimo debe
-                    cubrir el cuantil del 80% de la distribución conformal de demanda para maximizar la rentabilidad esperada.
-                </p>
-                <p style="font-size: 0.9rem; color: #b91c1c; font-weight: 600;">
-                    💡 Concepto Clave: Asimetría de Pérdidas y Coste de Oportunidad.
+                    Donde <b>C_under</b> es el coste unitario por quedarnos cortos (rotura)
+                    y <b>C_over</b> es el coste de exceso (merma).
+                    Con Cs=4 y Co=1, el Fractil Crítico τ* es 0.80, lo que significa que
+                    el inventario óptimo debe cubrir el cuantil del 80% de la distribución
+                    conformal de demanda para maximizar la rentabilidad esperada.
+                </div>
+                <p style="font-size: 0.9rem; color: #ef4444; font-weight: 600; margin: 0;
+                          display: flex; align-items: center; gap: 6px;">
+                    <span>💡</span> <strong>Concepto Clave:</strong>
+                    Asimetría de Pérdidas y Coste de Oportunidad.
                 </p>
             </div>
             """,
@@ -672,16 +1042,24 @@ with tab4:
 
         st.markdown(
             """
-            <div style="background-color: rgba(245, 158, 11, 0.08); padding: 20px; border-radius: 12px; border-left: 5px solid #f59e0b; min-height: 300px;">
-                <h4 style="margin-top: 0; color: #78350f;">📦 4. Optimización LP con Capacidad</h4>
-                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    En el mundo real, los almacenes o camiones tienen una capacidad máxima. Cuando aplicas el modelo Newsvendor
-                    independiente a cada SKU, la suma total de órdenes de compra puede exceder el límite físico global.
+            <div class="tfg-card orange" style="min-height: 300px;">
+                <h4 style="margin-top: 0; color: #78350f;
+                           font-family: 'Outfit', sans-serif; font-size: 1.25rem;">
+                    📦 4. Optimización LP con Capacidad
+                </h4>
+                <p style="font-size: 0.95rem; text-align: justify;
+                          line-height: 1.6; color: #334155; margin-bottom: 12px;">
+                    En el mundo real, los almacenes o camiones tienen una capacidad máxima.
+                    Cuando aplicas el modelo Newsvendor independiente a cada SKU,
+                    la suma total de órdenes de compra puede exceder el límite físico global.
                 </p>
-                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.5; color: black;">
-                    Nuestra plataforma resuelve un **Problema de Programación Lineal (LP)** dinámico cada día.
-                    Cuando el límite global de capacidad está activo, el sistema redistribuye inteligentemente
-                    las cuotas de capacidad priorizando los productos con mayor criticidad o mayor penalización por rotura.
+                <p style="font-size: 0.95rem; text-align: justify; line-height: 1.6;
+                          color: #475569; margin: 0;">
+                    Nuestra plataforma resuelve un **Problema de Programación Lineal (LP)**
+                    dinámico cada día. Cuando el límite global de capacidad está activo,
+                    el sistema redistribuye inteligentemente las cuotas de capacidad
+                    priorizando los productos con mayor criticidad o mayor penalización
+                    por rotura.
                 </p>
             </div>
             """,
@@ -716,5 +1094,6 @@ with c2:
 
 st.markdown("---")
 st.caption(
-    "Dashboard desarrollado para el TFG sobre Forecasting Probabilístico y Decisiones de Inventario."
+    "Dashboard desarrollado para el TFG sobre Forecasting Probabilístico "
+    "y Decisiones de Inventario."
 )

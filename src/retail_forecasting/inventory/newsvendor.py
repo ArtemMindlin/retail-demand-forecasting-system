@@ -8,8 +8,9 @@ from retail_forecasting.inventory.cost_profiles import attach_series_costs
 
 
 def critical_fractile(inventory_config: InventoryConfig) -> float:
-    return inventory_config.stockout_cost / (
-        inventory_config.stockout_cost + inventory_config.overstock_cost
+    return float(
+        inventory_config.stockout_cost
+        / (inventory_config.stockout_cost + inventory_config.overstock_cost)
     )
 
 
