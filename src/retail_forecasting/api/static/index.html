@@ -796,6 +796,10 @@
     from { transform: translateY(20px) scale(0.95); opacity: 0; }
     to { transform: translateY(0) scale(1); opacity: 1; }
   }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 </style>
 
 </head>
@@ -1092,7 +1096,7 @@
                   API · {window.location.host}
                 </div>
               </div>
-              <div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <a
                   href="https://retail-forecasting.betteruptime.com"
                   target="_blank"
@@ -1101,6 +1105,30 @@
                 >
                   <Icon name="shield" size={11} stroke="var(--c-conf)" />
                   <span>SISTEMA: ONLINE</span>
+                </a>
+                <a
+                  href="/docs"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="status-link"
+                  style={{
+                    background: "rgba(139, 92, 246, 0.04)",
+                    borderColor: "rgba(139, 92, 246, 0.12)",
+                    color: "var(--text-3)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "var(--text-1)";
+                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.1)";
+                    e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.3)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "var(--text-3)";
+                    e.currentTarget.style.background = "rgba(139, 92, 246, 0.04)";
+                    e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.12)";
+                  }}
+                >
+                  <Icon name="terminal" size={11} stroke="var(--c-ai)" />
+                  <span>SWAGGER API</span>
                 </a>
               </div>
             </div>
@@ -3343,6 +3371,30 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           </div>
 
           <div style={{ display: "flex", gap: 8 }}>
+            <a
+              href="/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                ...btnGhost,
+                textDecoration: "none",
+                display: "inline-flex",
+                background: "rgba(139, 92, 246, 0.06)",
+                borderColor: "rgba(139, 92, 246, 0.25)",
+                color: "var(--text-1)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(139, 92, 246, 0.15)";
+                e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.5)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(139, 92, 246, 0.06)";
+                e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.25)";
+              }}
+            >
+              <Icon name="terminal" size={13} stroke="var(--c-ai)" />
+              <span>Doc API Swagger</span>
+            </a>
             <button style={btnGhost} onClick={onRefresh}>
               <Icon name="refresh" size={13} /> Refrescar
             </button>
@@ -3372,6 +3424,143 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       transition: "all 0.15s ease"
     };
 
+    function EmptyState({ onRunPipeline, running, error }) {
+      return (
+        <div className="glass" style={{
+          padding: "48px 40px",
+          borderRadius: "20px",
+          maxWidth: "720px",
+          margin: "40px auto",
+          textAlign: "center",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          background: "linear-gradient(185deg, rgba(19, 25, 35, 0.85) 0%, rgba(11, 15, 21, 0.9) 100%)",
+          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 24,
+          animation: "toast-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)"
+        }}>
+          {/* Animated/Glowing Icon */}
+          <div style={{
+            position: "relative",
+            width: "80px",
+            height: "80px",
+            borderRadius: "50%",
+            background: "rgba(245, 158, 11, 0.08)",
+            border: "1px solid rgba(245, 158, 11, 0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 0 30px rgba(245, 158, 11, 0.15)",
+            marginBottom: 8
+          }}>
+            <Icon name="zap" size={36} color="var(--c-drift)" />
+            {/* Pulsing ring */}
+            <div style={{
+              position: "absolute",
+              inset: "-4px",
+              borderRadius: "50%",
+              border: "1px dashed rgba(245, 158, 11, 0.35)",
+              animation: "spin 20s linear infinite"
+            }} />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="label-mono" style={{ color: "var(--c-drift)", fontSize: 12 }}>
+              invariante de predicción · sin datos
+            </div>
+            <h2 className="h-display" style={{
+              fontSize: "30px",
+              color: "#fff",
+              margin: 0,
+              fontWeight: 800,
+              letterSpacing: "-0.02em"
+            }}>
+              No se puede predecir
+            </h2>
+            <p style={{
+              fontSize: "14.5px",
+              color: "var(--text-2)",
+              maxWidth: "520px",
+              margin: "0 auto",
+              lineHeight: 1.6
+            }}>
+              No se han encontrado ejecuciones previas del modelo en la carpeta de reportes (<code style={{ color: "var(--c-drift)", background: "rgba(245, 158, 11, 0.08)", padding: "2px 6px", borderRadius: 4, fontFamily: "var(--font-mono)", fontSize: 13 }}>reports/</code>).
+            </p>
+          </div>
+
+          <div style={{
+            background: "rgba(0, 0, 0, 0.25)",
+            border: "1px solid rgba(255, 255, 255, 0.04)",
+            padding: "16px 20px",
+            borderRadius: "12px",
+            width: "100%",
+            textAlign: "left",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            fontFamily: "var(--font-mono)",
+            fontSize: "12px"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-2)" }}>
+              <span className="live-dot" style={{ background: "var(--c-drift)", boxShadow: "0 0 0 0 rgba(245, 158, 11, 0.6)" }} />
+              <span>Invariantes del Sistema de Información:</span>
+            </div>
+            <div style={{ color: "var(--text-3)", paddingLeft: 14, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div>• El sistema prohíbe terminantemente la simulación o invención de datos ficticios.</div>
+              <div>• Requiere un archivo <code style={{ color: "var(--text-1)" }}>predictions.csv</code> generado a través del pipeline.</div>
+              <div>• Estado actual de la API: <span style={{ color: "var(--c-drift)" }}>INACTIVO (Esperando Pipeline)</span>.</div>
+            </div>
+          </div>
+
+          {error && (
+            <div style={{
+              color: "#ff5555",
+              background: "rgba(255,85,85,0.08)",
+              border: "1px solid rgba(255,85,85,0.2)",
+              padding: "12px 16px",
+              borderRadius: "8px",
+              fontSize: "13px",
+              width: "100%",
+              textAlign: "left"
+            }}>
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
+          <div style={{ width: "100%", maxWidth: "340px", marginTop: 8 }}>
+            <button
+              className="btn-run"
+              onClick={onRunPipeline}
+              disabled={running}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                height: "48px",
+                borderColor: running ? "rgba(139, 92, 246, 0.3)" : "rgba(139, 92, 246, 0.55)",
+                background: running ? "rgba(139, 92, 246, 0.1)" : undefined
+              }}
+            >
+              {running ? (
+                <>
+                  <Icon name="refresh" size={16} style={{ animation: "spin 1s linear infinite" }} />
+                  <span>Ejecutando Pipeline...</span>
+                </>
+              ) : (
+                <>
+                  <Icon name="play" size={16} />
+                  <span>Ejecutar Pipeline de Predicción</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     function App() {
       const [params, setParams] = useState({
         serviceLevel: 95,
@@ -3389,6 +3578,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const debounceRef = useRef(null);
 
       const [toasts, setToasts] = useState([]);
+      const [pipelineRunning, setPipelineRunning] = useState(false);
+      const [pipelineError, setPipelineError] = useState(null);
 
       const showToast = useCallback((title, message, type = "warning") => {
         const id = Date.now() + Math.random().toString(36).substr(2, 9);
@@ -3431,7 +3622,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         }
       }, [data, params.serviceLevel, showToast]);
 
-      const unreadAlerts = alerts.filter(a => !a.read).length;
+      const currentAlerts = data?.status === "no_predictions" ? [] : alerts;
+      const unreadAlerts = currentAlerts.filter(a => !a.read).length;
 
       // Real alerts fetching
       useEffect(() => {
@@ -3472,10 +3664,44 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [params]);
 
-      const handleRun = () => reload(750);
+      const handleRunPipeline = async () => {
+        setPipelineRunning(true);
+        setPipelineError(null);
+        try {
+          const res = await fetch("/predict_orders", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ config_path: "configs/default.yaml" })
+          });
+          const result = await res.json();
+          if (res.ok && result.status === "success") {
+            // Pipeline ran successfully! Reload data
+            await reload(750);
+          } else {
+            setPipelineError(result.detail || "Error desconocido ejecutando el pipeline.");
+          }
+        } catch (err) {
+          console.error(err);
+          setPipelineError("Error de red: No se pudo conectar con el servidor para ejecutar el pipeline.");
+        } finally {
+          setPipelineRunning(false);
+        }
+      };
+
+      const handleRun = () => {
+        if (data?.status === "no_predictions") {
+          handleRunPipeline();
+        } else {
+          reload(750);
+        }
+      };
+
       const handleAction = (a) => {
-        // Mock: an alert action triggers a re-run
-        reload(550);
+        if (data?.status === "no_predictions") {
+          handleRunPipeline();
+        } else {
+          reload(550);
+        }
       };
 
       return (
@@ -3496,84 +3722,93 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               onRefresh={handleRun}
             />
 
-            {/* Premium Tab Navigation Bar */}
-            <div style={{
-              display: "flex",
-              gap: 8,
-              borderBottom: "1px solid var(--border)",
-              paddingBottom: 16,
-              marginBottom: 20
-            }}>
-              {[
-                { id: "dashboard", label: "Dashboard General", icon: "activity" },
-                { id: "skus", label: "Análisis SKU", icon: "package" },
-                { id: "drift", label: "Monitor de Drift", icon: "zap" }
-              ].map(t => (
-                <button
-                  key={t.id}
-                  className={`filter-tab ${activeTab === t.id ? "active" : ""}`}
-                  onClick={() => setActiveTab(t.id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 12.5,
-                    padding: "10px 16px",
-                    borderRadius: "8px",
-                    background: activeTab === t.id ? "rgba(139, 92, 246, 0.12)" : "rgba(255,255,255,0.02)",
-                    color: activeTab === t.id ? "#fff" : "var(--text-2)",
-                    borderColor: activeTab === t.id ? "rgba(139, 92, 246, 0.45)" : "var(--border)"
-                  }}
-                >
-                  <Icon name={t.icon} size={14} />
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {activeTab === "dashboard" && (
+            {data?.status === "no_predictions" ? (
+              <EmptyState
+                onRunPipeline={handleRunPipeline}
+                running={pipelineRunning}
+                error={pipelineError}
+              />
+            ) : (
               <>
-                <KpiGrid data={data} loading={loading || !data} />
+                {/* Premium Tab Navigation Bar */}
+                <div style={{
+                  display: "flex",
+                  gap: 8,
+                  borderBottom: "1px solid var(--border)",
+                  paddingBottom: 16,
+                  marginBottom: 20
+                }}>
+                  {[
+                    { id: "dashboard", label: "Dashboard General", icon: "activity" },
+                    { id: "skus", label: "Análisis SKU", icon: "package" },
+                    { id: "drift", label: "Monitor de Drift", icon: "zap" }
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      className={`filter-tab ${activeTab === t.id ? "active" : ""}`}
+                      onClick={() => setActiveTab(t.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 12.5,
+                        padding: "10px 16px",
+                        borderRadius: "8px",
+                        background: activeTab === t.id ? "rgba(139, 92, 246, 0.12)" : "rgba(255,255,255,0.02)",
+                        color: activeTab === t.id ? "#fff" : "var(--text-2)",
+                        borderColor: activeTab === t.id ? "rgba(139, 92, 246, 0.45)" : "var(--border)"
+                      }}
+                    >
+                      <Icon name={t.icon} size={14} />
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
 
-            <div style={{ marginTop: 16 }}>
-              <ChartBlock
-                data={data}
-                loading={loading || !data}
-                params={params}
-                recommendation={data?.recommendation || { qStar: 0, z: 0, criticalRatio: 0, utilization: 0 }}
-              />
-            </div>
+                {activeTab === "dashboard" && (
+                  <>
+                    <KpiGrid data={data} loading={loading || !data} />
 
-            <div style={{ marginTop: 24, marginBottom: 10 }}>
-              <div className="label-mono" style={{ marginBottom: 4 }}>módulos académicos · defensa TFG</div>
-              <div className="h-display" style={{ fontSize: 18, color: "var(--text-1)" }}>
-                Fundamentos matemáticos
-              </div>
-            </div>
-            <AcademicGrid
-              params={params}
-              recommendation={data?.recommendation || { qStar: 0, z: 0, criticalRatio: 0, utilization: 0 }}
-            />
+                    <div style={{ marginTop: 16 }}>
+                      <ChartBlock
+                        data={data}
+                        loading={loading || !data}
+                        params={params}
+                        recommendation={data?.recommendation || { qStar: 0, z: 0, criticalRatio: 0, utilization: 0 }}
+                      />
+                    </div>
 
+                    <div style={{ marginTop: 24, marginBottom: 10 }}>
+                      <div className="label-mono" style={{ marginBottom: 4 }}>módulos académicos · defensa TFG</div>
+                      <div className="h-display" style={{ fontSize: 18, color: "var(--text-1)" }}>
+                        Fundamentos matemáticos
+                      </div>
+                    </div>
+                    <AcademicGrid
+                      params={params}
+                      recommendation={data?.recommendation || { qStar: 0, z: 0, criticalRatio: 0, utilization: 0 }}
+                    />
+                  </>
+                )}
+
+                {activeTab === "skus" && (
+                  <SkuView
+                    params={params}
+                    loading={loading}
+                    selectedSkuId={selectedSkuId}
+                    onSelectSku={(skuId) => {
+                      setSelectedSkuId(skuId);
+                      if (skuId) {
+                        setActiveTab("dashboard");
+                      }
+                    }}
+                  />
+                )}
+
+                {activeTab === "drift" && (
+                  <DriftView params={params} />
+                )}
               </>
-            )}
-
-            {activeTab === "skus" && (
-              <SkuView
-                params={params}
-                loading={loading}
-                selectedSkuId={selectedSkuId}
-                onSelectSku={(skuId) => {
-                  setSelectedSkuId(skuId);
-                  if (skuId) {
-                    setActiveTab("dashboard");
-                  }
-                }}
-              />
-            )}
-
-            {activeTab === "drift" && (
-              <DriftView params={params} />
             )}
 
             <div style={{
@@ -3598,7 +3833,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
           {alertsOpen && (
             <AlertsPanel
-              alerts={alerts}
+              alerts={currentAlerts}
               setAlerts={setAlerts}
               onClose={() => setAlertsOpen(false)}
               onActionRun={handleAction}
