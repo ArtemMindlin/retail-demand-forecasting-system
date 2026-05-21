@@ -1,0 +1,3652 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Retail Forecasting · Decision Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
+<style>
+  :root {
+    /* Base — Slate/Zinc dark */
+    --bg-0:        #07090d;
+    --bg-1:        #0b0f15;
+    --bg-2:        #0f141c;
+    --surface:     #131923;
+    --surface-2:   #1a2230;
+    --border:      rgba(148, 163, 184, 0.10);
+    --border-2:    rgba(148, 163, 184, 0.18);
+    --text-1:      #e7ecf3;
+    --text-2:      #aab4c5;
+    --text-3:      #6b7689;
+    --text-mute:   #4b5468;
+
+    /* Semantic palette */
+    --c-inv:       #3b82f6;  /* Coste de Inventario — azul cobalto */
+    --c-conf:      #10b981;  /* Cobertura Conformal — verde esmeralda */
+    --c-ai:        #8b5cf6;  /* Precisión IA MAE — púrpura neón */
+    --c-drift:     #f59e0b;  /* Alertas Drift — naranja */
+
+    --c-inv-soft:  rgba(59, 130, 246, 0.14);
+    --c-conf-soft: rgba(16, 185, 129, 0.14);
+    --c-ai-soft:   rgba(139, 92, 246, 0.14);
+    --c-drift-soft:rgba(245, 158, 11, 0.16);
+
+    --font-display: 'Outfit', system-ui, sans-serif;
+    --font-body:    'Inter', system-ui, sans-serif;
+    --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg-0);
+    color: var(--text-1);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Subtle dot grid backdrop on canvas */
+  .canvas-bg {
+    background-color: var(--bg-1);
+    background-image:
+      radial-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-position: -8px -8px;
+  }
+
+  /* Glass surface */
+  .glass {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.005)),
+      rgba(19, 25, 35, 0.72);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border-radius: 14px;
+  }
+
+  /* Native range slider styling */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--track-fill, var(--c-inv)) 0%, var(--track-fill, var(--c-inv)) var(--track-percent, 50%), rgba(148, 163, 184, 0.16) var(--track-percent, 50%), rgba(148, 163, 184, 0.16) 100%);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.16);
+  }
+  input[type="range"]::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--track-fill, var(--c-inv));
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--track-fill, var(--c-inv));
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04), 0 0 12px var(--track-fill, var(--c-inv));
+    transition: transform 0.12s ease;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--track-fill, var(--c-inv));
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04), 0 0 12px var(--track-fill, var(--c-inv));
+  }
+  input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.1); }
+  input[type="range"]:focus { outline: none; }
+
+  /* Run optimization button */
+  .btn-run {
+    position: relative;
+    width: 100%;
+    border: 1px solid rgba(139, 92, 246, 0.55);
+    background:
+      radial-gradient(120% 200% at 0% 0%, rgba(139, 92, 246, 0.25), transparent 60%),
+      linear-gradient(180deg, rgba(139, 92, 246, 0.16), rgba(59, 130, 246, 0.12));
+    color: #fff;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    padding: 14px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: hidden;
+  }
+  .btn-run::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+    transition: box-shadow 0.3s ease;
+    pointer-events: none;
+  }
+  .btn-run:hover::before {
+    box-shadow: 0 0 30px 4px rgba(139, 92, 246, 0.35), 0 0 60px 6px rgba(59, 130, 246, 0.18);
+  }
+  .btn-run:hover {
+    border-color: rgba(139, 92, 246, 0.85);
+    transform: translateY(-1px);
+  }
+  .btn-run:active { transform: translateY(0); }
+  .btn-run:disabled { opacity: 0.5; cursor: progress; }
+
+  /* Pulsing dot for "live" indicator */
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--c-conf);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+    animation: live-pulse 2s ease-out infinite;
+  }
+  @keyframes live-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+    70%  { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  }
+
+  /* KPI card */
+  .kpi {
+    position: relative;
+    padding: 18px 18px 16px 22px;
+    overflow: hidden;
+    border-radius: 14px;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .kpi::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 12px; bottom: 12px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, var(--kpi-color, var(--c-inv)) 0%, transparent 100%);
+  }
+  .kpi:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-2);
+  }
+
+  /* Academic card */
+  .academic {
+    padding: 20px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .academic:hover {
+    border-color: var(--border-2);
+    transform: translateY(-2px);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.005)),
+      rgba(19, 25, 35, 0.85);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.12); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.22); }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* Tabular numbers */
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* Loading skeleton shimmer */
+  .shimmer {
+    background: linear-gradient(90deg, rgba(148,163,184,0.06) 0%, rgba(148,163,184,0.14) 50%, rgba(148,163,184,0.06) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: 6px;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Recharts overrides */
+  .recharts-cartesian-axis-tick-value {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    fill: var(--text-3) !important;
+  }
+  .recharts-default-tooltip {
+    background: rgba(11, 15, 21, 0.96) !important;
+    border: 1px solid var(--border-2) !important;
+    border-radius: 10px !important;
+    backdrop-filter: blur(8px);
+    font-family: var(--font-body) !important;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5) !important;
+  }
+  .recharts-tooltip-label {
+    color: var(--text-2) !important;
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    margin-bottom: 6px !important;
+  }
+  .recharts-tooltip-item {
+    color: var(--text-1) !important;
+    font-size: 12px !important;
+  }
+  .recharts-cartesian-grid-horizontal line,
+  .recharts-cartesian-grid-vertical line {
+    stroke: rgba(148, 163, 184, 0.06) !important;
+  }
+
+  /* Title and section labels */
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .h-display { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.01em; }
+
+  /* Tooltip on segment chips */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-2);
+    letter-spacing: 0.04em;
+  }
+
+  /* Layout container */
+  .app {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: 100vh;
+  }
+  @media (max-width: 1100px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { position: static !important; height: auto !important; border-right: 0 !important; border-bottom: 1px solid var(--border); }
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    background: linear-gradient(180deg, #080b10 0%, #0a0e14 100%);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .canvas {
+    padding: 28px 32px 56px;
+    max-width: 1440px;
+  }
+  @media (max-width: 720px) {
+    .canvas { padding: 20px 16px 40px; }
+  }
+
+  /* Grid utilities */
+  .grid-kpi {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+  @media (max-width: 1280px) { .grid-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px)  { .grid-kpi { grid-template-columns: 1fr; } }
+
+  .grid-academic {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+  @media (max-width: 1100px) { .grid-academic { grid-template-columns: 1fr; } }
+
+  /* Subtle terminal cursor */
+  .blink-cursor::after {
+    content: "▍";
+    color: var(--c-conf);
+    margin-left: 2px;
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Soft glow halo on chart container */
+  .chart-card {
+    position: relative;
+  }
+  .chart-card::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 40% at 20% 0%, rgba(59, 130, 246, 0.08), transparent 70%),
+      radial-gradient(40% 30% at 100% 100%, rgba(139, 92, 246, 0.06), transparent 70%);
+    z-index: 0;
+  }
+  .chart-card > * { position: relative; z-index: 1; }
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(4, 6, 10, 0.72);
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    animation: backdrop-in 0.18s ease-out;
+  }
+  @keyframes backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .modal-window {
+    position: relative;
+    width: min(820px, 100%);
+    max-height: 88vh;
+    overflow: hidden;
+    border-radius: 16px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)),
+      rgba(13, 18, 26, 0.96);
+    border: 1px solid var(--border-2);
+    box-shadow:
+      0 30px 80px rgba(0,0,0,0.55),
+      0 0 0 1px rgba(255,255,255,0.02) inset;
+    display: flex;
+    flex-direction: column;
+    animation: modal-in 0.24s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  @keyframes modal-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .modal-glow {
+    position: absolute; inset: -1px;
+    pointer-events: none;
+    border-radius: inherit;
+    background: radial-gradient(60% 40% at 50% 0%, var(--modal-glow, rgba(139,92,246,0.18)), transparent 70%);
+    z-index: 0;
+  }
+  .modal-close {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    cursor: pointer;
+    display: grid; place-items: center;
+    transition: all 0.15s ease;
+  }
+  .modal-close:hover { background: rgba(255,255,255,0.08); color: var(--text-1); }
+
+  .modal-body {
+    padding: 22px 26px 26px;
+    overflow-y: auto;
+  }
+  .modal-section-title {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-3);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 22px 0 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .modal-section-title::before {
+    content: "";
+    width: 14px; height: 1px;
+    background: var(--modal-accent, var(--text-3));
+  }
+  .formula-big {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 14px 16px;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--modal-accent, var(--c-ai));
+    border-radius: 8px;
+    color: var(--text-1);
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.7;
+  }
+  .modal-text { font-size: 13px; color: var(--text-2); line-height: 1.65; }
+  .modal-text code {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    padding: 1px 5px;
+    background: rgba(148, 163, 184, 0.10);
+    border-radius: 4px;
+    color: var(--text-1);
+  }
+  .modal-text b { color: var(--text-1); font-weight: 600; }
+  .modal-text i { color: var(--text-1); font-style: normal; border-bottom: 1px dashed var(--text-3); }
+
+  .code-block {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    padding: 14px 16px;
+    background: #060810;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-1);
+    overflow-x: auto;
+    line-height: 1.65;
+    white-space: pre;
+  }
+  .code-block .k { color: #c084fc; }   /* keyword */
+  .code-block .s { color: #34d399; }   /* string */
+  .code-block .n { color: #60a5fa; }   /* number */
+  .code-block .c { color: var(--text-mute); font-style: italic; } /* comment */
+  .code-block .f { color: #fbbf24; }   /* function */
+
+  .pill-row {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-top: 4px;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-2);
+  }
+  .pill .v { color: var(--text-1); font-weight: 600; }
+  .pill .accent { color: var(--modal-accent, var(--c-ai)); }
+
+  /* ===== Alerts drawer ===== */
+  .drawer-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(4, 6, 10, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 100;
+    animation: backdrop-in 0.18s ease-out;
+  }
+  .drawer {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(440px, 100%);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.005)),
+      rgba(11, 15, 21, 0.985);
+    border-left: 1px solid var(--border-2);
+    box-shadow: -30px 0 80px rgba(0,0,0,0.55);
+    z-index: 101;
+    display: flex;
+    flex-direction: column;
+    animation: drawer-in 0.26s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  @keyframes drawer-in {
+    from { transform: translateX(20px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+  .drawer-header {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 16px 16px;
+  }
+  .drawer-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.18);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-3);
+  }
+
+  .alert-item {
+    position: relative;
+    padding: 14px 14px 14px 18px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 10px 0;
+    background: rgba(19, 25, 35, 0.55);
+    transition: all 0.15s ease;
+  }
+  .alert-item.unread {
+    background: rgba(19, 25, 35, 0.85);
+  }
+  .alert-item:hover { border-color: var(--border-2); }
+  .alert-item::before {
+    content: "";
+    position: absolute;
+    left: -1px; top: 10px; bottom: 10px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--alert-color, var(--c-drift));
+  }
+  .alert-item.read {
+    opacity: 0.55;
+  }
+  .alert-item.read::before { background: var(--text-mute); }
+
+  .alert-row-1 {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+  }
+  .alert-sev {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    background: var(--alert-soft, rgba(245, 158, 11, 0.16));
+    color: var(--alert-color, var(--c-drift));
+    border: 1px solid var(--alert-color, var(--c-drift));
+    border-color: color-mix(in oklab, var(--alert-color, var(--c-drift)) 35%, transparent);
+  }
+  .alert-time {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-mute);
+  }
+  .alert-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-1);
+    margin-bottom: 4px;
+  }
+  .alert-desc {
+    font-size: 12px;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+  .alert-meta {
+    margin-top: 9px;
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .alert-meta .pill { font-size: 10px; padding: 3px 8px; }
+  .alert-actions {
+    display: flex; gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+  }
+  .alert-btn {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    font-family: var(--font-body);
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .alert-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-1); border-color: var(--border-2); }
+  .alert-btn.primary {
+    background: var(--alert-soft, rgba(245, 158, 11, 0.14));
+    color: var(--alert-color, var(--c-drift));
+    border-color: color-mix(in oklab, var(--alert-color, var(--c-drift)) 40%, transparent);
+  }
+  .alert-btn.primary:hover {
+    background: color-mix(in oklab, var(--alert-color, var(--c-drift)) 22%, transparent);
+    color: #fff;
+  }
+
+  .filter-tab {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s ease;
+  }
+  .filter-tab:hover { color: var(--text-1); border-color: var(--border-2); }
+  .filter-tab.active {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-1);
+    border-color: var(--border-2);
+  }
+
+  /* Bell button badge */
+  .btn-ghost-rel { position: relative; }
+  .badge {
+    position: absolute;
+    top: -4px; right: -4px;
+    min-width: 16px; height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--c-drift);
+    color: #08090d;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 9.5px;
+    display: grid; place-items: center;
+    box-shadow: 0 0 0 2px var(--bg-1);
+  }
+
+  /* Missing CSS classes for SkuView and DriftView */
+  .sku-grid {
+    display: grid;
+    grid-template-columns: 100px 110px 100px 70px 75px 125px 70px 70px 70px 100px;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .sku-grid.header {
+    background: rgba(255, 255, 255, 0.02);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  .sku-grid.row {
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  .sku-grid.row:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .sku-grid.row.selected {
+    background: rgba(139, 92, 246, 0.08);
+    border-left: 3px solid var(--c-ai);
+    padding-left: 15px; /* Offset the border */
+  }
+  .sku-th {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    user-select: none;
+  }
+  .sku-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cov-bar {
+    position: relative;
+    width: 70px;
+    height: 6px;
+    background: rgba(148, 163, 184, 0.16);
+    border-radius: 999px;
+  }
+  .cov-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+  }
+  .cov-bar-target {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 12px;
+    background: #fff;
+    box-shadow: 0 0 4px #fff;
+    z-index: 2;
+  }
+  .drift-row {
+    display: grid;
+    grid-template-columns: 200px 140px 220px 1fr;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s ease;
+  }
+  .drift-row:hover {
+    background: rgba(255, 255, 255, 0.015);
+  }
+  .psi-bar {
+    position: relative;
+    width: 100%;
+    height: 5px;
+    background: rgba(148, 163, 184, 0.12);
+    border-radius: 999px;
+  }
+  .psi-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+  }
+  .psi-bar-mark {
+    position: absolute;
+    top: -2px;
+    width: 1.5px;
+    height: 9px;
+    background: var(--c-ai);
+    opacity: 0.65;
+  }
+  .psi-bar-mark.crit {
+    background: var(--c-drift);
+    opacity: 0.85;
+  }
+  @keyframes toast-in {
+    from { transform: translateY(20px) scale(0.95); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+</style>
+
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- =================== ICONS =================== -->
+  <script type="text/babel" data-presets="env,react">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    // Minimal inline SVG icons (in the spirit of lucide-react)
+    const Icon = ({ name, size = 16, stroke = "currentColor", strokeWidth = 1.7, style }) => {
+      const common = {
+        width: size, height: size, viewBox: "0 0 24 24", fill: "none",
+        stroke, strokeWidth, strokeLinecap: "round", strokeLinejoin: "round",
+        style
+      };
+      const paths = {
+        activity:    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
+        cpu:         <g><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" /><line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" /><line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" /><line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" /></g>,
+        boxes:       <g><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z" /><path d="m7 16.5-4.74-2.85" /><path d="m7 16.5 5-3" /><path d="M7 16.5v5.17" /><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z" /><path d="m17 16.5-5-3" /><path d="m17 16.5 4.74-2.85" /><path d="M17 16.5v5.17" /><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z" /></g>,
+        target:      <g><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></g>,
+        shield:      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+        coins:       <g><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></g>,
+        warehouse:   <g><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z" /><path d="M6 18h12" /><path d="M6 14h12" /><path d="M6 10h12" /></g>,
+        zap:         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />,
+        play:        <polygon points="6 3 20 12 6 21 6 3" />,
+        arrowUp:     <g><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></g>,
+        arrowDown:   <g><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></g>,
+        info:        <g><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></g>,
+        sigma:       <g><path d="M18 7V4H6l6 8-6 8h12v-3" /></g>,
+        function:    <g><path d="M9 4H7a2 2 0 0 0-2 2v2" /><path d="M15 4h2a2 2 0 0 1 2 2v2" /><path d="M9 20H7a2 2 0 0 1-2-2v-2" /><path d="M15 20h2a2 2 0 0 0 2-2v-2" /><path d="M8 12h8" /></g>,
+        layers:      <g><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></g>,
+        chevronRight:<polyline points="9 18 15 12 9 6" />,
+        bell:        <g><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></g>,
+        terminal:    <g><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></g>,
+        package:     <g><path d="M16.5 9.4 7.55 4.24" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></g>,
+        sparkles:    <g><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z" /><path d="M5 3v4" /><path d="M19 17v4" /><path d="M3 5h4" /><path d="M17 19h4" /></g>,
+        refresh:     <g><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" /><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" /></g>,
+        alertTri:    <g><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></g>,
+        trendingUp:  <g><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></g>,
+        trendingDown:<g><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" /><polyline points="17 18 23 18 23 12" /></g>,
+        check:       <polyline points="20 6 9 17 4 12" />,
+        x:           <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g>,
+        clock:       <g><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></g>,
+        eye:         <g><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></g>,
+        slidersIcon: <g><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></g>,
+      };
+      return <svg {...common}>{paths[name] || null}</svg>;
+    };
+
+    window.Icon = Icon;
+  </script>
+
+  <!-- =================== UTILITIES & MOCK API =================== -->
+  <script type="text/babel" data-presets="env,react">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    // ----- helpers
+    const fmtCurrency = (n) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+    const fmtPct = (n, d = 1) => `${n >= 0 ? "+" : ""}${n.toFixed(d)}%`;
+    const fmtUnits = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+
+    function Latex({ formula, block = false, style }) {
+      const containerRef = useRef(null);
+      useEffect(() => {
+        if (containerRef.current) {
+          try {
+            katex.render(formula, containerRef.current, {
+              displayMode: block,
+              throwOnError: false
+            });
+          } catch (err) {
+            console.error("KaTeX render error:", err);
+            containerRef.current.textContent = formula;
+          }
+        }
+      }, [formula, block]);
+      return <span ref={containerRef} style={style} />;
+    }
+    window.Latex = Latex;
+
+    // Deterministic pseudo-random (so the chart is stable between renders)
+    const seededNoise = (i, seed = 17) => {
+      const x = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453;
+      return x - Math.floor(x);
+    };
+
+    // ----- Mock fetch (simulating FastAPI endpoints) -----
+    // The real frontend will swap these for `await fetch("/api/...")`.
+    const mockFetch = (endpoint, payload, latencyMs = 650) =>
+      new Promise((resolve) => {
+        setTimeout(() => resolve(buildResponse(endpoint, payload)), latencyMs);
+      });
+
+    function buildResponse(endpoint, p = {}) {
+      // p contains: serviceLevel (0–100), shortageCost, holdingCost, capacity
+      const sl = p.serviceLevel ?? 95;
+      const cs = p.shortageCost ?? 18;
+      const ch = p.holdingCost ?? 4;
+      const cap = p.capacity ?? 12000;
+
+      // ----- /api/forecast — 30-day series
+      const days = 30;
+      const series = [];
+      for (let i = 0; i < days; i++) {
+        const weekly = Math.sin((i / 7) * Math.PI * 2) * 38;
+        const trend = i * 1.4;
+        const base = 320 + trend + weekly;
+        const noise = (seededNoise(i, 11) - 0.5) * 50;
+        const actual = i < 22 ? Math.max(0, base + noise) : null; // last 8 days = future
+        const predicted = base + (seededNoise(i, 23) - 0.5) * 10;
+
+        // conformal interval width grows mildly with horizon
+        const horizonFactor = i < 22 ? 0.06 : 0.10 + (i - 22) * 0.012;
+        const widenForSL = 0.6 + ((sl - 80) / 20) * 0.9; // higher SL -> wider band
+        const half = predicted * horizonFactor * widenForSL;
+
+        series.push({
+          day: i + 1,
+          label: `D${String(i + 1).padStart(2, "0")}`,
+          actual: actual !== null ? Math.round(actual) : null,
+          predicted: Math.round(predicted),
+          lower: Math.round(predicted - half),
+          upper: Math.round(predicted + half),
+        });
+      }
+
+      // ----- /api/kpis — depend on simulator inputs
+      // Newsvendor critical ratio
+      const cr = cs / (cs + ch);
+      const targetCR = sl / 100;
+      const ratioDelta = (targetCR - cr) * 100; // pts off
+
+      // Inventory cost — scales w/ holding cost & service level (more SL => more safety stock => more cost)
+      const invCost = Math.round((84000 + (sl - 90) * 4200 + (ch - 4) * 3800) * 1);
+      const invDelta = -((cs - 18) * 0.4 + (cap - 12000) * 0.0009 + (95 - sl) * 0.5);
+
+      // Conformal coverage: closely tracks target SL, with small empirical drift
+      const empCoverage = Math.max(80, Math.min(99.4, sl - 0.6 + (seededNoise(sl, 5) - 0.5) * 0.8));
+      const covDelta = empCoverage - sl;
+
+      // MAE — improves slightly w/ tighter coverage requirements via re-fit
+      const mae = +(11.2 - (sl - 90) * 0.06 + (ch - 4) * 0.04).toFixed(2);
+      const maeDelta = -8.4 + (sl - 95) * 0.4;
+
+      // Drift PSI
+      const psi = +(0.18 + (seededNoise(sl + ch, 9) - 0.5) * 0.06).toFixed(3);
+      const psiDelta = (psi - 0.20) * 100;
+
+      // Recommended order quantity (newsvendor): inverse CDF approximation
+      // For demonstration: avg predicted * (1 + z*sigma), z ~ from sl
+      const z = sl >= 99 ? 2.33 : sl >= 97 ? 1.88 : sl >= 95 ? 1.65 : sl >= 90 ? 1.28 : 0.84;
+      const avgPred = series.slice(22).reduce((s, r) => s + r.predicted, 0) / 8;
+      const sigma = avgPred * 0.18;
+      const qStar = Math.round(avgPred + z * sigma);
+
+      // Capacity utilization
+      const util = Math.min(100, Math.round((qStar * 4 / cap) * 100));
+
+      return {
+        forecast: series,
+        kpis: {
+          inventoryCost: { value: invCost, delta: invDelta },
+          coverage:      { value: empCoverage, target: sl, delta: covDelta },
+          mae:           { value: mae, delta: maeDelta },
+          driftPSI:      { value: psi, delta: psiDelta },
+        },
+        recommendation: {
+          qStar,
+          z,
+          criticalRatio: cr,
+          targetCR,
+          ratioDelta,
+          utilization: util,
+        },
+      };
+    }
+
+
+    // --- Real API fetches with mock fallback ---
+    const realFetch = async (endpoint, payload = {}) => {
+      try {
+        if (endpoint === "/api/forecast") {
+          const res = await fetch("/api/forecast", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error("API error " + res.status);
+          return await res.json();
+        } else if (endpoint === "/api/skus") {
+          const query = new URLSearchParams({
+            service_level: String(payload.serviceLevel ?? 95),
+            shortage_cost: String(payload.shortageCost ?? 18),
+            holding_cost: String(payload.holdingCost ?? 4),
+            capacity: String(payload.capacity ?? 12000)
+          });
+          const res = await fetch(`/api/skus?${query.toString()}`);
+          if (!res.ok) throw new Error("API error " + res.status);
+          return await res.json();
+        } else if (endpoint === "/api/drift") {
+          const query = new URLSearchParams({
+            service_level: String(payload.serviceLevel ?? 95)
+          });
+          const res = await fetch(`/api/drift?${query.toString()}`);
+          if (!res.ok) throw new Error("API error " + res.status);
+          return await res.json();
+        } else if (endpoint === "/api/alerts") {
+          const res = await fetch("/api/alerts");
+          if (!res.ok) throw new Error("API error " + res.status);
+          return await res.json();
+        }
+      } catch (err) {
+        console.warn(`Fallback to mock for ${endpoint}:`, err);
+        return mockFetch(endpoint, payload);
+      }
+      return mockFetch(endpoint, payload);
+    };
+
+    window.api = { mockFetch, fetch: realFetch };
+
+    window.fmt = { fmtCurrency, fmtPct, fmtUnits };
+  </script>
+
+  <!-- =================== SIDEBAR =================== -->
+  <script type="text/babel" data-presets="env,react">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    function Slider({ label, hint, value, min, max, step = 1, unit = "", color, onChange, format }) {
+      const percent = ((value - min) / (max - min)) * 100;
+      const display = format ? format(value) : `${value}${unit}`;
+      return (
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+            <div>
+              <div style={{ fontSize: 12.5, color: "var(--text-1)", fontWeight: 500 }}>{label}</div>
+              {hint && <div style={{ fontSize: 11, color: "var(--text-mute)", marginTop: 1 }}>{hint}</div>}
+            </div>
+            <div className="tnum" style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 600,
+              fontSize: 17,
+              color,
+              letterSpacing: "-0.01em"
+            }}>
+              {display}
+            </div>
+          </div>
+          <input
+            type="range"
+            min={min} max={max} step={step}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            style={{
+              "--track-fill": color,
+              "--track-percent": `${percent}%`,
+            }}
+          />
+        </div>
+      );
+    }
+
+    function Sidebar({ params, setParams, onRun, running, lastRunAt }) {
+      const update = (k) => (v) => setParams((p) => ({ ...p, [k]: v }));
+
+      return (
+        <aside className="sidebar">
+          {/* Header */}
+          <div style={{ padding: "22px 22px 18px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: 8,
+                background: "linear-gradient(135deg, var(--c-ai), var(--c-inv))",
+                display: "grid", placeItems: "center",
+                boxShadow: "0 0 18px rgba(139, 92, 246, 0.45)"
+              }}>
+                <Icon name="sparkles" size={16} stroke="#fff" strokeWidth={2} />
+              </div>
+              <div>
+                <div className="h-display" style={{ fontSize: 15, color: "var(--text-1)" }}>
+                  Forecast<span style={{ color: "var(--c-ai)" }}>.ai</span>
+                </div>
+                <div style={{ fontSize: 10.5, color: "var(--text-3)", fontFamily: "var(--font-mono)", letterSpacing: "0.08em" }}>
+                  RETAIL · v0.3.1
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="live-dot"></div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--text-2)", letterSpacing: "0.06em" }}>
+                FASTAPI · 127.0.0.1:8000
+              </div>
+            </div>
+          </div>
+
+          {/* Section */}
+          <div style={{ padding: "20px 22px 4px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <Icon name="terminal" size={12} stroke="var(--c-ai)" />
+              <div className="label-mono">What-If Simulator</div>
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--text-mute)", marginBottom: 18, lineHeight: 1.45 }}>
+              Ajusta los parámetros del modelo Newsvendor + Conformal y reoptimiza la política de inventario.
+            </div>
+
+            <Slider
+              label="Target Service Level"
+              hint="Probabilidad objetivo de no rotura"
+              value={params.serviceLevel}
+              min={80} max={99.5} step={0.5}
+              color="var(--c-conf)"
+              format={(v) => `${v.toFixed(1)}%`}
+            onChange={update("serviceLevel")}
+            />
+
+            <Slider
+              label="Coste de Rotura"
+              hint="Penalización por unidad faltante  ·  c_s"
+              value={params.shortageCost}
+              min={5} max={60} step={1}
+              color="var(--c-drift)"
+              format={(v) => `$${v}`}
+              onChange={update("shortageCost")}
+            />
+
+            <Slider
+              label="Coste de Almacenamiento"
+              hint="Holding cost por unidad/día  ·  c_h"
+              value={params.holdingCost}
+              min={1} max={20} step={0.5}
+              color="var(--c-inv)"
+              format={(v) => `$${v.toFixed(1)}`}
+              onChange={update("holdingCost")}
+            />
+
+            <Slider
+              label="Capacidad de Almacén"
+              hint="Máximo de unidades almacenables"
+              value={params.capacity}
+              min={5000} max={25000} step={500}
+              color="var(--c-ai)"
+              format={(v) => `${(v / 1000).toFixed(1)}k u`}
+              onChange={update("capacity")}
+            />
+          </div>
+
+          {/* Critical Ratio readout */}
+          <div style={{ padding: "0 22px 18px" }}>
+            <div style={{
+              padding: "10px 12px",
+              background: "rgba(139, 92, 246, 0.05)",
+              border: "1px dashed rgba(139, 92, 246, 0.35)",
+              borderRadius: 8,
+              fontFamily: "var(--font-mono)",
+              fontSize: 11
+            }}>
+              <div style={{ color: "var(--text-3)", marginBottom: 4 }}>derived</div>
+              <div style={{ color: "var(--text-1)" }}>
+                <span style={{ color: "var(--c-ai)" }}>CR*</span> = c_s / (c_s + c_h) ={" "}
+                <span className="tnum" style={{ color: "#fff", fontWeight: 600 }}>
+                  {(params.shortageCost / (params.shortageCost + params.holdingCost)).toFixed(3)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action */}
+          <div style={{ padding: "0 22px 18px" }}>
+            <button className="btn-run" onClick={onRun} disabled={running}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
+                {running
+                  ? <><span className="shimmer" style={{ width: 14, height: 14, borderRadius: "50%" }} /> Optimizando…</>
+                  : <><Icon name="zap" size={15} /> Ejecutar Optimización</>}
+              </span>
+            </button>
+            <div style={{
+              marginTop: 9,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10.5,
+              color: "var(--text-mute)",
+              textAlign: "center",
+              letterSpacing: "0.04em"
+            }}>
+              POST /api/optimize
+            </div>
+          </div>
+
+          {/* Footer log */}
+          <div style={{
+            marginTop: "auto",
+            padding: "14px 22px",
+            borderTop: "1px solid var(--border)",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10.5,
+            color: "var(--text-3)",
+            background: "rgba(0,0,0,0.18)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span>last_run</span>
+              <span style={{ color: "var(--text-2)" }}>
+                {lastRunAt ? lastRunAt : "—"}<span style={{ opacity: 0.5 }}>{running ? "" : ""}</span>
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+              <span>model</span>
+              <span style={{ color: "var(--text-2)" }}>LightGBM + ICP</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+              <span>calibration</span>
+              <span style={{ color: "var(--c-conf)" }}>holdout · 14d</span>
+            </div>
+          </div>
+        </aside>
+      );
+    }
+
+    window.Sidebar = Sidebar;
+  </script>
+
+  <!-- =================== KPI CARDS =================== -->
+  <script type="text/babel" data-presets="env,react">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    function KpiCard({ label, value, suffix, delta, deltaUnit = "%", color, loading, sub, lower_is_better = false }) {
+      const isUp = (delta ?? 0) >= 0;
+      // Color of delta: depends on whether lower is better
+      const good = lower_is_better ? !isUp : isUp;
+      const deltaColor = good ? "var(--c-conf)" : "var(--c-drift)";
+
+      return (
+        <div className="glass kpi" style={{ "--kpi-color": color }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <div className="label-mono">{label}</div>
+            <div style={{
+              width: 6, height: 6, borderRadius: "50%",
+              background: color, boxShadow: `0 0 8px ${color}`
+            }} />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            {loading ? (
+              <div className="shimmer" style={{ width: 110, height: 32 }} />
+            ) : (
+              <>
+                <div className="tnum h-display" style={{
+                  fontSize: 30, color: "var(--text-1)", lineHeight: 1
+                }}>
+                  {value}
+                </div>
+                {suffix && (
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--text-3)", fontWeight: 500 }}>
+                    {suffix}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "2px 7px 2px 5px",
+              borderRadius: 999,
+              background: good ? "rgba(16, 185, 129, 0.10)" : "rgba(245, 158, 11, 0.12)",
+              color: deltaColor,
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              fontWeight: 600,
+            }}>
+              <Icon name={isUp ? "arrowUp" : "arrowDown"} size={11} strokeWidth={2.4} />
+              {loading ? "—" : `${Math.abs(delta).toFixed(deltaUnit === "%" ? 1 : 2)}${deltaUnit}`}
+            </div>
+            {sub && (
+              <div style={{ fontSize: 10.5, color: "var(--text-mute)", fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}>
+                {sub}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function KpiGrid({ data, loading }) {
+      const k = data?.kpis;
+      return (
+        <div className="grid-kpi">
+          <KpiCard
+            label="Coste de Inventario"
+            value={loading ? "" : fmt.fmtCurrency(k.inventoryCost.value)}
+            delta={loading ? 0 : k.inventoryCost.delta}
+            color="var(--c-inv)"
+            loading={loading}
+            sub="vs. base policy"
+            lower_is_better
+          />
+          <KpiCard
+            label="Cobertura Empírica"
+            value={loading ? "" : k.coverage.value.toFixed(1)}
+            suffix="%"
+            delta={loading ? 0 : k.coverage.delta}
+            deltaUnit=" pts"
+            color="var(--c-conf)"
+            loading={loading}
+            sub={loading ? "" : `target ${k.coverage.target.toFixed(1)}%`}
+          />
+          <KpiCard
+            label="Precisión IA · MAE"
+            value={loading ? "" : k.mae.value.toFixed(2)}
+            suffix="u"
+            delta={loading ? 0 : k.mae.delta}
+            color="var(--c-ai)"
+            loading={loading}
+            sub="14-day rolling"
+            lower_is_better
+          />
+          <KpiCard
+            label="Alerta de Drift"
+            value={loading ? "" : k.driftPSI.value.toFixed(3)}
+            suffix="PSI"
+            delta={loading ? 0 : k.driftPSI.delta}
+            color="var(--c-drift)"
+            loading={loading}
+            sub="threshold 0.20"
+            lower_is_better
+          />
+        </div>
+      );
+    }
+
+    window.KpiGrid = KpiGrid;
+  </script>
+
+  <!-- =================== CHART =================== -->
+  <script type="text/babel" data-presets="env,react">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    // ---------- math helpers ----------
+    // Catmull–Rom → cubic Bézier smoothing for a series of [x,y] points
+    function smoothPath(points) {
+      if (!points || points.length === 0) return "";
+      if (points.length === 1) return `M ${points[0][0]} ${points[0][1]}`;
+      const t = 0.2;
+      let d = `M ${points[0][0]} ${points[0][1]}`;
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i - 1] || points[i];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2] || p2;
+        const c1x = p1[0] + (p2[0] - p0[0]) * t;
+        const c1y = p1[1] + (p2[1] - p0[1]) * t;
+        const c2x = p2[0] - (p3[0] - p1[0]) * t;
+        const c2y = p2[1] - (p3[1] - p1[1]) * t;
+        d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`;
+      }
+      return d;
+    }
+
+    function niceTicks(min, max, count = 5) {
+      const range = max - min;
+      const step0 = range / count;
+      const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+      const norm = step0 / mag;
+      const step = (norm >= 5 ? 10 : norm >= 2 ? 5 : norm >= 1 ? 2 : 1) * mag;
+      const lo = Math.floor(min / step) * step;
+      const hi = Math.ceil(max / step) * step;
+      const ticks = [];
+      for (let v = lo; v <= hi + 1e-9; v += step) ticks.push(v);
+      return ticks;
+    }
+
+    // ---------- chart ----------
+    function ChartBlock({ data, loading, params, recommendation }) {
+      const series = data?.forecast || [];
+      const forecastStart = series.findIndex((d) => d.actual === null);
+
+      const wrapRef = useRef(null);
+      const [W, setW] = useState(800);
+      const H = 320;
+      const pad = { top: 18, right: 18, bottom: 30, left: 48 };
+
+      useEffect(() => {
+        if (!wrapRef.current) return;
+        const ro = new ResizeObserver((entries) => {
+          for (const e of entries) setW(Math.max(320, Math.floor(e.contentRect.width)));
+        });
+        ro.observe(wrapRef.current);
+        return () => ro.disconnect();
+      }, []);
+
+      const [hover, setHover] = useState(null); // index into series
+
+      const geom = useMemo(() => {
+        if (series.length === 0) return null;
+        const innerW = W - pad.left - pad.right;
+        const innerH = H - pad.top - pad.bottom;
+        const xs = series.map((_, i) => pad.left + (i / (series.length - 1)) * innerW);
+
+        // y domain from lower/upper bands + actual
+        let lo = Infinity, hi = -Infinity;
+        series.forEach((d) => {
+          lo = Math.min(lo, d.lower, d.actual ?? Infinity, d.predicted);
+          hi = Math.max(hi, d.upper, d.actual ?? -Infinity, d.predicted);
+        });
+        // pad domain
+        const span = hi - lo || 1;
+        lo -= span * 0.08;
+        hi += span * 0.08;
+        const ticks = niceTicks(lo, hi, 5);
+        lo = Math.min(lo, ticks[0]);
+        hi = Math.max(hi, ticks[ticks.length - 1]);
+        const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * innerH;
+
+        const actualPts = series
+          .map((d, i) => (d.actual === null ? null : [xs[i], y(d.actual)]))
+          .filter(Boolean);
+        const predPts = series.map((d, i) => [xs[i], y(d.predicted)]);
+        const upperPts = series.map((d, i) => [xs[i], y(d.upper)]);
+        const lowerPts = series.map((d, i) => [xs[i], y(d.lower)]);
+
+        // band polygon: upper forward + lower reverse
+        const bandPath =
+          "M " + upperPts.map(([x, y]) => `${x} ${y}`).join(" L ") +
+          " L " + [...lowerPts].reverse().map(([x, y]) => `${x} ${y}`).join(" L ") + " Z";
+
+        return {
+          innerW, innerH, xs, y, lo, hi, ticks,
+          actualPath: smoothPath(actualPts),
+          predPath: smoothPath(predPts),
+          upperPath: smoothPath(upperPts),
+          lowerPath: smoothPath(lowerPts),
+          bandPath,
+          actualPts, predPts,
+        };
+      }, [series, W]);
+
+      const onMouseMove = (e) => {
+        if (!geom || !series.length) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        // find nearest index
+        let best = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < geom.xs.length; i++) {
+          const d = Math.abs(geom.xs[i] - x);
+          if (d < bestDist) { bestDist = d; best = i; }
+        }
+        setHover(best);
+      };
+
+      const horizonX1 = geom && forecastStart > 0 ? geom.xs[forecastStart] : null;
+      const horizonX2 = geom && forecastStart > 0 ? geom.xs[geom.xs.length - 1] : null;
+
+      // x-axis labels: every 4 points
+      const xTickIdx = series.map((_, i) => i).filter((i) => i % 4 === 0 || i === series.length - 1);
+
+      return (
+        <div className="glass chart-card" style={{ padding: 22 }}>
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 6 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <div className="h-display" style={{ fontSize: 18 }}>Demanda · Real vs Predicha</div>
+                <div className="chip">
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--c-conf)" }} />
+                  CONFORMAL {params.serviceLevel.toFixed(1)}%
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-3)" }}>
+                Predicción puntual + intervalo conformal calibrado · ventana 30 días
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
+              <Legend2 color="var(--c-inv)" label="Real" />
+              <Legend2 color="var(--c-ai)" label="Predicción" dashed />
+              <Legend2 color="rgba(148, 163, 184, 0.35)" label="Intervalo" square />
+            </div>
+          </div>
+
+          {/* Chart */}
+          <div ref={wrapRef} style={{ height: H, marginTop: 14, position: "relative" }}>
+            {loading && (
+              <div style={{
+                position: "absolute", inset: 0, display: "grid", placeItems: "center",
+                background: "rgba(11, 15, 21, 0.5)", backdropFilter: "blur(2px)", zIndex: 2,
+                borderRadius: 10
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-2)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                  <div className="shimmer" style={{ width: 14, height: 14, borderRadius: "50%" }} />
+                  GET /api/forecast?h=30…
+                </div>
+              </div>
+            )}
+
+            {geom && (
+              <svg
+                width={W} height={H}
+                onMouseMove={onMouseMove}
+                onMouseLeave={() => setHover(null)}
+                style={{ display: "block", overflow: "visible" }}
+              >
+                <defs>
+                  <linearGradient id="gradInterval" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor="#94a3b8" stopOpacity={0.26} />
+                    <stop offset="60%"  stopColor="#3b82f6" stopOpacity={0.10} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.04} />
+                  </linearGradient>
+                  <linearGradient id="gradPred" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.5} />
+                    <stop offset="60%" stopColor="#8b5cf6" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#a78bfa" stopOpacity={1} />
+                  </linearGradient>
+                </defs>
+
+                {/* Horizon region shading */}
+                {horizonX1 !== null && (
+                  <g>
+                    <rect
+                      x={horizonX1} y={pad.top}
+                      width={horizonX2 - horizonX1}
+                      height={geom.innerH}
+                      fill="rgba(139, 92, 246, 0.045)"
+                    />
+                    <line
+                      x1={horizonX1} x2={horizonX1}
+                      y1={pad.top} y2={pad.top + geom.innerH}
+                      stroke="rgba(139, 92, 246, 0.45)"
+                      strokeDasharray="3 4"
+                      strokeWidth={1}
+                    />
+                    <text
+                      x={horizonX1 + 6} y={pad.top + 12}
+                      fill="rgba(139, 92, 246, 0.85)"
+                      fontFamily="var(--font-mono)" fontSize={10}
+                      letterSpacing="0.08em"
+                    >
+                      horizon →
+                    </text>
+                  </g>
+                )}
+
+                {/* Y grid + labels */}
+                {geom.ticks.map((t, i) => (
+                  <g key={`y${i}`}>
+                    <line
+                      x1={pad.left} x2={W - pad.right}
+                      y1={geom.y(t)} y2={geom.y(t)}
+                      stroke="rgba(148, 163, 184, 0.07)"
+                      strokeWidth={1}
+                    />
+                    <text
+                      x={pad.left - 8} y={geom.y(t) + 3}
+                      textAnchor="end"
+                      fill="var(--text-3)"
+                      fontFamily="var(--font-mono)" fontSize={10.5}
+                    >
+                      {Math.round(t)}
+                    </text>
+                  </g>
+                ))}
+
+                {/* X labels */}
+                {xTickIdx.map((i) => (
+                  <text
+                    key={`x${i}`}
+                    x={geom.xs[i]} y={H - pad.bottom + 16}
+                    textAnchor="middle"
+                    fill="var(--text-3)"
+                    fontFamily="var(--font-mono)" fontSize={10.5}
+                  >
+                    {series[i].label}
+                  </text>
+                ))}
+
+                {/* Conformal band */}
+                <path d={geom.bandPath} fill="url(#gradInterval)" />
+                <path d={geom.upperPath} fill="none" stroke="rgba(148, 163, 184, 0.35)" strokeWidth={1} strokeDasharray="2 3" />
+                <path d={geom.lowerPath} fill="none" stroke="rgba(148, 163, 184, 0.35)" strokeWidth={1} strokeDasharray="2 3" />
+
+                {/* Predicted (dashed) */}
+                <path
+                  d={geom.predPath}
+                  fill="none"
+                  stroke="url(#gradPred)"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  strokeLinecap="round"
+                />
+                {/* Actual (solid) */}
+                <path
+                  d={geom.actualPath}
+                  fill="none"
+                  stroke="var(--c-inv)"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                />
+
+                {/* Hover indicator */}
+                {hover !== null && (
+                  <g>
+                    <line
+                      x1={geom.xs[hover]} x2={geom.xs[hover]}
+                      y1={pad.top} y2={pad.top + geom.innerH}
+                      stroke="rgba(148, 163, 184, 0.35)"
+                      strokeDasharray="3 3"
+                      strokeWidth={1}
+                    />
+                    {series[hover].actual !== null && (
+                      <circle
+                        cx={geom.xs[hover]}
+                        cy={geom.y(series[hover].actual)}
+                        r={4}
+                        fill="var(--c-inv)"
+                        stroke="#fff"
+                        strokeWidth={1.5}
+                      />
+                    )}
+                    <circle
+                      cx={geom.xs[hover]}
+                      cy={geom.y(series[hover].predicted)}
+                      r={4}
+                      fill="var(--c-ai)"
+                      stroke="#fff"
+                      strokeWidth={1.5}
+                    />
+                  </g>
+                )}
+
+                {/* Capture rect for mouse events covering full plot */}
+                <rect
+                  x={pad.left} y={pad.top}
+                  width={geom.innerW} height={geom.innerH}
+                  fill="transparent"
+                />
+              </svg>
+            )}
+
+            {/* Tooltip */}
+            {hover !== null && geom && (
+              <ChartTooltip
+                x={geom.xs[hover]}
+                y={geom.y(series[hover].predicted)}
+                W={W}
+                row={series[hover]}
+              />
+            )}
+          </div>
+
+          {/* Footer mini-readouts */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0,1fr))",
+            gap: 14,
+            paddingTop: 16,
+            marginTop: 4,
+            borderTop: "1px dashed var(--border)"
+          }}>
+            <Stat label="q* (order)" value={loading ? "—" : fmt.fmtUnits(recommendation.qStar)} unit="u" color="var(--c-ai)" mono />
+            <Stat label="z-score" value={loading ? "—" : recommendation.z.toFixed(2)} color="var(--c-conf)" mono />
+            <Stat label="critical ratio" value={loading ? "—" : recommendation.criticalRatio.toFixed(3)} color="var(--c-drift)" mono />
+            <Stat label="capacity util" value={loading ? "—" : recommendation.utilization} unit="%" color="var(--c-inv)" mono />
+          </div>
+        </div>
+      );
+    }
+
+    function Legend2({ color, label, dashed, square }) {
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)", letterSpacing: "0.04em" }}>
+          {square ? (
+            <span style={{ width: 12, height: 8, background: color, borderRadius: 2 }} />
+          ) : (
+            <span style={{
+              width: 14, height: 2, background: dashed ? "transparent" : color,
+              borderTop: dashed ? `2px dashed ${color}` : "none"
+            }} />
+          )}
+          {label}
+        </div>
+      );
+    }
+
+    function CustomTooltip() { return null; } // legacy stub
+
+    function ChartTooltip({ x, y, W, row }) {
+      // position: prefer right of cursor, flip if too close to right edge
+      const flip = x > W - 200;
+      const left = flip ? x - 190 : x + 14;
+      const top = Math.max(8, y - 60);
+      return (
+        <div style={{
+          position: "absolute",
+          left, top,
+          pointerEvents: "none",
+          background: "rgba(11, 15, 21, 0.96)",
+          border: "1px solid var(--border-2)",
+          borderRadius: 10,
+          padding: "10px 12px",
+          backdropFilter: "blur(8px)",
+          boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+          minWidth: 170,
+          zIndex: 3
+        }}>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em" }}>
+            {row.label}
+          </div>
+          {[
+            { label: "actual",    value: row.actual ?? "—", color: "var(--c-inv)" },
+            { label: "predicted", value: row.predicted, color: "var(--c-ai)" },
+            { label: "interval",  value: `${row.lower}–${row.upper}`, color: "var(--text-2)" },
+          ].map((it) => (
+            <div key={it.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginTop: 3 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-2)", fontSize: 11.5 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: it.color }} />
+                {it.label}
+              </span>
+              <span className="tnum" style={{ color: "var(--text-1)", fontSize: 12, fontWeight: 500 }}>{it.value}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function Stat({ label, value, unit, color, mono }) {
+      return (
+        <div>
+          <div className="label-mono" style={{ marginBottom: 4 }}>{label}</div>
+          <div style={{
+            fontFamily: mono ? "var(--font-mono)" : "var(--font-display)",
+            fontSize: 18,
+            color: "var(--text-1)",
+            fontWeight: 600
+          }} className="tnum">
+            {value}
+            {unit && <span style={{ color: "var(--text-3)", fontSize: 12, marginLeft: 2 }}>{unit}</span>}
+          </div>
+        </div>
+      );
+    }
+
+    window.ChartBlock = ChartBlock;
+  </script>
+
+  <!-- =================== ACADEMIC MODULES =================== -->
+  <script type="text/babel" data-presets="env,react">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    function AcademicCard({ item, params, recommendation, onOpen }) {
+      const { icon, color, kicker, title, formula } = item;
+      return (
+        <div className="glass academic" onClick={onOpen}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: `linear-gradient(135deg, ${color}, transparent 140%)`,
+              border: `1px solid ${color}55`,
+              display: "grid", placeItems: "center",
+              color
+            }}>
+              <Icon name={icon} size={16} stroke={color} strokeWidth={2} />
+            </div>
+            <div className="chip" style={{ borderColor: `${color}30` }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: color }} />
+              {kicker}
+            </div>
+          </div>
+
+          <div className="h-display" style={{ fontSize: 16, marginBottom: 4, color: "var(--text-1)" }}>{title}</div>
+
+          {/* Formula block */}
+          <div style={{
+            padding: "10px 12px",
+            background: "rgba(0,0,0,0.25)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            color: "var(--text-2)",
+            margin: "10px 0 12px",
+            overflowX: "auto",
+            display: "flex",
+            justifyContent: "center"
+          }}>
+            <Latex formula={formula} block={true} />
+          </div>
+
+          <div style={{ fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.55 }}>
+            {item.short}
+          </div>
+
+          {/* Live readout + open hint */}
+          <div style={{
+            marginTop: 14,
+            paddingTop: 12,
+            borderTop: "1px dashed var(--border)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}>
+            <div className="tnum" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color }}>
+              {kicker === "Conformal" && `α = ${(1 - params.serviceLevel / 100).toFixed(3)}`}
+              {kicker === "Newsvendor" && `CR* = ${(params.shortageCost / (params.shortageCost + params.holdingCost)).toFixed(3)}`}
+              {kicker === "LP" && `capacity = ${(params.capacity / 1000).toFixed(1)}k u`}
+            </div>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10.5,
+              color: "var(--text-3)",
+              letterSpacing: "0.06em"
+            }}>
+              VER DETALLE <Icon name="chevronRight" size={11} stroke="var(--text-3)" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ---- modal ----
+    function AcademicModal({ item, params, recommendation, onClose }) {
+      useEffect(() => {
+        const onKey = (e) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+          document.removeEventListener("keydown", onKey);
+          document.body.style.overflow = prev;
+        };
+      }, [onClose]);
+
+      const cssVars = {
+        "--modal-glow": item.color.startsWith("var(--c-conf") ? "rgba(16,185,129,0.22)"
+                       : item.color.startsWith("var(--c-drift") ? "rgba(245,158,11,0.22)"
+                       : "rgba(139,92,246,0.22)",
+        "--modal-accent": item.color,
+      };
+
+      return (
+        <div className="modal-backdrop" onClick={onClose}>
+          <div className="modal-window" style={cssVars} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-glow" />
+            {/* Header */}
+            <div style={{
+              position: "relative",
+              padding: "20px 26px 18px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              gap: 14
+            }}>
+              <div style={{
+                width: 42, height: 42, borderRadius: 10,
+                background: `linear-gradient(135deg, ${item.color}, transparent 140%)`,
+                border: `1px solid ${item.color}66`,
+                display: "grid", placeItems: "center",
+                boxShadow: `0 0 24px ${item.color}33`
+              }}>
+                <Icon name={item.icon} size={20} stroke={item.color} strokeWidth={2} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="label-mono" style={{ color: item.color, marginBottom: 2 }}>{item.kicker} · MÓDULO ACADÉMICO</div>
+                <div className="h-display" style={{ fontSize: 20, color: "var(--text-1)" }}>{item.title}</div>
+              </div>
+              <button className="modal-close" onClick={onClose} aria-label="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="modal-body">
+              {/* Live state pills */}
+              <div className="pill-row">
+                {item.pills(params, recommendation).map((p, i) => (
+                  <div key={i} className="pill">
+                    <span style={{ color: "var(--text-3)" }}>{p.label}</span>
+                    <span className={p.accent ? "v accent" : "v"}>{p.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Intuition */}
+              <div className="modal-section-title">Intuición</div>
+              <div className="modal-text">{item.intuition}</div>
+
+              {/* Formula */}
+              <div className="modal-section-title">Formulación</div>
+              <div className="formula-big" style={{ display: "flex", justifyContent: "center", whiteSpace: "normal" }}>
+                <Latex formula={item.bigFormula} block={true} />
+              </div>
+
+              {/* Derivation / details */}
+              <div className="modal-section-title">Derivación &amp; supuestos</div>
+              <div className="modal-text">{item.derivation}</div>
+
+              {/* Example numérico */}
+              <div className="modal-section-title">Ejemplo numérico · en vivo</div>
+              <div className="modal-text">{item.example(params, recommendation)}</div>
+
+              {/* Code snippet */}
+              <div className="modal-section-title">Implementación · FastAPI</div>
+              <pre className="code-block" dangerouslySetInnerHTML={{ __html: item.code }} />
+
+              {/* Defense tips */}
+              <div className="modal-section-title">Defensa ante tribunal</div>
+              <ul style={{ margin: "4px 0 0 0", padding: 0, listStyle: "none" }}>
+                {item.defense.map((d, i) => (
+                  <li key={i} style={{
+                    display: "flex", gap: 10, alignItems: "flex-start",
+                    padding: "8px 0",
+                    borderBottom: i < item.defense.length - 1 ? "1px dashed var(--border)" : "none"
+                  }}>
+                    <span style={{
+                      flexShrink: 0,
+                      marginTop: 2,
+                      width: 18, height: 18, borderRadius: 4,
+                      background: `${item.color}18`,
+                      color: item.color,
+                      display: "grid", placeItems: "center",
+                      fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600
+                    }}>{String(i + 1).padStart(2, "0")}</span>
+                    <span className="modal-text" style={{ fontSize: 12.5 }}>{d}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* References */}
+              <div className="modal-section-title">Referencias</div>
+              <div className="modal-text" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, lineHeight: 1.9 }}>
+                {item.refs.map((r, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10 }}>
+                    <span style={{ color: "var(--text-mute)", width: 20 }}>[{i + 1}]</span>
+                    <span style={{ color: "var(--text-2)" }}>{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ----- content per fundamental -----
+    const ACADEMIC_ITEMS = [
+      {
+        id: "conformal",
+        icon: "shield",
+        color: "var(--c-conf)",
+        kicker: "Conformal",
+        title: "Conformal Prediction",
+        formula: "C(X) = [ \\hat{y} - \\hat{q}_{1-\\alpha}, \\; \\hat{y} + \\hat{q}_{1-\\alpha} ] \\quad \\text{donde} \\quad P( Y \\in C(X) ) \\ge 1 - \\alpha",
+        short: (<>Calibramos residuales sobre un holdout y obtenemos un intervalo con <b>garantía marginal</b> de cobertura — base estadística del Service Level.</>),
+        bigFormula: "\\begin{aligned} R_i &= | y_i - \\hat{y}_i |, \\quad i \\in \\mathcal{D}_{\\text{cal}} \\\\ \\hat{q}_{1-\\alpha} &= \\text{Quantile}\\left(\\{R_1, \\dots, R_n\\}, \\frac{\\lceil(n+1)(1-\\alpha)\\rceil}{n}\\right) \\\\ C(X) &= [ \\hat{y}(X) - \\hat{q}_{1-\\alpha}, \\; \\hat{y}(X) + \\hat{q}_{1-\\alpha} ] \\\\ P( Y_{n+1} &\\in C(X_{n+1}) ) \\ge 1 - \\alpha \\quad \\text{(Cobertura Marginal)} \\end{aligned}",
+        intuition: (<>
+          La idea es <b>elegante y simple</b>: si nuestros errores históricos en un conjunto de
+          calibración tienen un cierto cuantil <code>q̂</code>, entonces — bajo el único supuesto de
+          <i> intercambiabilidad</i> de los datos — la siguiente observación caerá dentro del intervalo
+          <code>ŷ ± q̂</code> con probabilidad <b>al menos</b> <code>1 − α</code>. <b>No requiere</b> asumir
+          normalidad ni propiedades del modelo: funciona con LightGBM, redes neuronales, modelos lineales o
+          cualquier <i>black-box</i>.
+        </>),
+        derivation: (<>
+          Partimos del conjunto de calibración disjunto del entrenamiento. Calculamos los <i>scores de no-conformidad</i>
+          <code> R_i = |y_i − ŷ_i|</code>. El teorema clave (Vovk et al., 2005) prueba que el <i>rank</i> de un nuevo
+          score es uniforme en <code>{"{1, …, n+1}"}</code>, por lo que tomar el cuantil empírico <code>q̂</code>
+          garantiza la cobertura marginal. Para hacerlo <b>adaptativo</b> usamos <i>Mondrian CP</i> (cuantiles por
+          segmento de SKU) y <i>weighted CP</i> para corregir el <i>covariate shift</i> estacional.
+        </>),
+        example: (p, r) => {
+          const alpha = 1 - p.serviceLevel / 100;
+          return (<>
+            Con <code>SL = {p.serviceLevel.toFixed(1)}%</code> trabajamos con <code>α = {alpha.toFixed(3)}</code>.
+            Sobre <code>n = 14</code> muestras de calibración, el cuantil empírico requerido es el de orden
+            <code> ⌈15 · {(1 - alpha).toFixed(3)}⌉ / 14 = {(Math.ceil(15 * (1 - alpha)) / 14).toFixed(3)}</code>.
+            En la última ventana ese <code>q̂</code> se sitúa en torno a <b>{Math.round(r.qStar * 0.18)} u</b>,
+            generando los intervalos translúcidos que ves en el gráfico principal.
+          </>);
+        },
+        code:
+`<span class="k">from</span> sklearn.model_selection <span class="k">import</span> train_test_split
+<span class="k">import</span> numpy <span class="k">as</span> np
+
+<span class="k">def</span> <span class="f">conformal_interval</span>(model, X_cal, y_cal, X_new, alpha=<span class="n">0.05</span>):
+    <span class="c"># 1. residuales de calibración</span>
+    y_hat_cal = model.predict(X_cal)
+    scores    = np.abs(y_cal - y_hat_cal)
+
+    <span class="c"># 2. cuantil ajustado por tamaño finito</span>
+    n    = <span class="f">len</span>(scores)
+    q    = np.quantile(scores, np.ceil((n+<span class="n">1</span>)*(<span class="n">1</span>-alpha))/n,
+                       method=<span class="s">"higher"</span>)
+
+    <span class="c"># 3. intervalo para la nueva predicción</span>
+    y_hat = model.predict(X_new)
+    <span class="k">return</span> y_hat - q, y_hat, y_hat + q`,
+        pills: (p, r) => ([
+          { label: "α", value: (1 - p.serviceLevel / 100).toFixed(3), accent: true },
+          { label: "1 − α", value: `${p.serviceLevel.toFixed(1)}%` },
+          { label: "n_cal", value: "14" },
+          { label: "score", value: "|y − ŷ|" },
+        ]),
+        defense: [
+          "Es distribution-free: la garantía vale sin asumir normalidad ni linealidad — clave si el tribunal pregunta por los supuestos del modelo.",
+          "La garantía es marginal, no condicional: hablamos de cobertura promedio en X, no en cada subgrupo. Por eso aplicamos Mondrian CP por categoría de SKU.",
+          "Bajo covariate shift (rebajas, festivos) la intercambiabilidad falla. Mitigamos con weighted CP y re-calibración semanal automática.",
+          "Trade-off natural: bajar α (más cobertura) → intervalos más anchos → política Newsvendor más conservadora → más coste de almacenamiento.",
+        ],
+        refs: [
+          "Vovk, Gammerman, Shafer (2005) — Algorithmic Learning in a Random World.",
+          "Angelopoulos & Bates (2022) — A Gentle Introduction to Conformal Prediction.",
+          "Tibshirani et al. (2019) — Conformal Prediction Under Covariate Shift.",
+        ],
+      },
+      {
+        id: "newsvendor",
+        icon: "function",
+        color: "var(--c-drift)",
+        kicker: "Newsvendor",
+        title: "Newsvendor Model",
+        formula: "q^* = F^{-1}\\left( \\frac{c_s}{c_s + c_h} \\right)",
+        short: (<>Cantidad óptima bajo coste asimétrico. El <b>critical ratio</b> determina el cuantil de demanda a cubrir.</>),
+        bigFormula: "\\begin{aligned} \\text{Coste Esperado: } C(q) &= c_h \\cdot \\mathbb{E}[(q - D)^+] + c_s \\cdot \\mathbb{E}[(D - q)^+] \\\\ \\text{Bajo Leibniz: } \\frac{dC}{dq} &= c_h \\cdot F(q) - c_s \\cdot (1 - F(q)) = 0 \\\\ \\Rightarrow F(q^*) &= \\frac{c_s}{c_s + c_h} = \\text{CR}^* \\\\ \\Rightarrow q^* &= F^{-1}(\\text{CR}^*) \\end{aligned}",
+        intuition: (<>
+          Cada unidad de más nos cuesta <code>c_h</code> (almacenamiento, capital inmovilizado, obsolescencia).
+          Cada unidad de menos nos cuesta <code>c_s</code> (venta perdida, penalizaciones, daño reputacional).
+          Si <code>c_s ≫ c_h</code> compensa pedir mucho — <b>preferimos sobre-stockear a quedarnos cortos</b>.
+          El <i>critical ratio</i> traduce esa asimetría en el <b>cuantil exacto</b> de demanda que debemos cubrir.
+        </>),
+        derivation: (<>
+          Modelamos la demanda como variable aleatoria <code>D</code> con distribución <code>F</code>.
+          El coste esperado es convexo en <code>q</code>, así que la condición de primer orden basta:
+          la derivada <code>c_h · F(q) − c_s · (1 − F(q))</code> se anula en el cuantil <code>CR*</code> de la CDF.
+          En este TFG la CDF <b>no es paramétrica</b>: la construimos a partir del intervalo conformal — los
+          extremos <code>[L, U]</code> definen el soporte y el <i>spread</i> implícito de la incertidumbre.
+        </>),
+        example: (p, r) => {
+          const cr = p.shortageCost / (p.shortageCost + p.holdingCost);
+          return (<>
+            Con <code>c_s = ${p.shortageCost}</code> y <code>c_h = ${p.holdingCost.toFixed(1)}</code>, el critical ratio es
+            <code> CR* = {cr.toFixed(3)}</code> → debemos cubrir el cuantil <code>{(cr * 100).toFixed(1)}%</code> de la demanda.
+            Aplicando z ≈ <code>{r.z.toFixed(2)}</code> sobre la predicción media: <code>q* = μ + z · σ ≈ </code>
+            <b>{fmt.fmtUnits(r.qStar)} u</b>. <i>Mueve los sliders y observa cómo q* se reajusta en directo.</i>
+          </>);
+        },
+        code:
+`<span class="k">from</span> scipy.stats <span class="k">import</span> norm
+<span class="k">import</span> numpy <span class="k">as</span> np
+
+<span class="k">def</span> <span class="f">newsvendor_q</span>(mu, sigma, c_s, c_h, dist=<span class="s">"normal"</span>):
+    <span class="c"># critical ratio</span>
+    cr = c_s / (c_s + c_h)
+
+    <span class="k">if</span> dist == <span class="s">"normal"</span>:
+        z = norm.ppf(cr)
+        <span class="k">return</span> mu + z * sigma
+
+    <span class="c"># empirical CDF a partir del intervalo conformal</span>
+    samples = np.random.normal(mu, sigma, <span class="n">10_000</span>)
+    <span class="k">return</span> np.quantile(samples, cr)
+
+
+<span class="c"># En el endpoint /api/optimize:</span>
+q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
+                      c_s=req.shortage_cost, c_h=req.holding_cost)`,
+        pills: (p, r) => ([
+          { label: "c_s", value: `$${p.shortageCost}` },
+          { label: "c_h", value: `$${p.holdingCost.toFixed(1)}` },
+          { label: "CR*", value: (p.shortageCost / (p.shortageCost + p.holdingCost)).toFixed(3), accent: true },
+          { label: "q*", value: `${fmt.fmtUnits(r.qStar)} u` },
+        ]),
+        defense: [
+          "Es el modelo seminal de inventario para productos de un solo periodo — Arrow, Harris, Marschak (1951). El comité lo reconoce inmediatamente.",
+          "La elegancia: una sola fórmula cerrada captura todo el trade-off rotura/almacén. No hay hiperparámetros que tunear.",
+          "Cuando c_s/c_h se desconocen, los inferimos del margen unitario y el coste financiero. Documentamos la sensibilidad en el slider del dashboard.",
+          "Limitación honesta: asume demanda no estacional. Por eso re-estimamos μ y σ por ventana móvil de 14 días.",
+        ],
+        refs: [
+          "Arrow, Harris, Marschak (1951) — Optimal Inventory Policy.",
+          "Porteus (2002) — Foundations of Stochastic Inventory Theory.",
+          "Bertsimas & Thiele (2006) — A Data-Driven Approach to Newsvendor Problems.",
+        ],
+      },
+      {
+        id: "capacity",
+        icon: "layers",
+        color: "var(--c-ai)",
+        kicker: "LP",
+        title: "Capacity Optimization",
+        formula: "\\max \\sum_{i=1}^N \\pi_i q_i \\quad \\text{s.t.} \\quad \\sum_{i=1}^N v_i q_i \\le V, \\; q_i \\ge q^*_i, \\; q_i \\in \\mathbb{R}^+",
+        short: (<>Cuando la capacidad <code>V</code> es vinculante, repartimos espacio entre SKUs maximizando margen esperado.</>),
+        bigFormula: "\\begin{aligned} \\max_{q_1, \\dots, q_N} \\quad &\\sum_{i=1}^N \\pi_i \\cdot q_i \\quad \\text{(Margen Esperado Total)} \\\\ \\text{sujeto a:} \\quad &\\sum_{i=1}^N v_i \\cdot q_i \\le V \\quad \\text{(Capacidad Física de Almacén)} \\\\ &q_i \\ge q^{*,\\text{news}}_i \\quad \\text{(Mínimo Newsvendor por SKU)} \\\\ &q_i \\le U_i^{\\text{conformal}} \\quad \\text{(Cota Conformal por SKU)} \\\\ &q_i \\ge 0 \\quad \\forall i \\end{aligned}",
+        intuition: (<>
+          El Newsvendor te dice cuánto pedir <i>por SKU aislado</i>. Pero el almacén es <b>finito</b>: si la
+          suma de los <code>q*_i</code> excede la capacidad, alguien tiene que ceder. La LP elige qué SKU
+          sacrifica unidades minimizando la pérdida de margen total. Es una <b>capa de decisión</b> sobre las
+          recomendaciones probabilísticas del modelo.
+        </>),
+        derivation: (<>
+          Es un problema de Programación Lineal estándar — convexo, con dualidad fuerte. El dual nos da los
+          <i> precios sombra</i> <code>λ</code> del recurso "capacidad": cuántos dólares de margen perdemos por
+          cada unidad de espacio que <i>no</i> tenemos. <b>Es la métrica clave para decidir cuándo ampliar el
+          almacén</b>. Resoluble con <code>scipy.optimize.linprog</code> (método HiGHS) en milisegundos para
+          miles de SKUs.
+        </>),
+        example: (p, r) => {
+          return (<>
+            Capacidad actual <code>V = {(p.capacity / 1000).toFixed(1)}k u</code>. La política agregada utiliza
+            <code> {r.utilization}%</code> del espacio.
+            {r.utilization >= 100
+              ? <> <b>Restricción activa</b>: el solver está recortando q_i en SKUs de bajo margen. El precio sombra es estrictamente positivo — ampliar capacidad mejoraría el margen.</>
+              : <> Restricción <b>no vinculante</b>: cada SKU recibe su q* del Newsvendor sin recortes. Holgura {(100 - r.utilization)}%.</>
+            }
+          </>);
+        },
+        code:
+`<span class="k">from</span> scipy.optimize <span class="k">import</span> linprog
+<span class="k">import</span> numpy <span class="k">as</span> np
+
+<span class="k">def</span> <span class="f">allocate_capacity</span>(margins, volumes, q_min, q_max, capacity):
+    <span class="c"># linprog minimiza ⇒ negamos el margen para maximizar</span>
+    c = -np.array(margins)
+
+    <span class="c"># A_ub @ q ≤ b_ub : restricción de capacidad</span>
+    A_ub = [volumes]
+    b_ub = [capacity]
+
+    <span class="c"># bounds por SKU: [q*_i_news,  U_i_conformal]</span>
+    bounds = <span class="f">list</span>(<span class="f">zip</span>(q_min, q_max))
+
+    res = <span class="f">linprog</span>(c, A_ub=A_ub, b_ub=b_ub,
+                  bounds=bounds, method=<span class="s">"highs"</span>)
+
+    <span class="k">return</span> {
+        <span class="s">"q"</span>:           res.x,
+        <span class="s">"margin"</span>:      -res.fun,
+        <span class="s">"shadow_price"</span>: res.ineqlin.marginals[<span class="n">0</span>],
+    }`,
+        pills: (p, r) => ([
+          { label: "V", value: `${(p.capacity / 1000).toFixed(1)}k u`, accent: true },
+          { label: "utilización", value: `${r.utilization}%` },
+          { label: "estado", value: r.utilization >= 100 ? "binding" : "slack" },
+          { label: "solver", value: "HiGHS" },
+        ]),
+        defense: [
+          "La LP encadena con el Newsvendor: usamos sus q* como cota inferior, manteniendo coherencia entre los dos niveles de decisión.",
+          "El precio sombra λ del dual da una interpretación económica directa al stakeholder: '$X de margen perdido por cada unidad de espacio faltante'.",
+          "Complejidad polinomial — escala a >10k SKUs en <1s con HiGHS. Listo para producción en FastAPI.",
+          "Extensible a programación entera mixta (MILP) si se incluyen costes fijos por SKU o restricciones de lote mínimo.",
+        ],
+        refs: [
+          "Dantzig (1963) — Linear Programming and Extensions.",
+          "Bertsimas & Tsitsiklis (1997) — Introduction to Linear Optimization.",
+          "Huangfu & Hall (2018) — Parallelizing the Dual Revised Simplex Method (HiGHS).",
+        ],
+      },
+    ];
+
+    function AcademicGrid({ params, recommendation }) {
+      const [openId, setOpenId] = useState(null);
+      const openItem = ACADEMIC_ITEMS.find((it) => it.id === openId);
+
+      return (
+        <>
+          <div className="grid-academic">
+            {ACADEMIC_ITEMS.map((it) => (
+              <AcademicCard
+                key={it.id}
+                item={it}
+                params={params}
+                recommendation={recommendation}
+                onOpen={() => setOpenId(it.id)}
+              />
+            ))}
+          </div>
+          {openItem && (
+            <AcademicModal
+              item={openItem}
+              params={params}
+              recommendation={recommendation}
+              onClose={() => setOpenId(null)}
+            />
+          )}
+        </>
+      );
+    }
+
+    window.AcademicGrid = AcademicGrid;
+  </script>
+
+  <!-- =================== EXTENDED VIEWS, ALERT DETAIL, DYNAMIC ALERTS =================== -->
+  <script type="text/babel" data-presets="env,react">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    // ============ Tiny sparkline ============
+    function Sparkline({ data, color = "var(--c-inv)", w = 90, h = 24, strokeWidth = 1.4, fill = true }) {
+      if (!data || data.length < 2) return <svg width={w} height={h} />;
+      const lo = Math.min(...data);
+      const hi = Math.max(...data);
+      const range = hi - lo || 1;
+      const xs = data.map((_, i) => (i / (data.length - 1)) * (w - 2) + 1);
+      const ys = data.map((d) => h - 2 - ((d - lo) / range) * (h - 4));
+      const pts = xs.map((x, i) => [x, ys[i]]);
+      const path = "M " + pts.map(([x, y]) => `${x} ${y}`).join(" L ");
+      const area = path + ` L ${xs[xs.length - 1]} ${h} L ${xs[0]} ${h} Z`;
+      const gradId = `spark-grad-${Math.random().toString(36).slice(2, 9)}`;
+      return (
+        <svg width={w} height={h} style={{ display: "block" }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.32} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          {fill && <path d={area} fill={`url(#${gradId})`} />}
+          <path d={path} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" strokeLinecap="round" />
+          <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r={1.8} fill={color} />
+        </svg>
+      );
+    }
+    window.Sparkline = Sparkline;
+
+    // ============ SKU view ============
+    function buildSkus(params) {
+      const categories = ["Bebidas", "Lácteos", "Snacks", "Limpieza", "Frescos", "Congelados", "Higiene"];
+      const skus = [];
+      for (let i = 0; i < 28; i++) {
+        const id = `SKU-${(1000 + i * 17).toString()}`;
+        const cat = categories[i % categories.length];
+        const baseDemand = 80 + (i * 19) % 320;
+        const series = [];
+        for (let d = 0; d < 14; d++) {
+          const n = seededNoise(i * 13 + d, 7) - 0.5;
+          series.push(Math.round(baseDemand + Math.sin(d / 2 + i) * baseDemand * 0.12 + n * baseDemand * 0.18));
+        }
+        const margin = +(0.18 + ((i * 7) % 40) / 100).toFixed(2);
+        const stock = Math.round(baseDemand * (2 + ((i * 3) % 5)) * (1 - (params.serviceLevel - 95) / 200));
+        const coverageTarget = params.serviceLevel;
+        const empCoverage = Math.max(75, Math.min(99.8, coverageTarget - 1.4 + (seededNoise(i, 5) - 0.5) * 10));
+        const driftPsi = +(0.05 + ((i * 0.027) % 0.4)).toFixed(3);
+        const lastActual = series[series.length - 1];
+        const lastPred = Math.round(lastActual * (1 + (seededNoise(i + 99, 3) - 0.5) * 0.18));
+        const status =
+          driftPsi > 0.2 ? "drift" :
+          empCoverage < coverageTarget - 3 ? "shortage" :
+          empCoverage > coverageTarget + 2 ? "overstock" :
+          "ok";
+        const q_star = Math.round(lastPred * 1.25);
+        skus.push({ id, cat, series, margin, stock, q_star, empCoverage, coverageTarget, driftPsi, lastActual, lastPred, status });
+      }
+      return skus;
+    }
+
+    const STATUS_COLORS = {
+      ok: { color: "var(--c-conf)",  label: "OK" },
+      drift: { color: "var(--c-drift)", label: "DRIFT" },
+      shortage: { color: "var(--c-drift)", label: "SHORTAGE" },
+      overstock: { color: "var(--c-inv)", label: "OVERSTOCK" },
+    };
+
+    function SkuView({ params, loading, onSelectSku, selectedSkuId }) {
+      const [search, setSearch] = useState("");
+      const [filter, setFilter] = useState("all");
+      const [sortKey, setSortKey] = useState("driftPsi");
+      const [sortDir, setSortDir] = useState("desc");
+      const [skus, setSkus] = useState([]);
+
+      useEffect(() => {
+        let active = true;
+        const load = async () => {
+          const data = await api.fetch("/api/skus", params);
+          if (active && data) setSkus(data);
+        };
+        load();
+        return () => { active = false; };
+      }, [params]);
+      const filtered = useMemo(() => {
+        let r = skus;
+        if (filter !== "all") r = r.filter(s => s.status === filter);
+        if (search) {
+          const q = search.toLowerCase();
+          r = r.filter(s => s.id.toLowerCase().includes(q) || s.cat.toLowerCase().includes(q));
+        }
+        r = [...r].sort((a, b) => {
+          const va = a[sortKey], vb = b[sortKey];
+          if (typeof va === "string") return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+          return sortDir === "asc" ? va - vb : vb - va;
+        });
+        return r;
+      }, [skus, filter, search, sortKey, sortDir]);
+
+      const setSort = (k) => {
+        if (sortKey === k) setSortDir(d => d === "asc" ? "desc" : "asc");
+        else { setSortKey(k); setSortDir("desc"); }
+      };
+
+      const counts = useMemo(() => ({
+        all: skus.length,
+        ok: skus.filter(s => s.status === "ok").length,
+        drift: skus.filter(s => s.status === "drift").length,
+        shortage: skus.filter(s => s.status === "shortage").length,
+        overstock: skus.filter(s => s.status === "overstock").length,
+      }), [skus]);
+
+      const selected = filtered.find(s => s.id === selectedSkuId);
+
+      const handleDownloadCSV = () => {
+        if (!skus.length) return;
+        const headers = [
+          "SKU", "Categoria", "Ultimo_Actual", "Ultimo_Predicho",
+          "Cobertura_Empirica", "Objetivo_Cobertura", "Drift_PSI",
+          "Margen", "Cantidad_Recomendada_qStar", "Estado"
+        ];
+        const rows = skus.map(s => [
+          s.id, s.cat, s.lastActual, s.lastPred,
+          s.empCoverage.toFixed(2), s.coverageTarget,
+          s.driftPsi.toFixed(3), (s.margin * 100).toFixed(0) + "%",
+          s.q_star, s.status
+        ]);
+        const csvContent = "data:text/csv;charset=utf-8,"
+          + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `plan_reposicion_retail_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      return (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
+            <div>
+              <div className="label-mono">VIEW · SKU-LEVEL</div>
+              <div className="h-display" style={{ fontSize: 22, color: "var(--text-1)", marginTop: 4 }}>
+                Inventario por SKU
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-3)", marginTop: 2 }}>
+                {skus.length} SKUs activos · cobertura empírica calculada por <i>holdout</i> conformal
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button
+                onClick={handleDownloadCSV}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 14px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(16, 185, 129, 0.4)",
+                  background: "linear-gradient(180deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05))",
+                  color: "var(--c-conf)",
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 600,
+                  fontSize: 12.5,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                <Icon name="arrowDown" size={14} stroke="var(--c-conf)" strokeWidth={2} />
+                Descargar CSV
+              </button>
+              <div style={{
+                display: "inline-flex",
+                padding: 4, borderRadius: 10,
+                background: "rgba(255,255,255,0.025)", border: "1px solid var(--border)",
+                alignItems: "center"
+              }}>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar SKU o categoría…"
+                  style={{
+                    background: "transparent", border: "none", outline: "none",
+                    color: "var(--text-1)", fontFamily: "var(--font-mono)",
+                    fontSize: 12, padding: "6px 10px", width: 220
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Filter tabs */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+            {[
+              { id: "all", label: "Todos", n: counts.all, color: "var(--text-2)" },
+              { id: "ok", label: "OK", n: counts.ok, color: "var(--c-conf)" },
+              { id: "drift", label: "Drift", n: counts.drift, color: "var(--c-drift)" },
+              { id: "shortage", label: "Rotura", n: counts.shortage, color: "var(--c-drift)" },
+              { id: "overstock", label: "Overstock", n: counts.overstock, color: "var(--c-inv)" },
+            ].map(t => (
+              <button
+                key={t.id}
+                className={`filter-tab ${filter === t.id ? "active" : ""}`}
+                onClick={() => setFilter(t.id)}
+                style={filter === t.id ? { color: t.color, borderColor: t.color } : {}}
+              >
+                {t.label} <span style={{ opacity: 0.6, marginLeft: 4 }}>{t.n}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="glass" style={{ padding: 0, overflow: "hidden" }}>
+            <div className="sku-grid header">
+              {[
+                ["id", "SKU"],
+                ["cat", "Categoría"],
+                ["series", "14d trend", true],
+                ["lastActual", "Real"],
+                ["lastPred", "Predicho"],
+                ["empCoverage", "Cobertura"],
+                ["driftPsi", "PSI"],
+                ["margin", "Margen"],
+                ["q_star", "q*"],
+                ["status", "Estado"],
+              ].map(([k, label, noSort]) => (
+                <div
+                  key={k}
+                  className="sku-th"
+                  onClick={noSort ? undefined : () => setSort(k)}
+                  style={{ cursor: noSort ? "default" : "pointer" }}
+                >
+                  {label}
+                  {sortKey === k && !noSort && (
+                    <span style={{ marginLeft: 4, color: "var(--text-2)" }}>
+                      {sortDir === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{ maxHeight: 480, overflowY: "auto" }}>
+              {filtered.map((s) => {
+                const sc = STATUS_COLORS[s.status];
+                const cov = s.empCoverage;
+                const covColor =
+                  cov < s.coverageTarget - 3 ? "var(--c-drift)" :
+                  cov > s.coverageTarget + 2 ? "var(--c-inv)" :
+                  "var(--c-conf)";
+                return (
+                  <div
+                    key={s.id}
+                    className={`sku-grid row ${selectedSkuId === s.id ? "selected" : ""}`}
+                    onClick={() => { if (onSelectSku) onSelectSku(s.id); }}
+                  >
+                    <div className="sku-cell" style={{ fontFamily: "var(--font-mono)", color: "var(--text-1)", fontSize: 12, fontWeight: 600 }}>{s.id}</div>
+                    <div className="sku-cell" style={{ color: "var(--text-2)", fontSize: 12 }}>{s.cat}</div>
+                    <div className="sku-cell"><Sparkline data={s.series} color={sc.color} /></div>
+                    <div className="sku-cell tnum" style={{ fontFamily: "var(--font-mono)", color: "var(--text-1)" }}>{s.lastActual}</div>
+                    <div className="sku-cell tnum" style={{ fontFamily: "var(--font-mono)", color: "var(--c-ai)" }}>{s.lastPred}</div>
+                    <div className="sku-cell">
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div className="cov-bar" title={`${cov.toFixed(1)}% / target ${s.coverageTarget}%`}>
+                          <div className="cov-bar-fill" style={{
+                            width: `${Math.min(100, (cov / 100) * 100)}%`,
+                            background: covColor
+                          }} />
+                          <div className="cov-bar-target" style={{ left: `${s.coverageTarget}%` }} />
+                        </div>
+                        <span className="tnum" style={{ fontFamily: "var(--font-mono)", color: covColor, fontSize: 11 }}>
+                          {cov.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="sku-cell tnum" style={{
+                      fontFamily: "var(--font-mono)",
+                      color: s.driftPsi > 0.2 ? "var(--c-drift)" : "var(--text-2)"
+                    }}>{s.driftPsi.toFixed(3)}</div>
+                    <div className="sku-cell tnum" style={{ fontFamily: "var(--font-mono)", color: "var(--text-2)" }}>{(s.margin * 100).toFixed(0)}%</div>
+                    <div className="sku-cell tnum" style={{ fontFamily: "var(--font-mono)", color: "var(--c-ai)", fontWeight: 600 }}>{s.q_star}</div>
+                    <div className="sku-cell">
+                      <span className="alert-sev" style={{
+                        "--alert-color": sc.color,
+                        "--alert-soft": `${sc.color.replace("var(--c-", "rgba(0,0,0,0.16)").slice(0, 20)}`,
+                        background: "rgba(255,255,255,0.02)",
+                        color: sc.color,
+                        borderColor: sc.color
+                      }}>{sc.label}</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {filtered.length === 0 && (
+                <div style={{ padding: 40, textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+                  Sin SKUs que coincidan con el filtro.
+                </div>
+              )}
+            </div>
+            <div style={{
+              padding: "10px 16px",
+              borderTop: "1px solid var(--border)",
+              fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--text-3)",
+              display: "flex", justifyContent: "space-between"
+            }}>
+              <span>GET /api/skus?bundle=RT-029-A&amp;status={filter}</span>
+              <span>{filtered.length} / {skus.length} mostrados</span>
+            </div>
+          </div>
+
+          {selected && (
+            <div className="glass" style={{ marginTop: 16, padding: 22 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <div className="label-mono" style={{ color: STATUS_COLORS[selected.status].color }}>SKU INSPECTOR</div>
+                  <div className="h-display" style={{ fontSize: 17, color: "var(--text-1)", marginTop: 4 }}>
+                    {selected.id} · <span style={{ color: "var(--text-3)", fontWeight: 500 }}>{selected.cat}</span>
+                  </div>
+                </div>
+                <button className="alert-btn" onClick={() => { if (onSelectSku) onSelectSku(null); }} style={{ flex: "0 0 auto" }}>
+                  <Icon name="x" size={11} /> Cerrar
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14 }}>
+                <Stat2 label="last actual" value={selected.lastActual} unit="u" color="var(--c-inv)" />
+                <Stat2 label="last predicted" value={selected.lastPred} unit="u" color="var(--c-ai)" />
+                <Stat2 label="cobertura" value={selected.empCoverage.toFixed(1)} unit="%" color="var(--c-conf)" />
+                <Stat2 label="psi drift" value={selected.driftPsi.toFixed(3)} color={selected.driftPsi > 0.2 ? "var(--c-drift)" : "var(--text-2)"} />
+                <Stat2 label="margen" value={(selected.margin * 100).toFixed(0)} unit="%" color="var(--c-drift)" />
+                <Stat2 label="recomendación q*" value={selected.q_star} unit="u" color="var(--c-ai)" big />
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function Stat2({ label, value, unit, color, big }) {
+      return (
+        <div style={{
+          padding: "12px 14px",
+          borderRadius: 8,
+          background: "rgba(0,0,0,0.2)",
+          border: "1px solid var(--border)"
+        }}>
+          <div className="label-mono" style={{ marginBottom: 6 }}>{label}</div>
+          <div style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: big ? 28 : 22,
+            color,
+            lineHeight: 1
+          }} className="tnum">
+            {value}
+            {unit && <span style={{ color: "var(--text-3)", fontSize: 12, marginLeft: 3, fontWeight: 500 }}>{unit}</span>}
+          </div>
+        </div>
+      );
+    }
+
+    window.SkuView = SkuView;
+
+    // ============ Drift Monitor ============
+    function buildDrift(params) {
+      const features = [
+        { name: "temperature_7d",    base: 0.27, type: "numeric",  importance: 0.32 },
+        { name: "weekend_flag",      base: 0.05, type: "binary",   importance: 0.21 },
+        { name: "promo_intensity",   base: 0.22, type: "numeric",  importance: 0.19 },
+        { name: "price_lag_1",       base: 0.14, type: "numeric",  importance: 0.11 },
+        { name: "category_id",       base: 0.07, type: "categoric",importance: 0.09 },
+        { name: "competitor_idx",    base: 0.18, type: "numeric",  importance: 0.05 },
+        { name: "is_holiday",        base: 0.03, type: "binary",   importance: 0.03 },
+      ];
+      return features.map((f, i) => {
+        const noise = (seededNoise(i + params.serviceLevel, 5) - 0.5) * 0.05;
+        const psi = +Math.max(0.005, f.base + noise).toFixed(3);
+        const bins = 8;
+        // Pre / post distributions: post is shifted/skewed
+        const pre = [], post = [];
+        for (let b = 0; b < bins; b++) {
+          const x = (b - bins / 2) / 1.2;
+          const preP = Math.exp(-x * x / 2);
+          const shift = Math.min(1.6, psi * 5);
+          const postP = Math.exp(-((x - shift) ** 2) / 2);
+          pre.push(preP);
+          post.push(postP);
+        }
+        const sumPre = pre.reduce((a, b) => a + b, 0);
+        const sumPost = post.reduce((a, b) => a + b, 0);
+        return {
+          ...f,
+          psi,
+          status: psi > 0.20 ? "critical" : psi > 0.10 ? "warning" : "ok",
+          pre: pre.map(v => v / sumPre),
+          post: post.map(v => v / sumPost),
+        };
+      });
+    }
+
+    function DistChart({ pre, post, color }) {
+      const W = 200, H = 56, bins = pre.length;
+      const max = Math.max(...pre, ...post);
+      const bw = W / bins;
+      return (
+        <svg width={W} height={H} style={{ display: "block" }}>
+          {pre.map((p, i) => {
+            const h = (p / max) * (H - 4);
+            return (
+              <rect key={`p${i}`}
+                x={i * bw + 1}
+                y={H - h}
+                width={bw - 2}
+                height={h}
+                fill="rgba(148, 163, 184, 0.25)"
+                rx={1.5}
+              />
+            );
+          })}
+          {post.map((p, i) => {
+            const h = (p / max) * (H - 4);
+            return (
+              <rect key={`q${i}`}
+                x={i * bw + 1}
+                y={H - h}
+                width={bw - 2}
+                height={h}
+                fill={color}
+                fillOpacity={0.6}
+                rx={1.5}
+              />
+            );
+          })}
+        </svg>
+      );
+    }
+
+    function DriftView({ params }) {
+      const [features, setFeatures] = useState([]);
+
+      useEffect(() => {
+        let active = true;
+        const load = async () => {
+          const data = await api.fetch("/api/drift", params);
+          if (active && data) setFeatures(data);
+        };
+        load();
+        return () => { active = false; };
+      }, [params]);
+      const sorted = [...features].sort((a, b) => b.psi - a.psi);
+      const max = Math.max(...features.map(f => f.psi), 0.3);
+
+      return (
+        <div>
+          <div style={{ marginBottom: 18 }}>
+            <div className="label-mono">VIEW · DRIFT MONITOR</div>
+            <div className="h-display" style={{ fontSize: 22, color: "var(--text-1)", marginTop: 4 }}>
+              Distribución de features
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-3)", marginTop: 2 }}>
+              Population Stability Index por feature · referencia: <i>holdout</i> calibrado vs últimos 7 días
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div className="grid-kpi" style={{ marginBottom: 16 }}>
+            <KpiInline label="Features con drift" value={features.filter(f => f.status === "critical").length} suffix="/ 7" color="var(--c-drift)" />
+            <KpiInline label="PSI promedio" value={(features.reduce((s, f) => s + f.psi, 0) / features.length).toFixed(3)} color="var(--c-ai)" />
+            <KpiInline label="Última calibración" value="14d" color="var(--c-conf)" />
+            <KpiInline label="Próxima retrain" value="02:00" suffix="UTC" color="var(--c-inv)" />
+          </div>
+
+          {/* Feature list */}
+          <div className="glass" style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{
+              padding: "14px 18px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex", justifyContent: "space-between", alignItems: "center"
+            }}>
+              <div className="h-display" style={{ fontSize: 14, color: "var(--text-1)" }}>
+                Features · ordenadas por PSI
+              </div>
+              <div style={{ display: "flex", gap: 14, fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--text-3)" }}>
+                <span><span style={{ display: "inline-block", width: 8, height: 8, background: "rgba(148, 163, 184, 0.5)", borderRadius: 1.5, marginRight: 4 }} /> referencia</span>
+                <span><span style={{ display: "inline-block", width: 8, height: 8, background: "var(--c-drift)", borderRadius: 1.5, marginRight: 4 }} /> actual</span>
+              </div>
+            </div>
+            <div>
+              {sorted.map((f, i) => {
+                const sevColor = f.status === "critical" ? "var(--c-drift)" : f.status === "warning" ? "var(--c-ai)" : "var(--c-conf)";
+                const barPct = (f.psi / max) * 100;
+                return (
+                  <div key={f.name} className="drift-row">
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: sevColor }} />
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-1)", fontWeight: 600 }}>{f.name}</div>
+                        <span className="chip" style={{ fontSize: 9.5, padding: "2px 6px" }}>{f.type}</span>
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>
+                        importance: {(f.importance * 100).toFixed(0)}%
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div className="psi-bar">
+                        <div className="psi-bar-fill" style={{ width: `${barPct}%`, background: sevColor }} />
+                        <div className="psi-bar-mark" style={{ left: `${(0.1 / max) * 100}%` }} title="warning threshold 0.10" />
+                        <div className="psi-bar-mark crit" style={{ left: `${(0.2 / max) * 100}%` }} title="critical threshold 0.20" />
+                      </div>
+                      <div className="tnum" style={{
+                        fontFamily: "var(--font-mono)", fontSize: 13,
+                        color: sevColor, fontWeight: 600, lineHeight: 1
+                      }}>
+                        PSI {f.psi.toFixed(3)}
+                      </div>
+                    </div>
+
+                    <DistChart pre={f.pre} post={f.post} color={sevColor} />
+
+                    <div style={{
+                      fontFamily: "var(--font-mono)", fontSize: 10,
+                      color: sevColor, letterSpacing: "0.1em",
+                      textTransform: "uppercase", fontWeight: 600,
+                      textAlign: "right"
+                    }}>
+                      {f.status}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{
+              padding: "10px 18px",
+              borderTop: "1px solid var(--border)",
+              fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--text-3)",
+              display: "flex", justifyContent: "space-between"
+            }}>
+              <span>GET /api/drift?window=7d</span>
+              <span>thresholds · warn 0.10 · crit 0.20</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function KpiInline({ label, value, suffix, color }) {
+      return (
+        <div className="glass" style={{ padding: "14px 16px" }}>
+          <div className="label-mono">{label}</div>
+          <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 4 }}>
+            <span className="tnum h-display" style={{ fontSize: 24, color: "var(--text-1)" }}>{value}</span>
+            {suffix && <span style={{ color: "var(--text-3)", fontSize: 12, fontFamily: "var(--font-display)" }}>{suffix}</span>}
+            <span style={{
+              marginLeft: "auto", width: 6, height: 6, borderRadius: "50%",
+              background: color, boxShadow: `0 0 8px ${color}`
+            }} />
+          </div>
+        </div>
+      );
+    }
+
+    window.DriftView = DriftView;
+
+    // ============ Alert detail modal ============
+    function AlertDetailModal({ alert, onClose, onActionRun }) {
+      useEffect(() => {
+        const onKey = (e) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+          document.removeEventListener("keydown", onKey);
+          document.body.style.overflow = prev;
+        };
+      }, [onClose]);
+
+      const s = SEV[alert.sev];
+      const cssVars = {
+        "--modal-glow": s.color.includes("conf") ? "rgba(16,185,129,0.22)" :
+                        s.color.includes("drift") ? "rgba(245,158,11,0.22)" :
+                        s.color.includes("inv") ? "rgba(59,130,246,0.22)" :
+                        "rgba(139,92,246,0.22)",
+        "--modal-accent": s.color,
+      };
+
+      // Build a 24-step metric timeline pointing toward this alert
+      const timeline = useMemo(() => {
+        const arr = [];
+        for (let i = 0; i < 24; i++) {
+          const trend = (i / 23);
+          const noise = (seededNoise(i + alert.id.length, 11) - 0.5) * 0.06;
+          let v;
+          if (alert.sev === "critical") v = 0.05 + trend * 0.28 + noise;
+          else if (alert.sev === "warning") v = 0.10 + trend * 0.12 + noise;
+          else if (alert.sev === "success") v = 0.30 - trend * 0.20 + noise;
+          else v = 0.12 + Math.sin(i / 4) * 0.04 + noise;
+          arr.push(Math.max(0, v));
+        }
+        return arr;
+      }, [alert.id, alert.sev]);
+
+      const events = [
+        { t: "−24h", title: "Métrica dentro de umbrales", kind: "info" },
+        { t: "−18h", title: "Inicio de deriva progresiva", kind: "warning" },
+        { t: "−6h",  title: "Cruce del umbral de warning", kind: "warning" },
+        { t: alert.time, title: alert.title, kind: alert.sev },
+      ];
+
+      return (
+        <div className="modal-backdrop" onClick={onClose}>
+          <div className="modal-window" style={cssVars} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-glow" />
+            <div style={{
+              padding: "20px 26px 18px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex", alignItems: "center", gap: 14
+            }}>
+              <div style={{
+                width: 42, height: 42, borderRadius: 10,
+                background: `linear-gradient(135deg, ${s.color}, transparent 140%)`,
+                border: `1px solid ${s.color}66`,
+                display: "grid", placeItems: "center",
+                boxShadow: `0 0 24px ${s.color}33`
+              }}>
+                <Icon name={s.icon} size={20} stroke={s.color} strokeWidth={2.2} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="label-mono" style={{ color: s.color, marginBottom: 2 }}>
+                  {s.label} · ALERTA {alert.id.toUpperCase()}
+                </div>
+                <div className="h-display" style={{ fontSize: 19, color: "var(--text-1)" }}>{alert.title}</div>
+              </div>
+              <button className="modal-close" onClick={onClose} aria-label="Cerrar">
+                <Icon name="x" size={14} />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="pill-row">
+                {alert.meta.map((m, i) => (
+                  <div key={i} className="pill">
+                    <span style={{ color: "var(--text-3)" }}>{m.k}</span>
+                    <span className="v">{m.v}</span>
+                  </div>
+                ))}
+                <div className="pill"><span style={{ color: "var(--text-3)" }}>bundle</span><span className="v">{alert.bundle}</span></div>
+                <div className="pill"><span style={{ color: "var(--text-3)" }}>detectada</span><span className="v">{alert.time}</span></div>
+              </div>
+
+              <div className="modal-section-title">Descripción</div>
+              <div className="modal-text">{alert.desc}</div>
+
+              <div className="modal-section-title">Histórico de la métrica · 24h</div>
+              <div className="glass" style={{ padding: 16 }}>
+                <Sparkline data={timeline} color={s.color} w={520} h={70} strokeWidth={1.8} />
+                <div style={{
+                  display: "flex", justifyContent: "space-between",
+                  fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-mute)",
+                  marginTop: 6
+                }}>
+                  <span>−24h</span><span>−18h</span><span>−12h</span><span>−6h</span><span>now</span>
+                </div>
+              </div>
+
+              <div className="modal-section-title">Timeline de eventos</div>
+              <div>
+                {events.map((e, i) => {
+                  const eColor = SEV[e.kind]?.color || "var(--text-3)";
+                  return (
+                    <div key={i} style={{
+                      display: "flex", gap: 12,
+                      padding: "10px 0",
+                      borderBottom: i < events.length - 1 ? "1px dashed var(--border)" : "none"
+                    }}>
+                      <div style={{
+                        flexShrink: 0,
+                        width: 54,
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 11,
+                        color: "var(--text-3)",
+                        paddingTop: 1
+                      }}>{e.t}</div>
+                      <div style={{
+                        flexShrink: 0,
+                        width: 10, height: 10, marginTop: 5,
+                        borderRadius: "50%", background: eColor,
+                        boxShadow: `0 0 0 3px ${eColor}22`
+                      }} />
+                      <div style={{ fontSize: 12.5, color: "var(--text-1)", lineHeight: 1.5 }}>{e.title}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="modal-section-title">Model trace</div>
+              <pre className="code-block">{`request_id   : req_${alert.id}-${Math.random().toString(36).slice(2,8)}
+model        : lightgbm_v0.3.1 · holdout 14d
+features     : 18 numéricas + 4 binarias
+inference    : ${alert.sev === "critical" ? "21.4 ms" : "18.2 ms"}
+last_retrain : 2026-05-14 02:00 UTC
+shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
+
+              {alert.endpoint && (
+                <>
+                  <div className="modal-section-title">Acción recomendada</div>
+                  <div className="modal-text" style={{ marginBottom: 10 }}>
+                    Ejecutar <code>{alert.endpoint}</code> para mitigar la alerta. La operación es idempotente y reentrante.
+                  </div>
+                  <button
+                    className="alert-btn primary"
+                    style={{
+                      "--alert-color": s.color,
+                      "--alert-soft": s.soft,
+                      width: "100%",
+                      padding: "12px 14px",
+                      fontSize: 13
+                    }}
+                    onClick={() => { onActionRun?.(alert); onClose(); }}
+                  >
+                    <Icon name="zap" size={13} /> {alert.actionLabel}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    window.AlertDetailModal = AlertDetailModal;
+
+    // ============ Dynamic alerts hook ============
+    function useDynamicAlerts(params, recommendation, baseAlerts) {
+      const [alerts, setAlerts] = useState(baseAlerts);
+      const lastConditions = useRef({});
+
+      useEffect(() => {
+        const conditions = [
+          {
+            id: "dyn-sl-low",
+            test: params.serviceLevel < 88,
+            build: () => ({
+              id: "dyn-sl-low",
+              sev: "critical",
+              title: `Service Level objetivo bajo (${params.serviceLevel.toFixed(1)}%)`,
+              desc: "El SL configurado en el simulador está por debajo del mínimo recomendado para esta vertical. Riesgo significativo de rotura en SKUs estacionales.",
+              meta: [
+                { k: "SL actual", v: `${params.serviceLevel.toFixed(1)}%` },
+                { k: "mínimo", v: "88%" },
+                { k: "α", v: (1 - params.serviceLevel / 100).toFixed(3) },
+              ],
+              endpoint: "POST /api/optimize",
+              actionLabel: "Subir SL al 95%",
+              time: "ahora",
+              ts: 0,
+              bundle: "RT-029-A",
+              isNew: true,
+            }),
+          },
+          {
+            id: "dyn-capacity-bind",
+            test: (recommendation?.utilization ?? 0) >= 95,
+            build: () => ({
+              id: "dyn-capacity-bind",
+              sev: "warning",
+              title: `Capacidad casi saturada (${recommendation.utilization}%)`,
+              desc: "La política propuesta consume casi toda la capacidad. La restricción está activa o a punto de activarse — considera ampliar el almacén.",
+              meta: [
+                { k: "utilización", v: `${recommendation.utilization}%` },
+                { k: "capacidad", v: `${(params.capacity / 1000).toFixed(1)}k u` },
+                { k: "λ sombra", v: recommendation.utilization >= 100 ? "$0.62/u" : "≈ 0" },
+              ],
+              endpoint: "GET /api/capacity/forecast",
+              actionLabel: "Simular ampliación",
+              time: "ahora",
+              ts: 0,
+              bundle: "global",
+              isNew: true,
+            }),
+          },
+          {
+            id: "dyn-ratio-extreme",
+            test: params.shortageCost / params.holdingCost > 14,
+            build: () => ({
+              id: "dyn-ratio-extreme",
+              sev: "info",
+              title: "Critical ratio muy asimétrico",
+              desc: `c_s / c_h = ${(params.shortageCost / params.holdingCost).toFixed(1)} — la política recomendará q* notablemente por encima de la media. Verifica que c_s y c_h reflejan el coste económico real.`,
+              meta: [
+                { k: "c_s", v: `$${params.shortageCost}` },
+                { k: "c_h", v: `$${params.holdingCost.toFixed(1)}` },
+                { k: "ratio", v: (params.shortageCost / params.holdingCost).toFixed(1) },
+              ],
+              endpoint: "",
+              actionLabel: "Entendido",
+              time: "ahora",
+              ts: 0,
+              bundle: "global",
+              isNew: true,
+            }),
+          },
+        ];
+
+        setAlerts(prev => {
+          let next = [...prev];
+          conditions.forEach((c) => {
+            const wasActive = lastConditions.current[c.id];
+            const isActive = c.test;
+            lastConditions.current[c.id] = isActive;
+            const existsIdx = next.findIndex(a => a.id === c.id);
+            if (isActive && existsIdx === -1) {
+              // Insert new at top
+              next = [c.build(), ...next];
+            } else if (!isActive && existsIdx !== -1) {
+              // Auto-resolve: remove the dynamic alert
+              next = next.filter(a => a.id !== c.id);
+            } else if (isActive && existsIdx !== -1) {
+              // Update existing content (so meta/title reflect current sliders)
+              next = next.map(a => a.id === c.id ? { ...c.build(), read: a.read } : a);
+            }
+          });
+          return next;
+        });
+      }, [params.serviceLevel, params.shortageCost, params.holdingCost, params.capacity, recommendation?.utilization]);
+
+      return [alerts, setAlerts];
+    }
+    window.useDynamicAlerts = useDynamicAlerts;
+  </script>
+  <script type="text/babel" data-presets="env,react">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    // ---------- Alert seed data + helpers ----------
+    const SEV = {
+      critical: { color: "var(--c-drift)",  soft: "rgba(245, 158, 11, 0.16)", label: "CRITICAL", icon: "alertTri" },
+      warning:  { color: "var(--c-ai)",     soft: "rgba(139, 92, 246, 0.16)", label: "WARNING",  icon: "trendingDown" },
+      info:     { color: "var(--c-inv)",    soft: "rgba(59, 130, 246, 0.14)", label: "INFO",     icon: "info" },
+      success:  { color: "var(--c-conf)",   soft: "rgba(16, 185, 129, 0.14)", label: "RESOLVED", icon: "check" },
+    };
+
+    const SEED_ALERTS = [
+      {
+        id: "a-001",
+        sev: "critical",
+        title: "Drift detectado · temperature_7d",
+        desc: "PSI = 0.27 supera el umbral de 0.20. La distribución de la feature ha cambiado significativamente desde la última calibración.",
+        meta: [
+          { k: "PSI", v: "0.27" },
+          { k: "feature", v: "temperature_7d" },
+          { k: "umbral", v: "0.20" },
+        ],
+        endpoint: "POST /api/retrain",
+        actionLabel: "Recalibrar modelo",
+        time: "hace 4 min",
+        ts: 4,
+        bundle: "RT-029-A",
+      },
+      {
+        id: "a-002",
+        sev: "critical",
+        title: "Riesgo de rotura · SKU-1187",
+        desc: "Demanda observada supera el límite superior conformal en 2 de los últimos 3 días. La política actual no garantiza el Service Level objetivo.",
+        meta: [
+          { k: "SKU", v: "1187" },
+          { k: "cobertura", v: "91.2%" },
+          { k: "target", v: "95.0%" },
+        ],
+        endpoint: "POST /api/optimize",
+        actionLabel: "Reoptimizar política",
+        time: "hace 12 min",
+        ts: 12,
+        bundle: "RT-029-A",
+      },
+      {
+        id: "a-003",
+        sev: "warning",
+        title: "Capacidad de almacén al 94%",
+        desc: "La política óptima propuesta consume 11 248 u de 12 000 u disponibles. Buffer reducido ante pico de demanda no anticipado.",
+        meta: [
+          { k: "utilización", v: "94%" },
+          { k: "λ (sombra)", v: "$0.42/u" },
+          { k: "horizon", v: "8d" },
+        ],
+        endpoint: "GET /api/capacity/forecast",
+        actionLabel: "Simular ampliación",
+        time: "hace 38 min",
+        ts: 38,
+        bundle: "global",
+      },
+      {
+        id: "a-004",
+        sev: "info",
+        title: "Recalibración programada",
+        desc: "El holdout conformal de 14 días se renovará automáticamente esta noche a las 02:00 UTC. Sin impacto operativo previsto.",
+        meta: [
+          { k: "ETA", v: "02:00 UTC" },
+          { k: "modo", v: "auto" },
+          { k: "duración", v: "~6 min" },
+        ],
+        endpoint: "GET /api/jobs/recalibrate",
+        actionLabel: "Ver detalles",
+        time: "hace 1 h",
+        ts: 60,
+        bundle: "global",
+      },
+      {
+        id: "a-005",
+        sev: "success",
+        title: "Cobertura empírica restaurada · SKU-0042",
+        desc: "Tras la reoptimización de las 09:14, el SKU-0042 ha vuelto al rango objetivo (95.3%). No requiere acción adicional.",
+        meta: [
+          { k: "SKU", v: "0042" },
+          { k: "cobertura", v: "95.3%" },
+          { k: "Δ", v: "+3.1 pts" },
+        ],
+        endpoint: "",
+        actionLabel: "Ocultar",
+        time: "hace 2 h",
+        ts: 120,
+        bundle: "RT-029-A",
+        read: true,
+      },
+    ];
+
+    function AlertsPanel({ onClose, alerts, setAlerts, onActionRun }) {
+      const [filter, setFilter] = useState("all");
+
+      useEffect(() => {
+        const onKey = (e) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+          document.removeEventListener("keydown", onKey);
+          document.body.style.overflow = prev;
+        };
+      }, [onClose]);
+
+      const counts = useMemo(() => ({
+        all: alerts.length,
+        critical: alerts.filter(a => a.sev === "critical").length,
+        warning: alerts.filter(a => a.sev === "warning").length,
+        info: alerts.filter(a => a.sev === "info" || a.sev === "success").length,
+      }), [alerts]);
+
+      const visible = useMemo(() => {
+        if (filter === "all") return alerts;
+        if (filter === "info") return alerts.filter(a => a.sev === "info" || a.sev === "success");
+        return alerts.filter(a => a.sev === filter);
+      }, [alerts, filter]);
+
+      const markAllRead = () => setAlerts(prev => prev.map(a => ({ ...a, read: true })));
+      const dismiss     = (id) => setAlerts(prev => prev.filter(a => a.id !== id));
+      const markRead    = (id) => setAlerts(prev => prev.map(a => a.id === id ? { ...a, read: true } : a));
+
+      const unread = alerts.filter(a => !a.read).length;
+
+      return (
+        <>
+          <div className="drawer-backdrop" onClick={onClose} />
+          <aside className="drawer" role="dialog" aria-label="Alertas">
+            {/* Header */}
+            <div className="drawer-header">
+              <div>
+                <div className="label-mono" style={{ color: "var(--c-drift)", marginBottom: 2 }}>
+                  CENTRO DE ALERTAS
+                </div>
+                <div className="h-display" style={{ fontSize: 17, color: "var(--text-1)", display: "inline-flex", alignItems: "center", gap: 10 }}>
+                  Alertas activas
+                  <span className="chip">
+                    <span className="live-dot" style={{ width: 5, height: 5 }} />
+                    {unread} sin leer
+                  </span>
+                </div>
+              </div>
+              <button className="modal-close" onClick={onClose} aria-label="Cerrar">
+                <Icon name="x" size={14} />
+              </button>
+            </div>
+
+            {/* Filter tabs */}
+            <div style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex", gap: 6, flexWrap: "wrap"
+            }}>
+              {[
+                { id: "all", label: "Todas", n: counts.all },
+                { id: "critical", label: "Críticas", n: counts.critical },
+                { id: "warning", label: "Warning", n: counts.warning },
+                { id: "info", label: "Info", n: counts.info },
+              ].map(t => (
+                <button
+                  key={t.id}
+                  className={`filter-tab ${filter === t.id ? "active" : ""}`}
+                  onClick={() => setFilter(t.id)}
+                >
+                  {t.label} <span style={{ opacity: 0.6, marginLeft: 4 }}>{t.n}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Body */}
+            <div className="drawer-body">
+              {visible.length === 0 && (
+                <div style={{
+                  padding: "60px 20px", textAlign: "center",
+                  color: "var(--text-3)", fontSize: 13
+                }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: "rgba(16, 185, 129, 0.1)",
+                    display: "grid", placeItems: "center",
+                    margin: "0 auto 12px",
+                    color: "var(--c-conf)"
+                  }}>
+                    <Icon name="check" size={20} stroke="var(--c-conf)" strokeWidth={2.4} />
+                  </div>
+                  Sin alertas en esta categoría.
+                </div>
+              )}
+
+              {visible.map(a => {
+                const s = SEV[a.sev];
+                const cssVars = {
+                  "--alert-color": s.color,
+                  "--alert-soft": s.soft,
+                };
+                return (
+                  <div
+                    key={a.id}
+                    className={`alert-item ${a.read ? "read" : "unread"}`}
+                    style={cssVars}
+                  >
+                    <div className="alert-row-1">
+                      <span className="alert-sev">
+                        <Icon name={s.icon} size={10} stroke={s.color} strokeWidth={2.4} />
+                        {s.label}
+                      </span>
+                      <span className="chip" style={{ fontSize: 9.5, padding: "2px 7px" }}>
+                        {a.bundle}
+                      </span>
+                      <span className="alert-time">
+                        <Icon name="clock" size={10} stroke="var(--text-mute)" /> {a.time}
+                      </span>
+                    </div>
+                    <div className="alert-title">{a.title}</div>
+                    <div className="alert-desc">{a.desc}</div>
+
+                    <div className="alert-meta">
+                      {a.meta.map((m, i) => (
+                        <span key={i} className="pill">
+                          <span style={{ color: "var(--text-3)" }}>{m.k}</span>
+                          <span className="v">{m.v}</span>
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="alert-actions">
+                      {a.endpoint ? (
+                        <button
+                          className="alert-btn primary"
+                          onClick={() => { markRead(a.id); onActionRun?.(a); }}
+                          title={a.endpoint}
+                        >
+                          <Icon name="zap" size={11} /> {a.actionLabel}
+                        </button>
+                      ) : (
+                        <button className="alert-btn" onClick={() => dismiss(a.id)}>
+                          <Icon name="eye" size={11} /> {a.actionLabel}
+                        </button>
+                      )}
+                      <button
+                        className="alert-btn"
+                        onClick={() => a.read ? dismiss(a.id) : markRead(a.id)}
+                        style={{ flex: "0 0 auto", padding: "6px 10px" }}
+                        title={a.read ? "Descartar" : "Marcar leída"}
+                      >
+                        <Icon name={a.read ? "x" : "check"} size={11} />
+                      </button>
+                    </div>
+
+                    {a.endpoint && (
+                      <div style={{
+                        marginTop: 8,
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 10,
+                        color: "var(--text-mute)",
+                        letterSpacing: "0.04em"
+                      }}>
+                        {a.endpoint}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="drawer-footer">
+              <div>
+                stream · <span style={{ color: "var(--c-conf)" }}>GET /api/alerts</span>
+              </div>
+              <button
+                className="filter-tab"
+                onClick={markAllRead}
+                disabled={unread === 0}
+                style={{ opacity: unread === 0 ? 0.4 : 1, cursor: unread === 0 ? "default" : "pointer" }}
+              >
+                Marcar todas leídas
+              </button>
+            </div>
+          </aside>
+        </>
+      );
+    }
+
+    function TopBar({ params, lastRunAt, unreadAlerts, onOpenAlerts, onRefresh }) {
+      return (
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "4px 0 22px", flexWrap: "wrap", gap: 12
+        }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div className="label-mono">DASHBOARD · 027 / RETAIL-FORECAST</div>
+              <div className="chip">
+                <span className="live-dot" style={{ width: 5, height: 5 }} />
+                LIVE
+              </div>
+            </div>
+            <div className="h-display" style={{ fontSize: 26, marginTop: 4, color: "var(--text-1)" }}>
+              Analítica Predictiva &amp; Decisiones de Inventario
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-3)", marginTop: 2 }}>
+              Sesión activa  ·  SKU bundle <span style={{ color: "var(--text-2)", fontFamily: "var(--font-mono)" }}>RT-029-A</span>
+              {" "}· horizon 8d  ·  α = {(1 - params.serviceLevel / 100).toFixed(3)}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={btnGhost} onClick={onRefresh}>
+              <Icon name="refresh" size={13} /> Refrescar
+            </button>
+            <button
+              style={btnGhost}
+              className="btn-ghost-rel"
+              onClick={onOpenAlerts}
+            >
+              <Icon name="bell" size={13} /> {unreadAlerts} alertas
+              {unreadAlerts > 0 && <span className="badge">{unreadAlerts}</span>}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const btnGhost = {
+      display: "inline-flex", alignItems: "center", gap: 7,
+      padding: "8px 12px",
+      borderRadius: 8,
+      background: "rgba(255,255,255,0.02)",
+      border: "1px solid var(--border)",
+      color: "var(--text-2)",
+      fontFamily: "var(--font-body)",
+      fontSize: 12.5,
+      cursor: "pointer",
+      transition: "all 0.15s ease"
+    };
+
+    function App() {
+      const [params, setParams] = useState({
+        serviceLevel: 95,
+        shortageCost: 18,
+        holdingCost: 4,
+        capacity: 12000,
+      });
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [lastRunAt, setLastRunAt] = useState(null);
+      const [alerts, setAlerts] = useState(SEED_ALERTS);
+      const [alertsOpen, setAlertsOpen] = useState(false);
+      const [activeTab, setActiveTab] = useState("dashboard");
+      const [selectedSkuId, setSelectedSkuId] = useState(null);
+      const debounceRef = useRef(null);
+
+      const [toasts, setToasts] = useState([]);
+
+      const showToast = useCallback((title, message, type = "warning") => {
+        const id = Date.now() + Math.random().toString(36).substr(2, 9);
+        setToasts(prev => [...prev.filter(t => t.title !== title), { id, title, message, type }]);
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }, 5000);
+      }, []);
+
+      useEffect(() => {
+        if (!data) return;
+
+        // 1. Capacity Saturation Toast
+        const util = data.recommendation?.utilization ?? 0;
+        if (util >= 95) {
+          showToast(
+            "Capacidad Crítica",
+            `Saturación del almacén al ${util}%: Restricciones de espacio activas en solver LP.`,
+            "critical"
+          );
+        }
+
+        // 2. Service Level Bound Toast
+        if (params.serviceLevel < 88) {
+          showToast(
+            "Riesgo de Rotura",
+            `Nivel de servicio objetivo bajo (${params.serviceLevel}%): Alto riesgo de quiebre de stock.`,
+            "warning"
+          );
+        }
+
+        // 3. Drift PSI Toast
+        const psi = data.kpis?.driftPSI?.value ?? 0;
+        if (psi > 0.20) {
+          showToast(
+            "Feature Drift Crítico",
+            `PSI general de features en ${psi.toFixed(2)}: Desviación temporal detectada. Recalibrar.`,
+            "drift"
+          );
+        }
+      }, [data, params.serviceLevel, showToast]);
+
+      const unreadAlerts = alerts.filter(a => !a.read).length;
+
+      // Real alerts fetching
+      useEffect(() => {
+        const loadAlerts = async () => {
+          try {
+            const data = await api.fetch("/api/alerts", params);
+            if (data && Array.isArray(data)) {
+              setAlerts(data);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        };
+        loadAlerts();
+      }, [params]);
+
+      // Initial load + debounced reload on param changes (simulates fetch /api/forecast & /api/kpis)
+      const reload = useCallback(async (latency = 650) => {
+        setLoading(true);
+        const res = await api.fetch("/api/forecast", { ...params, selectedSkuId }, latency);
+        setData(res);
+        setLoading(false);
+        const t = new Date();
+        setLastRunAt(t.toTimeString().slice(0, 8));
+      }, [params]);
+
+      // Initial load (slightly longer to show the skeleton)
+      useEffect(() => {
+        reload(900);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+
+      // Auto-refresh as the user drags sliders (debounced)
+      useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => reload(400), 280);
+        return () => clearTimeout(debounceRef.current);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [params]);
+
+      const handleRun = () => reload(750);
+      const handleAction = (a) => {
+        // Mock: an alert action triggers a re-run
+        reload(550);
+      };
+
+      return (
+        <div className="app">
+          <Sidebar
+            params={params}
+            setParams={setParams}
+            onRun={handleRun}
+            running={loading}
+            lastRunAt={lastRunAt}
+          />
+          <main className="canvas canvas-bg">
+            <TopBar
+              params={params}
+              lastRunAt={lastRunAt}
+              unreadAlerts={unreadAlerts}
+              onOpenAlerts={() => setAlertsOpen(true)}
+              onRefresh={handleRun}
+            />
+
+            {/* Premium Tab Navigation Bar */}
+            <div style={{
+              display: "flex",
+              gap: 8,
+              borderBottom: "1px solid var(--border)",
+              paddingBottom: 16,
+              marginBottom: 20
+            }}>
+              {[
+                { id: "dashboard", label: "Dashboard General", icon: "activity" },
+                { id: "skus", label: "Análisis SKU", icon: "package" },
+                { id: "drift", label: "Monitor de Drift", icon: "zap" }
+              ].map(t => (
+                <button
+                  key={t.id}
+                  className={`filter-tab ${activeTab === t.id ? "active" : ""}`}
+                  onClick={() => setActiveTab(t.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12.5,
+                    padding: "10px 16px",
+                    borderRadius: "8px",
+                    background: activeTab === t.id ? "rgba(139, 92, 246, 0.12)" : "rgba(255,255,255,0.02)",
+                    color: activeTab === t.id ? "#fff" : "var(--text-2)",
+                    borderColor: activeTab === t.id ? "rgba(139, 92, 246, 0.45)" : "var(--border)"
+                  }}
+                >
+                  <Icon name={t.icon} size={14} />
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === "dashboard" && (
+              <>
+                <KpiGrid data={data} loading={loading || !data} />
+
+            <div style={{ marginTop: 16 }}>
+              <ChartBlock
+                data={data}
+                loading={loading || !data}
+                params={params}
+                recommendation={data?.recommendation || { qStar: 0, z: 0, criticalRatio: 0, utilization: 0 }}
+              />
+            </div>
+
+            <div style={{ marginTop: 24, marginBottom: 10 }}>
+              <div className="label-mono" style={{ marginBottom: 4 }}>módulos académicos · defensa TFG</div>
+              <div className="h-display" style={{ fontSize: 18, color: "var(--text-1)" }}>
+                Fundamentos matemáticos
+              </div>
+            </div>
+            <AcademicGrid
+              params={params}
+              recommendation={data?.recommendation || { qStar: 0, z: 0, criticalRatio: 0, utilization: 0 }}
+            />
+
+              </>
+            )}
+
+            {activeTab === "skus" && (
+              <SkuView
+                params={params}
+                loading={loading}
+                selectedSkuId={selectedSkuId}
+                onSelectSku={(skuId) => {
+                  setSelectedSkuId(skuId);
+                  if (skuId) {
+                    setActiveTab("dashboard");
+                  }
+                }}
+              />
+            )}
+
+            {activeTab === "drift" && (
+              <DriftView params={params} />
+            )}
+
+            <div style={{
+              marginTop: 28,
+              padding: "14px 16px",
+              background: "rgba(0,0,0,0.18)",
+              border: "1px dashed var(--border)",
+              borderRadius: 10,
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--text-3)",
+              display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8
+            }}>
+              <span>
+                GET /api/forecast?h=30 · GET /api/kpis · POST /api/optimize · GET /api/alerts
+              </span>
+              <span>
+                fastapi 0.110 · uvicorn · python 3.11
+              </span>
+            </div>
+          </main>
+
+          {alertsOpen && (
+            <AlertsPanel
+              alerts={alerts}
+              setAlerts={setAlerts}
+              onClose={() => setAlertsOpen(false)}
+              onActionRun={handleAction}
+            />
+          )}
+
+          {/* Glassmorphism Toasts Container */}
+          <div style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            pointerEvents: "none"
+          }}>
+            {toasts.map(t => {
+              const accentColor =
+                t.type === "critical" ? "var(--c-drift)" :
+                t.type === "warning" ? "#ff5555" :
+                "var(--c-ai)";
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    pointerEvents: "auto",
+                    width: 320,
+                    padding: "14px 18px",
+                    borderRadius: 12,
+                    background: "rgba(19, 25, 35, 0.85)",
+                    border: `1px solid ${accentColor}44`,
+                    borderLeft: `4px solid ${accentColor}`,
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
+                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                    animation: "toast-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                    position: "relative"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{
+                      fontFamily: "var(--font-display)",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6
+                    }}>
+                      <Icon name="alertTri" size={14} stroke={accentColor} strokeWidth={2.5} />
+                      {t.title}
+                    </span>
+                    <button
+                      onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--text-3)",
+                        cursor: "pointer",
+                        padding: 0,
+                        lineHeight: 1
+                      }}
+                    >
+                      <Icon name="x" size={12} />
+                    </button>
+                  </div>
+                  <span style={{ fontSize: 12, color: "var(--text-2)", lineHeight: 1.4 }}>
+                    {t.message}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
