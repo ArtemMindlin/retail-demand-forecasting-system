@@ -34,7 +34,7 @@ from retail_forecasting.data.quality import (
     raise_on_blocking_data_quality,
     validate_prepared_panel,
 )
-from retail_forecasting.drift.regime_analysis import label_stockout_regime
+from retail_forecasting.drift import label_all_regimes
 from retail_forecasting.features.engineering import build_inference_frame_with_fallback
 from retail_forecasting.forecasting.pipeline import (
     _build_scoring_predictions,
@@ -90,7 +90,7 @@ def _score_one_step(
     series_cost_profile: pd.DataFrame | None,
 ) -> pd.DataFrame:
     """Reproduce the run_scoring inference path on an in-memory panel slice."""
-    prepared = label_stockout_regime(panel)
+    prepared = label_all_regimes(panel)
     inference_frame, inference_metadata = build_inference_frame_with_fallback(
         prepared,
         settings.features,
@@ -172,7 +172,7 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
     series_cost_profile = None
     if settings.inventory.use_series_costs:
         series_cost_profile = build_series_cost_profile(
-            label_stockout_regime(train_panel), settings.inventory
+            label_all_regimes(train_panel), settings.inventory
         )
 
     retrain_events: list[dict[str, Any]] = []

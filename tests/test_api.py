@@ -56,7 +56,7 @@ def test_get_dashboard() -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "Retail Forecasting · Decision Dashboard" in response.text
+    assert "Forecast.ai · Retail Demand Forecasting System" in response.text
 
 
 def test_api_forecast_with_mock_df() -> None:

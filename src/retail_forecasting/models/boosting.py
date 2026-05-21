@@ -41,6 +41,7 @@ class AutoBoostingModel:
     max_depth: int
     overstock_cost: float = 1.0
     stockout_cost: float = 0.0  # 0.0 means standard regression
+    loss_function: str = "RMSE"
     model_name: str = "auto_boosting"
     backend_name: str = field(init=False, default="unknown")
     point_model_: BaseRegressor | None = field(init=False, default=None)
@@ -98,8 +99,9 @@ class AutoBoostingModel:
             import lightgbm as lgb
 
             self.backend_name = "lightgbm"
+            objective = "regression" if self.loss_function == "RMSE" else "regression_l1"
             model: BaseRegressor = lgb.LGBMRegressor(
-                objective="regression",
+                objective=objective,
                 random_state=self.random_seed,
                 n_estimators=self.n_estimators,
                 learning_rate=self.learning_rate,
@@ -116,8 +118,9 @@ class AutoBoostingModel:
             from xgboost import XGBRegressor
 
             self.backend_name = "xgboost"
+            objective = "reg:squarederror" if self.loss_function == "RMSE" else "reg:absoluteerror"
             model = XGBRegressor(
-                objective="reg:squarederror",
+                objective=objective,
                 random_state=self.random_seed,
                 n_estimators=self.n_estimators,
                 learning_rate=self.learning_rate,
@@ -128,9 +131,11 @@ class AutoBoostingModel:
             return cast(BaseRegressor, model)
 
         self.backend_name = "sklearn_hist_gradient_boosting"
+        loss = "squared_error" if self.loss_function == "RMSE" else "absolute_error"
         return cast(
             BaseRegressor,
             HistGradientBoostingRegressor(
+                loss=loss,
                 learning_rate=self.learning_rate,
                 max_depth=self.max_depth,
                 max_iter=self.n_estimators,

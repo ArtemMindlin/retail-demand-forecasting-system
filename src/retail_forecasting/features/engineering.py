@@ -1,60 +1,22 @@
 from __future__ import annotations
 
 import logging
-from typing import Literal
 
 import pandas as pd
 from pandas.core.groupby.generic import SeriesGroupBy
-from pydantic import BaseModel, ConfigDict, Field
 
 from retail_forecasting.config import FeatureConfig
+from retail_forecasting.contracts import FeatureMetadata, InferenceFallbackMetadata
 
 logger = logging.getLogger(__name__)
 
 DROP_WARNING_FRACTION = 0.2
 
 
-class FeatureFrameMetadata(BaseModel):
-    """Auditable metadata for feature frame construction."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    mode: Literal["features", "supervised", "inference"]
-    feature_columns: list[str] = Field(min_length=1)
-    target_column: str | None = None
-    horizon: int | None = Field(default=None, gt=0)
-    lags: list[int] = Field(min_length=1)
-    rolling_windows: list[int] = Field(min_length=1)
-    input_rows: int = Field(ge=0)
-    output_rows: int = Field(ge=0)
-    dropped_rows_missing_target: int = Field(default=0, ge=0)
-    dropped_rows_missing_features: int = Field(default=0, ge=0)
-    rows_not_latest_origin: int = Field(default=0, ge=0)
-
-
-class InferenceFallbackMetadata(BaseModel):
-    """Auditable metadata for inference-time cold-start fallback planning."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    feature_columns: list[str] = Field(min_length=1)
-    horizon: int = Field(gt=0)
-    lags: list[int] = Field(min_length=1)
-    rolling_windows: list[int] = Field(min_length=1)
-    input_rows: int = Field(ge=0)
-    output_rows: int = Field(ge=0)
-    model_rows: int = Field(ge=0)
-    cold_start_rows: int = Field(ge=0)
-    fallback_rows_series: int = Field(default=0, ge=0)
-    fallback_rows_product: int = Field(default=0, ge=0)
-    fallback_rows_third_category: int = Field(default=0, ge=0)
-    fallback_rows_global: int = Field(default=0, ge=0)
-
-
 def build_feature_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
-) -> tuple[pd.DataFrame, FeatureFrameMetadata]:
+) -> tuple[pd.DataFrame, list[str]]:
     """Build reusable feature columns from a prepared daily panel.
 
     Args:
@@ -94,14 +56,12 @@ def build_feature_frame(
         ]
     )
 
-    # Demand lags: these features store past observed demand values for each series.
     demand_series = grouped["observed_demand"]
     for lag in sorted(set(feature_config.lags)):
         column = f"demand_lag_{lag}"
         frame[column] = demand_series.shift(lag)
         feature_columns.append(column)
 
-    # Rolling window features: these summarize recent observed demand over a window of past days for each series.
     for window in sorted(set(feature_config.rolling_windows)):
         mean_column = f"demand_roll_mean_{window}"
         sum_column = f"demand_roll_sum_{window}"
@@ -161,21 +121,14 @@ def build_feature_frame(
         ]
         feature_columns.extend(static_columns)
 
-    return frame, FeatureFrameMetadata(
-        mode="features",
-        feature_columns=feature_columns,
-        lags=sorted(set(feature_config.lags)),
-        rolling_windows=sorted(set(feature_config.rolling_windows)),
-        input_rows=len(panel),
-        output_rows=len(frame),
-    )
+    return frame, feature_columns
 
 
 def build_supervised_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
     horizon: int,
-) -> tuple[pd.DataFrame, FeatureFrameMetadata]:
+) -> tuple[pd.DataFrame, FeatureMetadata]:
     """Build the supervised modeling frame and feature list from a panel.
 
     Args:
@@ -187,11 +140,10 @@ def build_supervised_frame(
         A tuple containing the supervised frame and metadata with the ordered
         feature column names used for modeling.
     """
-    frame, feature_metadata = build_feature_frame(
+    frame, feature_columns = build_feature_frame(
         panel=panel,
         feature_config=feature_config,
     )
-    feature_columns = feature_metadata.feature_columns
     grouped = frame.groupby("series_id", sort=False)
 
     frame["target_lead_time_demand"] = _build_target(grouped["observed_demand"], horizon)
@@ -215,16 +167,17 @@ def build_supervised_frame(
         dropped_rows=dropped_rows_missing_features,
     )
     frame = frame.reset_index(drop=True)
-    _raise_if_empty(frame, mode="supervised")
+    if frame.empty:
+        raise ValueError("Feature engineering produced no usable rows for supervised mode.")
 
-    return frame, FeatureFrameMetadata(
+    return frame, FeatureMetadata(
         mode="supervised",
         feature_columns=feature_columns,
         target_column="target_lead_time_demand",
         horizon=horizon,
-        lags=feature_metadata.lags,
-        rolling_windows=feature_metadata.rolling_windows,
-        input_rows=feature_metadata.input_rows,
+        lags=sorted(set(feature_config.lags)),
+        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        input_rows=len(panel),
         output_rows=len(frame),
         dropped_rows_missing_target=dropped_rows_missing_target,
         dropped_rows_missing_features=dropped_rows_missing_features,
@@ -234,7 +187,7 @@ def build_supervised_frame(
 def build_inference_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
-) -> tuple[pd.DataFrame, FeatureFrameMetadata]:
+) -> tuple[pd.DataFrame, FeatureMetadata]:
     """Build one prediction-ready row per series from the latest valid origin.
 
     Args:
@@ -246,11 +199,10 @@ def build_inference_frame(
         A tuple containing the latest row per series with complete features and
         metadata with the ordered feature column names used for modeling.
     """
-    frame, feature_metadata = build_feature_frame(
+    frame, feature_columns = build_feature_frame(
         panel=panel,
         feature_config=feature_config,
     )
-    feature_columns = feature_metadata.feature_columns
     before_feature_drop = len(frame)
     frame = frame.dropna(subset=feature_columns)
     dropped_rows_missing_features = before_feature_drop - len(frame)
@@ -263,14 +215,15 @@ def build_inference_frame(
     frame = frame.groupby("series_id", sort=False, as_index=False).tail(1)
     rows_not_latest_origin = feature_complete_rows - len(frame)
     frame = frame.reset_index(drop=True)
-    _raise_if_empty(frame, mode="inference")
+    if frame.empty:
+        raise ValueError("Feature engineering produced no usable rows for inference mode.")
 
-    return frame, FeatureFrameMetadata(
+    return frame, FeatureMetadata(
         mode="inference",
         feature_columns=feature_columns,
-        lags=feature_metadata.lags,
-        rolling_windows=feature_metadata.rolling_windows,
-        input_rows=feature_metadata.input_rows,
+        lags=sorted(set(feature_config.lags)),
+        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        input_rows=len(panel),
         output_rows=len(frame),
         dropped_rows_missing_features=dropped_rows_missing_features,
         rows_not_latest_origin=rows_not_latest_origin,
@@ -290,11 +243,10 @@ def build_inference_frame_with_fallback(
     the requested lead-time horizon.
     """
     _validate_fallback_columns(panel)
-    frame, feature_metadata = build_feature_frame(
+    frame, feature_columns = build_feature_frame(
         panel=panel,
         feature_config=feature_config,
     )
-    feature_columns = feature_metadata.feature_columns
 
     latest_rows = frame.groupby("series_id", sort=False, as_index=False).tail(1).copy()
     feature_complete_mask = latest_rows[feature_columns].notna().all(axis=1)
@@ -319,7 +271,8 @@ def build_inference_frame_with_fallback(
         ].to_numpy()
 
     latest_rows = latest_rows.reset_index(drop=True)
-    _raise_if_empty(latest_rows, mode="inference")
+    if latest_rows.empty:
+        raise ValueError("Feature engineering produced no usable rows for inference mode.")
 
     fallback_counts = latest_rows.loc[
         latest_rows["prediction_source"] == "cold_start_fallback", "fallback_level"
@@ -328,9 +281,9 @@ def build_inference_frame_with_fallback(
     return latest_rows, InferenceFallbackMetadata(
         feature_columns=feature_columns,
         horizon=horizon,
-        lags=feature_metadata.lags,
-        rolling_windows=feature_metadata.rolling_windows,
-        input_rows=feature_metadata.input_rows,
+        lags=sorted(set(feature_config.lags)),
+        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        input_rows=len(panel),
         output_rows=len(latest_rows),
         model_rows=int((latest_rows["prediction_source"] == "model").sum()),
         cold_start_rows=int((latest_rows["prediction_source"] == "cold_start_fallback").sum()),
@@ -477,8 +430,3 @@ def _warn_on_large_drop(step: str, input_rows: int, dropped_rows: int) -> None:
             dropped_rows,
             input_rows,
         )
-
-
-def _raise_if_empty(frame: pd.DataFrame, mode: Literal["supervised", "inference"]) -> None:
-    if frame.empty:
-        raise ValueError(f"Feature engineering produced no usable rows for {mode} mode.")

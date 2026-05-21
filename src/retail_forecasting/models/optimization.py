@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 import numpy as np
 import optuna
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from retail_forecasting.config import Settings
 from retail_forecasting.contracts.contracts_tuning import (
@@ -64,6 +67,8 @@ class HyperparameterTuner:
                 learning_rate=trial.suggest_float("learning_rate", 0.005, 0.2, log=True),
                 max_depth=trial.suggest_int("max_depth", 3, 12),
             )
+            # Introduce loss_function as a categorical hyperparameter
+            loss_function = trial.suggest_categorical("loss_function", ["RMSE", "MAE"])
 
             model = AutoBoostingModel(
                 quantiles=self.settings.models.quantiles,
@@ -71,6 +76,7 @@ class HyperparameterTuner:
                 n_estimators=params.n_estimators,
                 learning_rate=params.learning_rate,
                 max_depth=params.max_depth,
+                loss_function=loss_function,  # Note: AutoBoostingModel must support this argument
             )
 
             model.fit(t_train.loc[:, feature_columns], t_train[target_col])
@@ -110,6 +116,20 @@ class HyperparameterTuner:
 
         # Multi-objective study: Minimize both MAE and Winkler
         study = optuna.create_study(directions=["minimize", "minimize"])
+
+        # Apply stratified sampling for large datasets to keep tuning feasible
+        MAX_TUNING_ROWS = 500_000
+        if len(t_train) > MAX_TUNING_ROWS:
+            logger.info(
+                "Dataset too large for tuning (%s rows). Performing stratified sampling.",
+                len(t_train),
+            )
+            series_count = t_train["series_id"].nunique()
+            rows_per_series = MAX_TUNING_ROWS // series_count
+            t_train = t_train.groupby("series_id", group_keys=False).apply(
+                lambda x: x.tail(rows_per_series)
+            )
+
         study.optimize(objective, n_trials=self.n_trials, n_jobs=-1)
 
         # Select the best trial from the Pareto front

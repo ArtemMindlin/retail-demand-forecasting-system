@@ -7,6 +7,10 @@ from retail_forecasting.contracts.contracts_drift import (
     DriftEvent,
     DriftResult,
 )
+from retail_forecasting.contracts.contracts_engineering import (
+    FeatureMetadata,
+    InferenceFallbackMetadata,
+)
 from retail_forecasting.contracts.contracts_quality import (
     DataQualityError,
     DataQualityIssue,
@@ -29,6 +33,8 @@ __all__ = [
     "DriftDetectorMetadata",
     "DriftEvent",
     "DriftResult",
+    "FeatureMetadata",
+    "InferenceFallbackMetadata",
     "TuningMetadata",
     "TuningResult",
 ]

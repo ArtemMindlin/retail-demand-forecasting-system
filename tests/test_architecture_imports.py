@@ -15,7 +15,7 @@ ALLOWED_LAYER_IMPORTS = {
     "drift": {"contracts"},
     "eda": {"config", "contracts", "data", "eda", "utils"},
     "evaluation": {"config", "contracts", "utils", "visualization"},
-    "features": {"config"},
+    "features": {"config", "contracts"},
     "forecasting": {
         "config",
         "contracts",

@@ -38,11 +38,39 @@ El sistema distingue explícitamente entre operaciones de investigación y opera
     \item \textbf{\texttt{simulate\_ops}}: Modo de investigación MLOps. Ejecuta la simulación operacional en \textit{streaming} descrita en la Sección~\ref{sec:simulate_ops}, comparando múltiples cadencias de reentrenamiento sobre el split de evaluación.
 \end{enumerate}
 
-\subsection{Política Champion/Challenger y Promotion Logic}
+\subsection{Ciclo de Vida de los Hiperparámetros: Optimización vs. Reentrenamiento}
+\label{sec:mlops_workflow}
 
-El sistema implementa el patrón estándar de MLOps para la gestión del ciclo de vida de modelos. El \textbf{champion} es el modelo vigente en producción, registrado en \texttt{champion\_registry.json}. Un \textbf{challenger} es un candidato nuevo entrenado con datos más recientes o con una configuración diferente.
+Una de las decisiones críticas de diseño ha sido la separación entre la optimización estructural de los hiperparámetros y el reentrenamiento operacional diario. Siguiendo las mejores prácticas de MLOps para entornos de inventario, el sistema opera bajo un esquema de dos niveles, visualizado en la Figura~\ref{fig:mlops_flow}:
 
-La \textbf{promotion logic} define los criterios bajo los cuales el challenger puede reemplazar al champion. El challenger solo es promovido si supera al champion en coste total de inventario sobre el \textit{holdout} y mantiene el nivel de servicio por encima del umbral mínimo configurado. Esta política garantiza que el modelo en producción nunca se degrada por un reentrenamiento deficiente: el champion permanece activo hasta que un challenger lo derrota de forma inequívoca según los criterios de negocio, no únicamente según métricas estadísticas.
+\begin{figure}[h]
+    \centering
+    \begin{tikzpicture}[node distance=1.8cm, every node/.style={font=\sffamily\small, align=center}]
+        % Nodos
+        \node[draw, rectangle, rounded corners, fill=blue!10] (data) {Datos Recientes};
+        \node[draw, rectangle, rounded corners, fill=green!10, below of=data] (retrain) {\textbf{run\_retrain} \\ (Diario)};
+        \node[draw, rectangle, rounded corners, fill=red!10, left of=retrain, xshift=-2.5cm] (optuna) {\textbf{run\_experiment} \\ (Mensual/Optuna)};
+        \node[draw, rectangle, rounded corners, fill=yellow!10, below of=retrain] (deploy) {Configuración\\Estable (YAML)};
+
+        % Flujo
+        \draw[->, thick] (data) -- (retrain);
+        \draw[->, thick] (optuna) -- (deploy);
+        \draw[->, thick, dashed] (deploy) -- (retrain) node[midway, right] {Parámetros\\Fijos};
+
+        % Notas
+        \node[above of=optuna, yshift=-0.5cm] {\textbf{Optimización}\\\textbf{Estructural}};
+        \node[above of=retrain, yshift=-0.5cm] {\textbf{Adaptación}\\\textbf{Operativa}};
+    \end{tikzpicture}
+    \caption{Ciclo de vida MLOps: Optimización mensual vs. Reentrenamiento operativo.}
+    \label{fig:mlops_flow}
+\end{figure}
+
+\begin{enumerate}
+    \item \textbf{Fase de Optimización Mensual (Optuna)}: Ejecutado mediante el modo \texttt{experiment}, este ciclo realiza una búsqueda exhaustiva en el espacio de hiperparámetros utilizando \textit{Optuna}. Dado el volumen de datos (4.5M de filas), el sistema implementa un \textbf{muestreo estratificado por serie temporal}, limitando el entrenamiento del tuning a un máximo de 500k registros representativos. Esto garantiza que la convergencia de Optuna sea ágil sin perder la significancia estadística. Los resultados son validados mediante un análisis humano de estabilidad (comparando MAE y Winkler Score), y si se identifican mejoras significativas, se actualiza el archivo \texttt{configs/default.yaml}.
+    \item \textbf{Fase de Reentrenamiento Operacional (Daily)}: Ejecutado mediante el modo \texttt{retrain}, este proceso es determinista y utiliza la configuración fija definida en \texttt{default.yaml}. Su función es la integración de los datos de ventas más recientes, manteniendo la lógica del modelo estable.
+\end{enumerate}
+
+Esta separación garantiza la \textbf{continuidad y explicabilidad del negocio}: un sistema de inventario cuya arquitectura interna cambia drásticamente cada día es inauditable. Al fijar los hiperparámetros y validarlos mensualmente, se logra un equilibrio entre adaptabilidad al mercado y estabilidad necesaria para las operaciones logísticas.
 
 \section{Calidad de Software e Infraestructura CI/CD}
 Para garantizar que la deuda técnica no limite el escalado del sistema, se han aplicado prácticas fundamentales de \textit{DevOps}:

@@ -35,9 +35,12 @@ class CatBoostingModel:
         self.point_model_ = CatBoostRegressor(
             iterations=self.n_estimators,
             learning_rate=self.learning_rate,
-            depth=min(self.max_depth, 16),  # CatBoost max depth is usually 16
+            depth=min(self.max_depth, 16),
             random_seed=self.random_seed,
             loss_function="RMSE",
+            task_type="CPU",
+            l2_leaf_reg=3.0,
+            nan_mode="Min",
             verbose=False,
             allow_writing_files=False,
             thread_count=-1,
@@ -53,6 +56,9 @@ class CatBoostingModel:
                 depth=min(self.max_depth, 16),
                 random_seed=self.random_seed,
                 loss_function=f"Quantile:alpha={q}",
+                task_type="CPU",
+                l2_leaf_reg=3.0,
+                nan_mode="Min",
                 verbose=False,
                 allow_writing_files=False,
                 thread_count=-1,

@@ -14,8 +14,8 @@ from retail_forecasting.data.quality import (
     raise_on_blocking_data_quality,
     validate_prepared_panel,
 )
+from retail_forecasting.drift import label_all_regimes
 from retail_forecasting.drift.detectors import PageHinkleyDetector
-from retail_forecasting.drift.regime_analysis import label_stockout_regime
 from retail_forecasting.evaluation.metrics import summarize_costs, summarize_predictions
 from retail_forecasting.evaluation.reporting import (
     BacktestMetadata,
@@ -168,7 +168,7 @@ def run_experiment_from_frame(
     quality_report = validate_prepared_panel(panel, settings)
     raise_on_blocking_data_quality(quality_report)
 
-    prepared_panel = label_stockout_regime(panel)
+    prepared_panel = label_all_regimes(panel)
     series_cost_profile = None
     if settings.inventory.use_series_costs:
         series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)
@@ -185,7 +185,7 @@ def run_experiment_from_frame(
     holdout_supervised_frame: pd.DataFrame | None = None
     if holdout_panel is not None:
         combined_panel = pd.concat([panel, holdout_panel], ignore_index=True)
-        combined_prepared = label_stockout_regime(combined_panel)
+        combined_prepared = label_all_regimes(combined_panel)
         full_supervised, _ = build_supervised_frame(
             panel=combined_prepared,
             feature_config=settings.features,
@@ -629,6 +629,9 @@ def _build_baseline_predictions(
         "target_lead_time_demand",
         "stockout_hours",
         "stockout_regime",
+        "velocity_regime",
+        "promo_regime",
+        "seasonal_regime",
     ]
     if "latent_demand_est" in validation_frame.columns:
         cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
@@ -670,6 +673,9 @@ def _build_model_predictions(
         "target_lead_time_demand",
         "stockout_hours",
         "stockout_regime",
+        "velocity_regime",
+        "promo_regime",
+        "seasonal_regime",
     ]
     if "latent_demand_est" in validation_frame.columns:
         cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
@@ -745,13 +751,9 @@ def train_and_save_champion(
     panel: pd.DataFrame,
     models_dir: Path | None = None,
 ) -> Path:
-    """Fit the configured champion model on the full panel and persist it to disk.
+    """Fit the configured champion model on the full panel and persist it to disk."""
 
-    No fold-based evaluation is performed; the last ``calibration_days`` of the
-    panel are reserved for conformal calibration. The wrapped ConformalForecaster
-    is saved to ``models_dir/<backend_name>.pkl``.
-    """
-    prepared_panel = label_stockout_regime(panel)
+    prepared_panel = label_all_regimes(panel)
     supervised_frame, feature_metadata = build_supervised_frame(
         panel=prepared_panel,
         feature_config=settings.features,
@@ -844,7 +846,7 @@ def run_scoring(
     model = ConformalForecaster.load(model_path)
     print(f"✅ Loaded champion model: {model.backend_name} from {model_path}")
 
-    prepared_panel = label_stockout_regime(panel)
+    prepared_panel = label_all_regimes(panel)
     series_cost_profile = None
     if settings.inventory.use_series_costs:
         series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)

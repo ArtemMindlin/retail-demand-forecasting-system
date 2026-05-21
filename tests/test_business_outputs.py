@@ -31,6 +31,9 @@ def test_build_reorder_recommendations_flags_cold_start_and_exceptions() -> None
                 "fold_id": [0, 0],
                 "stockout_hours": [3.0, 0.0],
                 "stockout_regime": ["high", "low"],
+                "velocity_regime": ["fast_moving", "slow_moving"],
+                "promo_regime": ["baseline_price", "on_promotion"],
+                "seasonal_regime": ["standard_season", "standard_season"],
             }
         ),
         metrics_summary=pd.DataFrame(),

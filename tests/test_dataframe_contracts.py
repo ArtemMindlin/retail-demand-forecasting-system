@@ -45,6 +45,9 @@ def _assert_prepared_panel_contract(frame) -> None:
         "observed_demand",
         "stockout_hours",
         "stockout_regime",
+        "velocity_regime",
+        "promo_regime",
+        "seasonal_regime",
         "store_id",
         "product_id",
     }
@@ -190,3 +193,40 @@ def _assert_quantile_columns_are_monotonic(predictions) -> None:
 
 def _quantile_level(column: str) -> float:
     return float(column.replace("q_", "").replace("_", "."))
+
+
+def test_stockout_regime_thresholds() -> None:
+    import pandas as pd
+
+    from retail_forecasting.drift import label_all_regimes, label_stockout_regime
+
+    # 1. Verify handling of zero-stockout case
+    df_zero = pd.DataFrame({"stockout_hours": [0.0, 0.0, 0.0]})
+    # With a custom threshold of 1.0 (or default 1.0)
+    res_zero = label_stockout_regime(df_zero, threshold=1.0)
+    assert (res_zero["stockout_regime"] == "low_stockout").all()
+
+    # 2. Verify that strict inequality > is used rather than >=
+    # If stockout_hours is exactly equal to the threshold, it should be "low_stockout"
+    df_exact = pd.DataFrame({"stockout_hours": [1.0, 2.0, 0.5]})
+    res_exact = label_stockout_regime(df_exact, threshold=1.0)
+    assert res_exact.loc[0, "stockout_regime"] == "low_stockout"  # 1.0 is equal to threshold
+    assert res_exact.loc[1, "stockout_regime"] == "high_stockout"  # 2.0 is > threshold
+    assert res_exact.loc[2, "stockout_regime"] == "low_stockout"  # 0.5 is < threshold
+
+    # 3. Verify label_all_regimes forwards the custom stockout threshold correctly
+    df_all = pd.DataFrame(
+        {
+            "series_id": ["1", "1", "1"],
+            "observed_demand": [10.0, 15.0, 20.0],
+            "stockout_hours": [2.0, 0.0, 1.0],
+            "discount": [0.0, 0.1, 0.0],
+            "holiday_flag": [0.0, 0.0, 1.0],
+        }
+    )
+    res_all = label_all_regimes(df_all, velocity_threshold=5.0, stockout_threshold=1.5)
+    # Series average demand is 15.0 > 5.0 -> fast_moving
+    # For stockout: 2.0 > 1.5 -> high_stockout. 0.0 and 1.0 are <= 1.5 -> low_stockout.
+    assert res_all.loc[0, "stockout_regime"] == "high_stockout"
+    assert res_all.loc[1, "stockout_regime"] == "low_stockout"
+    assert res_all.loc[2, "stockout_regime"] == "low_stockout"

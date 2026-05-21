@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 
 from retail_forecasting.config import FeatureConfig
+from retail_forecasting.contracts import FeatureMetadata
 from retail_forecasting.features.engineering import (
-    FeatureFrameMetadata,
     build_feature_frame,
     build_inference_frame,
     build_inference_frame_with_fallback,
@@ -63,7 +63,7 @@ def test_build_supervised_frame_returns_pydantic_metadata() -> None:
         horizon=horizon,
     )
 
-    assert isinstance(metadata, FeatureFrameMetadata)
+    assert isinstance(metadata, FeatureMetadata)
     assert metadata.mode == "supervised"
     assert metadata.target_column == "target_lead_time_demand"
     assert metadata.horizon == horizon
@@ -86,7 +86,7 @@ def test_build_inference_frame_returns_pydantic_metadata() -> None:
         feature_config,
     )
 
-    assert isinstance(metadata, FeatureFrameMetadata)
+    assert isinstance(metadata, FeatureMetadata)
     assert metadata.mode == "inference"
     assert metadata.target_column is None
     assert metadata.horizon is None

@@ -127,8 +127,8 @@ main()
   - `feature_config`.
 - Devuelve:
   - `pd.DataFrame` con las columnas originales y las features derivadas;
-  - `FeatureFrameMetadata` con las columnas de features y metadatos auditables.
-- Se usa en: `build_supervised_frame()` y `build_inference_frame()`.
+  - `list[str]` con los nombres de las columnas de features creadas.
+- Se usa en: `build_supervised_frame()`, `build_inference_frame()` y `build_inference_frame_with_fallback()`.
 
 ### `build_supervised_frame`
 - Archivo: `src/retail_forecasting/features/engineering.py`
@@ -139,7 +139,7 @@ main()
   - `horizon`.
 - Devuelve:
   - `pd.DataFrame` con el frame supervisado;
-  - `FeatureFrameMetadata` con las columnas de features y metadatos auditables.
+  - `FeatureMetadata` con las columnas de features y metadatos auditables.
 - Hace internamente:
   - variables de calendario;
   - lags de demanda;
@@ -159,7 +159,7 @@ main()
   - `feature_config`.
 - Devuelve:
   - `pd.DataFrame` con la ultima fila valida por `series_id`;
-  - `FeatureFrameMetadata` con las columnas de features y metadatos auditables.
+  - `FeatureMetadata` con las columnas de features y metadatos auditables.
 - Se usa en: futuros flujos de inferencia/despliegue.
 
 ### `build_inference_frame_with_fallback`
@@ -182,8 +182,8 @@ main()
   - global.
 - Se usa en: futuros flujos de inferencia/despliegue con politica explicita de `cold start`.
 
-### `FeatureFrameMetadata`
-- Archivo: `src/retail_forecasting/features/engineering.py`
+### `FeatureMetadata`
+- Archivo: `src/retail_forecasting/contracts/contracts_engineering.py`
 - Que hace: contrato Pydantic congelado con metadatos auditables de feature engineering.
 - Campos principales:
   - `mode`;
@@ -337,13 +337,49 @@ main()
 ## Drift and Inventory
 
 ### `label_stockout_regime`
-- Archivo: `src/retail_forecasting/drift/regime_analysis.py`
+- Archivo: `src/retail_forecasting/drift/regime.py`
 - Que hace: etiqueta cada fila como `high_stockout` o `low_stockout` segun el stockout observado.
 - Recibe:
   - `frame`;
   - `threshold`.
 - Devuelve: `pd.DataFrame`.
-- Se usa en: `run_experiment_from_frame()`.
+- Se usa en: `label_all_regimes()`.
+
+### `label_demand_velocity_regime`
+- Archivo: `src/retail_forecasting/drift/regime.py`
+- Que hace: etiqueta series como `fast_moving` o `slow_moving` según su promedio de demanda.
+- Recibe:
+  - `frame`;
+  - `threshold`.
+- Devuelve: `pd.DataFrame`.
+- Se usa en: `label_all_regimes()`.
+
+### `label_promotion_regime`
+- Archivo: `src/retail_forecasting/drift/regime.py`
+- Que hace: etiqueta filas como `on_promotion` o `baseline_price` según si hay descuento activo.
+- Recibe:
+  - `frame`;
+  - `discount_col`.
+- Devuelve: `pd.DataFrame`.
+- Se usa en: `label_all_regimes()`.
+
+### `label_seasonal_regime`
+- Archivo: `src/retail_forecasting/drift/regime.py`
+- Que hace: etiqueta filas como `peak_holiday` o `standard_season` según las festividades.
+- Recibe:
+  - `frame`;
+  - `holiday_col`.
+- Devuelve: `pd.DataFrame`.
+- Se usa en: `label_all_regimes()`.
+
+### `label_all_regimes`
+- Archivo: `src/retail_forecasting/drift/regime.py`
+- Que hace: aplica todos los etiquetadores de régimen de forma secuencial.
+- Recibe:
+  - `frame`;
+  - `velocity_threshold`.
+- Devuelve: `pd.DataFrame`.
+- Se usa en: `run_experiment_from_frame()`, `train_and_save_champion()`, y `run_scoring()`.
 
 ### `critical_fractile`
 - Archivo: `src/retail_forecasting/inventory/newsvendor.py`
