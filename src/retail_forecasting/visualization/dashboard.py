@@ -14,8 +14,14 @@ def get_report_dirs() -> list[Path]:
     reports_path = Path("reports")
     if not reports_path.exists():
         return []
-    # Return directories sorted by modification time (newest first)
-    dirs = [d for d in reports_path.iterdir() if d.is_dir()]
+    # Return only experiment directories that contain the required CSV files
+    dirs = [
+        d for d in reports_path.iterdir()
+        if d.is_dir()
+        and (d / "predictions.csv").exists()
+        and (d / "metrics_summary.csv").exists()
+        and (d / "cost_summary.csv").exists()
+    ]
     return sorted(dirs, key=lambda x: x.stat().st_mtime, reverse=True)
 
 
