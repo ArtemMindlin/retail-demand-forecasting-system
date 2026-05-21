@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv (fast Python package installer)
 RUN pip install uv
 
-# Copy project configuration files
-COPY pyproject.toml .
+# Copy project configuration files and package dynamic metadata sources
+COPY pyproject.toml README.md LICENSE ./
 COPY src/retail_forecasting/__init__.py src/retail_forecasting/__init__.py
 
 # Install dependencies using uv (we install the ML group to get lightgbm/xgboost if needed)
