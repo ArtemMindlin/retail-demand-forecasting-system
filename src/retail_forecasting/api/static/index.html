@@ -800,6 +800,68 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
+  /* Console Terminal overlay styles */
+  .terminal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 5, 8, 0.78);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: toast-in 0.2s ease-out;
+  }
+  .terminal-window {
+    width: 780px;
+    max-width: 90vw;
+    height: 480px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    background: rgba(11, 15, 21, 0.94);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(16, 185, 129, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    font-family: var(--font-mono);
+  }
+  .terminal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: rgba(16, 185, 129, 0.06);
+    border-bottom: 1px solid rgba(16, 185, 129, 0.15);
+  }
+  .terminal-dot-group {
+    display: flex;
+    gap: 6px;
+  }
+  .terminal-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .terminal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px;
+    color: #34d399; /* Emerald 400 */
+    font-size: 12.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    background: #030712;
+  }
+  .terminal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid var(--border);
+  }
 </style>
 
 </head>
@@ -1063,7 +1125,7 @@
       );
     }
 
-    function Sidebar({ params, setParams, onRun, running, lastRunAt }) {
+    function Sidebar({ params, setParams, onRun, running, lastRunAt, onRunPipeline }) {
       const update = (k) => (v) => setParams((p) => ({ ...p, [k]: v }));
 
       return (
@@ -1206,7 +1268,7 @@
           </div>
 
           {/* Action */}
-          <div style={{ padding: "0 22px 18px" }}>
+          <div style={{ padding: "0 22px 10px" }}>
             <button className="btn-run" onClick={onRun} disabled={running}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
                 {running
@@ -1215,7 +1277,7 @@
               </span>
             </button>
             <div style={{
-              marginTop: 9,
+              marginTop: 6,
               fontFamily: "var(--font-mono)",
               fontSize: 10.5,
               color: "var(--text-mute)",
@@ -1223,6 +1285,33 @@
               letterSpacing: "0.04em"
             }}>
               POST /api/optimize
+            </div>
+          </div>
+
+          {/* Action 2: Ejecutar Experimento Completo */}
+          <div style={{ padding: "0 22px 18px" }}>
+            <button
+              className="btn-run"
+              onClick={onRunPipeline}
+              style={{
+                borderColor: "rgba(16, 185, 129, 0.45)",
+                background: "radial-gradient(120% 200% at 0% 0%, rgba(16, 185, 129, 0.2), transparent 60%), linear-gradient(180deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.05))"
+              }}
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
+                <Icon name="terminal" size={15} stroke="var(--c-conf)" />
+                Ejecutar Experimento ⚡
+              </span>
+            </button>
+            <div style={{
+              marginTop: 6,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10.5,
+              color: "var(--text-mute)",
+              textAlign: "center",
+              letterSpacing: "0.04em"
+            }}>
+              POST /api/run
             </div>
           </div>
 
@@ -3581,6 +3670,12 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const [pipelineRunning, setPipelineRunning] = useState(false);
       const [pipelineError, setPipelineError] = useState(null);
 
+      const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+      const [consoleLogs, setConsoleLogs] = useState("");
+      const [consoleStatus, setConsoleStatus] = useState("idle");
+      const [consoleError, setConsoleError] = useState(null);
+      const consoleBodyRef = useRef(null);
+
       const showToast = useCallback((title, message, type = "warning") => {
         const id = Date.now() + Math.random().toString(36).substr(2, 9);
         setToasts(prev => [...prev.filter(t => t.title !== title), { id, title, message, type }]);
@@ -3664,27 +3759,99 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [params]);
 
-      const handleRunPipeline = async () => {
-        setPipelineRunning(true);
-        setPipelineError(null);
+      // Auto scroll console logs to bottom when updated
+      useEffect(() => {
+        if (consoleBodyRef.current) {
+          consoleBodyRef.current.scrollTop = consoleBodyRef.current.scrollHeight;
+        }
+      }, [consoleLogs]);
+
+      // Polling logic for status
+      useEffect(() => {
+        if (!isConsoleOpen || consoleStatus !== "running") return;
+
+        let interval = setInterval(async () => {
+          try {
+            const res = await fetch("/api/run/status");
+            if (!res.ok) throw new Error("Failed to fetch status");
+            const result = await res.json();
+
+            setConsoleLogs(result.logs || "");
+            setConsoleStatus(result.status);
+            if (result.status === "success") {
+              clearInterval(interval);
+              showToast(
+                "¡Éxito!",
+                "El pipeline se ha ejecutado exitosamente. Recargando datos...",
+                "conformal"
+              );
+              await reload(800);
+            } else if (result.status === "failed") {
+              clearInterval(interval);
+              setConsoleError(result.error || "La ejecución del pipeline falló.");
+              showToast(
+                "Error en Pipeline",
+                "Hubo un fallo durante la ejecución del experimento.",
+                "critical"
+              );
+            }
+          } catch (err) {
+            console.error("Error polling pipeline status:", err);
+          }
+        }, 1000);
+
+        return () => clearInterval(interval);
+      }, [isConsoleOpen, consoleStatus, reload, showToast]);
+
+      // Fetch status on opening
+      useEffect(() => {
+        if (!isConsoleOpen) return;
+
+        const checkCurrentStatus = async () => {
+          try {
+            const res = await fetch("/api/run/status");
+            if (res.ok) {
+              const result = await res.json();
+              setConsoleLogs(result.logs || "");
+              setConsoleStatus(result.status);
+              setConsoleError(result.error);
+            }
+          } catch (err) {
+            console.error("Error fetching initial status:", err);
+          }
+        };
+
+        checkCurrentStatus();
+      }, [isConsoleOpen]);
+
+      const startPipelineRun = async () => {
+        setConsoleStatus("running");
+        setConsoleError(null);
+        setConsoleLogs("Iniciando pipeline de forecasting e inventario en background...\n");
         try {
-          const res = await fetch("/predict_orders", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ config_path: "configs/default.yaml" })
+          const res = await fetch("/api/run", {
+            method: "POST"
           });
           const result = await res.json();
-          if (res.ok && result.status === "success") {
-            // Pipeline ran successfully! Reload data
-            await reload(750);
+          if (res.ok && result.status === "running") {
+            setConsoleLogs(prev => prev + "Proceso de background lanzado con éxito. Leyendo logs en tiempo real...\n\n");
           } else {
-            setPipelineError(result.detail || "Error desconocido ejecutando el pipeline.");
+            setConsoleStatus("failed");
+            setConsoleError(result.detail || "No se pudo iniciar el pipeline.");
+            setConsoleLogs(prev => prev + `[ERROR] ${result.detail || "No se pudo iniciar el pipeline."}\n`);
           }
         } catch (err) {
           console.error(err);
-          setPipelineError("Error de red: No se pudo conectar con el servidor para ejecutar el pipeline.");
-        } finally {
-          setPipelineRunning(false);
+          setConsoleStatus("failed");
+          setConsoleError("Error de red: No se pudo conectar con la API.");
+          setConsoleLogs(prev => prev + `[ERROR] Error de red al iniciar: ${err.message}\n`);
+        }
+      };
+
+      const handleRunPipeline = () => {
+        setIsConsoleOpen(true);
+        if (consoleStatus !== "running") {
+          startPipelineRun();
         }
       };
 
@@ -3712,6 +3879,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             onRun={handleRun}
             running={loading}
             lastRunAt={lastRunAt}
+            onRunPipeline={handleRunPipeline}
           />
           <main className="canvas canvas-bg">
             <TopBar
@@ -3725,8 +3893,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             {data?.status === "no_predictions" ? (
               <EmptyState
                 onRunPipeline={handleRunPipeline}
-                running={pipelineRunning}
-                error={pipelineError}
+                running={consoleStatus === "running"}
+                error={consoleError}
               />
             ) : (
               <>
@@ -3911,6 +4079,101 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               );
             })}
           </div>
+
+          {/* Terminal Console Overlay */}
+          {isConsoleOpen && (
+            <div className="terminal-overlay">
+              <div className="terminal-window">
+                <div className="terminal-header">
+                  <div className="terminal-dot-group">
+                    <span className="terminal-dot" style={{ background: "#ef4444" }} />
+                    <span className="terminal-dot" style={{ background: "#eab308" }} />
+                    <span className="terminal-dot" style={{ background: "#22c55e" }} />
+                  </div>
+                  <div style={{
+                    fontSize: 13,
+                    color: "rgba(16, 185, 129, 0.8)",
+                    fontWeight: 600
+                  }}>
+                    Consola del Experimento · retail_forecasting_pipeline
+                  </div>
+                  <button
+                    onClick={() => setIsConsoleOpen(false)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "rgba(16, 185, 129, 0.6)",
+                      cursor: "pointer",
+                      padding: 4,
+                      display: "flex",
+                      alignItems: "center"
+                    }}
+                  >
+                    <Icon name="x" size={16} />
+                  </button>
+                </div>
+
+                <div className="terminal-body" ref={consoleBodyRef}>
+                  {consoleLogs || "Consola inactiva. Presiona 'Iniciar Ejecución' para comenzar..."}
+                  {consoleStatus === "running" && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginTop: 12,
+                      color: "var(--c-conf)"
+                    }}>
+                      <Icon name="refresh" size={14} style={{ animation: "spin 1.5s linear infinite" }} />
+                      <span>Procesando pipeline y estimando cobertura conformal...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="terminal-footer">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="live-dot" style={{
+                      background: consoleStatus === "running" ? "var(--c-conf)" : (consoleStatus === "failed" ? "var(--c-drift)" : "var(--text-mute)"),
+                      boxShadow: consoleStatus === "running" ? undefined : "none"
+                    }} />
+                    <span style={{ fontSize: 11.5, color: "var(--text-2)", fontFamily: "var(--font-mono)" }}>
+                      Estado: {consoleStatus.toUpperCase()}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {consoleStatus !== "running" && (
+                      <button
+                        className="btn-run"
+                        onClick={startPipelineRun}
+                        style={{
+                          padding: "8px 16px",
+                          fontSize: 12,
+                          borderColor: "rgba(16, 185, 129, 0.5)",
+                          background: "rgba(16, 185, 129, 0.1)"
+                        }}
+                      >
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <Icon name="play" size={12} />
+                          {consoleStatus === "idle" ? "Iniciar Ejecución" : "Volver a Ejecutar"}
+                        </span>
+                      </button>
+                    )}
+                    <button
+                      className="btn-run"
+                      onClick={() => setIsConsoleOpen(false)}
+                      style={{
+                        padding: "8px 16px",
+                        fontSize: 12,
+                        borderColor: "var(--border)",
+                        background: "rgba(255,255,255,0.02)"
+                      }}
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }

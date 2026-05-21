@@ -159,3 +159,53 @@ def test_load_latest_predictions_fallback() -> None:
         pytest.raises(FileNotFoundError),
     ):
         load_latest_predictions()
+
+
+def test_api_run_success() -> None:
+    from retail_forecasting.api.main import _RUN_LOCK, _RUN_STATE
+
+    _RUN_STATE["status"] = "idle"
+    _RUN_STATE["error"] = None
+    if _RUN_LOCK.locked():
+        _RUN_LOCK.release()
+
+    with mock.patch("retail_forecasting.api.main._execute_pipeline_in_background"):
+        response = client.post("/api/run")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "running"
+        assert "started" in data["message"]
+
+
+def test_api_run_conflict() -> None:
+    from retail_forecasting.api.main import _RUN_LOCK
+
+    _RUN_LOCK.acquire(blocking=False)
+    try:
+        response = client.post("/api/run")
+        assert response.status_code == 409
+        data = response.json()
+        assert "already in progress" in data["detail"]
+    finally:
+        _RUN_LOCK.release()
+
+
+def test_api_run_status() -> None:
+    from retail_forecasting.api.main import _RUN_STATE
+
+    _RUN_STATE["status"] = "success"
+    _RUN_STATE["error"] = None
+    log_file_mock = mock.MagicMock()
+    log_file_mock.exists.return_value = True
+    open_mock = mock.mock_open(read_data="--- Pipeline Execution logs mock ---")
+
+    with (
+        mock.patch("retail_forecasting.api.main.Path", return_value=log_file_mock),
+        mock.patch("builtins.open", open_mock),
+    ):
+        response = client.get("/api/run/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["error"] is None
+        assert "Pipeline Execution logs mock" in data["logs"]

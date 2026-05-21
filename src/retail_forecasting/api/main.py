@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+import subprocess
+import sys
+import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -8,7 +11,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -28,6 +31,72 @@ _PREDICTIONS_CACHE: dict[str, Any] = {}
 
 # Server start time for uptime tracking
 _START_TIME: float = time.monotonic()
+
+# Thread-safe lock and state for background pipeline runs
+_RUN_LOCK = threading.Lock()
+_RUN_STATE: dict[str, Any] = {
+    "status": "idle",
+    "error": None,
+    "start_time": None,
+    "end_time": None,
+}
+
+
+def _execute_pipeline_in_background(config_path: Path) -> None:
+    """Execute the pipeline in a background subprocess and log output."""
+    global _RUN_STATE
+    # Attempt to acquire the lock to prevent concurrent runs
+    if not _RUN_LOCK.acquire(blocking=False):
+        return
+
+    try:
+        _RUN_STATE["status"] = "running"
+        _RUN_STATE["error"] = None
+        _RUN_STATE["start_time"] = time.monotonic()
+
+        # Clear prediction cache beforehand so frontend re-fetches updated predictions on success
+        _PREDICTIONS_CACHE.clear()
+
+        reports_dir = Path("reports")
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        log_file = reports_dir / "active_run.log"
+
+        with open(log_file, "w", encoding="utf-8") as f:
+            f.write(f"--- Pipeline Execution Started at {datetime.now(UTC).isoformat()} ---\n")
+            f.flush()
+
+        # Use sys.executable to run the command in the exact same environment
+        cmd = [sys.executable, "-m", "retail_forecasting.run", "--config", str(config_path)]
+
+        with open(log_file, "a", encoding="utf-8") as f:
+            process = subprocess.Popen(
+                cmd,
+                stdout=f,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            returncode = process.wait()
+
+        if returncode == 0:
+            _RUN_STATE["status"] = "success"
+        else:
+            _RUN_STATE["status"] = "failed"
+            _RUN_STATE["error"] = f"Pipeline exited with code {returncode}."
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(f"\n[ERROR] Pipeline failed with exit code {returncode}\n")
+    except Exception as e:
+        _RUN_STATE["status"] = "failed"
+        _RUN_STATE["error"] = str(e)
+        try:
+            log_file = Path("reports/active_run.log")
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(f"\n[EXCEPTION] Failed to run pipeline: {e}\n")
+        except Exception:
+            pass
+    finally:
+        _RUN_STATE["end_time"] = time.monotonic()
+        _RUN_LOCK.release()
+
 
 # Deterministic helper mapping SKU to category
 CATEGORIES = ["Bebidas", "Lácteos", "Snacks", "Limpieza", "Frescos", "Congelados", "Higiene"]
@@ -96,6 +165,49 @@ class ScoreResponse(BaseModel):
     run_directory: str
     recommendations_generated: int
     recommendations: list[dict[str, Any]]
+
+
+@app.post("/api/run")
+def run_pipeline(
+    background_tasks: BackgroundTasks,
+    config_path: str = "configs/default.yaml",
+) -> dict[str, str]:
+    """Trigger pipeline execution in a background task."""
+    config_file = Path(config_path)
+    if not config_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Configuration file not found: {config_file}",
+        )
+
+    # Check if a run is already in progress
+    if _RUN_LOCK.locked():
+        raise HTTPException(
+            status_code=409,
+            detail="A pipeline run is already in progress.",
+        )
+
+    background_tasks.add_task(_execute_pipeline_in_background, config_file)
+    return {"status": "running", "message": "Pipeline run started in background."}
+
+
+@app.get("/api/run/status")
+def get_run_status() -> dict[str, Any]:
+    """Retrieve background pipeline run status and accumulated execution logs."""
+    log_file = Path("reports/active_run.log")
+    logs = ""
+    if log_file.exists():
+        try:
+            with open(log_file, encoding="utf-8") as f:
+                logs = f.read()
+        except Exception as e:
+            logs = f"Error reading log file: {e}"
+
+    return {
+        "status": _RUN_STATE["status"],
+        "error": _RUN_STATE["error"],
+        "logs": logs,
+    }
 
 
 @app.get("/health")
