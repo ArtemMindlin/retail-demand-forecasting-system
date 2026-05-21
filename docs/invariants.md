@@ -4,7 +4,7 @@ These rules protect the experimental validity and architecture of the project.
 
 ## Data Layer
 
-1. Raw FreshRetailNet column names are isolated to `src/retail_forecasting/data/fresh_retailnet.py`.
+1. Raw FreshRetailNet column names are isolated to `src/retail_forecasting/data/dataset.py`.
 
    Raw names include `dt`, `sale_amount`, and `stock_hour6_22_cnt`.
 

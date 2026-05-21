@@ -61,7 +61,7 @@ main()
 ## Data Loading
 
 ### `build_hf_uri`
-- Archivo: `src/retail_forecasting/data/fresh_retailnet.py`
+- Archivo: `src/retail_forecasting/data/dataset.py`
 - Que hace: construye la URI `hf://...` del split remoto.
 - Recibe:
   - `dataset_id`;
@@ -70,7 +70,7 @@ main()
 - Se usa en: `load_raw_split()`.
 
 ### `processed_panel_path`
-- Archivo: `src/retail_forecasting/data/fresh_retailnet.py`
+- Archivo: `src/retail_forecasting/data/dataset.py`
 - Que hace: calcula la ruta del parquet procesado para un split.
 - Recibe:
   - `dataset_config`;
@@ -79,7 +79,7 @@ main()
 - Se usa en: `load_prepared_panel()`.
 
 ### `load_raw_split`
-- Archivo: `src/retail_forecasting/data/fresh_retailnet.py`
+- Archivo: `src/retail_forecasting/data/dataset.py`
 - Que hace: carga el split raw desde cache local o desde Hugging Face.
 - Recibe:
   - `dataset_config`;
@@ -89,7 +89,7 @@ main()
 - Se usa en: `load_prepared_panel()`.
 
 ### `prepare_daily_panel`
-- Archivo: `src/retail_forecasting/data/fresh_retailnet.py`
+- Archivo: `src/retail_forecasting/data/dataset.py`
 - Que hace: transforma el dataset bruto en un panel diario listo para modelado.
 - Recibe:
   - `frame`;
@@ -108,7 +108,7 @@ main()
 - Se usa en: `load_prepared_panel()`.
 
 ### `load_prepared_panel`
-- Archivo: `src/retail_forecasting/data/fresh_retailnet.py`
+- Archivo: `src/retail_forecasting/data/dataset.py`
 - Que hace: devuelve el panel ya procesado, leyendolo de cache si existe o generandolo si no.
 - Recibe:
   - `dataset_config`;

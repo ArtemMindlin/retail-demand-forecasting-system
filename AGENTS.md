@@ -48,7 +48,7 @@ run.py
 
 ## Hard Rules
 
-- Raw dataset names such as `dt`, `sale_amount`, and `stock_hour6_22_cnt` must not leak beyond `data/fresh_retailnet.py`.
+- Raw dataset names such as `dt`, `sale_amount`, and `stock_hour6_22_cnt` must not leak beyond `data/dataset.py`.
 - The canonical prepared panel uses `date`, `series_id`, `observed_demand`, and `stockout_hours`.
 - `target_lead_time_demand` is built only in `features/engineering.py`.
 - Temporal features must use only information available at the forecast origin.
