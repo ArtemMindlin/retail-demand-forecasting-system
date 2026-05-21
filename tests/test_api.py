@@ -145,3 +145,22 @@ def test_api_retrain() -> None:
     data = response.json()
     assert data["status"] == "success"
     assert "triggered" in data["message"].lower()
+
+
+def test_load_latest_predictions_fallback() -> None:
+    from retail_forecasting.api.main import _PREDICTIONS_CACHE, load_latest_predictions
+
+    # Clear predictions cache first to force reload
+    _PREDICTIONS_CACHE.clear()
+
+    # Patch reports_dir Path.exists to return False to force fallback
+    with mock.patch("pathlib.Path.exists", return_value=False):
+        df = load_latest_predictions()
+
+    assert not df.empty
+    assert "date" in df.columns
+    assert "series_id" in df.columns
+    assert "y_true" in df.columns
+    assert "y_pred" in df.columns
+    assert "data_strategy" in df.columns
+    assert "SKU-1001" in df["series_id"].values

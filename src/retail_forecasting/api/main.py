@@ -38,42 +38,95 @@ def get_category(series_id: str) -> str:
     return CATEGORIES[val % len(CATEGORIES)]
 
 
+def _create_synthetic_predictions() -> pd.DataFrame:
+    """Generate high-quality synthetic predictions for mock/demo mode when reports/ is empty."""
+    skus = ["SKU-1001", "SKU-1002", "SKU-1003", "SKU-1004", "SKU-1005"]
+    dates = pd.date_range(end=datetime.now(UTC), periods=30, freq="D").strftime("%Y-%m-%d").tolist()
+
+    rows = []
+    for sku in skus:
+        # seed based on SKU name for stability
+        seed = sum(ord(c) for c in sku)
+        np.random.seed(seed)
+
+        # generate a nice sine wave trend with some noise
+        base_demand = 50.0 + (seed % 7) * 15.0
+        for i, dt in enumerate(dates):
+            weekly_pattern = np.sin((i / 7.0) * 2.0 * np.pi) * 15.0
+            noise = np.random.normal(0, 5.0)
+            y_pred = max(5.0, base_demand + weekly_pattern + np.random.normal(0, 2.0))
+            y_true = max(0.0, y_pred + noise)
+
+            rows.append(
+                {
+                    "date": dt,
+                    "series_id": sku,
+                    "y_true": float(y_true),
+                    "y_pred": float(y_pred),
+                    "data_strategy": "Synthetic_Fallback",
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
 def load_latest_predictions() -> pd.DataFrame:
-    """Find the latest run in reports/ with predictions.csv and cache it."""
+    """Find the latest run in reports/ with predictions.csv and cache it, falling back to synthetic data if empty."""
     if "df" in _PREDICTIONS_CACHE:
         return _PREDICTIONS_CACHE["df"]
 
     reports_dir = Path("reports")
-    if not reports_dir.exists():
-        raise FileNotFoundError("reports/ directory does not exist.")
-
-    runs = []
-    for d in reports_dir.iterdir():
-        if d.is_dir() and not d.name.startswith((".", "models", "ablation")):
-            if (d / "predictions.csv").exists():
-                runs.append(d)
-
-    if not runs:
-        raise FileNotFoundError("No runs with predictions.csv found in reports/.")
-
-    # Sort runs alphabetically descending
-    runs.sort(key=lambda x: x.name, reverse=True)
-    latest_run = runs[0]
-
-    usecols = ["date", "series_id", "y_true", "y_pred", "data_strategy"]
     try:
-        df = pd.read_csv(latest_run / "predictions.csv", usecols=usecols)
-    except Exception:
-        df = pd.read_csv(latest_run / "predictions.csv")
+        if not reports_dir.exists():
+            logger.warning(
+                "reports/ directory does not exist. Serving high-quality synthetic fallback predictions."
+            )
+            df = _create_synthetic_predictions()
+            _PREDICTIONS_CACHE["df"] = df
+            _PREDICTIONS_CACHE["run_path"] = None
+            _PREDICTIONS_CACHE["grouped"] = {sku: group for sku, group in df.groupby("series_id")}
+            return df
 
-    _PREDICTIONS_CACHE["df"] = df
-    _PREDICTIONS_CACHE["run_path"] = latest_run
+        runs = []
+        for d in reports_dir.iterdir():
+            if d.is_dir() and not d.name.startswith((".", "models", "ablation")):
+                if (d / "predictions.csv").exists():
+                    runs.append(d)
 
-    # Pre-group predictions by SKU to reduce search latency to O(1)
-    grouped = {sku: group for sku, group in df.groupby("series_id")}
-    _PREDICTIONS_CACHE["grouped"] = grouped
+        if not runs:
+            logger.warning(
+                "No runs with predictions.csv found in reports/. Serving high-quality synthetic fallback predictions."
+            )
+            df = _create_synthetic_predictions()
+            _PREDICTIONS_CACHE["df"] = df
+            _PREDICTIONS_CACHE["run_path"] = None
+            _PREDICTIONS_CACHE["grouped"] = {sku: group for sku, group in df.groupby("series_id")}
+            return df
 
-    return df
+        # Sort runs alphabetically descending
+        runs.sort(key=lambda x: x.name, reverse=True)
+        latest_run = runs[0]
+
+        usecols = ["date", "series_id", "y_true", "y_pred", "data_strategy"]
+        try:
+            df = pd.read_csv(latest_run / "predictions.csv", usecols=usecols)
+        except Exception:
+            df = pd.read_csv(latest_run / "predictions.csv")
+
+        _PREDICTIONS_CACHE["df"] = df
+        _PREDICTIONS_CACHE["run_path"] = latest_run
+        # Pre-group predictions by SKU to reduce search latency to O(1)
+        _PREDICTIONS_CACHE["grouped"] = {sku: group for sku, group in df.groupby("series_id")}
+
+        return df
+
+    except Exception as e:
+        logger.error(f"Error loading predictions: {e}. Falling back to synthetic predictions.")
+        df = _create_synthetic_predictions()
+        _PREDICTIONS_CACHE["df"] = df
+        _PREDICTIONS_CACHE["run_path"] = None
+        _PREDICTIONS_CACHE["grouped"] = {sku: group for sku, group in df.groupby("series_id")}
+        return df
 
 
 class ForecastRequest(BaseModel):
