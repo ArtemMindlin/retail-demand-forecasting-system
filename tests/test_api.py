@@ -15,7 +15,13 @@ client = TestClient(app)
 def test_health_check() -> None:
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "Retail Forecasting API"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["service"] == "Retail Demand Forecasting API"
+    assert body["version"] == "1.0.0"
+    assert "timestamp" in body
+    assert "uptime" in body
+    assert "data_loaded" in body
 
 
 def test_predict_orders_invalid_config() -> None:

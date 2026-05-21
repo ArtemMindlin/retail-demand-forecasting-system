@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,9 @@ app = FastAPI(
 
 # Cache dictionary for predictions dataframe
 _PREDICTIONS_CACHE: dict[str, Any] = {}
+
+# Server start time for uptime tracking
+_START_TIME: float = time.monotonic()
 
 # Deterministic helper mapping SKU to category
 CATEGORIES = ["Bebidas", "Lácteos", "Snacks", "Limpieza", "Frescos", "Congelados", "Higiene"]
@@ -97,9 +102,20 @@ class ScoreResponse(BaseModel):
 
 
 @app.get("/health")
-def health_check() -> dict[str, str]:
-    """Verify that the API is up and running."""
-    return {"status": "ok", "service": "Retail Forecasting API"}
+def health_check() -> dict[str, Any]:
+    """Liveness probe for Railway and BetterStack uptime monitoring."""
+    uptime_seconds = int(time.monotonic() - _START_TIME)
+    hours, remainder = divmod(uptime_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    data_loaded = "df" in _PREDICTIONS_CACHE
+    return {
+        "status": "ok",
+        "service": "Retail Demand Forecasting API",
+        "version": "1.0.0",
+        "timestamp": datetime.now(UTC).isoformat(),
+        "uptime": f"{hours:02d}:{minutes:02d}:{seconds:02d}",
+        "data_loaded": data_loaded,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
