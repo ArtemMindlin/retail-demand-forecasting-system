@@ -3,8 +3,8 @@ from __future__ import annotations
 import pandas as pd
 
 from retail_forecasting.config import BusinessConfig, Settings
-from retail_forecasting.contracts.business import ChampionRecord, ChampionRegistry
-from retail_forecasting.contracts.drift import DriftEvent
+from retail_forecasting.contracts.contracts_business import ChampionRecord, ChampionRegistry
+from retail_forecasting.contracts.contracts_drift import DriftEvent
 from retail_forecasting.evaluation.reporting import (
     RunArtifacts,
     build_exceptions_frame,

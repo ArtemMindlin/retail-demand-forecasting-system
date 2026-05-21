@@ -17,7 +17,6 @@ class DataQualityError(ValueError):
 
 class DataQualityReport(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-
     run_mode: str
     checked_rows: int = Field(ge=0)
     checked_series: int = Field(ge=0)

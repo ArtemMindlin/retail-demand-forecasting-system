@@ -5,9 +5,9 @@ from pathlib import Path
 import pandas as pd
 
 from retail_forecasting.config import Settings
-from retail_forecasting.contracts.backtesting import FoldRunMetadata
-from retail_forecasting.contracts.drift import DriftDetectorMetadata, DriftEvent
-from retail_forecasting.contracts.tuning import BoostingParams
+from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
+from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
+from retail_forecasting.contracts.contracts_tuning import BoostingParams
 from retail_forecasting.data.censorship import LatentDemandImputer
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.data.quality import (

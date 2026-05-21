@@ -99,9 +99,9 @@ def prepare_daily_panel(
     panel["series_id"] = panel["store_id"].astype(str) + "_" + panel["product_id"].astype(str)
     panel = panel.sort_values(["series_id", "date"]).reset_index(drop=True)
 
-    history_lengths = panel.groupby("series_id")["date"].nunique()
-    valid_series = history_lengths.loc[history_lengths >= dataset_config.min_history_days].index
-    panel = panel.loc[panel["series_id"].isin(valid_series)].copy()
+    history_lengths = panel.groupby("series_id")["date"].count()
+    valid_series = history_lengths[history_lengths >= dataset_config.min_history_days].index
+    panel = panel[panel["series_id"].isin(valid_series)].copy()
 
     if dataset_config.top_n_series:
         top_series = (
@@ -110,7 +110,7 @@ def prepare_daily_panel(
             .nlargest(dataset_config.top_n_series)
             .index
         )
-        panel = panel.loc[panel["series_id"].isin(top_series)].copy()
+        panel = panel[panel["series_id"].isin(top_series)].copy()
 
     if preprocessing_config.fill_missing_values:
         zero_fill_columns = [
