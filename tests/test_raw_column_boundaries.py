@@ -3,10 +3,9 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "src" / "retail_forecasting"
 RAW_COLUMN_NAMES = {"dt", "sale_amount", "stock_hour6_22_cnt"}
-RAW_COLUMN_OWNER = PACKAGE_ROOT / "data" / "fresh_retailnet.py"
+RAW_COLUMN_OWNER = PACKAGE_ROOT / "data" / "dataset.py"
 
 
 def test_raw_dataset_column_names_stay_inside_data_loader() -> None:

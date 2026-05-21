@@ -33,7 +33,10 @@ def test_predict_orders_returns_recommendations_on_success(tmp_path: pytest.Temp
         {"series_id": ["1_101", "2_202"], "order_quantity": [10.0, 5.0]}
     )
 
-    with mock.patch("retail_forecasting.api.main.run_experiment", return_value=mock_artifacts):
+    with (
+        mock.patch("retail_forecasting.api.main.run_scoring", return_value=mock_artifacts),
+        mock.patch("retail_forecasting.api.main.run_experiment", return_value=mock_artifacts),
+    ):
         response = client.post("/predict_orders", json={"config_path": str(config_file)})
 
     assert response.status_code == 200
