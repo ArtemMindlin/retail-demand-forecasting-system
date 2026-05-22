@@ -52,7 +52,7 @@ class ConformalForecaster:
         self.alpha = alpha
         self.confidence_level = 1 - alpha
 
-        y_true = target.values
+        y_true = target.to_numpy()
         scores = self._calculate_conformity_scores(features, y_true)
 
         # Global q_hat
