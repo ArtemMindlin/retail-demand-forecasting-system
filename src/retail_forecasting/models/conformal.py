@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, cast, runtime_checkable
 
@@ -21,6 +22,7 @@ class Forecaster(Protocol):
     def predict_quantiles(self, features: Any) -> dict[str, np.ndarray]: ...
 
 
+@dataclass
 class ConformalForecaster:
     """A universal wrapper that provides conformal prediction guarantees.
 
@@ -29,12 +31,11 @@ class ConformalForecaster:
     (q_hat) based on SKU groups (taxonomies, intermittency, etc.).
     """
 
-    def __init__(self, base_model: Any):
-        self.base_model = base_model
-        self.q_hat: float | None = None
-        self.mondrian_q_hat: dict[Any, float] = {}
-        self.confidence_level: float | None = None
-        self.alpha: float | None = None
+    base_model: Any
+    q_hat: float | None = field(default=None, init=False)
+    mondrian_q_hat: dict[Any, float] = field(default_factory=dict, init=False)
+    confidence_level: float | None = field(default=None, init=False)
+    alpha: float | None = field(default=None, init=False)
 
     def fit(self, features: Any, target: pd.Series) -> ConformalForecaster:
         """Fit the underlying base model."""
