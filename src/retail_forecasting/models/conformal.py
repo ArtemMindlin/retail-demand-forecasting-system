@@ -60,7 +60,7 @@ class ConformalForecaster:
 
         # Mondrian (Group-specific) q_hat
         if group_ids is not None:
-            group_ids_arr = group_ids.values
+            group_ids_arr = group_ids.to_numpy()
             unique_groups = np.unique(group_ids_arr)
             for group in unique_groups:
                 group_mask = group_ids_arr == group
@@ -126,7 +126,7 @@ class ConformalForecaster:
         if group_ids is not None and self.mondrian_q_hat:
             q_hat_vec = cast(
                 np.ndarray,
-                group_ids.map(self.mondrian_q_hat).fillna(self.q_hat).values,
+                group_ids.map(self.mondrian_q_hat).fillna(self.q_hat).to_numpy(),
             )
         else:
             q_hat_vec = np.full(len(y_pred), self.q_hat)
