@@ -345,7 +345,8 @@
   .canvas {
     position: relative;
     padding: 28px 32px 56px;
-    max-width: 1440px;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   @media (max-width: 720px) {
     .canvas { padding: 20px 16px 40px; }
@@ -711,7 +712,7 @@
   /* Missing CSS classes for SkuView and DriftView */
   .sku-grid {
     display: grid;
-    grid-template-columns: 100px 110px 100px 70px 75px 125px 70px 70px 70px 100px;
+    grid-template-columns: 100px 1fr 100px 70px 75px 125px 70px 70px 70px 100px;
     align-items: center;
     gap: 8px;
     padding: 12px 18px;
