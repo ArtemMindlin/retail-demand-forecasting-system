@@ -314,11 +314,11 @@ def run_experiment_from_frame(
                     settings.inventory.stockout_cost if settings.models.optimize_for_cost else 0.0
                 ),
             )
-            base_lgb.fit(
+            boosting_model = ConformalForecaster(base_lgb)
+            boosting_model.fit(
                 sub_train_frame.loc[:, feature_columns],
                 sub_train_frame["target_lead_time_demand"],
             )
-            boosting_model = ConformalForecaster(base_lgb)
             if not calib_frame.empty:
                 boosting_model.calibrate(
                     calib_frame.loc[:, feature_columns],
@@ -347,11 +347,11 @@ def run_experiment_from_frame(
                 learning_rate=best_boosting_params.learning_rate,
                 max_depth=best_boosting_params.max_depth,
             )
-            base_cat.fit(
+            cat_model = ConformalForecaster(base_cat)
+            cat_model.fit(
                 sub_train_frame.loc[:, feature_columns],
                 sub_train_frame["target_lead_time_demand"],
             )
-            cat_model = ConformalForecaster(base_cat)
             if not calib_frame.empty:
                 cat_model.calibrate(
                     calib_frame.loc[:, feature_columns],
@@ -426,11 +426,11 @@ def run_experiment_from_frame(
                 settings.inventory.stockout_cost if settings.models.optimize_for_cost else 0.0
             ),
         )
-        base_lgb_final.fit(
+        holdout_boosting_model = ConformalForecaster(base_lgb_final)
+        holdout_boosting_model.fit(
             full_sub_train.loc[:, feature_columns],
             full_sub_train["target_lead_time_demand"],
         )
-        holdout_boosting_model = ConformalForecaster(base_lgb_final)
         if not full_calib.empty:
             holdout_boosting_model.calibrate(
                 full_calib.loc[:, feature_columns],
@@ -446,11 +446,11 @@ def run_experiment_from_frame(
             learning_rate=best_boosting_params.learning_rate,
             max_depth=best_boosting_params.max_depth,
         )
-        base_cat_final.fit(
+        holdout_cat_model = ConformalForecaster(base_cat_final)
+        holdout_cat_model.fit(
             full_sub_train.loc[:, feature_columns],
             full_sub_train["target_lead_time_demand"],
         )
-        holdout_cat_model = ConformalForecaster(base_cat_final)
         if not full_calib.empty:
             holdout_cat_model.calibrate(
                 full_calib.loc[:, feature_columns],
@@ -497,7 +497,7 @@ def run_experiment_from_frame(
     # Persist final models to the stable models directory for operational serving
     _lgb_to_save = holdout_boosting_model if holdout_boosting_model is not None else boosting_model
     _cat_to_save = holdout_cat_model if holdout_cat_model is not None else cat_model
-    _models_dir = settings.reporting.output_dir / "models"
+    _models_dir = settings.models.models_dir
     _models_dir.mkdir(parents=True, exist_ok=True)
     for _m in [_lgb_to_save, _cat_to_save]:
         if _m is not None:
@@ -771,11 +771,11 @@ def train_and_save_champion(
         calib_frame = pd.DataFrame()
 
     base_model = _instantiate_champion_base_model(settings)
-    base_model.fit(
+    conformal = ConformalForecaster(base_model)
+    conformal.fit(
         train_frame.loc[:, feature_columns],
         train_frame["target_lead_time_demand"],
     )
-    conformal = ConformalForecaster(base_model)
     if not calib_frame.empty:
         calib_group_ids = None
         if "third_category_id" in calib_frame.columns:
@@ -787,9 +787,7 @@ def train_and_save_champion(
             group_ids=calib_group_ids,
         )
 
-    resolved_dir = (
-        models_dir if models_dir is not None else settings.reporting.output_dir / "models"
-    )
+    resolved_dir = models_dir if models_dir is not None else settings.models.models_dir
     resolved_dir.mkdir(parents=True, exist_ok=True)
     model_path = resolved_dir / f"{conformal.backend_name}.pkl"
     conformal.save(model_path)
@@ -838,7 +836,7 @@ def run_scoring(
         quality_report = None
 
     if model_path is None:
-        models_dir = settings.reporting.output_dir / "models"
+        models_dir = settings.models.models_dir
         champion_backend = settings.business.champion_backend_name
         model_path = models_dir / f"{champion_backend}.pkl"
     if not model_path.exists():

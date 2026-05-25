@@ -46,6 +46,7 @@ data_quality:
   max_data_age_days: null
 
 models:
+  models_dir: models
   quantiles: [0.1, 0.5, 0.9]
   seasonal_period: 7
   n_estimators: 500

@@ -94,6 +94,7 @@ class DataQualityConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
+    models_dir: Path = Field(default=Path("models"))
     quantiles: list[float] = Field(default_factory=lambda: [0.1, 0.5, 0.9], min_length=1)
     seasonal_period: int = Field(default=7, gt=0)
     n_estimators: int = Field(default=200, gt=0)

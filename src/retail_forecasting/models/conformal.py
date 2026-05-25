@@ -62,12 +62,9 @@ class ConformalForecaster:
         # Mondrian (Group-specific) q_hat
         if group_ids is not None:
             group_ids_arr = group_ids.to_numpy()
-            unique_groups = np.unique(group_ids_arr)
-            for group in unique_groups:
+            for group in np.unique(group_ids_arr):
                 group_mask = group_ids_arr == group
-                if np.any(group_mask):
-                    group_scores = scores[group_mask]
-                    self.mondrian_q_hat[group] = self._compute_q_hat(group_scores, alpha)
+                self.mondrian_q_hat[group] = self._compute_q_hat(scores[group_mask], alpha)
 
         return self
 
@@ -92,8 +89,6 @@ class ConformalForecaster:
 
     def _compute_q_hat(self, scores: np.ndarray, alpha: float) -> float:
         n = len(scores)
-        if n == 0:
-            return 0.0
         q_level = (1 - alpha) * (1 + 1 / n)
         q_level = min(max(q_level, 0.0), 1.0)
         q_hat = np.quantile(scores, q_level, method="higher")
