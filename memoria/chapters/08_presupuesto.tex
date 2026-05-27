@@ -2,51 +2,124 @@
 \chapter{Presupuesto del Proyecto}
 \label{chap:presupuesto}
 
-Este capítulo detalla el coste económico asociado al desarrollo del presente Trabajo de Fin de Grado. El presupuesto se desglosa en costes de personal, recursos materiales y costes indirectos.
+Este capítulo detalla el coste económico asociado al desarrollo del presente Trabajo de Fin de Grado. El presupuesto se desglosa en costes de personal, recursos materiales e infraestructura, y gastos generales.
 
 \section{Costes de Personal}
-El principal recurso del proyecto ha sido la dedicación del ingeniero desarrollador. Se estima un tiempo total de ejecución de 300 horas, distribuidas entre las fases de investigación, implementación, experimentación y redacción de la memoria.
 
-\begin{table}[h]
+El principal recurso del proyecto ha sido la dedicación del ingeniero desarrollador. Se estima un tiempo total de \textbf{300 horas}, distribuidas entre las fases de investigación, implementación, experimentación y redacción de la memoria según el desglose de la Tabla~\ref{tab:horas_fases}.
+
+\begin{table}[htbp]
 \centering
+\small
+\begin{tabular}{@{}p{0.38\textwidth}p{0.42\textwidth}c@{}}
+\toprule
+\textbf{Fase} & \textbf{Descripción} & \textbf{Horas} \\
+\midrule
+Investigación bibliográfica & Revisión de literatura: GFMs, Conformal Prediction, inventario estocástico & 40 \\
+Diseño del sistema & Arquitectura MLOps, contratos de datos, diseño de módulos & 25 \\
+Pipeline de datos & Ingesta, Data Quality Gate, corrección de censura & 35 \\
+Feature engineering y modelos & 58 features, CatBoost, LightGBM, Mondrian CP & 55 \\
+Experimentación y backtesting & Walk-forward ($K=3$), optimización NSGA-II, análisis Pareto & 40 \\
+MLOps e infraestructura & FastAPI, Docker, MLflow, GitHub Actions, React dashboard & 45 \\
+Testing y calidad de software & 19 módulos de test, CI/CD, contratos de datos & 25 \\
+Redacción de la memoria & Capítulos, figuras y revisión & 35 \\
+\midrule
+\textbf{Total} & & \textbf{300} \\
+\bottomrule
+\end{tabular}
+\caption{Desglose de horas por fase del proyecto.}
+\label{tab:horas_fases}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\small
 \begin{tabular}{@{}p{0.42\textwidth}ccc@{}}
 \toprule
-\textbf{Perfil} & \textbf{Horas} & \textbf{Precio/Hora} & \textbf{Subtotal} \\ \midrule
-Ingeniero Junior (Desarrollo y Análisis) & 300 & 30,00 \texteuro{} & 9.000,00 \texteuro{} \\ \midrule
-\textbf{Total Personal} & & & \textbf{9.000,00 \texteuro{}} \\ \bottomrule
+\textbf{Perfil} & \textbf{Horas} & \textbf{Precio/hora} & \textbf{Subtotal} \\
+\midrule
+Ingeniero Junior (Desarrollo y Análisis) & 300 & 30,00 \texteuro{} & 9.000,00 \texteuro{} \\
+\midrule
+\textbf{Total personal} & & & \textbf{9.000,00 \texteuro{}} \\
+\bottomrule
 \end{tabular}
 \caption{Presupuesto de recursos humanos.}
+\label{tab:presupuesto_personal}
 \end{table}
 
 \section{Recursos Materiales e Infraestructura}
-Se incluyen los costes de amortización del equipo informático utilizado y los servicios de computación necesarios para el entrenamiento de los modelos.
 
-\begin{itemize}
-    \item \textbf{Amortización de Hardware}: Uso de un equipo con procesador Apple M2 y 16GB RAM durante 4 meses. Estimado en 400,00 \texteuro{}.
-    \item \textbf{Servicios Cloud / Almacenamiento}: Uso de repositorios privados y \textit{hosting} de datos en Hugging Face. Coste 0,00 \texteuro{} (niveles gratuitos).
-    \item \textbf{Software}: Se han utilizado herramientas de código abierto como Python, CatBoost, VS Code y Tectonic, con un coste de licencia de 0,00 \texteuro{}.
-\end{itemize}
+La Tabla~\ref{tab:presupuesto_materiales} detalla los costes de amortización del equipo informático y los servicios necesarios para el entrenamiento de modelos y el alojamiento del código. La amortización del hardware se calcula mediante la fórmula:
 
-\section{Gastos Generales y Otros Costes}
-Se consideran costes indirectos como el consumo eléctrico y el espacio de trabajo.
-\begin{itemize}
-    \item \textbf{Electricidad y Suministros}: Estimado en 25,00 \texteuro{} mensuales durante la duración del proyecto. Total: 100,00 \texteuro{}.
-\end{itemize}
+\begin{equation}
+    C_{\text{amort}} = P_{\text{equipo}} \times \frac{T_{\text{proyecto}}}{V_{\text{útil}}}
+\end{equation}
+
+donde $P_{\text{equipo}}$ es el precio de adquisición, $T_{\text{proyecto}}$ la duración del proyecto en meses y $V_{\text{útil}}$ la vida útil estimada en meses.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}p{0.34\textwidth}p{0.42\textwidth}c@{}}
+\toprule
+\textbf{Concepto} & \textbf{Detalle} & \textbf{Coste} \\
+\midrule
+Amortización hardware & Ordenador portátil Apple M2 (1.800 \texteuro{}, vida útil 3 años): $1.800 \times \frac{4}{36}$ & 200,00 \texteuro{} \\
+Almacenamiento y \textit{hosting} & Hugging Face, GitHub (niveles gratuitos) & 0,00 \texteuro{} \\
+Software y licencias & Python, CatBoost, VS Code, Tectonic (código abierto) & 0,00 \texteuro{} \\
+\midrule
+\textbf{Total materiales} & & \textbf{200,00 \texteuro{}} \\
+\bottomrule
+\end{tabular}
+\caption{Presupuesto de recursos materiales e infraestructura.}
+\label{tab:presupuesto_materiales}
+\end{table}
+
+\section{Gastos Generales}
+
+Se incluyen los costes indirectos de suministros durante los 4 meses de duración del proyecto.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}p{0.34\textwidth}p{0.42\textwidth}c@{}}
+\toprule
+\textbf{Concepto} & \textbf{Detalle} & \textbf{Coste} \\
+\midrule
+Electricidad & 25,00 \texteuro{}/mes $\times$ 4 meses & 100,00 \texteuro{} \\
+Conexión a internet & 40,00 \texteuro{}/mes $\times$ 25\% de imputación $\times$ 4 meses & 40,00 \texteuro{} \\
+\midrule
+\textbf{Total gastos generales} & & \textbf{140,00 \texteuro{}} \\
+\bottomrule
+\end{tabular}
+\caption{Presupuesto de gastos generales.}
+\label{tab:presupuesto_generales}
+\end{table}
 
 \section{Resumen del Presupuesto Total}
-A continuación se presenta el resumen final del coste del proyecto:
 
-\begin{table}[h]
+La Tabla~\ref{tab:presupuesto_total} presenta el resumen final. Se aplica una contingencia del 5\% sobre la base imponible para cubrir posibles desviaciones no previstas (retrasos en experimentación, iteraciones adicionales de redacción).
+
+\begin{table}[htbp]
 \centering
+\small
 \begin{tabular}{@{}lc@{}}
 \toprule
-\textbf{Concepto} & \textbf{Importe} \\ \midrule
-Costes de Personal & 9.000,00 \texteuro{} \\
-Recursos Materiales & 400,00 \texteuro{} \\
-Gastos Generales & 100,00 \texteuro{} \\ \midrule
-\textbf{BASE IMPONIBLE} & \textbf{9.500,00 \texteuro{}} \\
-IVA (21\%) & 1.995,00 \texteuro{} \\ \midrule
-\textbf{TOTAL DEL PROYECTO} & \textbf{11.495,00 \texteuro{}} \\ \bottomrule
+\textbf{Concepto} & \textbf{Importe} \\
+\midrule
+Costes de personal     & 9.000,00 \texteuro{} \\
+Recursos materiales    &   200,00 \texteuro{} \\
+Gastos generales       &   140,00 \texteuro{} \\
+\midrule
+\textbf{Base imponible} & \textbf{9.340,00 \texteuro{}} \\
+Contingencia (5\%)     &   467,00 \texteuro{} \\
+\midrule
+\textbf{Subtotal}      & \textbf{9.807,00 \texteuro{}} \\
+IVA (21\%)             & 2.059,47 \texteuro{} \\
+\midrule
+\textbf{TOTAL DEL PROYECTO} & \textbf{11.866,47 \texteuro{}} \\
+\bottomrule
 \end{tabular}
 \caption{Resumen del presupuesto total del proyecto.}
+\label{tab:presupuesto_total}
 \end{table}

@@ -1,6 +1,7 @@
-\documentclass[12pt,a4paper,oneside]{book}
+\documentclass[11pt,a4paper,oneside]{book}
 
 % --- Paquetes Básicos ---
+\usepackage[utf8]{inputenc}
 \usepackage[spanish,es-tabla]{babel}
 \usepackage[T1]{fontenc}
 \usepackage{graphicx}
@@ -10,11 +11,15 @@
 \usepackage{titlesec}
 \usepackage{booktabs}
 \usepackage{textcomp}
+\usepackage{eurosym}
 \usepackage{array}
 \usepackage{caption}
+\usepackage{float}
 \usepackage{microtype}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{tikz}
+\usetikzlibrary{babel, positioning, shapes.geometric}
 
 % --- Configuración de Página ---
 \geometry{
@@ -22,7 +27,7 @@
     top=3cm,
     bottom=3cm,
     left=3cm,
-    right=2.5cm
+    right=3cm
 }
 
 % --- Datos del TFG ---
@@ -37,6 +42,7 @@
 
 \frontmatter
 \input{chapters/abstracts}
+\input{chapters/anexo_abreviaturas}
 \tableofcontents
 \listoffigures
 \listoftables
@@ -53,6 +59,10 @@
 \input{chapters/06_resultados}
 \input{chapters/07_conclusiones}
 \input{chapters/08_presupuesto}
+
+% --- Apéndices ---
+\appendix
+\input{chapters/anexo_ods}
 
 \backmatter
 % --- Bibliografía ---

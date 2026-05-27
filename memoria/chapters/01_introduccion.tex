@@ -7,16 +7,16 @@ En la era del \textit{Big Data} y la inteligencia artificial, la gestión de la 
 
 La relevancia de este problema no es solo operativa, sino también económica y ética. A nivel europeo, se estima que el desperdicio alimentario genera un coste directo al sector \textit{retail} de aproximadamente 13.000 millones de euros anuales, representando cerca del 1,64\% de las ventas totales \cite{eucommission2023foodwaste}. En España, estas cifras han servido de base para una transformación del marco legislativo con la entrada en vigor de la Ley 1/2025 de Prevención de las Pérdidas y el Desperdicio Alimentario \cite{leydesperdicio2025}, que obliga a las empresas de distribución a implementar planes estratégicos de prevención y penaliza severamente la ineficiencia en la gestión de excedentes.
 
-Este Trabajo de Fin de Grado nace de la necesidad de alinear los modelos matemáticos de previsión con la realidad de la toma de decisiones en la reposición. El caso de uso central no es una predicción abstracta de demanda, sino la construcción de un \textbf{Sistema de Apoyo a la Decisión (DSS) End-to-End} que responda a una pregunta operativa concreta del responsable de aprovisionamiento: \emph{¿cuántas unidades debe pedir mañana cada SKU bajo restricciones logísticas reales?} Para contestarla, el sistema no solo estima la demanda esperada y cuantifica la incertidumbre matemáticamente, sino que orquesta una simulación dinámica y una optimización de recursos para minimizar tanto el coste por rotura de stock (\textit{stockout}) como el coste por sobrestock y desperdicio, contribuyendo así al Objetivo de Desarrollo Sostenible (ODS) 12: Producción y Consumo Responsables \cite{ods12un}.
+Este Trabajo de Fin de Grado nace de la necesidad de alinear los modelos matemáticos de previsión con la realidad de la toma de decisiones en la reposición. El caso de uso central no es una predicción abstracta de demanda, sino la construcción de un \textbf{Sistema de Apoyo a la Decisión (DSS) End-to-End} que responda a una pregunta operativa concreta del responsable de aprovisionamiento: \emph{\textquestiondown cuántas unidades debe pedir mañana cada SKU bajo restricciones logísticas reales?} Para contestarla, el sistema no solo estima la demanda esperada y cuantifica la incertidumbre matemáticamente, sino que orquesta una simulación dinámica y una optimización de recursos para minimizar tanto el coste por rotura de stock (\textit{stockout}) como el coste por sobrestock y desperdicio, contribuyendo así al Objetivo de Desarrollo Sostenible (ODS) 12: Producción y Consumo Responsables \cite{ods12un}.
 
 \section{Definición del Problema}
 El enfoque tradicional del \textit{demand forecasting} se ha centrado históricamente en la obtención de predicciones puntuales (\textit{point forecasts}) mediante la minimización de métricas de error promedio como el MAE (\textit{Mean Absolute Error}) o el RMSE (\textit{Root Mean Squared Error}). Aunque útiles, estos enfoques presentan severas limitaciones cuando intentan utilizarse aisladamente en entornos de \textit{retail} de producción:
 
 \begin{enumerate}
-    \item \textbf{Censura de datos por stockout:} Cuando un producto se agota en el estante, la demanda observada se detiene, pero la demanda latente (lo que los clientes habrían comprado) sigue existiendo. Ignorar este fenómeno introduce un sesgo negativo en los modelos.
-    \item \textbf{Desconexión entre error estadístico y coste logístico:} En productos frescos, el coste de equivocarse "por exceso" (desperdicio) suele ser muy distinto al coste de equivocarse "por defecto" (pérdida de venta y fidelidad). 
-    \item \textbf{Decisiones estáticas vs. dinámicas:} Los modelos teóricos a menudo asumen que cada día se empieza desde cero. En la realidad, el inventario sobrante o faltante se acumula (\textit{efecto látigo}), requiriendo políticas dinámicas que consideren el estado físico del almacén.
-    \item \textbf{Capacidad infinita ilusoria:} Una recomendación de pedido óptima para un producto aislado deja de ser válida si, al sumar todo el catálogo, se supera el presupuesto de compra o la capacidad de almacenamiento de la tienda.
+    \item \textbf{Censura de datos por stockout:} Cuando un producto se agota en el estante, la demanda observada se detiene, pero la demanda latente (lo que los clientes habrían comprado) sigue existiendo. Musalem et al.~\cite{musalem2010structural} demuestran empíricamente que ignorar este fenómeno introduce un sesgo negativo sistemático en los modelos, subestimando la demanda real en los periodos de rotura.
+    \item \textbf{Desconexión entre error estadístico y coste logístico:} En productos frescos, el coste de equivocarse ``por exceso'' (desperdicio) es estructuralmente distinto al coste de equivocarse ``por defecto'' (pérdida de venta). Ban y Rudin~\cite{ban2019big} muestran que minimizar el MAE no es equivalente a minimizar el coste esperado del inventario; la función de pérdida debe reflejar la asimetría de costes del negocio \cite{koenker2005quantile}.
+    \item \textbf{Decisiones estáticas vs. dinámicas:} Los modelos teóricos asumen frecuentemente que cada día se empieza desde cero. En la realidad, el inventario sobrante o faltante se acumula amplificando los errores de previsión a lo largo de la cadena de suministro ---el conocido \textit{efecto látigo}~\cite{lee1997bullwhip}---, requiriendo políticas dinámicas que consideren el estado físico del almacén.
+    \item \textbf{Capacidad infinita ilusoria:} Una recomendación de pedido óptima para un producto aislado deja de ser válida si, al sumar todo el catálogo, se supera el presupuesto de compra o la capacidad de almacenamiento de la tienda \cite{silver1998inventory}.
 \end{enumerate}
 
 Este trabajo aborda estas limitaciones mediante un enfoque unificado: desde un \textbf{forecasting probabilístico} avanzado con garantías matemáticas (\textit{Mondrian Conformal Prediction}) hasta la toma de decisión bajo restricciones mediante Investigación de Operaciones (Programación Lineal) y MLOps, todo empaquetado en una arquitectura industrial lista para despliegue.
@@ -26,12 +26,52 @@ El objetivo general de este proyecto es diseñar, evaluar y desplegar un sistema
 
 Para alcanzar este objetivo general, se plantean los siguientes objetivos específicos:
 \begin{itemize}
-    \item Desarrollar un \textit{pipeline} de datos reproducible que incluya compuertas de calidad (\textit{Data Quality Gates}) y la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}.
-    \item Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos.
-    \item Garantizar la calibración estadística y la equidad de las predicciones mediante técnicas del estado del arte como \textit{Mondrian Conformal Prediction} e hiper-optimización multi-objetivo (\textit{Pareto Frontier}).
-    \item Evaluar el rendimiento mediante un gemelo digital logístico (Simulación Dinámica de Inventario $s,S$) que integre restricciones operativas globales usando Programación Lineal (\textit{Continuous Knapsack}).
-    \item Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software, incluyendo seguimiento automatizado (MLflow), explicabilidad (SHAP), despliegue como microservicio (FastAPI) y un cuadro de mandos interactivo para análisis \textit{What-If} (Streamlit), todo ello soportado por contenerización (Docker) e Integración Continua (CI/CD).
+    \item Desarrollar un \textit{pipeline} de datos reproducible que incluya compuertas de calidad (\textit{Data Quality Gates}) y la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}, verificando que ninguna observación censurada por stockout introduce fuga de información hacia la etiqueta objetivo.
+    \item Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos, obteniendo un Winkler Score en el conjunto de test inferior al de un \textit{baseline} estacional ingenuo (\textit{seasonal naïve}).
+    \item Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con hiper-optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 90\%$ para intervalos al nivel $\alpha = 0.10$ sobre el conjunto de calibración.
+    \item Evaluar el rendimiento del sistema completo mediante un gemelo digital logístico (Simulación Dinámica de Inventario $s,S$) con restricciones globales vía Programación Lineal, cuantificando la reducción de coste logístico total frente a una política basada en predicción puntual.
+    \item Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software,
+    incluyendo seguimiento (MLflow), explicabilidad (SHAP), microservicio (FastAPI) y un
+    cuadro de mandos interactivo \textit{What-If} desarrollado en \textit{React}, soportado por \textit{Docker} e
+    Integración Continua (CI/CD).
 \end{itemize}
+
+\section{Alcance}
+El presente trabajo se enmarca en el contexto de la previsión de demanda a corto plazo para productos frescos en el sector \textit{retail}. A continuación se delimitan explícitamente los límites del sistema para evitar interpretaciones erróneas sobre su cobertura.
+
+\textbf{Dentro del alcance:}
+\begin{itemize}
+    \item Previsión de la demanda acumulada a nivel SKU-tienda para un horizonte de planificación de corto plazo (días), alineado con el ciclo de reposición habitual en distribución de frescos.
+    \item Datos de granularidad diaria provenientes del benchmark \textit{Fresh RetailNet}, que cubre 50.000 combinaciones tienda-producto a lo largo de 90 días de observación.
+    \item Corrección del sesgo por demanda censurada (stockout) mediante técnicas de imputación supervisada.
+    \item Cuantificación de la incertidumbre con garantías estadísticas formales (Mondrian Conformal Prediction) y optimización multi-objetivo de hiperparámetros.
+    \item Simulación de inventario a nivel de tienda bajo una política de reposición dinámica $(s, S)$ y resolución de conflictos mediante Programación Lineal.
+    \item Operativización del sistema mediante estándares MLOps (MLflow, FastAPI, CI/CD) y visualización interactiva.
+\end{itemize}
+
+\textbf{Fuera del alcance:}
+\begin{itemize}
+    \item \textbf{Optimización de precios}: los precios y descuentos se tratan como variables exógenas observables, no como variables de decisión del sistema.
+    \item \textbf{Cadena de suministro multi-escalón}: el sistema opera a nivel de tienda individual; la gestión de almacenes centrales, proveedores o logística de transporte queda excluida.
+    \item \textbf{Predicción a medio y largo plazo}: no se aborda la planificación estacional ni la previsión más allá del horizonte de reposición inmediato.
+    \item \textbf{Ejecución automática de pedidos}: el sistema genera recomendaciones de pedido cuantificadas, pero la decisión final y la emisión del pedido corresponden al responsable de aprovisionamiento.
+    \item \textbf{Productos no perecederos}: la metodología está orientada a frescos con alta rotación y corta vida útil; su extrapolación a otras categorías requeriría validación adicional.
+\end{itemize}
+
+\section{Contribuciones Principales}
+Las aportaciones originales de este trabajo, diferenciadas del estado del arte revisado en el Capítulo~\ref{chap:estado_del_arte}, son las siguientes:
+
+\begin{enumerate}
+    \item \textbf{Aplicación de Mondrian Conformal Prediction a demanda censurada en retail.} Si bien la Conformal Prediction con garantías de cobertura marginal es una técnica consolidada, su extensión estratificada (Mondrian) al contexto de demanda censurada por stockout en productos frescos constituye una combinación no explorada en la literatura de distribución masiva. La estratificación por categoría de producto permite obtener garantías de cobertura condicional respetando la heterogeneidad del catálogo demostrada en el análisis exploratorio.
+
+    \item \textbf{Sistema de Apoyo a la Decisión end-to-end con cierre logístico.} La mayoría de los trabajos académicos evalúan el rendimiento predictivo mediante métricas estadísticas (MAE, RMSE) desconectadas de la operativa real. Este trabajo cierra el ciclo integrando el modelo probabilístico con una simulación dinámica de inventario $(s, S)$ (\textit{gemelo digital}) y una etapa de optimización global por Programación Lineal, permitiendo medir el impacto directo de la calidad predictiva en el coste logístico.
+
+    \item \textbf{Optimización multi-objetivo para la selección de hiperparámetros probabilísticos.} Se propone una búsqueda de hiperparámetros simultánea sobre el frente de Pareto entre precisión puntual (MAE) y nitidez probabilística (Winkler Score) mediante NSGA-II, superando la práctica habitual de optimizar una única métrica escalar que puede penalizar la calibración de los intervalos.
+
+    \item \textbf{Comparativa sistemática de estrategias de corrección de demanda censurada.} Se evalúan y comparan tres enfoques de imputación (escalado estático, media histórica local y modelo supervisor LightGBM) bajo el mismo protocolo de backtesting, cuantificando su efecto tanto en el error predictivo como en el coste logístico simulado.
+
+    \item \textbf{Arquitectura MLOps de grado industrial sobre el problema.} Se diseña e implementa una arquitectura completa con seguimiento de experimentos (MLflow), microservicio de inferencia (FastAPI), explicabilidad automática (SHAP), cuadro de mandos \textit{What-If} (React) e integración continua (CI/CD), operativizando el sistema más allá del prototipo experimental.
+\end{enumerate}
 
 \section{Estructura del Documento}
 La presente memoria se organiza en seis capítulos adicionales:

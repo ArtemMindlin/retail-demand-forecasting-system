@@ -2,26 +2,208 @@
 \chapter{Implementación y Arquitectura MLOps}
 \label{chap:implementacion}
 
-Este capítulo detalla la realización técnica del sistema. A diferencia de implementaciones puramente académicas en formato de *notebooks*, este proyecto se ha desarrollado como un \textbf{Sistema Inteligente End-to-End} bajo los más estrictos estándares de Ingeniería de Software y MLOps, listo para un entorno de producción industrial.
+Este capítulo detalla la realización técnica del sistema. A diferencia de implementaciones puramente académicas en formato de \textit{notebooks}, este proyecto se ha desarrollado como un \textbf{Sistema Inteligente End-to-End} bajo los más estrictos estándares de Ingeniería de Software y MLOps, listo para un entorno de producción industrial.
 
 \section{Arquitectura del Sistema}
-La estructura del código se organiza en torno a micro-arquitecturas especializadas:
+
+El sistema se organiza en cuatro capas funcionales que transforman los datos brutos de ventas en recomendaciones de pedido operativas. La Figura~\ref{fig:arquitectura_sistema} muestra el flujo completo de datos y decisiones.
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    node distance=0.65cm and 1.1cm,
+    every node/.style={font=\sffamily\footnotesize, align=center},
+    block/.style={draw, rectangle, rounded corners=3pt, minimum width=2.7cm, minimum height=0.9cm, text width=2.6cm},
+    datablk/.style={block, fill=blue!12},
+    featblk/.style={block, fill=teal!15},
+    modelblk/.style={block, fill=orange!18},
+    decblk/.style={block, fill=red!12},
+    outblk/.style={block, fill=green!15},
+    sideblk/.style={block, fill=gray!12, dashed},
+    arr/.style={->, thick},
+    darr/.style={->, thick, dashed, gray!70}
+]
+
+%% ── CAPA 1: DATOS ──────────────────────────────────────────────
+\node[datablk] (hf)    {Hugging Face\\Dataset};
+\node[datablk, right=of hf]  (qgate) {Data Quality\\Gate};
+\node[datablk, right=of qgate] (panel) {Panel\\Preparado};
+
+%% ── CAPA 2: FEATURES ────────────────────────────────────────────
+\node[featblk, below=of hf]    (cens)  {Corrección\\Censura};
+\node[featblk, right=of cens]  (feng)  {Feature\\Engineering\\(58 features)};
+\node[featblk, right=of feng]  (frame) {Frame\\Supervisado};
+
+%% ── CAPA 3: MODELADO ────────────────────────────────────────────
+\node[modelblk, below=of cens]   (optuna) {Optuna\\NSGA-II\\(Pareto)};
+\node[modelblk, right=of optuna] (catb)   {CatBoost\\Multi-Cuantil\\(Pinball)};
+\node[modelblk, right=of catb]   (conf)   {Mondrian\\Conformal\\Prediction};
+
+%% ── CAPA 4: DECISIÓN ────────────────────────────────────────────
+\node[decblk, below=of optuna] (nv)  {Newsvendor\\fractil $q^*$};
+\node[decblk, right=of nv]     (sim) {Simulación\\Dinámica $(s,S)$};
+\node[decblk, right=of sim]    (lp)  {LP Optimizer\\(Knapsack)};
+
+%% ── OUTPUT ──────────────────────────────────────────────────────
+\node[outblk, below=of sim] (reco) {\texttt{reorder\_recommendations}\\$\rightarrow$ FastAPI / Dashboard};
+
+%% ── LATERAL: MLflow ─────────────────────────────────────────────
+\node[sideblk, right=1.1cm of conf, yshift=-1.5cm] (mlflow) {MLflow\\Tracking};
+
+%% ── FLECHAS PRINCIPALES ─────────────────────────────────────────
+\draw[arr] (hf)     -- (qgate);
+\draw[arr] (qgate)  -- (panel);
+\draw[arr] (panel)  -- (cens);
+\draw[arr] (cens)   -- (feng);
+\draw[arr] (feng)   -- (frame);
+\draw[arr] (frame)  -- (optuna);
+\draw[arr] (optuna) -- (catb);
+\draw[arr] (catb)   -- (conf);
+\draw[arr] (conf)   -- (nv);
+\draw[arr] (nv)     -- (sim);
+\draw[arr] (sim)    -- (lp);
+\draw[arr] (lp)     -- (reco);
+\draw[arr] (sim)    -- (reco);
+
+%% ── FLECHAS MLflow ──────────────────────────────────────────────
+\draw[darr] (catb)  -- (mlflow);
+\draw[darr] (conf)  -- (mlflow);
+\draw[darr] (sim)   to[bend right=15] (mlflow);
+
+%% ── ETIQUETAS DE CAPA ───────────────────────────────────────────
+\node[left=0.25cm of hf,     rotate=90, anchor=south, font=\sffamily\scriptsize\bfseries, gray!80] {Datos};
+\node[left=0.25cm of cens,   rotate=90, anchor=south, font=\sffamily\scriptsize\bfseries, gray!80] {Features};
+\node[left=0.25cm of optuna, rotate=90, anchor=south, font=\sffamily\scriptsize\bfseries, gray!80] {Modelado};
+\node[left=0.25cm of nv,     rotate=90, anchor=south, font=\sffamily\scriptsize\bfseries, gray!80] {Decisión};
+
+\end{tikzpicture}
+}
+\caption{Arquitectura end-to-end del sistema: flujo de datos desde la ingesta hasta la recomendación de pedido.}
+\label{fig:arquitectura_sistema}
+\shorthandon{>}%
+\end{figure}
+
+La estructura del código se organiza en torno a cuatro capas especializadas:
 
 \begin{enumerate}
-    \item \textbf{Data Engineering y Quality Gates}: Encargado de la ingesta desde fuentes externas (Hugging Face) y la limpieza. Se ha implementado un estricto \textit{Data Quality Gate} que aborta la ejecución si detecta anomalías operativas (ej. datos obsoletos o duplicados) antes de contaminar los modelos.
-    \item \textbf{Pipeline de Entrenamiento}: Gestiona la ingeniería de características sin \textit{leakage}, la optimización bayesiana multi-objetivo y el calibrado \textit{Mondrian Conformal}.
-    \item \textbf{Decisión e Investigación de Operaciones}: Transforma los cuantiles en decisiones de reposición mediante la simulación de inventario (s, S) y la programación lineal.
+    \item \textbf{Capa de Datos}: Ingesta desde Hugging Face con un \textit{Data Quality Gate} que aborta la ejecución si detecta anomalías (datos obsoletos, duplicados o series incompletas) antes de contaminar los modelos.
+    \item \textbf{Capa de Features}: Corrección de demanda censurada por stockout e ingeniería de 58 características temporales, exógenas y estáticas sin \textit{data leakage}.
+    \item \textbf{Capa de Modelado}: Búsqueda Pareto de hiperparámetros (Optuna NSGA-II), entrenamiento multi-cuantil (CatBoost con Pinball Loss) y calibración de intervalos (Mondrian Conformal Prediction).
+    \item \textbf{Capa de Decisión}: Transformación de cuantiles en órdenes de pedido vía el fractil crítico del Newsvendor, simulación dinámica $(s,S)$ y resolución de restricciones globales por Programación Lineal.
 \end{enumerate}
 
 \section{Ecosistema Tecnológico}
-El \textit{stack} tecnológico se ha seleccionado para maximizar la robustez, escalabilidad y explicabilidad:
+
+La Tabla~\ref{tab:tech_stack} resume las herramientas principales del sistema. Cada elección responde a una necesidad técnica concreta, no a preferencia arbitraria.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{lll}
+        \toprule
+        \textbf{Componente} & \textbf{Herramienta} & \textbf{Alternativa descartada} \\
+        \midrule
+        Modelado probabilístico & CatBoost, LightGBM & XGBoost, scikit-learn \\
+        Optimización multi-objetivo & Optuna (NSGA-II) & Hyperopt, GridSearch \\
+        Optimización lineal & SciPy HiGHS & PuLP, CVXPY \\
+        Experiment tracking & MLflow & Weights \& Biases, Neptune \\
+        Microservicio de inferencia & FastAPI & Flask, Django REST \\
+        Contenerización & Docker + Compose & Entornos virtuales \\
+        Validación de contratos & Pydantic v2 & dataclasses, marshmallow \\
+        Explicabilidad & SHAP & LIME, eli5 \\
+        Dashboard interactivo & React & Streamlit, Dash \\
+        CI/CD & GitHub Actions & Jenkins, GitLab CI \\
+        \bottomrule
+    \end{tabular}
+    \caption{Stack tecnológico del sistema con alternativas descartadas.}
+    \label{tab:tech_stack}
+\end{table}
+
+Las decisiones más relevantes se justifican a continuación:
+
 \begin{itemize}
-    \item \textbf{Motor de Modelado}: \texttt{CatBoost} y \texttt{LightGBM} para \textit{Gradient Boosting} probabilístico.
-    \item \textbf{Optimización y OR}: \texttt{Optuna} (NSGA-II) para el frente de Pareto y \texttt{SciPy} (método \textit{highs}) para el \textit{Continuous Knapsack}.
-    \item \textbf{Experiment Tracking (MLflow)}: El registro local de artefactos se ha migrado a un servidor \texttt{MLflow}. El sistema inyecta automáticamente todos los hiperparámetros, métricas (Winkler, PICP, costes) y gráficos generados, asegurando la reproducibilidad absoluta y la comparabilidad visual de cientos de ejecuciones.
-    \item \textbf{Despliegue y Microservicios (FastAPI)}: El modelo no es un ente pasivo. Se ha implementado un microservicio asíncrono con \texttt{FastAPI} que expone el \textit{endpoint} \texttt{/predict\_orders}. Este servicio está diseñado para ser consumido directamente por el ERP de la cadena de suministro, integrando la inferencia y la optimización logística en tiempo real.
-    \item \textbf{Dashboard Interactivo (Streamlit)}: Para acercar la matemática al tomador de decisiones, se ha desarrollado un \textit{What-If Dashboard}. Esta interfaz permite a los directores ajustar los costes de rotura y exceso o las capacidades de almacén de forma visual, re-simulando y comparando las decisiones logísticas al instante.
+    \item \textbf{CatBoost sobre XGBoost}: Como se argumentó en el Capítulo~\ref{chap:estado_del_arte}, CatBoost gestiona variables categóricas de alta cardinalidad (tienda, producto, categoría) de forma nativa mediante \textit{Ordered Target Statistics}, eliminando el riesgo de \textit{target leakage} que introduce el \textit{target encoding} manual en XGBoost. Adicionalmente, sus árboles oblivious actúan como regularizador implícito, beneficioso para series con alta variabilidad.
+
+    \item \textbf{Optuna sobre Hyperopt o GridSearch}: Optuna implementa el sampler TPE (\textit{Tree-structured Parzen Estimator}) con soporte nativo para optimización multi-objetivo (NSGA-II), \textit{pruning} de trials poco prometedores y paralelización. GridSearch es inviable a escala (espacio de hiperparámetros continuo) e Hyperopt no soporta nativamente Pareto multi-objetivo sin extensiones.
+
+    \item \textbf{FastAPI sobre Flask}: FastAPI genera documentación OpenAPI automática, soporta tipado estático con Pydantic y es asíncrono de forma nativa (ASGI), lo que reduce la latencia bajo carga concurrente ---relevante cuando el dashboard realiza múltiples recálculos en paralelo. Flask es síncrono por defecto y requiere extensiones para alcanzar el mismo nivel de robustez.
+
+    \item \textbf{Pydantic v2 sobre dataclasses}: Pydantic valida y convierte tipos en tiempo de ejecución, no solo en tiempo de análisis estático. Esto permite rechazar configuraciones incoherentes (ej. un horizonte negativo o una ruta de modelo inexistente) antes de que lleguen al pipeline, convirtiendo los errores tardíos en fallos rápidos y auditables.
+
+    \item \textbf{Docker sobre entornos virtuales}: Un entorno virtual resuelve las dependencias Python pero no fija el sistema operativo, las librerías del sistema ni la versión de CUDA. Docker garantiza que el entorno de entrenamiento y el de inferencia son bitwise idénticos, eliminando la clase entera de bugs ``funciona en mi máquina''.
+
+    \item \textbf{React sobre Streamlit o Dash}: Streamlit y Dash son adecuados para prototipos, pero reconstruyen toda la página ante cada interacción del usuario. El dashboard \textit{What-If} requiere recalcular la simulación de inventario en tiempo real mientras el usuario ajusta los sliders de coste, lo que demanda actualizaciones de estado parciales (virtual DOM de React) para mantener la latencia por debajo de 200ms.
 \end{itemize}
+
+\section{Pipeline de Datos: De la Ingesta al Frame Supervisado}
+\label{sec:data_pipeline}
+
+El pipeline de datos transforma los registros de ventas crudos en el \textit{frame} supervisado que alimenta el entrenamiento del modelo. Está implementado en tres módulos especializados bajo \texttt{src/retail\_forecasting/data/} con una separación clara de responsabilidades y contratos de interfaz explícitos.
+
+\subsection{Ingesta y Normalización (\texttt{dataset.py})}
+
+La función \texttt{load\_raw\_split()} descarga el dataset \textit{FreshRetailNet-50K} desde Hugging Face con caché local, seleccionando el split \texttt{train} por defecto. El resultado es un \texttt{DataFrame} con las 14 columnas brutas definidas en la especificación del dataset: siete identificadores estáticos de jerarquía (\texttt{city\_id}, \texttt{store\_id}, \texttt{management\_group\_id}, tres niveles de categoría y \texttt{product\_id}), la fecha (\texttt{dt}), las ventas brutas (\texttt{sale\_amount}) y las covariables exógenas (descuento, horas de disponibilidad, indicadores de festivo y promoción, precipitación, temperatura, humedad, viento).
+
+La normalización construye el \texttt{series\_id} como concatenación de \texttt{store\_id} y \texttt{product\_id}, renombra \texttt{sale\_amount} a \texttt{observed\_demand} y \texttt{stock\_hour6\_22\_cnt} a \texttt{stockout\_hours}. El resultado es el \textbf{panel preparado}: una tabla indexada por (\texttt{series\_id}, \texttt{date}) sin duplicados, base para todas las etapas posteriores.
+
+\subsection{Puerta de Calidad de Datos (\texttt{quality.py})}
+
+Antes de iniciar ningún cálculo, el módulo \texttt{validate\_prepared\_panel()} ejecuta una batería de validaciones clasificadas en dos niveles de severidad:
+
+\begin{itemize}
+    \item \textbf{Errores bloqueantes}: La ejecución se aborta si se detectan columnas obligatorias ausentes (\texttt{date}, \texttt{series\_id}, \texttt{observed\_demand}, \texttt{stockout\_hours}), pares (\texttt{series\_id}, \texttt{date}) duplicados, nulos en columnas clave, fechas con formato inválido, valores negativos de demanda o datos obsoletos en modo operacional (\texttt{score\_daily}) con una antigüedad superior a \texttt{max\_data\_age\_days}.
+    \item \textbf{Advertencias no bloqueantes}: Se registran en el reporte final si la fracción de valores faltantes en alguna covariable supera el umbral configurado (\texttt{max\_missing\_fraction\_warning}) o si alguna serie tiene una cobertura temporal inferior al mínimo requerido.
+\end{itemize}
+
+Este diseño de \textit{fail-fast} garantiza que ningún error de datos alcanza la fase de entrenamiento. Los umbrales son configurables en \texttt{DataQualityConfig} para adaptarse a distintos entornos sin modificar el código.
+
+\subsection{Corrección de Demanda Censurada (\texttt{censorship.py})}
+
+El módulo \texttt{LatentDemandImputer} implementa las cuatro estrategias de corrección descritas en la Sección~\ref{sec:demanda_censurada}: \texttt{supervised} (modelo auxiliar, estrategia por defecto), \texttt{historical\_mean} (media histórica de la serie en días sin rotura), \texttt{clipped\_scaling} (escalado proporcional con factor configurable) y \texttt{none} (sin corrección, como \textit{baseline}). El estrategia activa es configurable en \texttt{PreprocessingConfig.censorship\_strategy}, permitiendo comparaciones controladas entre enfoques.
+
+La estrategia \texttt{supervised} entrena un regresor LightGBM sobre las observaciones limpias (días con \texttt{stockout\_hours == 0}), usando como covariables los lags históricos de demanda, las variables de calendario y los indicadores exógenos. Después predice la demanda latente en los días censurados. El módulo añade tres columnas al panel: \texttt{latent\_demand\_est} (estimación de la demanda real), \texttt{original\_observed\_demand} (copia de las ventas originales para auditoría) e \texttt{is\_imputed} (indicador binario de las filas corregidas). El campo \texttt{observed\_demand} es sobreescrito con la estimación latente para que el pipeline de features no requiera lógica condicional.
+
+\subsection{Flujo Completo}
+
+La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la fuente hasta el \textit{frame} supervisado listo para entrenamiento.
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+    node distance=0.55cm and 0.9cm,
+    every node/.style={font=\sffamily\footnotesize, align=center},
+    stage/.style={draw, rectangle, rounded corners=4pt, minimum width=3.2cm, minimum height=0.85cm, text width=3.0cm},
+    s1/.style={stage, fill=blue!10},
+    s2/.style={stage, fill=red!10},
+    s3/.style={stage, fill=orange!10},
+    s4/.style={stage, fill=teal!10},
+    s5/.style={stage, fill=green!12},
+    arr/.style={->, thick},
+    modfont/.style={font=\ttfamily\tiny, gray!70}
+]
+\node[s1] (raw)   {Hugging Face\\FreshRetailNet-50K};
+\node[s2, right=of raw]   (qgate)  {Data Quality Gate\\(7 checks)};
+\node[s3, right=of qgate] (panel)  {Panel Preparado\\(series\_id, date)};
+\node[s4, right=of panel] (cens)   {LatentDemand\\Imputer};
+\node[s5, right=of cens]  (frame)  {Frame Supervisado\\(58 features + target)};
+
+\draw[arr] (raw)   -- (qgate);
+\draw[arr] (qgate) -- (panel);
+\draw[arr] (panel) -- (cens);
+\draw[arr] (cens)  -- (frame);
+
+\node[modfont, below=0.15cm of raw]   {dataset.py};
+\node[modfont, below=0.15cm of qgate] {quality.py};
+\node[modfont, below=0.15cm of cens]  {censorship.py};
+\node[modfont, below=0.15cm of frame] {engineering.py};
+\end{tikzpicture}
+\shorthandon{>}%
+\caption{Pipeline de datos: flujo de transformaciones desde la ingesta hasta el frame supervisado.}
+\label{fig:data_pipeline}
+\end{figure}
 
 \section{Modos de Ejecución y Ciclo Operacional}
 \label{sec:run_modes}
@@ -72,17 +254,124 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
 
 Esta separación garantiza la \textbf{continuidad y explicabilidad del negocio}: un sistema de inventario cuya arquitectura interna cambia drásticamente cada día es inauditable. Al fijar los hiperparámetros y validarlos mensualmente, se logra un equilibrio entre adaptabilidad al mercado y estabilidad necesaria para las operaciones logísticas.
 
+\subsection{Lógica de Promoción del Modelo Campeón}
+\label{sec:champion_promotion}
+
+Al término de cada ejecución en modo \texttt{experiment}, el sistema evalúa automáticamente si algún \textit{challenger} del frente de Pareto debe reemplazar al modelo \textit{champion} actualmente registrado en \texttt{champion\_registry.json}. La decisión sigue un protocolo con dos guardarraíles configurables:
+
+\begin{enumerate}
+    \item \textbf{Mejora de coste mínima}: Se calcula la mejora relativa en coste de inventario simulado respecto al campeón actual como $\Delta_{\text{cost}} = \frac{C_{\text{champion}} - C_{\text{challenger}}}{C_{\text{champion}}} \times 100$\%. El \textit{challenger} solo es candidato si $\Delta_{\text{cost}} \geq \theta_{\text{cost}}$, donde $\theta_{\text{cost}}$ es el umbral \texttt{champion\_min\_cost\_improvement\_pct} (por defecto 0\%, modificable en \texttt{BusinessConfig}).
+
+    \item \textbf{Guardarraíl de nivel de servicio}: El \textit{challenger} no debe degradar el nivel de servicio más allá de un margen configurable (\texttt{champion\_max\_service\_level\_degradation}). Si $\Delta_{\text{sl}} < -\delta_{\text{sl}}$, el candidato es descartado aunque mejore el coste.
+\end{enumerate}
+
+Entre todos los \textit{challengers} que superan ambos guardarraíles, se selecciona el de menor coste total (con el nivel de servicio como criterio de desempate). La decisión ---incluyendo los valores exactos de $\Delta_{\text{cost}}$, $\Delta_{\text{sl}}$, el motivo de aceptación o rechazo y los identificadores de ambos modelos--- queda registrada en el campo \texttt{promotion} del metadato de la ejecución, garantizando una trazabilidad completa del historial de cambios de modelo.
+
+\subsection{Seguimiento de Experimentos con MLflow}
+\label{sec:mlflow_tracking}
+
+Cada ejecución en modo \texttt{experiment} registra automáticamente un \textit{run} en el servidor MLflow mediante el módulo \texttt{evaluation/mlflow\_logger.py}. Se almacenan tres categorías de información:
+
+\begin{itemize}
+    \item \textbf{Parámetros}: Todos los campos de \texttt{Settings} se aplastan a pares clave-valor y se registran como parámetros del \textit{run} (ej. \texttt{dataset\_horizon=7}, \texttt{validation\_n\_folds=3}, \texttt{model\_quantiles=[0.1, 0.5, 0.9]}).
+    \item \textbf{Métricas del campeón}: Coste de inventario simulado (\texttt{champion\_sim\_total\_cost}), nivel de servicio simulado (\texttt{champion\_sim\_service\_level}), Winkler Score (\texttt{champion\_winkler\_score}), cobertura condicional (\texttt{champion\_interval\_coverage}) y MAE (\texttt{champion\_mae}).
+    \item \textbf{Artefactos}: Todo el directorio de la ejecución ---\texttt{predictions.csv}, \texttt{cost\_summary.csv}, \texttt{report.md}, gráficos de Pareto--- se adjunta bajo la ruta \texttt{run\_outputs/} del \textit{run}, permitiendo reproducir cualquier experimento histórico a partir del servidor MLflow.
+\end{itemize}
+
+\section{API REST e Interfaz Web}
+\label{sec:api}
+
+El sistema expone un microservicio FastAPI que actúa como capa de acceso unificada para clientes externos (dashboard, sistemas de compras, scripts de automatización). Todos los modelos de datos de entrada y salida están tipados con Pydantic v2, lo que genera automáticamente documentación OpenAPI interactiva en \texttt{/docs}.
+
+\subsection{Endpoints Principales}
+
+La Tabla~\ref{tab:api_endpoints} describe los endpoints operacionales del servicio.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{lp{2.5cm}p{6.5cm}}
+        \toprule
+        \textbf{Método + Ruta} & \textbf{Nombre} & \textbf{Descripción} \\
+        \midrule
+        \texttt{POST /predict\_orders} & Scoring operacional & Ejecuta el modo \texttt{score\_daily} y devuelve \texttt{reorder\_recommendations}: una fila por par tienda-producto con \texttt{order\_quantity}, cuantiles calibrados y fecha de decisión. \\
+        \texttt{POST /api/run} & Ejecución asíncrona & Lanza el pipeline completo en un subproceso en segundo plano. Devuelve inmediatamente una respuesta de aceptación; el progreso y los logs de ejecución son consultables vía \texttt{GET /api/run/status}. \\
+        \texttt{POST /api/forecast} & Simulador \textit{What-If} & Recalcula en tiempo real los cuantiles conformes empíricos y la cantidad óptima $q^*$ del Newsvendor dado un conjunto de parámetros (\texttt{serviceLevel}, \texttt{shortageCost}, \texttt{holdingCost}, \texttt{capacity}) y un \texttt{selectedSkuId}. \\
+        \texttt{GET /api/skus} & Catálogo de SKUs & Devuelve hasta 50 SKUs con métricas calculadas sobre las predicciones del último run: cobertura empírica, PSI de drift, $q^*$ y estado operacional (\textit{ok}/\textit{drift}/\textit{shortage}/\textit{overstock}). \\
+        \texttt{GET /api/drift} & Monitor de drift & Devuelve el PSI (\textit{Population Stability Index}) de las siete features de mayor importancia SHAP, con su distribución pre/post para diagnóstico visual. \\
+        \texttt{GET /api/alerts} & Alertas operacionales & Extrae las filas marcadas en \texttt{exceptions.csv} del último run y las serializa como alertas con severidad (\textit{critical}/\textit{warning}), descripción y endpoint de acción sugerida. \\
+        \texttt{GET /health} & Sonda de disponibilidad & Devuelve estado del servicio, versión, \textit{uptime} y si las predicciones están cargadas en caché; utilizada por Railway y BetterStack para monitorización. \\
+        \bottomrule
+    \end{tabular}
+    \caption{Endpoints del microservicio FastAPI del sistema de previsión de demanda.}
+    \label{tab:api_endpoints}
+\end{table}
+
+\subsection{Dashboard Interactivo}
+
+El endpoint raíz \texttt{GET /} sirve un dashboard React de página única (\textit{Single Page Application}) embebido en el propio servidor FastAPI. El dashboard está organizado en cuatro paneles funcionales:
+
+\begin{itemize}
+    \item \textbf{Panel de Pronóstico y Simulador \textit{What-If}}: Muestra la serie temporal de predicciones vs. demanda real del SKU seleccionado, con los intervalos conformes superpuestos. El usuario puede ajustar mediante \textit{sliders} el nivel de servicio objetivo, los costes de rotura y sobrestock, y la capacidad del almacén; el endpoint \texttt{POST /api/forecast} recalcula en tiempo real la cantidad óptima $q^*$ y los KPIs de inventario (coste total, cobertura empírica, MAE, PSI de drift).
+
+    \item \textbf{Panel de Catálogo de SKUs}: Vista tabular de los 50 SKUs más activos con su estado operacional codificado en color, la tendencia de demanda de los últimos 14 días y las métricas clave. Permite seleccionar un SKU para actualizar el panel de pronóstico.
+
+    \item \textbf{Panel de Drift}: Gráfico de barras con el PSI de cada feature de importancia, marcando en naranja (PSI $> 0.10$) y rojo (PSI $> 0.20$) las features que han sufrido cambios distribucionales significativos desde el entrenamiento.
+
+    \item \textbf{Panel de Alertas}: Lista priorizada de alertas operacionales con enlace directo al endpoint de acción sugerida (reoptimización, reentrenamiento o revisión manual), extraídas del fichero \texttt{exceptions.csv} del último run.
+\end{itemize}
+
 \section{Calidad de Software e Infraestructura CI/CD}
 Para garantizar que la deuda técnica no limite el escalado del sistema, se han aplicado prácticas fundamentales de \textit{DevOps}:
 \begin{itemize}
     \item \textbf{Contratos Estrictos (Pydantic)}: Toda la configuración y los metadatos transitan a través de esquemas validados y tipados estáticamente, rechazando configuraciones incoherentes o derivas de datos no controladas.
-    \item \textbf{Contenerización (Docker)}: La API, el servidor MLflow y el Dashboard de Streamlit están orquestados conjuntamente mediante \texttt{docker-compose.yml}, garantizando que cualquier investigador pueda levantar la arquitectura completa con un solo comando en cualquier sistema operativo.
-    \item \textbf{Integración Continua (GitHub Actions)}: El repositorio cuenta con un pipeline de CI (\texttt{ci.yml}) que, ante cada nuevo \textit{commit}, despliega un entorno virgen, formatea el código (Ruff) y ejecuta exhaustivamente la batería de más de 80 tests automatizados (\texttt{Pytest}), garantizando la integridad arquitectónica ininterrumpida.
+    \item \textbf{Contenerización (Docker)}: La API (que sirve el microservicio FastAPI y
+    la interfaz React integrada), el servidor MLflow y el almacenamiento local están orquestados
+    conjuntamente mediante \texttt{docker-compose.yml}, garantizando que cualquier investigador
+    pueda levantar la arquitectura completa con un solo comando en cualquier sistema operativo.
+    \item \textbf{Integración Continua (GitHub Actions)}: El repositorio cuenta con un pipeline de CI (\texttt{ci.yml}) que, ante cada nuevo \textit{commit}, despliega un entorno virgen, formatea el código (Ruff) y ejecuta la batería de tests automatizados descritos en la sección siguiente.
 \end{itemize}
+
+\subsection{Estrategia de Testing: Pirámide de Verificación}
+
+El sistema cuenta con 19 módulos de test bajo \texttt{tests/} organizados en cinco niveles de la pirámide de verificación, cada uno orientado a un tipo de fallo diferente. La Tabla~\ref{tab:test_strategy} resume la clasificación.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{lp{4.2cm}p{5.6cm}}
+        \toprule
+        \textbf{Nivel} & \textbf{Módulos de test} & \textbf{Qué verifica} \\
+        \midrule
+        Contratos de datos & \texttt{test\_dataframe\_contracts} \newline \texttt{test\_raw\_column\_boundaries} \newline \texttt{test\_generated\_artifact\_boundaries} & Que los DataFrames producidos por cada etapa del pipeline cumplen los esquemas de columnas, tipos y rangos esperados. \\
+        \midrule
+        Anti-\textit{data leakage} & \texttt{test\_temporal\_leakage\_contract} & Que ninguna feature contiene información del periodo de predicción (target futuro, covariables del mismo día, ventanas deslizantes mal calculadas). \\
+        \midrule
+        Contratos de configuración & \texttt{test\_config\_contract} \newline \texttt{test\_quantile\_contract} & Que la configuración por defecto preserva los guardarraíles experimentales y que las métricas de cobertura se calculan con los cuantiles reales del modelo, no \textit{hardcodeados}. \\
+        \midrule
+        Unitarios de lógica & \texttt{test\_features} \newline \texttt{test\_metrics} \newline \texttt{test\_inventory} \newline \texttt{test\_backtesting} \newline \texttt{test\_data\_quality} & Correctitud aritmética de lags, ventanas deslizantes, Pinball Loss, Winkler Score, lógica del Newsvendor y validaciones del Data Quality Gate. \\
+        \midrule
+        Integración y humo & \texttt{test\_smoke} \newline \texttt{test\_business\_outputs} \newline \texttt{test\_operational\_simulation} \newline \texttt{test\_api} \newline \texttt{test\_run\_cli} \newline \texttt{test\_architecture\_imports} \newline \texttt{test\_docs\_references} \newline \texttt{test\_eda\_module} & Pipeline end-to-end sobre datos sintéticos, endpoints FastAPI, ciclo operacional completo, ausencia de dependencias cíclicas entre módulos. \\
+        \bottomrule
+    \end{tabular}
+    \caption{Estrategia de testing por niveles: 19 módulos clasificados por tipo de fallo que detectan.}
+    \label{tab:test_strategy}
+\end{table}
+
+El nivel más crítico ---y menos habitual en sistemas de ML--- es el de los \textbf{tests anti-\textit{data leakage}}. El módulo \texttt{test\_temporal\_leakage\_contract} verifica cuatro invariantes que garantizan la validez del backtesting:
+
+\begin{enumerate}
+    \item Que el \texttt{target\_lead\_time\_demand} es la suma de la demanda de los $H$ días siguientes a la fecha de decisión, no del día actual.
+    \item Que los \textit{lags} de demanda (ej. \texttt{demand\_lag\_1}) contienen el valor del día anterior, no del día actual, y que \texttt{observed\_demand} nunca aparece como columna de features.
+    \item Que las covariables realizadas (descuento, horas de stockout, variables climáticas) solo entran al modelo como \textit{lags} del pasado, no como valores del día de decisión.
+    \item Que el backtesting walk-forward respeta el \textit{gap} de $H$ días entre el último día de entrenamiento y el primer día de validación, evitando que el target del train se solape con el input del test.
+\end{enumerate}
+
+Estos tests se ejecutan como parte del pipeline de CI antes de cada merge, garantizando que ninguna refactorización del módulo de features introduce inadvertidamente fuga de información hacia el futuro.
 
 \section{Explicabilidad y Diagnóstico Automático}
 Un sistema de apoyo a la decisión en \textit{retail} pierde su valor si opera como una caja negra. Por ello, se han integrado módulos de observabilidad (\textit{Observability}):
 \begin{itemize}
-    \item \textbf{Explicabilidad Global (SHAP)}: El sistema genera valores de Shapley Aditivos (\texttt{shap}) para el modelo Campeón, documentando gráficamente el peso real de los \textit{lags}, las variables climáticas o las jerarquías en la predicción.
+    \item \textbf{Explicabilidad Global (SHAP)}: El sistema genera valores de Shapley Aditivos \cite{lundberg2017shap} (\texttt{shap}) para el modelo Campeón, documentando gráficamente el peso real de los \textit{lags}, las variables climáticas o las jerarquías en la predicción.
     \item \textbf{Diagnóstico Post-Mortem}: En lugar de requerir análisis manual tras un fallo logístico, el sistema escanea sus propios errores. Si un SKU genera sobrecostes excesivos en la simulación, un módulo automático redacta un diagnóstico en el reporte final, indicando si la pérdida se debió a un \textit{Concept Drift} (basado en el detector Page-Hinkley), \textit{Cold Start} (falta de historia) o alta intermitencia estructural. Esto transforma el sistema de un mero proyector numérico a un \textbf{agente autodiagnóstico}.
 \end{itemize}

@@ -2,7 +2,7 @@
 \chapter{Análisis del Conjunto de Datos}
 \label{chap:analisis_datos}
 
-Antes de abordar el modelado, es imperativo comprender la naturaleza y estructura de los datos. Este capítulo presenta un Análisis Exploratorio de Datos (EDA) sobre el dataset \textit{Fresh RetailNet}, identificando los patrones, retos y oportunidades que definen el problema de previsión.
+Este capítulo analiza la naturaleza y estructura del dataset \textit{Fresh RetailNet}, identificando los patrones, retos y oportunidades que condicionan el diseño del sistema de previsión.
 
 \section{Descripción del Dataset}
 El conjunto de datos \textit{Fresh RetailNet} es un benchmark masivo diseñado específicamente para el sector retail. Contiene series temporales diarias de ventas de productos frescos en diversas tiendas, acompañadas de metadatos jerárquicos y variables exógenas.
@@ -27,8 +27,8 @@ Para mantener una interpretación consistente a lo largo del proyecto, el panel 
         \midrule
         Fecha diaria & \texttt{date} & temporal & Origen de predicción y eje principal del panel. \\
         Identificador de serie & \texttt{series\_id} & categórica & Clave tienda-producto para agrupar historia y construir features por serie. \\
-        Demanda observada & demanda observada / sale amount & numérica & Señal objetivo base utilizada para construir la etiqueta acumulada de horizonte. \\
-        Horas de \textit{stockout} & horas de stockout / stock hour 6--22 count & numérica & Intensidad de falta de disponibilidad; actúa como contexto operativo y señal de censura. \\
+        Demanda observada & \texttt{observed\_demand} & numérica & Señal objetivo base utilizada para construir la etiqueta acumulada de horizonte. \\
+        Horas de \textit{stockout} & \texttt{stockout\_hours} & numérica & Intensidad de falta de disponibilidad; actúa como contexto operativo y señal de censura. \\
         Descuento & \texttt{discount} & numérica & Variable comercial exógena que captura promociones o rebajas. \\
         Festivo & \texttt{holiday\_flag} & binaria & Indicador de cierre o comportamiento especial asociado a días festivos. \\
         Actividad promocional & \texttt{activity\_flag} & binaria & Señal contextual de actividad comercial o evento local. \\
@@ -38,11 +38,11 @@ Para mantener una interpretación consistente a lo largo del proyecto, el panel 
         Nivel medio de viento & \texttt{avg\_wind\_level} & numérica & Variable meteorológica exógena. \\
         Ciudad & \texttt{city\_id} & categórica & Identificador jerárquico estático del entorno geográfico. \\
         Tienda & \texttt{store\_id} & categórica & Identificador estático de la ubicación comercial. \\
-        Grupo de gestión & management group id & categórica & Nivel jerárquico de gestión de la tienda. \\
-        Primera categoría & first category id & categórica & Primer nivel de la jerarquía del producto. \\
-        Segunda categoría & second category id & categórica & Segundo nivel de la jerarquía del producto. \\
-        Tercera categoría & third category id & categórica & Tercer nivel de la jerarquía del producto. \\
-        Producto & product id & categórica & Identificador del SKU concreto modelado. \\
+        Grupo de gestión & \texttt{management\_group\_id} & categórica & Nivel jerárquico de gestión de la tienda. \\
+        Primera categoría & \texttt{first\_category\_id} & categórica & Primer nivel de la jerarquía del producto. \\
+        Segunda categoría & \texttt{second\_category\_id} & categórica & Segundo nivel de la jerarquía del producto. \\
+        Tercera categoría & \texttt{third\_category\_id} & categórica & Tercer nivel de la jerarquía del producto. \\
+        Producto & \texttt{product\_id} & categórica & Identificador del SKU concreto modelado. \\
         \bottomrule
     \end{tabular}
     }
@@ -50,129 +50,193 @@ Para mantener una interpretación consistente a lo largo del proyecto, el panel 
     \label{tab:dataset_variables}
 \end{table}
 
+El dataset comprende \textbf{4.500.000 observaciones} distribuidas en \textbf{50.000 series} únicas (combinaciones tienda-producto), abarcando \textbf{898 tiendas} y \textbf{865 productos} distintos. La jerarquía de categorías tiene 32 categorías de primer nivel, 84 de segundo y 233 de tercer nivel. El horizonte temporal cubre el período del 28 de marzo al 25 de junio de 2024, con todas las series de longitud exacta de 90 días, lo que garantiza un panel perfectamente balanceado.
+
 En términos operativos, las columnas \texttt{date} y \texttt{series\_id} definen la estructura temporal y panelizada del problema. El resto de variables se divide en tres grupos funcionales: la demanda observada que actúa como señal base, las variables contextuales exógenas que describen el entorno operativo y las variables estáticas que codifican la jerarquía geográfica y comercial de cada serie. Esta separación es importante porque más adelante determina qué campos pueden utilizarse como entrada, cuáles solo sirven como contexto y cuáles no deben confundirse con la etiqueta objetivo.
 
-\section{Patrones Temporales y Estacionalidad}
-El análisis visual de las series revela una fuerte estacionalidad semanal. Las ventas tienden a concentrarse en los días previos al fin de semana, con caídas significativas en días festivos oficiales cuando las tiendas permanecen cerradas. Esta naturaleza cíclica justifica el uso de \textit{lags} de 7 días y variables de calendario en la fase de ingeniería de características.
+En cuanto a la calidad estructural, el panel preparado presenta una cobertura homogénea y balanceada tras el filtrado aplicado sobre las series válidas, sin discontinuidades ni huecos internos relevantes. La comprobación explícita de valores faltantes sobre las 4.500.000 filas del panel arroja \textbf{0 missings} en todas las columnas, tanto en la señal objetivo como en las variables exógenas y los identificadores jerárquicos. Esto permite interpretar el resto de resultados como propiedades del fenómeno de demanda y no como artefactos de una estructura irregular del dataset.
 
-\section{Análisis de la Intermitencia}
-Un rasgo distintivo del \textit{retail} fresco es la intermitencia. Muchas series presentan días con ventas cero, no debido a una falta de interés del consumidor, sino a la falta de disponibilidad del producto. Se ha cuantificado que aproximadamente el 15\% de las observaciones del dataset están afectadas por algún grado de \textit{stockout}, lo que subraya la importancia de la reconstrucción de la demanda latente propuesta en este trabajo.
+\section{Distribución de la Demanda}
 
-\section{Correlación con Variables Exógenas}
-Se observa una correlación positiva moderada entre la temperatura media y la demanda de ciertas categorías de productos frescos (ej. frutas de temporada). Asimismo, el factor "descuento" actúa como un fuerte impulsor de la demanda, alterando significativamente el patrón basal de ventas. El modelo desarrollado debe ser capaz de integrar estas señales para superar a los modelos autorregresivos simples.
+Conocer la forma de la distribución de la demanda es el primer paso para tomar decisiones de modelado informadas. Una distribución fuertemente asimétrica o con una masa elevada en cero tiene implicaciones directas sobre qué función de pérdida es adecuada, qué tipo de salida debe producir el modelo y cómo debe interpretarse el error agregado. En este contexto, ignorar la forma de la distribución equivale a diseñar el sistema sobre supuestos incorrectos.
 
-\section{Interpretación de las Visualizaciones del EDA}
+La Figura~\ref{fig:eda_observed_demand_distribution} muestra la distribución global de la demanda observada en dos escalas complementarias.
 
-Las visualizaciones generadas automáticamente complementan el análisis tabular del panel preparado y permiten identificar de forma más clara la estructura temporal, la heterogeneidad entre series y el impacto operativo de los \textit{stockouts}. Su objetivo no es modificar la semántica del problema, sino aportar evidencia descriptiva que justifique las decisiones posteriores de modelado y validación.
-
-\subsection{Cobertura temporal y calidad estructural del panel}
-
-Antes de estudiar los patrones de demanda, es necesario comprobar si el panel final presenta discontinuidades, series truncadas o huecos internos que puedan distorsionar el análisis temporal. En el panel preparado utilizado en este trabajo, la cobertura es homogénea y balanceada tras el filtrado aplicado sobre las series válidas. Esta observación es importante porque permite interpretar el resto de resultados como propiedades del fenómeno de demanda y no como simples artefactos de una estructura irregular del dataset. En otras palabras, el conjunto final puede tratarse como un panel suficientemente estable para una validación temporal rigurosa.
-
-\subsection{Distribución de la demanda observada}
-
-La distribución global de la demanda observada evidencia que la variable objetivo no sigue una forma aproximadamente normal, sino que presenta concentración en rangos bajos y una cola hacia valores más elevados. Esto es coherente con un contexto \textit{retail} de producto fresco, donde la demanda diaria suele ser moderada, irregular y sensible tanto a factores operativos como contextuales. La visualización de las series de mayor volumen mediante diagramas de caja confirma, además, que existe heterogeneidad relevante entre series, tanto en nivel medio como en dispersión. Esta evidencia apoya el uso de modelos globales con contexto, en lugar de asumir que todas las series comparten una dinámica homogénea.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{figures/eda/observed_demand_distribution.png}
     \caption{Distribución global de la demanda observada en el panel preparado.}
     \label{fig:eda_observed_demand_distribution}
 \end{figure}
 
-\begin{figure}[htbp]
+En escala lineal (panel izquierdo) se aprecia que la distribución está dominada por una masa concentrada en valores bajos, con una barra correspondiente a demanda cero que supera los 2.5 millones de observaciones. En escala logarítmica (panel derecho), la misma distribución revela una cola derecha larga con observaciones que alcanzan hasta 45 unidades diarias. La distribución es fuertemente asimétrica y no puede aproximarse por una gaussiana, lo que descarta el uso de funciones de pérdida simétricas como el MSE como único criterio de optimización.
+
+La Figura~\ref{fig:eda_observed_demand_boxplot} desglosa la heterogeneidad a nivel de serie individual, separando las series de alto volumen (panel izquierdo) de las de medio y bajo volumen (panel derecho), cada grupo con su propia escala.
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{figures/eda/observed_demand_boxplot_top_series.png}
-    \caption{Dispersión de la demanda observada en las series de mayor volumen.}
+    \caption{Dispersión de la demanda observada por series de alto, medio y bajo volumen.}
     \label{fig:eda_observed_demand_boxplot}
 \end{figure}
 
-\subsection{Estacionalidad semanal}
+Las series de alto volumen presentan medianas en torno a las 20 unidades diarias, con rangos intercuartílicos amplios (aproximadamente 10--28). Las series de medio y bajo volumen, en cambio, tienen medianas inferiores a 1 unidad diaria y sus cajas se comprimen casi completamente en torno a cero. Esta diferencia de escala de un orden de magnitud confirma que el panel no es homogéneo: conviven series con demanda sostenida y regular junto a series altamente intermitentes. Esta evidencia justifica el uso de modelos globales con contexto de serie, en lugar de asumir una dinámica compartida.
 
-La Figura~\ref{fig:eda_weekday_profile_manual} muestra la evolución de la demanda media y mediana según el día de la semana. El patrón observado sugiere una estacionalidad semanal clara, con diferencias sistemáticas entre días laborables y fin de semana. Esta regularidad justifica directamente la inclusión de variables de calendario y de retardos semanales en la etapa de ingeniería de características. Desde el punto de vista metodológico, esta es una de las señales más sólidas del EDA, ya que conecta de forma clara la estructura de los datos con el diseño de los predictores temporales.
+\section{Patrones Temporales y Estacionalidad}
 
-\begin{figure}[htbp]
+La existencia de patrones temporales recurrentes es una de las propiedades más valiosas en cualquier serie de demanda: si la demanda sigue un ciclo estable y predecible, el modelo puede aprender a anticiparlo en lugar de limitarse a reaccionar. En el sector retail de producto fresco, el ciclo semanal es el candidato más natural, dado que el comportamiento de compra de los consumidores varía sistemáticamente a lo largo de la semana. Confirmar esta hipótesis y cuantificar su intensidad es esencial para decidir qué variables de calendario y qué retardos temporales incluir como predictores.
+
+La Figura~\ref{fig:eda_weekday_profile_manual} muestra el perfil medio semanal de la demanda observada.
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.80\textwidth]{figures/eda/weekday_demand_profile.png}
     \caption{Perfil semanal de demanda observada con media y mediana.}
     \label{fig:eda_weekday_profile_manual}
 \end{figure}
 
-\subsection{Intermitencia y demanda cero}
+La demanda media alcanza su mínimo global el jueves, seguido de un repunte gradual el viernes y un crecimiento pronunciado durante el fin de semana. La mediana se mantiene estable en torno a 0.60 durante la semana laborable y experimenta un salto de aproximadamente el 33\% al inicio del sábado, estabilizando un \textit{plateau} en torno a 0.80 que se prolonga hasta el domingo. La media, en cambio, continúa creciendo hasta alcanzar el pico máximo el domingo, lo que refleja la presencia de valores atípicos altos durante el fin de semana. Este patrón justifica el uso de retardos estacionales (\textit{lags} de 7 días) y variables categóricas de calendario.
 
-La Figura~\ref{fig:eda_zero_demand_rate_manual} permite identificar las series con mayor proporción de observaciones en cero. Su lectura muestra que la intermitencia no afecta por igual a todo el panel, sino que se concentra con distinta intensidad según la serie. Esta heterogeneidad es importante porque advierte que las métricas agregadas pueden ocultar comportamientos muy diferentes entre productos o combinaciones tienda-producto. En consecuencia, la dificultad del problema no debe entenderse como uniforme, sino como dependiente del régimen operativo y de la naturaleza concreta de cada serie. Desde una perspectiva de modelado, esta observación sugiere evitar interpretaciones excesivamente agregadas de la calidad predictiva.
+Las Figuras~\ref{fig:eda_category_heatmap_high}, \ref{fig:eda_category_heatmap_medium} y \ref{fig:eda_category_heatmap_low} desglosan la estacionalidad semanal por categoría de producto, normalizada por \textit{Z-score} dentro de cada categoría, separando los tres niveles de demanda.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.90\textwidth]{figures/eda/category_seasonality_high.png}
+    \caption{Estacionalidad semanal: categorías de demanda alta.}
+    \label{fig:eda_category_heatmap_high}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.90\textwidth]{figures/eda/category_seasonality_medium.png}
+    \caption{Estacionalidad semanal: categorías de demanda media.}
+    \label{fig:eda_category_heatmap_medium}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.90\textwidth]{figures/eda/category_seasonality_low.png}
+    \caption{Estacionalidad semanal: categorías de demanda baja.}
+    \label{fig:eda_category_heatmap_low}
+\end{figure}
+
+Las tres figuras revelan que la heterogeneidad en los patrones semanales es una propiedad estructural del panel, presente en todos los niveles de demanda y no un artefacto de series marginales.
+
+En las categorías de \textbf{demanda alta}, la mayoría concentra actividad en sábado o domingo, pero con diferencias relevantes. Las categorías 56 y 171 presentan su pico máximo en martes (Z\,$\approx$\,1.8 y 1.7 respectivamente) con viernes muy negativo, invirtiendo completamente el patrón dominante. La categoría 66, a su vez, pica únicamente el sábado y registra un domingo negativo, al contrario de lo que cabría esperar en un producto fresco.
+
+En las categorías de \textbf{demanda media}, la diversidad es aún mayor. Las categorías 129, 218 y 67 alcanzan su máximo en martes o miércoles, con jueves y viernes fuertemente negativos, lo que sugiere un ciclo de reposición y consumo desplazado respecto al fin de semana. Las categorías 39, 68 y 139, en cambio, mantienen un patrón más convencional con pico en sábado o domingo.
+
+En las categorías de \textbf{demanda baja}, las categorías 40 y 117 tienen su máximo el martes (Z\,$\approx$\,1.9 y 1.6) con fin de semana neutro o negativo. El resto del grupo sí pica en domingo, pero no necesariamente en sábado.
+
+Esta evidencia confirma que asumir un único ciclo semanal para todo el panel sería un error sistemático. La calibración \textit{Mondrian} por categoría responde directamente a esta observación: en lugar de aplicar una corrección global uniforme a los intervalos de predicción, adapta la cobertura al comportamiento estacional específico de cada grupo.
+
+La Figura~\ref{fig:eda_acf_demand} muestra la función de autocorrelación (ACF) de la demanda diaria agregada hasta el retardo 28.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.90\textwidth]{figures/eda/acf_demand.png}
+    \caption{Función de autocorrelación (ACF) de la demanda diaria agregada. Los retardos múltiplos de 7 aparecen destacados en rojo; la banda sombreada indica el intervalo de confianza al 95\%.}
+    \label{fig:eda_acf_demand}
+\end{figure}
+
+Los picos en los retardos múltiplos de 7 superan con claridad el intervalo de confianza al 95\%, con valores de aproximadamente 0.62 en el retardo 7, 0.52 en el 14, 0.50 en el 21 y 0.39 en el 28. Esta estructura confirma una dependencia temporal con periodo exactamente semanal y amplitud decreciente, lo que justifica directamente la inclusión de retardos estacionales de 7 días como predictores en el modelo.
+
+\section{Intermitencia y Stockouts}
+
+En el contexto del \textit{retail} de producto fresco, los días con ventas registradas en cero pueden tener dos orígenes distintos. El primero es la \textbf{intermitencia}: una característica propia de ciertas series en las que la demanda real es esporádica, ya sea porque el producto se vende con poca frecuencia o porque la tienda no lo tiene en cartera todos los días. El segundo es el \textbf{stockout}: una situación en la que el producto sí existe demanda pero no hay stock disponible en el lineal, de modo que las ventas se detienen artificialmente y el dato registrado subestima la demanda real. Ambos fenómenos producen el mismo síntoma ---un cero en el registro de ventas--- pero tienen causas y consecuencias distintas para el modelado. Distinguirlos es fundamental: la intermitencia es una propiedad estructural de la serie que el modelo debe aprender, mientras que el stockout introduce un sesgo de censura que debe corregirse antes del entrenamiento.
+
+La Figura~\ref{fig:eda_zero_demand_rate_manual} muestra la distribución de la tasa de días con ventas cero en todas las series del panel.
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.78\textwidth]{figures/eda/zero_demand_rate_by_series.png}
-    \caption{Series más intermitentes según su proporción de demanda cero.}
+    \caption{Distribución de la tasa de demanda cero por serie.}
     \label{fig:eda_zero_demand_rate_manual}
 \end{figure}
 
-\subsection{Frecuencia e intensidad de los stockouts}
+La conclusión principal es que \textbf{la intermitencia no es el problema dominante}: la mediana de la tasa de demanda cero es de apenas 0.02, y la distribución está fuertemente concentrada por debajo de 0.1, con las dos primeras barras acumulando más de 33.000 series. Ninguna serie supera el umbral del 50\% de días sin ventas, lo que confirma que prácticamente todo el panel vende con regularidad. Sin embargo, la distribución tiene una cola derecha pronunciada que se extiende hasta valores próximos a 0.7. Estas series, aunque muy minoritarias, tienen una señal de demanda débil e irregular, lo que las convierte en los casos más difíciles de predecir. La enorme masa de ceros que se observaba en la Figura~\ref{fig:eda_observed_demand_distribution} no proviene principalmente de la intermitencia, sino de otro fenómeno: los \textit{stockouts}.
 
-La distribución de horas de \textit{stockout} muestra que la falta de disponibilidad no es un fenómeno anecdótico, sino una característica estructural del conjunto analizado. Esto refuerza la idea de que el problema de predicción no puede interpretarse como una simple serie temporal de ventas observadas, ya que parte de esas observaciones están condicionadas por restricciones de disponibilidad en el lineal.
+La Figura~\ref{fig:eda_stockout_distribution_manual} muestra la distribución de horas de \textit{stockout} en el panel.
 
-La Figura~\ref{fig:eda_stockout_distribution_manual} permite apreciar tanto la masa de observaciones sin rotura como la distribución de intensidades positivas. Complementariamente, la Figura~\ref{fig:eda_stockout_band_demand_manual} compara la demanda observada entre bandas de intensidad de \textit{stockout}. El patrón es coherente con la hipótesis de censura: cuando las horas de \textit{stockout} son severas, la demanda observada tiende a reducirse. No debe interpretarse esto como una estimación exacta de demanda latente, pero sí como evidencia descriptiva de que las ventas registradas pueden infraestimar el interés real del consumidor bajo condiciones de falta de stock.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{figures/eda/stockout_hours_distribution.png}
     \caption{Distribución de horas de \textit{stockout} en el panel preparado.}
     \label{fig:eda_stockout_distribution_manual}
 \end{figure}
 
-\begin{figure}[htbp]
+La mayoría de observaciones tienen cero horas de rotura, pero aproximadamente 2 millones de observaciones presentan algún grado de \textit{stockout}. El panel derecho, que muestra solo los días con rotura positiva, revela un patrón bimodal: una concentración entre las 4 y las 6 horas, y un segundo pico en las 16 horas, que corresponde a días con el lineal vacío prácticamente durante todo el horario comercial. Esto confirma que el \textit{stockout} no es un fenómeno anecdótico sino estructural, con una intensidad que varía desde roturas parciales hasta días completamente sin producto disponible.
+
+La Figura~\ref{fig:eda_stockout_band_demand_manual} muestra la demanda media observada por banda de intensidad de \textit{stockout}.
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{figures/eda/stockout_band_demand.png}
     \caption{Demanda media y número de observaciones por banda de \textit{stockout}.}
     \label{fig:eda_stockout_band_demand_manual}
 \end{figure}
 
-\subsection{Relación entre stockout y demanda observada}
+La relación entre intensidad de \textit{stockout} y demanda observada es, a primera vista, contraintuitiva. Los días sin rotura presentan una demanda media de 0.97, pero los días con 0--2 horas de \textit{stockout} muestran 1.41, superior. La explicación es que los \textit{stockouts} leves tienden a ocurrir precisamente en los días de mayor demanda: el producto se agota porque se vendió mucho. Solo cuando el \textit{stockout} es severo (7 o más horas) la demanda cae a 0.71, por debajo de la media sin rotura. Es en este régimen donde la censura es real: el producto lleva tanto tiempo agotado que las ventas perdidas superan a las registradas. Esta evidencia justifica tratar los días de \textit{stockout} severo de forma diferenciada en el preprocesamiento.
 
-La Figura~\ref{fig:eda_stockout_scatter_manual} representa la relación entre horas de \textit{stockout} y demanda observada, junto con una tendencia promedio. La relación agregada es negativa, aunque con alta dispersión. Esto indica que el efecto no es determinista ni uniforme, pero sí suficientemente visible como para considerar \texttt{stockout\_hours} una variable contextual relevante. La interpretación correcta es descriptiva y no causal: la visualización no demuestra por sí sola el mecanismo exacto de pérdida de ventas, pero sí aporta evidencia compatible con la existencia de censura operativa.
+\section{Variables Exógenas}
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.82\textwidth]{figures/eda/stockout_vs_demand_scatter.png}
-    \caption{Relación entre horas de \textit{stockout} y demanda observada.}
-    \label{fig:eda_stockout_scatter_manual}
-\end{figure}
+Además de la historia pasada de la propia serie, el dataset incluye variables externas que describen el entorno operativo: condiciones meteorológicas, actividad promocional e indicadores de festivos. Antes de incluirlas como predictores, es necesario evaluar en qué medida están asociadas con la demanda observada. Una correlación baja no implica necesariamente que la variable sea inútil ---un modelo no lineal puede explotar interacciones que no aparecen en una correlación marginal--- pero sí advierte de que su contribución puede ser modesta y condicionada al contexto.
 
-\subsection{Relaciones con covariables exógenas}
+La Figura~\ref{fig:eda_correlation_heatmap_manual} muestra el mapa de correlaciones entre las variables numéricas del panel.
 
-El mapa de correlaciones y la cuadrícula de relaciones entre covariables y demanda permiten estudiar la asociación entre la demanda observada y variables como descuento, temperatura o precipitación. En general, las relaciones marginales aparecen como moderadas o débiles, lo que sugiere que estas señales exógenas no deben interpretarse de forma aislada. Sin embargo, su inclusión sigue siendo razonable, ya que un modelo flexible puede capturar interacciones no lineales y dependencias condicionadas por serie o régimen que no se aprecian en una correlación global simple.
-
-La Figura~\ref{fig:eda_correlation_heatmap_manual} resume la estructura de correlaciones lineales entre las variables numéricas del panel preparado, mientras que la Figura~\ref{fig:eda_covariates_grid_manual} permite observar de manera más directa la relación entre demanda y algunas covariables exógenas relevantes. Ambas figuras son especialmente útiles para justificar que las variables contextuales pueden aportar información, aunque su efecto no sea uniforme ni lineal en todo el panel.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.82\textwidth]{figures/eda/correlation_heatmap.png}
     \caption{Mapa de correlaciones entre variables numéricas del panel preparado.}
     \label{fig:eda_correlation_heatmap_manual}
 \end{figure}
 
-\begin{figure}[htbp]
+La primera conclusión es que \texttt{observed\_demand} tiene correlaciones muy débiles con todas las variables. La más apreciable es la ligeramente negativa con \texttt{stockout\_hours} ---días con mucha rotura se registra menos demanda---, y la ligeramente positiva con \texttt{discount}. Las variables meteorológicas prácticamente no correlacionan con la demanda de forma directa.
+
+Entre las propias covariables destacan dos relaciones relevantes. Por un lado, \texttt{discount} y \texttt{activity\_flag} presentan una correlación negativa notable: son mecanismos promocionales que tienden a ser mutuamente excluyentes, de modo que cuando hay actividad comercial registrada no suele haber descuento activo y viceversa. Por otro lado, \texttt{holiday\_flag} y \texttt{discount} correlacionan positivamente, lo que indica que los descuentos se aplican con más frecuencia en festivos. En el bloque meteorológico, \texttt{precpt} y \texttt{avg\_humidity} correlacionan entre sí de forma esperada (más lluvia implica más humedad), pero esta relación es interna al grupo y no se traslada a la demanda.
+
+La Figura~\ref{fig:eda_covariates_grid_manual} muestra la relación entre cada covariable exógena y la demanda observada mediante muestras del panel.
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{figures/eda/covariate_vs_demand_grid.png}
     \caption{Relaciones muestreadas entre covariables exógenas y demanda observada.}
     \label{fig:eda_covariates_grid_manual}
 \end{figure}
 
-\subsection{Concentración del volumen y series representativas}
+La relación más clara y consistente es la de \texttt{avg\_temperature}: la demanda media crece de forma aproximadamente monótona desde 0.8 a 15\textdegree C hasta 1.15 a 28\textdegree C, lo que es coherente con el consumo estacional de producto fresco. La variable \texttt{precpt} muestra también una tendencia positiva aunque más ruidosa, posiblemente asociada al efecto estacional de la temperatura.
 
-Parte del volumen agregado se concentra en un subconjunto reducido de series. Esto contextualiza el uso de filtros como \texttt{top\_n\_series} y explica por qué el comportamiento agregado del panel puede cambiar cuando se restringe el análisis a las series más relevantes por volumen.
+La variable \texttt{discount} presenta una relación no monótona: la demanda es alta en los valores bajos de descuento (\(\approx\)0.5), cae progresivamente hasta valores cercanos a 0.85 en la zona media y repunta de nuevo hasta 1.5 al llegar al descuento máximo (1.0). Este patrón sugiere que el efecto promocional solo es efectivo en sus niveles extremos, y que la relación no puede capturarse con una correlación lineal.
 
-Finalmente, la Figura~\ref{fig:eda_representative_series_manual} ofrece una visión cualitativa especialmente útil para interpretar el problema. En estas series se observan simultáneamente patrones semanales, cambios de escala entre productos y episodios donde la demanda observada coexiste con intensidades elevadas de \textit{stockout}. Esta visualización es valiosa porque resume de forma intuitiva la complejidad conjunta del problema: estacionalidad, heterogeneidad entre series y posible censura por falta de disponibilidad. A diferencia de una tabla agregada, esta representación permite apreciar que el problema no solo es cuantitativamente heterogéneo, sino también visualmente distinto entre unas series y otras.
+Las variables \texttt{avg\_humidity} y \texttt{avg\_wind\_level} muestran tendencias más débiles e irregulares, con variaciones en la demanda media que apenas superan el 20\% a lo largo de todo su rango. En conjunto, estas gráficas confirman que las relaciones entre covariables exógenas y demanda son en su mayoría no lineales y de magnitud moderada, lo que justifica su inclusión en un modelo flexible capaz de explotar estas dependencias condicionadas.
 
-\begin{figure}[htbp]
+\section{Series Representativas}
+
+Los análisis anteriores han caracterizado el panel de forma agregada. Esta sección complementa esa visión con una inspección cualitativa de series individuales, que permite observar simultáneamente todos los fenómenos identificados: estacionalidad semanal, heterogeneidad de escala y episodios de \textit{stockout}.
+
+La Figura~\ref{fig:eda_representative_series_manual} muestra 12 series de alto volumen a lo largo del período de entrenamiento, con la demanda observada en azul y las horas de \textit{stockout} como área sombreada en rosa.
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{figures/eda/representative_series_panels.png}
     \caption{Series representativas con demanda observada y \textit{overlay} de \textit{stockout}.}
     \label{fig:eda_representative_series_manual}
 \end{figure}
 
-\subsection{Conclusiones del EDA}
+Las series provienen de tiendas distintas y muestran comportamientos cualitativamente diferentes. Los niveles de demanda varían entre series (de 0.2 a 4 unidades) y la volatilidad también es dispar: algunas series son relativamente estables mientras otras presentan picos aislados de alta amplitud. A nivel individual, el patrón semanal que era claro en el agregado resulta difícil de distinguir en la señal ruidosa de cada serie por separado, lo que subraya la importancia de incorporar retardos y variables de calendario como contexto explícito.
 
-En conjunto, las visualizaciones permiten extraer varias conclusiones relevantes para el diseño experimental del sistema. En primer lugar, el panel preparado presenta una estructura temporal consistente y adecuada para validación temporal. En segundo lugar, existe una estacionalidad semanal clara que justifica el uso de retardos y variables de calendario. En tercer lugar, la heterogeneidad entre series y la intermitencia parcial del panel aconsejan evitar simplificaciones excesivas en el modelado. Por último, la frecuencia y la intensidad de los \textit{stockouts}, junto con su asociación negativa con la demanda observada, refuerzan la idea de que el contexto operativo debe incorporarse explícitamente en el sistema de predicción y en la interpretación de sus resultados.
+La interacción entre demanda y \textit{stockout} (área rosa, escalada al rango de cada serie) muestra tres perfiles distintos. El primero, visible en la serie \texttt{671\_783}, es el caso más explícito de censura: en la primera mitad del período el \textit{stockout} es alto y la demanda observada baja; cuando el \textit{stockout} desaparece en la segunda mitad, la demanda sube notablemente, confirmando que había demanda latente que no se registraba. El segundo perfil, presente en series como \texttt{159\_740} y \texttt{404\_682}, corresponde a stockouts frecuentes que alternan con caídas puntuales de la demanda a lo largo de todo el período --- censura parcial y recurrente. El tercer perfil, ilustrado por \texttt{161\_847}, es el de una serie de demanda muy baja (0.2--0.9 unidades) con stockout persistente, donde es difícil separar la intermitencia propia del producto de la demanda suprimida por falta de disponibilidad.
+
+\section{Conclusiones del Análisis}
+
+El análisis exploratorio realizado permite consolidar cinco conclusiones que condicionan directamente el diseño del sistema de previsión.
+
+\textbf{Distribución asimétrica y heterogénea.} La demanda observada es fuertemente asimétrica, con más de 2.5 millones de ceros y una cola que alcanza las 45 unidades diarias. Las series de alto volumen tienen medianas en torno a 20 unidades, mientras las de medio y bajo volumen presentan medianas inferiores a 1. Esta heterogeneidad descarta el uso de una función de pérdida simétrica como el MSE como único criterio y justifica el uso de modelos globales con contexto de serie.
+
+\textbf{Estacionalidad semanal estructural y heterogénea entre categorías.} La ACF confirma una autocorrelación de 0.62 en el retardo 7, decreciendo hasta 0.39 en el retardo 28. El perfil semanal agrega muestra un mínimo el jueves y un pico el domingo. Sin embargo, el análisis por categorías revela que este patrón no es universal: categorías como la 56 o la 171 pican en martes, y la diversidad aparece en los tres niveles de demanda. Esto justifica el uso de retardos estacionales de 7 días y, especialmente, de una calibración \textit{Mondrian} por categoría que adapte los intervalos de predicción a cada perfil estacional.
+
+\textbf{Intermitencia minoritaria pero con cola relevante.} La mediana de la tasa de demanda cero es de 0.02 y ninguna serie supera el 50\% de días sin ventas. La intermitencia no es el fenómeno dominante, pero la cola derecha de la distribución incluye series con señales débiles e irregulares que el modelo debe tratar de forma diferenciada.
+
+\textbf{Stockout estructural con efecto de censura no monótono.} Aproximadamente 2 millones de observaciones presentan algún grado de \textit{stockout}. La relación con la demanda observada es no monótona: los \textit{stockouts} leves (0--2 horas) se asocian con mayor demanda (1.41 de media frente a 0.97 sin rotura) porque ocurren en los días de más ventas, mientras que los severos (7 o más horas) reducen la demanda registrada a 0.71 por efecto de censura. A nivel de serie individual se identifican tres perfiles distintos de interacción demanda--\textit{stockout}, desde censura total hasta coexistencia con demanda positiva.
+
+\textbf{Variables exógenas con relaciones no lineales y moderadas.} La temperatura muestra la asociación más clara y monótona con la demanda. El descuento presenta un efecto no monótono: alto en niveles extremos y bajo en el rango medio. Las variables meteorológicas restantes tienen un impacto directo débil pero pueden ser útiles como contexto en un modelo no lineal.
