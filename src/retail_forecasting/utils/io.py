@@ -28,14 +28,7 @@ def make_run_directory(base_dir: str | Path, run_name: str) -> Path:
 
 
 def quantile_column_name(quantile: float) -> str:
-    """Build the canonical column name for a quantile prediction.
-
-    Args:
-        quantile: Quantile level used by the forecast output.
-
-    Returns:
-        The column name associated with the quantile.
-    """
+    """Build the canonical column name for a quantile prediction."""
     normalized = str(quantile).replace(".", "_")
     return f"q_{normalized}"
 

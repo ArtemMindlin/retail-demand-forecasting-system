@@ -10,7 +10,7 @@ dataset:
   local_cache_dir: data/raw/fresh_retailnet
   processed_panel_dir: data/processed
   use_cache: true
-  top_n_series: 50
+  top_n_series: null
   min_history_days: 70
   max_rows: null
   horizon: 7
@@ -31,8 +31,8 @@ features:
 validation:
   initial_train_days: 45
   n_folds: 3
-  fold_size_days: 7
-  calibration_days: 21
+  fold_size_days: 14
+  calibration_days: 28
   retrain_each_fold: true
   drift_triggered_retrain: false
 
@@ -49,11 +49,11 @@ models:
   models_dir: models
   quantiles: [0.1, 0.5, 0.9]
   seasonal_period: 7
-  n_estimators: 500
+  n_estimators: 1000
   learning_rate: 0.05
   max_depth: 8
-  use_tuning: false
-  tuning_trials: 20
+  use_tuning: true
+  tuning_trials: 50
   optimize_for_cost: true
 
 inventory:
@@ -63,7 +63,7 @@ inventory:
   series_cost_strategy: "synthetic_series"
   clip_negative_orders: true
   pareto_order_scales: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3]
-  global_capacity_units: 3000
+  global_capacity_units: 3000000
 
   synthetic_cost_config:
     perishability_weights: [0.5, 0.3, 0.2]

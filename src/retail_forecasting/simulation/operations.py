@@ -1,22 +1,3 @@
-"""Streaming operational simulation that consumes the eval split day by day.
-
-The simulation answers a single MLOps question: *given an initial model trained
-only on the historical (train) split, how does cumulative inventory cost evolve
-under different retraining cadences as fresh data arrives?*
-
-For each day in the eval split:
-
-1. The "available history" is `train ∪ eval[date < current_date]`.
-2. Every retraining cadence holds its own model on disk. If a cadence's day
-   counter reaches its configured period, the model is refit on the current
-   available history.
-3. Each cadence scores predictions for the upcoming horizon, the eval data is
-   used to reveal realized demand, and per-series inventory cost is computed.
-
-The output captures one row per (cadence, decision_date, series) so downstream
-plots can compare cost trajectories side by side.
-"""
-
 from __future__ import annotations
 
 import json
@@ -335,6 +316,7 @@ def _plot_cumulative_cost(
 ) -> Path | None:
     try:
         import matplotlib
+        import matplotlib.dates as mdates
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
@@ -349,11 +331,16 @@ def _plot_cumulative_cost(
     for cadence, group in complete.groupby("cadence"):
         daily = group.groupby("decision_date")["total_cost"].sum().sort_index()
         cumulative = daily.cumsum()
-        ax.plot(cumulative.index, cumulative.values, label=f"cadence={cadence}", marker=".")
+        ax.plot(
+            cumulative.index.to_numpy(),
+            cumulative.to_numpy(),
+            label=f"cadence={cadence}",
+            marker=".",
+        )
 
     for event in retrain_events:
         ax.axvline(
-            pd.Timestamp(event["decision_date"]),
+            float(mdates.date2num(pd.Timestamp(event["decision_date"]))),
             color="grey",
             alpha=0.15,
             linestyle="--",

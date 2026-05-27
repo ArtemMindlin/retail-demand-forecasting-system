@@ -17,22 +17,7 @@ def build_feature_frame(
     panel: pd.DataFrame,
     feature_config: FeatureConfig,
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Build reusable feature columns from a prepared daily panel.
-
-    Args:
-        panel: Prepared daily panel with one row per series and date.
-        feature_config: Feature engineering configuration.
-
-    Returns:
-        A tuple containing the feature frame and metadata with the ordered
-        feature column names used for modeling. The returned frame is not
-        filtered for missing feature values, so callers can apply training or
-        inference policies.
-
-    Notes:
-        Historical features are built with positive lags so they only use past
-        information relative to each forecast origin.
-    """
+    """Build reusable feature columns from a prepared daily panel."""
     _validate_required_columns(panel=panel, feature_config=feature_config)
     frame = panel.copy().sort_values(["series_id", "date"]).reset_index(drop=True)
     grouped = frame.groupby("series_id", sort=False)
