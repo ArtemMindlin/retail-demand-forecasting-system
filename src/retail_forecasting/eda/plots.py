@@ -77,6 +77,10 @@ def render_eda_plots(
         series_summary,
         target_dir / "representative_series_panels.png",
     )
+    _plot_acf_demand(
+        panel,
+        target_dir / "acf_demand.png",
+    )
 
 
 def _plot_observed_demand_distribution(panel: pd.DataFrame, output_path: Path) -> None:
@@ -84,24 +88,24 @@ def _plot_observed_demand_distribution(panel: pd.DataFrame, output_path: Path) -
 
     axes[0].hist(
         panel["observed_demand"],
-        bins=30,
+        bins=50,
         color="#1f77b4",
         edgecolor="white",
     )
     axes[0].set_xlabel("Observed demand")
     axes[0].set_ylabel("Frequency")
-    axes[0].set_title("Observed demand distribution")
+    axes[0].set_title("Observed demand distribution (linear scale)")
 
-    strictly_positive = panel.loc[panel["observed_demand"] > 0, "observed_demand"]
     axes[1].hist(
-        strictly_positive,
-        bins=30,
-        color="#17becf",
+        panel["observed_demand"],
+        bins=50,
+        color="#1f77b4",
         edgecolor="white",
     )
-    axes[1].set_xlabel("Observed demand > 0")
-    axes[1].set_ylabel("Frequency")
-    axes[1].set_title("Positive-demand distribution")
+    axes[1].set_yscale("log")
+    axes[1].set_xlabel("Observed demand")
+    axes[1].set_ylabel("Frequency (log scale)")
+    axes[1].set_title("Observed demand distribution (log scale)")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -113,29 +117,39 @@ def _plot_observed_demand_boxplot_top_series(
     series_summary: pd.DataFrame,
     output_path: Path,
 ) -> None:
-    top_series = series_summary.head(TOP_SERIES_PLOT_COUNT)["series_id"].tolist()
-    subset = panel.loc[panel["series_id"].isin(top_series)].copy()
+    n = TOP_SERIES_PLOT_COUNT // 3 * 3
+    per_group = n // 3
+    top = series_summary.head(per_group)["series_id"].tolist()
+    mid_start = len(series_summary) // 2
+    mid = series_summary.iloc[mid_start : mid_start + per_group]["series_id"].tolist()
+    bottom = series_summary.tail(per_group)["series_id"].tolist()
+
+    subset = panel.loc[panel["series_id"].isin(top + mid + bottom)].copy()
     if subset.empty:
         return
 
-    ordered_labels = top_series
-    distributions = [
-        subset.loc[subset["series_id"] == series_id, "observed_demand"].to_numpy()
-        for series_id in ordered_labels
-    ]
+    def _distributions(ids: list[str]) -> list[np.ndarray]:
+        return [subset.loc[subset["series_id"] == s, "observed_demand"].to_numpy() for s in ids]
 
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.boxplot(
-        distributions,
-        tick_labels=ordered_labels,
-        patch_artist=True,
-        boxprops={"facecolor": "#aec7e8"},
-        medianprops={"color": "#d62728"},
-    )
-    ax.set_xlabel("Series")
-    ax.set_ylabel("Observed demand")
-    ax.set_title("Observed demand by top-demand series")
-    ax.tick_params(axis="x", rotation=45)
+    def _draw(ax: plt.Axes, ids: list[str], color: str, title: str) -> None:
+        bp = ax.boxplot(
+            _distributions(ids),
+            tick_labels=ids,
+            patch_artist=True,
+            medianprops={"color": "#d62728", "linewidth": 1.5},
+            flierprops={"marker": ".", "markersize": 3, "alpha": 0.4},
+        )
+        for patch in bp["boxes"]:
+            patch.set_facecolor(color)
+            patch.set_alpha(0.7)
+        ax.set_title(title)
+        ax.set_xlabel("Series")
+        ax.set_ylabel("Observed demand")
+        ax.tick_params(axis="x", rotation=45)
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    _draw(axes[0], top, "#2166ac", "High-volume series")
+    _draw(axes[1], mid + bottom, "#74add1", "Mid / low-volume series")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -143,28 +157,35 @@ def _plot_observed_demand_boxplot_top_series(
 
 
 def _plot_stockout_hours_distribution(panel: pd.DataFrame, output_path: Path) -> None:
+    max_hours = int(panel["stockout_hours"].max()) + 1
+    bins = np.arange(-0.5, max_hours + 0.5, 1)
+
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
     axes[0].hist(
         panel["stockout_hours"],
-        bins=24,
+        bins=bins,
         color="#d62728",
         edgecolor="white",
     )
+    axes[0].set_yscale("log")
     axes[0].set_xlabel("Stockout hours")
-    axes[0].set_ylabel("Frequency")
-    axes[0].set_title("Stockout hours distribution")
+    axes[0].set_ylabel("Frequency (log scale)")
+    axes[0].set_title("Stockout hours distribution (log scale)")
+    axes[0].set_xticks(range(0, max_hours, 2))
 
     positive_stockout = panel.loc[panel["stockout_hours"] > 0, "stockout_hours"]
+    bins_pos = np.arange(0.5, max_hours + 0.5, 1)
     axes[1].hist(
         positive_stockout,
-        bins=24,
+        bins=bins_pos,
         color="#ff9896",
         edgecolor="white",
     )
     axes[1].set_xlabel("Positive stockout hours")
     axes[1].set_ylabel("Frequency")
     axes[1].set_title("Positive stockout-hour distribution")
+    axes[1].set_xticks(range(1, max_hours, 2))
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -263,22 +284,33 @@ def _plot_zero_demand_rate_by_series(
     series_summary: pd.DataFrame,
     output_path: Path,
 ) -> None:
-    zero_demand_rank = series_summary.sort_values(
-        ["zero_demand_rate", "series_id"],
-        ascending=[False, True],
-    ).head(20)
-    if zero_demand_rank.empty:
+    rates = series_summary["zero_demand_rate"].dropna()
+    if rates.empty:
         return
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.barh(
-        zero_demand_rank["series_id"][::-1],
-        zero_demand_rank["zero_demand_rate"][::-1],
-        color="#8c564b",
+    median_rate = rates.median()
+    pct_above_50 = (rates > 0.5).mean() * 100
+
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.hist(rates, bins=40, color="#8c564b", edgecolor="white", alpha=0.85)
+    ax.axvline(
+        median_rate,
+        color="#d62728",
+        linewidth=1.8,
+        linestyle="--",
+        label=f"Median: {median_rate:.2f}",
+    )
+    ax.axvline(
+        0.5,
+        color="#ff7f0e",
+        linewidth=1.4,
+        linestyle=":",
+        label=f">50% zero: {pct_above_50:.0f}% of series",
     )
     ax.set_xlabel("Zero-demand rate")
-    ax.set_ylabel("Series")
-    ax.set_title("Top 20 most intermittent series")
+    ax.set_ylabel("Number of series")
+    ax.set_title("Distribution of zero-demand rate across all series")
+    ax.legend()
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -356,16 +388,30 @@ def _plot_stockout_vs_demand_scatter(panel: pd.DataFrame, output_path: Path) -> 
     plt.close(fig)
 
 
+_MEANINGFUL_NUMERIC = [
+    "observed_demand",
+    "stockout_hours",
+    "discount",
+    "holiday_flag",
+    "activity_flag",
+    "precpt",
+    "avg_temperature",
+    "avg_humidity",
+    "avg_wind_level",
+]
+
+
 def _plot_correlation_heatmap(panel: pd.DataFrame, output_path: Path) -> None:
-    numeric = panel.select_dtypes(include=["number"])
-    if numeric.empty:
+    cols = [c for c in _MEANINGFUL_NUMERIC if c in panel.columns]
+    if not cols:
         return
 
-    variable_numeric = numeric.loc[:, numeric.nunique(dropna=True) > 1]
+    variable_numeric = panel[cols].dropna(how="all")
+    variable_numeric = variable_numeric.loc[:, variable_numeric.nunique(dropna=True) > 1]
     if variable_numeric.empty:
         return
 
-    correlation = variable_numeric.corr(numeric_only=True)
+    correlation = variable_numeric.corr()
     fig, ax = plt.subplots(figsize=(10, 8))
     image = ax.imshow(
         correlation.to_numpy(),
@@ -394,35 +440,44 @@ def _plot_covariate_vs_demand_grid(panel: pd.DataFrame, output_path: Path) -> No
         "avg_humidity",
         "avg_wind_level",
     ]
-    columns = [column for column in candidate_columns if column in panel.columns]
+    columns = [c for c in candidate_columns if c in panel.columns]
     if not columns:
         return
 
-    sampled = _sample_panel(panel)
-    n_rows = 2
+    n_bins = 20
     n_cols = 3
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 8))
-    axes_flat = axes.flatten()
+    n_rows = int(np.ceil(len(columns) / n_cols))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 4 * n_rows))
+    axes_flat = np.atleast_1d(axes).flatten()
 
     for axis, column in zip(axes_flat, columns, strict=False):
-        axis.scatter(
-            sampled[column],
-            sampled["observed_demand"],
-            alpha=0.15,
-            s=10,
-            color="#1f77b4",
+        col_data = panel[[column, "observed_demand"]].dropna()
+        col_data = col_data[col_data[column] > col_data[column].quantile(0.01)]
+        col_data = col_data[col_data[column] < col_data[column].quantile(0.99)]
+
+        col_data["_bin"] = pd.cut(col_data[column], bins=n_bins)
+        binned = (
+            col_data.groupby("_bin", observed=True)["observed_demand"]
+            .agg(mean="mean", sem=lambda x: x.std() / np.sqrt(len(x)))
+            .reset_index()
         )
-        binned = _binned_average(sampled, feature_column=column)
-        if not binned.empty:
-            axis.plot(
-                binned[column],
-                binned["observed_demand_mean"],
-                color="#d62728",
-                linewidth=2,
-            )
+        binned["x_mid"] = binned["_bin"].apply(lambda b: b.mid)
+
+        axis.fill_between(
+            binned["x_mid"],
+            binned["mean"] - 1.96 * binned["sem"],
+            binned["mean"] + 1.96 * binned["sem"],
+            alpha=0.25,
+            color="#1f77b4",
+            label="95% CI",
+        )
+        axis.plot(
+            binned["x_mid"], binned["mean"], color="#1f77b4", linewidth=2, label="Mean demand"
+        )
         axis.set_xlabel(column)
-        axis.set_ylabel("Observed demand")
+        axis.set_ylabel("Mean observed demand")
         axis.set_title(f"{column} vs observed demand")
+        axis.legend(fontsize=8)
 
     for axis in axes_flat[len(columns) :]:
         axis.axis("off")
@@ -432,12 +487,57 @@ def _plot_covariate_vs_demand_grid(panel: pd.DataFrame, output_path: Path) -> No
     plt.close(fig)
 
 
+def _select_diverse_series(panel: pd.DataFrame, n: int = 12) -> list[str]:
+    """Pick n series spanning different stores, demand levels and stockout exposure."""
+    min_days = panel.groupby("series_id")["date"].count()
+    threshold = min_days.quantile(0.5)
+    valid = min_days[min_days >= threshold].index
+
+    df = panel[panel["series_id"].isin(valid)].copy()
+    stats = df.groupby("series_id").agg(
+        mean_demand=("observed_demand", "mean"),
+        zero_rate=("observed_demand", lambda x: (x == 0).mean()),
+        stockout_rate=("stockout_hours", lambda x: (x > 0).mean()),
+        store=("store_id", "first"),
+    )
+
+    stats["demand_tier"] = pd.qcut(stats["mean_demand"], q=3, labels=["low", "mid", "high"])
+    stats["stockout_tier"] = pd.cut(
+        stats["stockout_rate"], bins=[-0.01, 0.05, 0.3, 1.0], labels=["low", "mid", "high"]
+    )
+
+    selected: list[str] = []
+    used_stores: set[str] = set()
+    rng = np.random.default_rng(42)
+
+    for demand_tier in ["high", "mid", "low"]:
+        for stockout_tier in ["high", "mid", "low"]:
+            candidates = stats[
+                (stats["demand_tier"] == demand_tier)
+                & (stats["stockout_tier"] == stockout_tier)
+                & (~stats["store"].isin(used_stores))
+            ]
+            if candidates.empty:
+                candidates = stats[
+                    (stats["demand_tier"] == demand_tier) & (~stats["store"].isin(used_stores))
+                ]
+            if candidates.empty:
+                continue
+            pick = rng.choice(candidates.index)
+            selected.append(pick)
+            used_stores.add(stats.loc[pick, "store"])
+            if len(selected) >= n:
+                return selected
+
+    return selected[:n]
+
+
 def _plot_representative_series_panels(
     panel: pd.DataFrame,
     series_summary: pd.DataFrame,
     output_path: Path,
 ) -> None:
-    selected_series = series_summary.head(REPRESENTATIVE_SERIES_COUNT)["series_id"].tolist()
+    selected_series = _select_diverse_series(panel, n=REPRESENTATIVE_SERIES_COUNT)
     if not selected_series:
         return
 
@@ -449,18 +549,28 @@ def _plot_representative_series_panels(
 
     for axis, series_id in zip(axes_flat, selected_series, strict=False):
         series_frame = subset.loc[subset["series_id"] == series_id].sort_values("date")
+        demand_max = series_frame["observed_demand"].max()
+        stockout_max = series_frame["stockout_hours"].max()
+        # Scale stockout overlay to demand range so it doesn't dominate the axis
+        stockout_scaled = (
+            series_frame["stockout_hours"] / stockout_max * demand_max
+            if stockout_max > 0
+            else series_frame["stockout_hours"]
+        )
+        axis.fill_between(
+            series_frame["date"],
+            0,
+            stockout_scaled,
+            color="#d62728",
+            alpha=0.25,
+            label="Stockout (scaled)",
+        )
         axis.plot(
             series_frame["date"],
             series_frame["observed_demand"],
             color="#1f77b4",
             linewidth=1.8,
-        )
-        axis.fill_between(
-            series_frame["date"],
-            0,
-            series_frame["stockout_hours"],
-            color="#d62728",
-            alpha=0.18,
+            label="Demand",
         )
         axis.set_title(series_id)
         axis.tick_params(axis="x", rotation=45)
@@ -475,6 +585,50 @@ def _plot_representative_series_panels(
     )
     fig.tight_layout()
     fig.savefig(output_path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _plot_acf_demand(panel: pd.DataFrame, output_path: Path, max_lags: int = 28) -> None:
+    daily_mean = panel.groupby("date")["observed_demand"].mean().sort_index().to_numpy()
+    n = len(daily_mean)
+    if n < max_lags + 2:
+        return
+
+    mean = daily_mean.mean()
+    centered = daily_mean - mean
+    var = (centered**2).sum()
+    if var == 0:
+        return
+
+    acf_values = np.array(
+        [(centered[: n - lag] * centered[lag:]).sum() / var for lag in range(max_lags + 1)]
+    )
+    confidence_bound = 1.96 / np.sqrt(n)
+    lags = np.arange(max_lags + 1)
+
+    seasonal_lags = {7, 14, 21, 28}
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.axhspan(-confidence_bound, confidence_bound, color="#1f77b4", alpha=0.12, label="95% CI")
+
+    for lag, val in zip(lags, acf_values, strict=False):
+        color = "#d62728" if lag in seasonal_lags else "#1f77b4"
+        ax.vlines(lag, 0, val, colors=color, linewidth=1.8)
+        ax.plot(lag, val, "o", color=color, markersize=4)
+
+    for s_lag in seasonal_lags:
+        if s_lag <= max_lags:
+            ax.axvline(float(s_lag), color="#d62728", linewidth=0.7, linestyle="--", alpha=0.45)
+
+    ax.set_xlabel("Lag (days)")
+    ax.set_ylabel("Autocorrelation")
+    ax.set_title("ACF of daily aggregate demand (lags 0–28)")
+    ax.set_xticks(lags)
+    ax.legend(loc="upper right")
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
     plt.close(fig)
 
 

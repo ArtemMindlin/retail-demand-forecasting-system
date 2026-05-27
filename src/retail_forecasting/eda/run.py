@@ -52,15 +52,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
     """Run EDA on the canonical prepared panel and persist artifacts."""
+    # Force loading of the full dataset for EDA reporting, ignoring top_n_series filters
+    eda_dataset_config = settings.dataset.model_copy(
+        update={"top_n_series": None, "max_rows": None}
+    )
     panel = load_prepared_panel(
-        dataset_config=settings.dataset,
+        dataset_config=eda_dataset_config,
         preprocessing_config=settings.preprocessing,
         split=split,
     )
     panel = panel.sort_values(["series_id", "date"]).reset_index(drop=True)
     config_alignment_summary, warnings = build_config_alignment_summary(
         panel=panel,
-        dataset_config=settings.dataset,
+        dataset_config=eda_dataset_config,
     )
     raise_on_alignment_warnings(warnings)
 
