@@ -455,6 +455,10 @@ def _plot_covariate_vs_demand_grid(panel: pd.DataFrame, output_path: Path) -> No
         col_data = col_data[col_data[column] > col_data[column].quantile(0.01)]
         col_data = col_data[col_data[column] < col_data[column].quantile(0.99)]
 
+        if col_data.empty or col_data[column].nunique() < 2:
+            axis.set_visible(False)
+            continue
+
         col_data["_bin"] = pd.cut(col_data[column], bins=n_bins)
         binned = (
             col_data.groupby("_bin", observed=True)["observed_demand"]
@@ -501,7 +505,13 @@ def _select_diverse_series(panel: pd.DataFrame, n: int = 12) -> list[str]:
         store=("store_id", "first"),
     )
 
-    stats["demand_tier"] = pd.qcut(stats["mean_demand"], q=3, labels=["low", "mid", "high"])
+    n_quantiles = min(3, stats["mean_demand"].nunique())
+    stats["demand_tier"] = pd.qcut(
+        stats["mean_demand"],
+        q=n_quantiles,
+        labels=["low", "mid", "high"][:n_quantiles],
+        duplicates="drop",
+    )
     stats["stockout_tier"] = pd.cut(
         stats["stockout_rate"], bins=[-0.01, 0.05, 0.3, 1.0], labels=["low", "mid", "high"]
     )
