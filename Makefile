@@ -4,9 +4,7 @@
 PYTHON = uv run python
 PYTEST = uv run pytest
 CONFIG = configs/default.yaml
-DASHBOARD = src/retail_forecasting/visualization/dashboard.py
-
-.PHONY: help install run retrain score simulate eda dashboard api mlflow up test test-harness lint format clean
+.PHONY: help install run retrain score simulate eda api mlflow up test test-harness lint format clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -28,9 +26,6 @@ simulate: ## Run operational simulation comparing retrain cadences
 
 eda: ## Run the reproducible EDA module on the prepared panel
 	$(PYTHON) -m retail_forecasting.eda.run --config $(CONFIG)
-
-dashboard: ## Launch the interactive Streamlit dashboard
-	uv run streamlit run $(DASHBOARD)
 
 api: ## Start the FastAPI microservice
 	uv run uvicorn retail_forecasting.api.main:app --reload

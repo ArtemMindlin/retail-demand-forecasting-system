@@ -27,17 +27,3 @@ services:
     volumes:
       - ./mlruns:/app/mlruns
       - ./mlflow.db:/app/mlflow.db
-
-  # 3. Streamlit What-If Dashboard
-  dashboard:
-    build: .
-    container_name: retail_forecasting_dashboard
-    ports:
-      - "8501:8501"
-    command: ["streamlit", "run", "src/retail_forecasting/visualization/dashboard.py", "--server.address", "0.0.0.0"]
-    volumes:
-      - ./src:/app/src
-      - ./configs:/app/configs
-      - ./reports:/app/reports
-    depends_on:
-      - api
