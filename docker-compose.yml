@@ -21,7 +21,7 @@ services:
     container_name: retail_forecasting_mlflow
     ports:
       - "5000:5000"
-    command: ["mlflow", "ui", "--host", "0.0.0.0", "--port", "5000", "--allowed-hosts", "*"]
+    command: ["mlflow", "ui", "--host", "0.0.0.0", "--port", "5000", "--allowed-hosts", "157.180.17.160"]
     volumes:
       - ./mlruns:/app/mlruns
       - ./mlflow.db:/app/mlflow.db
