@@ -53,7 +53,7 @@ models:
   learning_rate: 0.05
   max_depth: 6
   use_tuning: false
-  tuning_trials: 0
+  tuning_trials: 1
   optimize_for_cost: true
 
 inventory:
