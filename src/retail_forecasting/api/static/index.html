@@ -3786,6 +3786,995 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       );
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // ExperimentsView — Historical runs browser (migrated from Streamlit)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+    function useApi(url, deps) {
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+      useEffect(() => {
+        if (!url) { setData(null); return; }
+        let cancelled = false;
+        setLoading(true);
+        setError(null);
+        fetch(url)
+          .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
+          .then(d => { if (!cancelled) { setData(d); setLoading(false); } })
+          .catch(e => { if (!cancelled) { setError(String(e)); setLoading(false); } });
+        return () => { cancelled = true; };
+      }, deps || [url]);
+      return { data, loading, error };
+    }
+
+    // ── small SVG chart primitives (reuse smoothPath / niceTicks from above) ──
+
+    function ExpForecastChart({ chartData, whatifOrders }) {
+      const wrapRef = useRef(null);
+      const [W, setW] = useState(800);
+      const H = 320;
+      const pad = { top: 18, right: 18, bottom: 34, left: 52 };
+
+      useEffect(() => {
+        if (!wrapRef.current) return;
+        const ro = new ResizeObserver(es => {
+          for (const e of es) setW(Math.max(320, Math.floor(e.contentRect.width)));
+        });
+        ro.observe(wrapRef.current);
+        return () => ro.disconnect();
+      }, []);
+
+      const [hover, setHover] = useState(null);
+
+      const geom = useMemo(() => {
+        if (!chartData || !chartData.dates || chartData.dates.length === 0) return null;
+        const n = chartData.dates.length;
+        const innerW = W - pad.left - pad.right;
+        const innerH = H - pad.top - pad.bottom;
+        const xs = chartData.dates.map((_, i) => pad.left + (i / Math.max(n - 1, 1)) * innerW);
+
+        const allVals = [
+          ...(chartData.y_true || []),
+          ...(chartData.y_pred || []),
+          ...(chartData.q_high || []),
+          ...(chartData.order_quantity || []),
+          ...(whatifOrders || []),
+        ].filter(v => v != null);
+        if (allVals.length === 0) return null;
+
+        let lo = Math.min(...allVals);
+        let hi = Math.max(...allVals);
+        const span = hi - lo || 1;
+        lo -= span * 0.08; hi += span * 0.08;
+        const ticks = niceTicks(lo, hi, 5);
+        lo = Math.min(lo, ticks[0]);
+        hi = Math.max(hi, ticks[ticks.length - 1]);
+        const y = v => pad.top + (1 - (v - lo) / (hi - lo)) * innerH;
+
+        const truePts = chartData.y_true
+          .map((v, i) => v != null ? [xs[i], y(v)] : null).filter(Boolean);
+        const predPts = chartData.y_pred
+          .map((v, i) => v != null ? [xs[i], y(v)] : null).filter(Boolean);
+
+        let bandPath = "";
+        if (chartData.q_high && chartData.q_low) {
+          const upper = chartData.q_high.map((v, i) => [xs[i], y(v ?? chartData.y_pred[i] ?? 0)]);
+          const lower = chartData.q_low.map((v, i) => [xs[i], y(v ?? chartData.y_pred[i] ?? 0)]);
+          bandPath = "M " + upper.map(([x, yv]) => `${x} ${yv}`).join(" L ")
+            + " L " + [...lower].reverse().map(([x, yv]) => `${x} ${yv}`).join(" L ") + " Z";
+        }
+
+        // Date tick labels every ~7 or so
+        const step = Math.max(1, Math.floor(n / 8));
+        const xTickIdx = chartData.dates.map((_, i) => i).filter(i => i % step === 0 || i === n - 1);
+        const xLabels = xTickIdx.map(i => {
+          const d = chartData.dates[i];
+          return d ? d.slice(5) : "";  // MM-DD
+        });
+
+        return { innerW, innerH, xs, y, lo, hi, ticks, truePath: smoothPath(truePts), predPath: smoothPath(predPts),
+                 bandPath, xTickIdx, xLabels, n,
+                 orderQtyPts: (chartData.order_quantity || []).map((v, i) => v != null ? [xs[i], y(v)] : null).filter(Boolean),
+                 whatifPts: (whatifOrders || []).map((v, i) => v != null ? [xs[i], y(v)] : null).filter(Boolean) };
+      }, [chartData, whatifOrders, W]);
+
+      const onMouseMove = e => {
+        if (!geom) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        let best = 0, bestD = Infinity;
+        for (let i = 0; i < geom.xs.length; i++) {
+          const d = Math.abs(geom.xs[i] - mx);
+          if (d < bestD) { bestD = d; best = i; }
+        }
+        setHover(best);
+      };
+
+      if (!geom) return (
+        <div style={{ height: H, display: "grid", placeItems: "center", color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+          Sin datos para mostrar
+        </div>
+      );
+
+      const hoverDate = hover != null ? (chartData.dates[hover] || "") : "";
+      const hoverTrue = hover != null ? chartData.y_true[hover] : null;
+      const hoverPred = hover != null ? chartData.y_pred[hover] : null;
+
+      return (
+        <div ref={wrapRef} style={{ position: "relative", height: H }}>
+          <svg width={W} height={H}
+            onMouseMove={onMouseMove} onMouseLeave={() => setHover(null)}
+            style={{ display: "block", overflow: "visible" }}>
+            <defs>
+              <linearGradient id="expBand" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
+              </linearGradient>
+            </defs>
+
+            {/* Y grid + labels */}
+            {geom.ticks.map((t, i) => (
+              <g key={i}>
+                <line x1={pad.left} x2={W - pad.right} y1={geom.y(t)} y2={geom.y(t)}
+                  stroke="rgba(148,163,184,0.06)" strokeWidth={1} />
+                <text x={pad.left - 6} y={geom.y(t) + 3.5} textAnchor="end"
+                  fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10.5}>
+                  {Math.round(t)}
+                </text>
+              </g>
+            ))}
+
+            {/* X labels */}
+            {geom.xTickIdx.map((i, ki) => (
+              <text key={ki} x={geom.xs[i]} y={H - pad.bottom + 16}
+                textAnchor="middle" fill="var(--text-3)"
+                fontFamily="var(--font-mono)" fontSize={10}>
+                {geom.xLabels[ki]}
+              </text>
+            ))}
+
+            {/* Conformal band */}
+            {geom.bandPath && (
+              <>
+                <path d={geom.bandPath} fill="url(#expBand)" />
+              </>
+            )}
+
+            {/* Predicted line (dashed purple) */}
+            <path d={geom.predPath} fill="none" stroke="var(--c-ai)" strokeWidth={1.8}
+              strokeDasharray="6 4" strokeLinecap="round" />
+
+            {/* Actual line (solid blue) */}
+            <path d={geom.truePath} fill="none" stroke="var(--c-inv)" strokeWidth={2}
+              strokeLinecap="round" />
+
+            {/* Order quantity markers (red diamonds) */}
+            {geom.orderQtyPts.map(([x, y], i) => (
+              <polygon key={i}
+                points={`${x},${y - 7} ${x + 5},${y} ${x},${y + 7} ${x - 5},${y}`}
+                fill="#ef4444" opacity={0.85} />
+            ))}
+
+            {/* What-if order markers (orange stars) */}
+            {geom.whatifPts.map(([x, y], i) => (
+              <text key={i} x={x} y={y + 5} textAnchor="middle"
+                fontSize={14} fill="#f59e0b">★</text>
+            ))}
+
+            {/* Hover line */}
+            {hover != null && (
+              <line x1={geom.xs[hover]} x2={geom.xs[hover]}
+                y1={pad.top} y2={pad.top + geom.innerH}
+                stroke="rgba(148,163,184,0.3)" strokeDasharray="3 3" strokeWidth={1} />
+            )}
+
+            <rect x={pad.left} y={pad.top} width={geom.innerW} height={geom.innerH} fill="transparent" />
+          </svg>
+
+          {hover != null && (
+            <div style={{
+              position: "absolute",
+              left: geom.xs[hover] > W - 170 ? geom.xs[hover] - 165 : geom.xs[hover] + 12,
+              top: Math.max(8, pad.top),
+              pointerEvents: "none",
+              background: "rgba(11,15,21,0.96)",
+              border: "1px solid var(--border-2)",
+              borderRadius: 10, padding: "10px 12px",
+              backdropFilter: "blur(8px)",
+              minWidth: 150, zIndex: 3
+            }}>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-3)", marginBottom: 5 }}>
+                {hoverDate}
+              </div>
+              {hoverTrue != null && <div style={{ fontSize: 12, color: "var(--c-inv)" }}>real: {Math.round(hoverTrue)}</div>}
+              {hoverPred != null && <div style={{ fontSize: 12, color: "var(--c-ai)" }}>pred: {Math.round(hoverPred)}</div>}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function ExpLatentChart({ latentData }) {
+      const wrapRef = useRef(null);
+      const [W, setW] = useState(800);
+      const H = 300;
+      const pad = { top: 18, right: 60, bottom: 34, left: 52 };
+
+      useEffect(() => {
+        if (!wrapRef.current) return;
+        const ro = new ResizeObserver(es => {
+          for (const e of es) setW(Math.max(320, Math.floor(e.contentRect.width)));
+        });
+        ro.observe(wrapRef.current);
+        return () => ro.disconnect();
+      }, []);
+
+      const geom = useMemo(() => {
+        if (!latentData || !latentData.dates || latentData.dates.length === 0) return null;
+        const n = latentData.dates.length;
+        const innerW = W - pad.left - pad.right;
+        const innerH = H - pad.top - pad.bottom;
+        const xs = latentData.dates.map((_, i) => pad.left + (i / Math.max(n - 1, 1)) * innerW);
+
+        const demandVals = [...(latentData.observed || []), ...(latentData.latent || [])].filter(v => v != null);
+        let dlo = Math.min(...demandVals, 0);
+        let dhi = Math.max(...demandVals, 1);
+        const dSpan = dhi - dlo || 1;
+        dlo -= dSpan * 0.08; dhi += dSpan * 0.12;
+        const dTicks = niceTicks(dlo, dhi, 5);
+        dlo = Math.min(dlo, dTicks[0]); dhi = Math.max(dhi, dTicks[dTicks.length - 1]);
+        const y = v => pad.top + (1 - (v - dlo) / (dhi - dlo)) * innerH;
+
+        // Secondary Y for stockout hours (0–24)
+        const yStockout = v => pad.top + (1 - v / 24) * innerH;
+
+        const step = Math.max(1, Math.floor(n / 8));
+        const xTickIdx = latentData.dates.map((_, i) => i).filter(i => i % step === 0 || i === n - 1);
+
+        const obsPts = (latentData.observed || []).map((v, i) => v != null ? [xs[i], y(v)] : null).filter(Boolean);
+        const latPts = (latentData.latent || []).map((v, i) => v != null ? [xs[i], y(v)] : null).filter(Boolean);
+
+        return { innerW, innerH, xs, y, yStockout, dTicks, xTickIdx, n, obsPts, latPts };
+      }, [latentData, W]);
+
+      if (!geom) return (
+        <div style={{ height: H, display: "grid", placeItems: "center", color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+          Sin datos de demanda latente
+        </div>
+      );
+
+      return (
+        <div ref={wrapRef} style={{ height: H }}>
+          <svg width={W} height={H} style={{ display: "block", overflow: "visible" }}>
+            {/* Y grid */}
+            {geom.dTicks.map((t, i) => (
+              <g key={i}>
+                <line x1={pad.left} x2={W - pad.right} y1={geom.y(t)} y2={geom.y(t)}
+                  stroke="rgba(148,163,184,0.06)" strokeWidth={1} />
+                <text x={pad.left - 6} y={geom.y(t) + 3.5} textAnchor="end"
+                  fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10.5}>
+                  {Math.round(t)}
+                </text>
+              </g>
+            ))}
+
+            {/* Secondary Y axis ticks (stockout hours) */}
+            {[0, 6, 12, 18, 24].map((t, i) => (
+              <g key={`sh${i}`}>
+                <text x={W - pad.right + 6} y={geom.yStockout(t) + 3.5} textAnchor="start"
+                  fill="var(--c-drift)" fontFamily="var(--font-mono)" fontSize={10} opacity={0.7}>
+                  {t}h
+                </text>
+              </g>
+            ))}
+
+            {/* X labels */}
+            {geom.xTickIdx.map((i, ki) => (
+              <text key={ki} x={geom.xs[i]} y={H - pad.bottom + 16} textAnchor="middle"
+                fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10}>
+                {(latentData.dates[i] || "").slice(5)}
+              </text>
+            ))}
+
+            {/* Stockout hours bars (amber, secondary axis) */}
+            {(latentData.stockout_hours || []).map((v, i) => {
+              if (v == null || v <= 0) return null;
+              const barH = geom.yStockout(0) - geom.yStockout(v);
+              const barW = Math.max(2, geom.innerW / geom.n * 0.7);
+              return (
+                <rect key={i} x={geom.xs[i] - barW / 2} y={geom.yStockout(v)}
+                  width={barW} height={barH}
+                  fill="rgba(245,158,11,0.22)" stroke="rgba(245,158,11,0.5)" strokeWidth={0.5} />
+              );
+            })}
+
+            {/* Observed line (red) */}
+            <path d={smoothPath(geom.obsPts)} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinecap="round" />
+
+            {/* Latent line (green) */}
+            <path d={smoothPath(geom.latPts)} fill="none" stroke="var(--c-conf)" strokeWidth={2} strokeLinecap="round" />
+          </svg>
+        </div>
+      );
+    }
+
+    function ExpParetoChart({ paretoData }) {
+      const wrapRef = useRef(null);
+      const [W, setW] = useState(700);
+      const H = 300;
+      const pad = { top: 20, right: 20, bottom: 40, left: 60 };
+
+      useEffect(() => {
+        if (!wrapRef.current) return;
+        const ro = new ResizeObserver(es => {
+          for (const e of es) setW(Math.max(300, Math.floor(e.contentRect.width)));
+        });
+        ro.observe(wrapRef.current);
+        return () => ro.disconnect();
+      }, []);
+
+      if (!paretoData || paretoData.length === 0) return (
+        <div style={{ padding: 32, color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+          No se encontró pareto_frontier.csv para este experimento.
+        </div>
+      );
+
+      const costs = paretoData.map(r => r.total_cost).filter(v => v != null);
+      const sls = paretoData.map(r => (r.service_level || 0) * 100).filter(v => v != null);
+      if (costs.length === 0) return null;
+
+      const innerW = W - pad.left - pad.right;
+      const innerH = H - pad.top - pad.bottom;
+      const xlo = Math.min(...costs), xhi = Math.max(...costs);
+      const ylo = Math.min(...sls), yhi = Math.max(...sls);
+      const xSpan = xhi - xlo || 1, ySpan = yhi - ylo || 1;
+      const px = v => pad.left + ((v - xlo) / xSpan) * innerW;
+      const py = v => pad.top + (1 - (v - ylo) / ySpan) * innerH;
+
+      const xTicks = niceTicks(xlo, xhi, 5);
+      const yTicks = niceTicks(ylo, yhi, 5);
+
+      // Color by group
+      const COLORS = ["var(--c-inv)", "var(--c-ai)", "var(--c-conf)", "var(--c-drift)", "#f472b6", "#06b6d4"];
+      const groups = [...new Set(paretoData.map(r => `${r.data_strategy || ""}|${r.model_name || ""}`))];
+      const colorOf = g => COLORS[groups.indexOf(g) % COLORS.length];
+
+      // Pareto frontier line
+      const efficient = paretoData
+        .filter(r => String(r.is_pareto_efficient).toLowerCase() === "true")
+        .sort((a, b) => a.total_cost - b.total_cost);
+
+      const frontierPts = efficient.map(r => [px(r.total_cost), py((r.service_level || 0) * 100)]);
+
+      return (
+        <div ref={wrapRef} style={{ height: H }}>
+          <svg width={W} height={H} style={{ display: "block", overflow: "visible" }}>
+            {/* Grid */}
+            {xTicks.map((t, i) => (
+              <g key={i}>
+                <line x1={px(t)} x2={px(t)} y1={pad.top} y2={pad.top + innerH}
+                  stroke="rgba(148,163,184,0.06)" strokeWidth={1} />
+                <text x={px(t)} y={H - pad.bottom + 16} textAnchor="middle"
+                  fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10}>
+                  {t >= 1000 ? `${(t/1000).toFixed(1)}k` : Math.round(t)}
+                </text>
+              </g>
+            ))}
+            {yTicks.map((t, i) => (
+              <g key={i}>
+                <line x1={pad.left} x2={pad.left + innerW} y1={py(t)} y2={py(t)}
+                  stroke="rgba(148,163,184,0.06)" strokeWidth={1} />
+                <text x={pad.left - 6} y={py(t) + 3.5} textAnchor="end"
+                  fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10}>
+                  {t.toFixed(1)}%
+                </text>
+              </g>
+            ))}
+
+            {/* Pareto frontier line */}
+            {frontierPts.length > 1 && (
+              <path d={smoothPath(frontierPts)} fill="none"
+                stroke="var(--c-conf)" strokeWidth={2} strokeDasharray="6 3" strokeLinecap="round" />
+            )}
+
+            {/* Scatter points */}
+            {paretoData.map((r, i) => {
+              const g = `${r.data_strategy || ""}|${r.model_name || ""}`;
+              const cx = px(r.total_cost);
+              const cy = py((r.service_level || 0) * 100);
+              const isEff = String(r.is_pareto_efficient).toLowerCase() === "true";
+              return (
+                <circle key={i} cx={cx} cy={cy} r={isEff ? 6 : 4}
+                  fill={colorOf(g)} opacity={0.8}
+                  stroke={isEff ? "#fff" : "none"} strokeWidth={1.5} />
+              );
+            })}
+
+            {/* Axis labels */}
+            <text x={pad.left + innerW / 2} y={H - 4} textAnchor="middle"
+              fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10.5}>
+              Coste Total ($)
+            </text>
+            <text x={12} y={pad.top + innerH / 2} textAnchor="middle"
+              fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10.5}
+              transform={`rotate(-90, 12, ${pad.top + innerH / 2})`}>
+              Nivel de Servicio (%)
+            </text>
+          </svg>
+
+          {/* Legend */}
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 6, paddingLeft: pad.left }}>
+            {groups.map((g, i) => (
+              <div key={g} style={{ display: "flex", alignItems: "center", gap: 5,
+                fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: COLORS[i % COLORS.length] }} />
+                {g.replace("|", " / ")}
+              </div>
+            ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 5,
+              fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
+              <span style={{ display: "inline-block", width: 14, height: 2,
+                background: "transparent", borderTop: "2px dashed var(--c-conf)" }} />
+              Frontera Pareto
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ExpSensChart({ sensData }) {
+      const wrapRef = useRef(null);
+      const [W, setW] = useState(700);
+      const H = 300;
+      const pad = { top: 20, right: 20, bottom: 40, left: 60 };
+
+      useEffect(() => {
+        if (!wrapRef.current) return;
+        const ro = new ResizeObserver(es => {
+          for (const e of es) setW(Math.max(300, Math.floor(e.contentRect.width)));
+        });
+        ro.observe(wrapRef.current);
+        return () => ro.disconnect();
+      }, []);
+
+      if (!sensData || sensData.length === 0) return (
+        <div style={{ padding: 32, color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+          No se encontró sensitivity_summary.csv para este experimento.
+        </div>
+      );
+
+      const ratios = sensData.map(r => r.ratio).filter(v => v != null);
+      const costs = sensData.map(r => r.total_cost).filter(v => v != null);
+      if (ratios.length === 0) return null;
+
+      const innerW = W - pad.left - pad.right;
+      const innerH = H - pad.top - pad.bottom;
+      const xlo = Math.min(...ratios), xhi = Math.max(...ratios);
+      const ylo = Math.min(...costs), yhi = Math.max(...costs);
+      const xSpan = xhi - xlo || 1, ySpan = yhi - ylo || 1;
+      const px = v => pad.left + ((v - xlo) / xSpan) * innerW;
+      const py = v => pad.top + (1 - (v - ylo) / ySpan) * innerH;
+
+      const xTicks = niceTicks(xlo, xhi, 5);
+      const yTicks = niceTicks(ylo, yhi, 5);
+
+      const COLORS = ["var(--c-inv)", "var(--c-ai)", "var(--c-conf)", "var(--c-drift)", "#f472b6", "#06b6d4"];
+
+      // Group by data_strategy + model_name
+      const groupMap = {};
+      sensData.forEach(r => {
+        const key = `${r.data_strategy || ""}|${r.model_name || ""}`;
+        if (!groupMap[key]) groupMap[key] = [];
+        groupMap[key].push(r);
+      });
+      const groups = Object.entries(groupMap);
+
+      return (
+        <div ref={wrapRef} style={{ height: H }}>
+          <svg width={W} height={H} style={{ display: "block", overflow: "visible" }}>
+            {xTicks.map((t, i) => (
+              <g key={i}>
+                <line x1={px(t)} x2={px(t)} y1={pad.top} y2={pad.top + innerH}
+                  stroke="rgba(148,163,184,0.06)" strokeWidth={1} />
+                <text x={px(t)} y={H - pad.bottom + 16} textAnchor="middle"
+                  fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10}>
+                  {t.toFixed(1)}
+                </text>
+              </g>
+            ))}
+            {yTicks.map((t, i) => (
+              <g key={i}>
+                <line x1={pad.left} x2={pad.left + innerW} y1={py(t)} y2={py(t)}
+                  stroke="rgba(148,163,184,0.06)" strokeWidth={1} />
+                <text x={pad.left - 6} y={py(t) + 3.5} textAnchor="end"
+                  fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10}>
+                  {t >= 1000 ? `${(t/1000).toFixed(1)}k` : Math.round(t)}
+                </text>
+              </g>
+            ))}
+
+            {groups.map(([key, rows], gi) => {
+              const sorted = [...rows].sort((a, b) => a.ratio - b.ratio);
+              const pts = sorted.map(r => [px(r.ratio), py(r.total_cost)]);
+              return (
+                <g key={key}>
+                  <path d={smoothPath(pts)} fill="none"
+                    stroke={COLORS[gi % COLORS.length]} strokeWidth={2} strokeLinecap="round" />
+                  {pts.map(([x, y], i) => (
+                    <circle key={i} cx={x} cy={y} r={3} fill={COLORS[gi % COLORS.length]} />
+                  ))}
+                </g>
+              );
+            })}
+
+            <text x={pad.left + innerW / 2} y={H - 4} textAnchor="middle"
+              fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10.5}>
+              Ratio Cs/Co
+            </text>
+            <text x={12} y={pad.top + innerH / 2} textAnchor="middle"
+              fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10.5}
+              transform={`rotate(-90, 12, ${pad.top + innerH / 2})`}>
+              Coste Total ($)
+            </text>
+          </svg>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 6, paddingLeft: pad.left }}>
+            {groups.map(([key], i) => (
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: 5,
+                fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
+                <span style={{ display: "inline-block", width: 14, height: 2, background: COLORS[i % COLORS.length] }} />
+                {key.replace("|", " / ")}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ── ExperimentsView main component ────────────────────────────────────────
+    function ExperimentsView() {
+      const [selectedRun, setSelectedRun] = useState("");
+      const [selectedStrategy, setSelectedStrategy] = useState("");
+      const [selectedSeries, setSelectedSeries] = useState("");
+      const [selectedModel, setSelectedModel] = useState("");
+      const [subTab, setSubTab] = useState("forecast");
+
+      // What-if panel state
+      const [wiOpen, setWiOpen] = useState(false);
+      const [cOver, setCOver] = useState(1.0);
+      const [cUnder, setCUnder] = useState(4.0);
+      const [wiCapacity, setWiCapacity] = useState("");
+      const [wiResult, setWiResult] = useState(null);
+      const [wiLoading, setWiLoading] = useState(false);
+
+      // API data
+      const { data: runs, loading: runsLoading } = useApi("/api/runs", []);
+      const { data: filters, loading: filtersLoading } = useApi(
+        selectedRun ? `/api/runs/${encodeURIComponent(selectedRun)}/filters` : null,
+        [selectedRun]
+      );
+      const { data: summary, loading: summaryLoading } = useApi(
+        selectedRun ? `/api/runs/${encodeURIComponent(selectedRun)}/summary` : null,
+        [selectedRun]
+      );
+
+      const chartUrl = useMemo(() => {
+        if (!selectedRun) return null;
+        const p = new URLSearchParams();
+        if (selectedStrategy) p.set("strategy", selectedStrategy);
+        if (selectedSeries) p.set("series_id", selectedSeries);
+        if (selectedModel) p.set("model", selectedModel);
+        return `/api/runs/${encodeURIComponent(selectedRun)}/chart?${p}`;
+      }, [selectedRun, selectedStrategy, selectedSeries, selectedModel]);
+
+      const { data: chartData, loading: chartLoading } = useApi(chartUrl, [chartUrl]);
+
+      const latentUrl = useMemo(() => {
+        if (!selectedRun || !filters?.has_latent) return null;
+        const p = new URLSearchParams();
+        if (selectedSeries) p.set("series_id", selectedSeries);
+        if (selectedModel) p.set("model", selectedModel);
+        return `/api/runs/${encodeURIComponent(selectedRun)}/latent?${p}`;
+      }, [selectedRun, filters, selectedSeries, selectedModel]);
+
+      const { data: latentData, loading: latentLoading } = useApi(latentUrl, [latentUrl]);
+
+      const { data: paretoData, loading: paretoLoading } = useApi(
+        selectedRun && subTab === "pareto" ? `/api/runs/${encodeURIComponent(selectedRun)}/pareto` : null,
+        [selectedRun, subTab]
+      );
+      const { data: sensData, loading: sensLoading } = useApi(
+        selectedRun && subTab === "pareto" ? `/api/runs/${encodeURIComponent(selectedRun)}/sensitivity` : null,
+        [selectedRun, subTab]
+      );
+
+      // Auto-select first option when filters load
+      useEffect(() => {
+        if (!filters) return;
+        if (filters.strategies?.length) setSelectedStrategy(filters.strategies[0]);
+        if (filters.series_ids?.length) setSelectedSeries(filters.series_ids[0]);
+        if (filters.models?.length) setSelectedModel(filters.models[0]);
+      }, [filters]);
+
+      // Compute KPIs from summary
+      const kpis = useMemo(() => {
+        if (!summary || !selectedModel) return null;
+        const m = (summary.metrics || []).find(r =>
+          r.model_name === selectedModel &&
+          (!selectedStrategy || r.data_strategy === selectedStrategy)
+        );
+        const c = (summary.costs || []).find(r =>
+          r.model_name === selectedModel &&
+          (!selectedStrategy || r.data_strategy === selectedStrategy)
+        );
+        if (!m && !c) return null;
+        const coverage = m?.interval_coverage ?? m?.coverage_q_0_1_q_0_9 ?? null;
+        return {
+          totalCost: c?.sim_total_cost ?? c?.total_cost ?? null,
+          mae: m?.mae ?? null,
+          coverage: coverage != null ? coverage * 100 : null,
+          serviceLevel: c?.sim_service_level ?? c?.service_level ?? null,
+        };
+      }, [summary, selectedModel, selectedStrategy]);
+
+      const handleWhatIf = async () => {
+        if (!selectedRun || !selectedModel) return;
+        setWiLoading(true);
+        setWiResult(null);
+        try {
+          const r = await fetch(`/api/runs/${encodeURIComponent(selectedRun)}/whatif`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model_name: selectedModel,
+              data_strategy: selectedStrategy || "Observed",
+              series_id: selectedSeries || null,
+              c_over: cOver,
+              c_under: cUnder,
+              capacity: wiCapacity ? parseInt(wiCapacity, 10) : null,
+            }),
+          });
+          if (r.ok) setWiResult(await r.json());
+        } finally {
+          setWiLoading(false);
+        }
+      };
+
+      const selectStyle = {
+        background: "var(--surface)",
+        border: "1px solid var(--border-2)",
+        color: "var(--text-1)",
+        borderRadius: 8,
+        padding: "7px 10px",
+        fontFamily: "var(--font-mono)",
+        fontSize: 12,
+        cursor: "pointer",
+        minWidth: 160,
+      };
+
+      const labelStyle = {
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        color: "var(--text-3)",
+        marginBottom: 4,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+      };
+
+      // ── render ──
+      if (!selectedRun && !runsLoading && (!runs || runs.length === 0)) return (
+        <div style={{ padding: 48, textAlign: "center", color: "var(--text-3)" }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>📂</div>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 14 }}>
+            No se encontraron experimentos en <code>reports/</code>. Ejecuta un experimento primero.
+          </div>
+        </div>
+      );
+
+      return (
+        <div>
+          {/* ── Filter bar ── */}
+          <div className="glass" style={{ padding: "14px 18px", marginBottom: 18 }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+              {/* Run selector */}
+              <div>
+                <div style={labelStyle}>Ejecución (Run)</div>
+                <select style={selectStyle} value={selectedRun}
+                  onChange={e => { setSelectedRun(e.target.value); setWiResult(null); }}>
+                  <option value="">— seleccionar —</option>
+                  {(runs || []).map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+
+              {filters && (
+                <>
+                  <div>
+                    <div style={labelStyle}>Estrategia</div>
+                    <select style={selectStyle} value={selectedStrategy}
+                      onChange={e => setSelectedStrategy(e.target.value)}>
+                      {(filters.strategies || []).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div style={labelStyle}>Serie / SKU</div>
+                    <select style={selectStyle} value={selectedSeries}
+                      onChange={e => setSelectedSeries(e.target.value)}>
+                      {(filters.series_ids || []).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div style={labelStyle}>Modelo</div>
+                    <select style={selectStyle} value={selectedModel}
+                      onChange={e => setSelectedModel(e.target.value)}>
+                      {(filters.models || []).map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+
+                  {/* What-If toggle */}
+                  <button
+                    className={`filter-tab ${wiOpen ? "active" : ""}`}
+                    onClick={() => setWiOpen(o => !o)}
+                    style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "8px 14px",
+                      alignSelf: "flex-end", borderRadius: 8,
+                      background: wiOpen ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.02)",
+                      color: wiOpen ? "#fff" : "var(--text-2)",
+                      borderColor: wiOpen ? "rgba(139,92,246,0.45)" : "var(--border)" }}>
+                    <Icon name="zap" size={13} />
+                    What-If
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* What-if panel */}
+            {wiOpen && filters && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px dashed var(--border)",
+                display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div style={{ minWidth: 180 }}>
+                  <div style={{ ...labelStyle, color: "var(--c-inv)" }}>
+                    C_over: {cOver.toFixed(1)}
+                  </div>
+                  <input type="range" min={0.1} max={5.0} step={0.1} value={cOver}
+                    onChange={e => setCOver(parseFloat(e.target.value))}
+                    style={{ "--track-fill": "var(--c-inv)", "--track-percent": `${((cOver - 0.1) / 4.9) * 100}%` }} />
+                </div>
+                <div style={{ minWidth: 180 }}>
+                  <div style={{ ...labelStyle, color: "var(--c-drift)" }}>
+                    C_under: {cUnder.toFixed(1)}
+                  </div>
+                  <input type="range" min={0.5} max={20.0} step={0.5} value={cUnder}
+                    onChange={e => setCUnder(parseFloat(e.target.value))}
+                    style={{ "--track-fill": "var(--c-drift)", "--track-percent": `${((cUnder - 0.5) / 19.5) * 100}%` }} />
+                </div>
+                <div>
+                  <div style={labelStyle}>Capacidad (u)</div>
+                  <input type="number" placeholder="sin límite"
+                    value={wiCapacity} onChange={e => setWiCapacity(e.target.value)}
+                    style={{ ...selectStyle, width: 130 }} />
+                </div>
+                <button className="btn-run"
+                  disabled={wiLoading || !selectedModel}
+                  onClick={handleWhatIf}
+                  style={{ padding: "9px 18px", fontSize: 12, width: "auto" }}>
+                  {wiLoading ? "Simulando…" : "▶ Simular"}
+                </button>
+                {wiResult && (
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-2)" }}>
+                    <span style={{ color: wiResult.cost_delta < 0 ? "var(--c-conf)" : "#ef4444" }}>
+                      {wiResult.cost_delta < 0 ? "↓" : "↑"} ${Math.abs(wiResult.cost_delta).toFixed(2)}
+                    </span>
+                    {" vs base · SL: "}
+                    <span style={{ color: "var(--c-inv)" }}>
+                      {(wiResult.whatif_service_level * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!selectedRun ? (
+            <div style={{ padding: 48, textAlign: "center", color: "var(--text-3)",
+              fontFamily: "var(--font-mono)", fontSize: 13 }}>
+              Selecciona un experimento para explorar los resultados.
+            </div>
+          ) : (
+            <>
+              {/* ── Sub-tab bar ── */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+                {[
+                  { id: "forecast", label: "Pronósticos", icon: "activity" },
+                  { id: "latent",   label: "Demanda Latente", icon: "eye" },
+                  { id: "pareto",   label: "Pareto & Sensibilidad", icon: "target" },
+                ].map(t => (
+                  <button key={t.id}
+                    className={`filter-tab ${subTab === t.id ? "active" : ""}`}
+                    onClick={() => setSubTab(t.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12,
+                      padding: "8px 14px", borderRadius: 8,
+                      background: subTab === t.id ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.02)",
+                      color: subTab === t.id ? "#fff" : "var(--text-2)",
+                      borderColor: subTab === t.id ? "rgba(139,92,246,0.45)" : "var(--border)" }}>
+                    <Icon name={t.icon} size={13} />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Sub-tab: Pronósticos ── */}
+              {subTab === "forecast" && (
+                <div>
+                  {/* KPI strip */}
+                  {summaryLoading ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+                      {[1,2,3,4].map(i => (
+                        <div key={i} className="shimmer" style={{ height: 72, borderRadius: 10 }} />
+                      ))}
+                    </div>
+                  ) : kpis ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))",
+                      gap: 12, marginBottom: 16 }}>
+                      {[
+                        { label: "Coste Total", value: kpis.totalCost != null ? `$${kpis.totalCost.toFixed(2)}` : "—", color: "var(--c-inv)" },
+                        { label: "MAE", value: kpis.mae != null ? kpis.mae.toFixed(3) : "—", color: "var(--c-ai)" },
+                        { label: "Cobertura Conformal", value: kpis.coverage != null ? `${kpis.coverage.toFixed(1)}%` : "—", color: "var(--c-conf)" },
+                        { label: "Nivel de Servicio", value: kpis.serviceLevel != null ? `${(kpis.serviceLevel * 100).toFixed(1)}%` : "—", color: "var(--c-drift)" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className="glass" style={{ padding: "12px 16px" }}>
+                          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10.5,
+                            color: "var(--text-3)", textTransform: "uppercase",
+                            letterSpacing: "0.05em", marginBottom: 6 }}>
+                            {label}
+                          </div>
+                          <div style={{ fontFamily: "var(--font-display)", fontSize: 22,
+                            fontWeight: 700, color }}>
+                            {value}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* Drift alert banner */}
+                  {filters && (
+                    <div style={{
+                      padding: "10px 16px", borderRadius: 10, marginBottom: 14,
+                      borderLeft: `4px solid ${filters.drift_alert ? "#ef4444" : "var(--c-conf)"}`,
+                      background: filters.drift_alert ? "rgba(239,68,68,0.06)" : "rgba(16,185,129,0.06)",
+                      color: filters.drift_alert ? "#ef4444" : "var(--c-conf)",
+                      fontFamily: "var(--font-mono)", fontSize: 12,
+                    }}>
+                      {filters.drift_alert
+                        ? `⚠ Drift detectado: ${filters.drift_alert}`
+                        : "✓ Sin drift detectado en esta ejecución"}
+                    </div>
+                  )}
+
+                  {/* Forecast chart */}
+                  <div className="glass" style={{ padding: "18px 18px 14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between",
+                      alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                      <div>
+                        <div className="h-display" style={{ fontSize: 16 }}>Pronóstico vs Realidad</div>
+                        <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                          Intervalo conformal · pedidos sugeridos · escenario what-if
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                        <Legend2 color="var(--c-inv)" label="Real" />
+                        <Legend2 color="var(--c-ai)" label="Predicción" dashed />
+                        <Legend2 color="rgba(148,163,184,0.3)" label="Intervalo" square />
+                        <div style={{ display: "flex", alignItems: "center", gap: 5,
+                          fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
+                          <span style={{ color: "#ef4444", fontSize: 12 }}>◆</span> Pedido base
+                        </div>
+                        {wiResult && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5,
+                            fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
+                            <span style={{ color: "#f59e0b", fontSize: 12 }}>★</span> What-If
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {chartLoading ? (
+                      <div className="shimmer" style={{ height: 320, borderRadius: 8 }} />
+                    ) : (
+                      <ExpForecastChart
+                        chartData={chartData}
+                        whatifOrders={(() => {
+                          if (!wiResult || !wiResult.whatif_orders || !chartData) return null;
+                          const wo = wiResult.whatif_orders;
+                          if (!wo.dates || wo.dates.length === 0) return null;
+                          const m = new Map(wo.dates.map((d, i) => [d, wo.order_quantity[i]]));
+                          return (chartData.dates || []).map(d => m.has(d) ? m.get(d) : null);
+                        })()}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Sub-tab: Demanda Latente ── */}
+              {subTab === "latent" && (
+                <div className="glass" style={{ padding: "18px 18px 14px" }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <div className="h-display" style={{ fontSize: 16 }}>Imputación de Demanda Latente</div>
+                    <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                      Horas de rotura de stock · venta registrada (censurada) · demanda latente imputada
+                    </div>
+                  </div>
+
+                  {!filters?.has_latent ? (
+                    <div style={{ padding: 32, color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                      Esta ejecución no contiene datos de imputación de demanda latente.
+                      Selecciona una ejecución que incluya estrategia Latent_.
+                    </div>
+                  ) : latentLoading ? (
+                    <div className="shimmer" style={{ height: 300, borderRadius: 8 }} />
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5,
+                          fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
+                          <span style={{ width: 10, height: 10, borderRadius: 2,
+                            background: "rgba(245,158,11,0.4)" }} /> Horas de rotura (eje der.)
+                        </div>
+                        <Legend2 color="#ef4444" label="Venta real (censurada)" />
+                        <Legend2 color="var(--c-conf)" label="Demanda latente imputada" />
+                      </div>
+                      <ExpLatentChart latentData={latentData || { dates: [], stockout_hours: [], observed: [], latent: [] }} />
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ── Sub-tab: Pareto & Sensibilidad ── */}
+              {subTab === "pareto" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div className="glass" style={{ padding: "18px 18px 14px" }}>
+                    <div style={{ marginBottom: 12 }}>
+                      <div className="h-display" style={{ fontSize: 16 }}>Frontera de Pareto</div>
+                      <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                        Nivel de servicio vs coste total · puntos eficientes destacados
+                      </div>
+                    </div>
+                    {paretoLoading ? (
+                      <div className="shimmer" style={{ height: 300, borderRadius: 8 }} />
+                    ) : (
+                      <ExpParetoChart paretoData={paretoData || []} />
+                    )}
+                  </div>
+
+                  <div className="glass" style={{ padding: "18px 18px 14px" }}>
+                    <div style={{ marginBottom: 12 }}>
+                      <div className="h-display" style={{ fontSize: 16 }}>Sensibilidad a Ratio Cs/Co</div>
+                      <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                        Coste total de inventario en función del ratio de penalización por modelo
+                      </div>
+                    </div>
+                    {sensLoading ? (
+                      <div className="shimmer" style={{ height: 300, borderRadius: 8 }} />
+                    ) : (
+                      <ExpSensChart sensData={sensData || []} />
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // End of ExperimentsView
+    // ═══════════════════════════════════════════════════════════════════════
+
     function App() {
       const [params, setParams] = useState({
         serviceLevel: 95,
@@ -4060,7 +5049,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                   {[
                     { id: "dashboard", label: "Dashboard General", icon: "activity" },
                     { id: "skus", label: "Análisis SKU", icon: "package" },
-                    { id: "drift", label: "Monitor de Drift", icon: "zap" }
+                    { id: "drift", label: "Monitor de Drift", icon: "zap" },
+                    { id: "experiments", label: "Experimentos", icon: "layers" }
                   ].map(t => (
                     <button
                       key={t.id}
@@ -4132,6 +5122,10 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
                 {activeTab === "drift" && (
                   <DriftView params={params} />
+                )}
+
+                {activeTab === "experiments" && (
+                  <ExperimentsView />
                 )}
               </>
             )}

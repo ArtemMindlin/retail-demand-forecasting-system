@@ -15,8 +15,10 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
-from retail_forecasting.config import load_config
+from retail_forecasting.config import InventoryConfig, load_config
+from retail_forecasting.evaluation.metrics import summarize_costs
 from retail_forecasting.forecasting.pipeline import run_experiment, run_scoring
+from retail_forecasting.inventory.simulation import simulate_inventory_policy
 
 logger = logging.getLogger("retail_forecasting.api")
 
@@ -640,6 +642,306 @@ def get_alerts() -> list[dict[str, Any]]:
             },
         ]
     return alerts
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Historical Runs Browser — for the "Experimentos" tab in the React dashboard.
+# These endpoints intentionally do NOT share _PREDICTIONS_CACHE / _get_latest_run_path.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_REPORTS_DIR = Path("reports")
+
+
+def _resolve_run_path(run_name: str) -> Path:
+    """Validate run_name (path-traversal guard) and return its absolute Path."""
+    safe_name = Path(run_name).name
+    if not safe_name or safe_name != run_name or run_name.startswith("."):
+        raise HTTPException(status_code=404, detail="Run not found.")
+    run_path = _REPORTS_DIR / run_name
+    if not run_path.is_dir() or not (run_path / "predictions.csv").exists():
+        raise HTTPException(status_code=404, detail=f"Run '{run_name}' not found.")
+    return run_path
+
+
+def _df_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Serialize DataFrame to JSON-safe list of dicts (NaN → None)."""
+    records: list[dict[str, Any]] = df.where(pd.notnull(df), other=None).to_dict(orient="records")
+    return records
+
+
+def _parse_drift_alert(run_path: Path) -> str | None:
+    report = run_path / "report.md"
+    if not report.exists():
+        return None
+    lines = report.read_text(encoding="utf-8").splitlines()
+    alerts = [ln.strip() for ln in lines if "**ALERT**" in ln]
+    return " ".join(alerts) if alerts else None
+
+
+class WhatIfRequest(BaseModel):
+    model_name: str
+    data_strategy: str
+    series_id: str | None = None
+    c_over: float = Field(default=1.0, gt=0)
+    c_under: float = Field(default=4.0, gt=0)
+    capacity: int | None = Field(default=None, gt=0)
+
+
+@app.get("/api/runs")
+def list_runs() -> list[str]:
+    """Return names of experiment dirs in reports/ that have the required CSVs."""
+    if not _REPORTS_DIR.exists():
+        return []
+    runs = [
+        d.name
+        for d in sorted(_REPORTS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)
+        if d.is_dir()
+        and (d / "predictions.csv").exists()
+        and (d / "metrics_summary.csv").exists()
+        and (d / "cost_summary.csv").exists()
+    ]
+    return runs
+
+
+@app.get("/api/runs/{run_name}/filters")
+def get_run_filters(run_name: str) -> dict[str, Any]:
+    """Return available filter options for a given historical run."""
+    run_path = _resolve_run_path(run_name)
+    preds = pd.read_csv(run_path / "predictions.csv")
+
+    strategies: list[str] = (
+        sorted(preds["data_strategy"].dropna().unique().tolist())
+        if "data_strategy" in preds.columns
+        else ["Observed"]
+    )
+    series_ids: list[str] = sorted(preds["series_id"].dropna().unique().tolist())
+    models: list[str] = sorted(preds["model_name"].dropna().unique().tolist())
+
+    has_latent = (
+        any("Latent_" in s for s in preds.get("data_strategy", pd.Series([])).dropna())
+        and "original_observed_demand" in preds.columns
+    )
+    has_pareto = (run_path / "pareto_frontier.csv").exists()
+    has_sensitivity = (run_path / "sensitivity_summary.csv").exists()
+    drift_alert = _parse_drift_alert(run_path)
+
+    return {
+        "strategies": strategies,
+        "series_ids": series_ids,
+        "models": models,
+        "has_latent": has_latent,
+        "has_pareto": has_pareto,
+        "has_sensitivity": has_sensitivity,
+        "drift_alert": drift_alert,
+    }
+
+
+@app.get("/api/runs/{run_name}/chart")
+def get_run_chart(
+    run_name: str,
+    strategy: str | None = None,
+    series_id: str | None = None,
+    model: str | None = None,
+) -> dict[str, Any]:
+    """Return time-series chart data for a run filtered by strategy/series/model."""
+    run_path = _resolve_run_path(run_name)
+    preds = pd.read_csv(run_path / "predictions.csv")
+
+    if strategy and "data_strategy" in preds.columns:
+        preds = preds[preds["data_strategy"] == strategy]
+    if series_id:
+        preds = preds[preds["series_id"] == series_id]
+    if model:
+        preds = preds[preds["model_name"] == model]
+
+    preds = preds.sort_values("date")
+
+    q_low = preds["q_0_1"].tolist() if "q_0_1" in preds.columns else [None] * len(preds)
+    q_high = preds["q_0_9"].tolist() if "q_0_9" in preds.columns else [None] * len(preds)
+    order_qty = (
+        preds["order_quantity"].tolist()
+        if "order_quantity" in preds.columns
+        else [None] * len(preds)
+    )
+
+    return {
+        "dates": preds["date"].tolist(),
+        "y_true": [v if pd.notna(v) else None for v in preds["y_true"].tolist()],
+        "y_pred": [v if pd.notna(v) else None for v in preds["y_pred"].tolist()],
+        "q_low": [v if pd.notna(v) else None for v in q_low],
+        "q_high": [v if pd.notna(v) else None for v in q_high],
+        "order_quantity": [v if pd.notna(v) else None for v in order_qty],
+    }
+
+
+@app.get("/api/runs/{run_name}/latent")
+def get_run_latent(
+    run_name: str,
+    series_id: str | None = None,
+    model: str | None = None,
+) -> dict[str, Any]:
+    """Return latent demand data (stockout hours, observed, latent estimate)."""
+    run_path = _resolve_run_path(run_name)
+    preds = pd.read_csv(run_path / "predictions.csv")
+
+    # Detect latent strategy (any strategy with "Latent_" in its name)
+    latent_strat: str | None = None
+    if "data_strategy" in preds.columns:
+        for s in preds["data_strategy"].dropna().unique():
+            if "Latent_" in s:
+                latent_strat = s
+                break
+
+    if latent_strat is None or "original_observed_demand" not in preds.columns:
+        return {"dates": [], "stockout_hours": [], "observed": [], "latent": []}
+
+    df = preds[preds["data_strategy"] == latent_strat]
+    if series_id:
+        df = df[df["series_id"] == series_id]
+    if model:
+        df = df[df["model_name"] == model]
+    df = df.sort_values("date")
+
+    stockout_hours = (
+        df["stockout_hours"].tolist() if "stockout_hours" in df.columns else [None] * len(df)
+    )
+    latent = (
+        df["latent_demand_est"].tolist() if "latent_demand_est" in df.columns else [None] * len(df)
+    )
+
+    return {
+        "dates": df["date"].tolist(),
+        "stockout_hours": [v if pd.notna(v) else None for v in stockout_hours],
+        "observed": [v if pd.notna(v) else None for v in df["original_observed_demand"].tolist()],
+        "latent": [v if pd.notna(v) else None for v in latent],
+    }
+
+
+@app.get("/api/runs/{run_name}/pareto")
+def get_run_pareto(run_name: str) -> list[dict[str, Any]]:
+    """Return pareto_frontier.csv as a list of dicts ([] if not found)."""
+    run_path = _resolve_run_path(run_name)
+    pareto_path = run_path / "pareto_frontier.csv"
+    if not pareto_path.exists():
+        return []
+    df = pd.read_csv(pareto_path)
+    return _df_to_records(df)
+
+
+@app.get("/api/runs/{run_name}/sensitivity")
+def get_run_sensitivity(run_name: str) -> list[dict[str, Any]]:
+    """Return sensitivity_summary.csv as a list of dicts ([] if not found)."""
+    run_path = _resolve_run_path(run_name)
+    sens_path = run_path / "sensitivity_summary.csv"
+    if not sens_path.exists():
+        return []
+    df = pd.read_csv(sens_path)
+    return _df_to_records(df)
+
+
+@app.get("/api/runs/{run_name}/summary")
+def get_run_summary(run_name: str) -> dict[str, list[dict[str, Any]]]:
+    """Return metrics_summary.csv and cost_summary.csv as lists of dicts."""
+    run_path = _resolve_run_path(run_name)
+    metrics = pd.read_csv(run_path / "metrics_summary.csv")
+    costs = pd.read_csv(run_path / "cost_summary.csv")
+    return {
+        "metrics": _df_to_records(metrics),
+        "costs": _df_to_records(costs),
+    }
+
+
+@app.post("/api/runs/{run_name}/whatif")
+def run_whatif(run_name: str, body: WhatIfRequest) -> dict[str, Any]:
+    """
+    Re-simulate inventory policy with custom cost params and return cost delta
+    vs the base scenario stored in cost_summary.csv.
+    """
+    run_path = _resolve_run_path(run_name)
+    preds = pd.read_csv(run_path / "predictions.csv")
+
+    # Filter to the requested strategy/model
+    if "data_strategy" in preds.columns:
+        preds = preds[preds["data_strategy"] == body.data_strategy]
+    preds = preds[preds["model_name"] == body.model_name].copy()
+
+    if preds.empty:
+        raise HTTPException(
+            status_code=404, detail="No predictions found for the requested filters."
+        )
+
+    # Apply what-if cost overrides
+    preds["c_over"] = body.c_over
+    preds["c_under"] = body.c_under
+    preds["critical_fractile"] = body.c_under / (body.c_under + body.c_over)
+
+    custom_config = InventoryConfig(
+        overstock_cost=body.c_over,
+        stockout_cost=body.c_under,
+        use_series_costs=False,
+        global_capacity_units=body.capacity,
+    )
+
+    wi_preds = simulate_inventory_policy(
+        predictions=preds,
+        inventory_config=custom_config,
+        series_cost_profile=None,
+    )
+    wi_costs = summarize_costs(wi_preds)
+
+    # Build per-series what-if order quantities for the requested series (chart overlay)
+    whatif_orders: dict[str, Any] = {}
+    order_col = "order_quantity" if "order_quantity" in wi_preds.columns else None
+    target_series = body.series_id
+    if order_col and "date" in wi_preds.columns and target_series:
+        wi_for_series = (
+            wi_preds[wi_preds["series_id"] == target_series]
+            if "series_id" in wi_preds.columns
+            else wi_preds
+        )
+        wi_for_series = wi_for_series.sort_values("date")
+        whatif_orders = {
+            "dates": wi_for_series["date"].astype(str).tolist(),
+            "order_quantity": wi_for_series[order_col].tolist(),
+        }
+
+    # Load base costs for comparison
+    base_costs = pd.read_csv(run_path / "cost_summary.csv")
+    if "data_strategy" in base_costs.columns:
+        base_costs = base_costs[base_costs["data_strategy"] == body.data_strategy]
+    base_costs = base_costs[base_costs["model_name"] == body.model_name]
+
+    cost_col = "sim_total_cost" if "sim_total_cost" in wi_costs.columns else "total_cost"
+    base_col = "sim_total_cost" if "sim_total_cost" in base_costs.columns else "total_cost"
+
+    wi_total = float(wi_costs[cost_col].sum()) if cost_col in wi_costs.columns else 0.0
+    base_total = (
+        float(base_costs[base_col].sum())
+        if base_col in base_costs.columns and not base_costs.empty
+        else 0.0
+    )
+
+    sl_col = "sim_service_level" if "sim_service_level" in wi_costs.columns else "service_level"
+    base_sl_col = (
+        "sim_service_level" if "sim_service_level" in base_costs.columns else "service_level"
+    )
+    wi_sl = float(wi_costs[sl_col].mean()) if sl_col in wi_costs.columns else 0.0
+    base_sl = (
+        float(base_costs[base_sl_col].mean())
+        if base_sl_col in base_costs.columns and not base_costs.empty
+        else 0.0
+    )
+
+    return {
+        "whatif_total_cost": round(wi_total, 2),
+        "base_total_cost": round(base_total, 2),
+        "cost_delta": round(wi_total - base_total, 2),
+        "whatif_service_level": round(wi_sl, 4),
+        "base_service_level": round(base_sl, 4),
+        "service_level_delta": round(wi_sl - base_sl, 4),
+        "summary": _df_to_records(wi_costs),
+        "whatif_orders": whatif_orders,
+    }
 
 
 @app.post("/api/retrain")
