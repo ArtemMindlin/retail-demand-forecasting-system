@@ -10,9 +10,9 @@ dataset:
   local_cache_dir: data/raw/fresh_retailnet
   processed_panel_dir: data/processed
   use_cache: true
-  top_n_series: null
+  top_n_series: 20
   min_history_days: 70
-  max_rows: null
+  max_rows: 50000
   horizon: 7
 
 preprocessing:
@@ -30,10 +30,10 @@ features:
 
 validation:
   initial_train_days: 45
-  n_folds: 3
+  n_folds: 2
   fold_size_days: 14
-  calibration_days: 28
-  retrain_each_fold: true
+  calibration_days: 14
+  retrain_each_fold: false
   drift_triggered_retrain: false
 
 drift:
@@ -49,11 +49,11 @@ models:
   models_dir: models
   quantiles: [0.1, 0.5, 0.9]
   seasonal_period: 7
-  n_estimators: 1000
+  n_estimators: 200
   learning_rate: 0.05
-  max_depth: 8
-  use_tuning: true
-  tuning_trials: 50
+  max_depth: 6
+  use_tuning: false
+  tuning_trials: 0
   optimize_for_cost: true
 
 inventory:
@@ -92,9 +92,9 @@ business:
 reporting:
   output_dir: reports
   run_name: fresh_retailnet_v2
-  make_plots: true
+  make_plots: false
 
 simulation:
   retrain_cadences: [null, 7, 1]
   simulation_days: null
-  make_plots: true
+  make_plots: false
