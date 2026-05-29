@@ -1,12 +1,27 @@
 version: '3.8'
 
 services:
-  # 1. FastAPI Model Serving
+  # 1. Caddy — reverse proxy + automatic HTTPS
+  caddy:
+    image: caddy:2-alpine
+    container_name: retail_forecasting_caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # 2. FastAPI Model Serving
   api:
     build: .
     container_name: retail_forecasting_api
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     command: ["uvicorn", "retail_forecasting.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     volumes:
       - ./configs:/app/configs
@@ -14,6 +29,7 @@ services:
       - ./reports:/app/reports
     environment:
       - RETAIL_PROJECT__RUN_MODE=score_daily
+    restart: unless-stopped
 
   # 2. MLflow Tracking Server
   mlflow:
@@ -27,3 +43,8 @@ services:
     volumes:
       - ./mlruns:/app/mlruns
       - ./mlflow.db:/app/mlflow.db
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
