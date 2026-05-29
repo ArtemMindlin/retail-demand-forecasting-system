@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import logging
 import subprocess
 import sys
@@ -13,7 +14,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import yaml
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -32,6 +33,29 @@ app = FastAPI(
 
 # Cache dictionary for predictions dataframe
 _PREDICTIONS_CACHE: dict[str, Any] = {}
+
+# Simple in-memory rate limiter for /api/run (max 3 calls per IP per 10 minutes)
+_RATE_LIMIT_WINDOW = 600  # seconds
+_RATE_LIMIT_MAX = 3
+_RATE_BUCKETS: dict[str, collections.deque[float]] = collections.defaultdict(
+    lambda: collections.deque()
+)
+_RATE_LOCK = threading.Lock()
+
+
+def _check_rate_limit(ip: str) -> None:
+    now = time.monotonic()
+    with _RATE_LOCK:
+        bucket = _RATE_BUCKETS[ip]
+        while bucket and now - bucket[0] > _RATE_LIMIT_WINDOW:
+            bucket.popleft()
+        if len(bucket) >= _RATE_LIMIT_MAX:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Demasiadas solicitudes. Máximo {_RATE_LIMIT_MAX} ejecuciones por {_RATE_LIMIT_WINDOW // 60} minutos.",
+            )
+        bucket.append(now)
+
 
 # Server start time for uptime tracking
 _START_TIME: float = time.monotonic()
@@ -183,10 +207,14 @@ class ScoreResponse(BaseModel):
 
 @app.post("/api/run")
 def run_pipeline(
+    request: Request,
     background_tasks: BackgroundTasks,
     config_path: str = "configs/default.yaml",
 ) -> dict[str, str]:
     """Trigger pipeline execution in a background task."""
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip)
+
     config_file = Path(config_path)
     if not config_file.exists():
         raise HTTPException(

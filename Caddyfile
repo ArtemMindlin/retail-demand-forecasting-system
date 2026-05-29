@@ -1,3 +1,6 @@
 artemmindlin.site {
+    basicauth {
+        ArtemMindlin $2a$14$1IFv3jbmeG78mdQrp1z9BuOKV8bN4G/NUfjrbqxMH5HbB9QgXWYDi
+    }
     reverse_proxy api:8000
 }
