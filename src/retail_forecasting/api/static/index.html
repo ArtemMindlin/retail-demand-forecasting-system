@@ -1186,7 +1186,7 @@
       );
     }
 
-    function Sidebar({ params, setParams, onRun, running, lastRunAt, onRunPipeline, dataStatus }) {
+    function Sidebar({ params, setParams, onRun, running, lastRunAt, onRunPipeline, dataStatus, onOpenConfig }) {
       const update = (k) => (v) => setParams((p) => ({ ...p, [k]: v }));
 
       return (
@@ -1376,7 +1376,24 @@
             </div>
           </div>
 
-          {/* Action 3: Descarga de Resultados */}
+          {/* Action 3: Configuración */}
+          <div style={{ padding: "0 22px 10px" }}>
+            <button
+              className="btn-run"
+              onClick={onOpenConfig}
+              style={{
+                borderColor: "rgba(139, 92, 246, 0.35)",
+                background: "radial-gradient(120% 200% at 0% 0%, rgba(139, 92, 246, 0.12), transparent 60%), linear-gradient(180deg, rgba(139, 92, 246, 0.07), rgba(59, 130, 246, 0.03))"
+              }}
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
+                <Icon name="settings" size={15} stroke="var(--c-ai)" />
+                ⚙ Configuración
+              </span>
+            </button>
+          </div>
+
+          {/* Action 4: Descarga de Resultados */}
           <div style={{ padding: "0 22px 18px" }}>
             <div style={{
               fontSize: 10.5,
@@ -4775,6 +4792,203 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     // End of ExperimentsView
     // ═══════════════════════════════════════════════════════════════════════
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // ConfigModal — YAML config editor
+    // ═══════════════════════════════════════════════════════════════════════
+    function ConfigModal({ onClose, onRunPipeline }) {
+      const [yaml, setYaml] = useState("");
+      const [loading, setLoading] = useState(true);
+      const [saving, setSaving] = useState(false);
+      const [error, setError] = useState(null);
+      const [saved, setSaved] = useState(false);
+
+      useEffect(() => {
+        const onKey = (e) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+          document.removeEventListener("keydown", onKey);
+          document.body.style.overflow = prev;
+        };
+      }, [onClose]);
+
+      useEffect(() => {
+        fetch("/api/config")
+          .then(r => r.json())
+          .then(d => { setYaml(d.yaml); setLoading(false); })
+          .catch(() => { setError("No se pudo cargar la configuración."); setLoading(false); });
+      }, []);
+
+      const save = async (andRun = false) => {
+        setError(null);
+        setSaving(true);
+        try {
+          const res = await fetch("/api/config", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ yaml }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            setError(data.detail || "Error al guardar la configuración.");
+            setSaving(false);
+            return;
+          }
+          setSaved(true);
+          setTimeout(() => setSaved(false), 2000);
+          if (andRun) {
+            onClose();
+            onRunPipeline?.();
+          }
+        } catch (e) {
+          setError("Error de red al guardar.");
+        } finally {
+          setSaving(false);
+        }
+      };
+
+      return (
+        <div className="modal-backdrop" onClick={onClose}>
+          <div
+            className="modal-window"
+            style={{ width: "min(720px, 100%)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "20px 24px 16px",
+              borderBottom: "1px solid var(--border)"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Icon name="settings" size={16} stroke="var(--c-ai)" />
+                <span style={{ fontSize: 14.5, fontWeight: 600, color: "#fff", letterSpacing: "0.01em" }}>
+                  Configuración del Pipeline
+                </span>
+              </div>
+              <button className="modal-close" onClick={onClose} aria-label="Cerrar" />
+            </div>
+
+            {/* Body */}
+            <div style={{ flex: 1, padding: "20px 24px", overflowY: "auto" }}>
+              {loading ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[1,2,3,4,5].map(i => (
+                    <div key={i} className="shimmer" style={{ height: 18, borderRadius: 4, width: i % 2 === 0 ? "70%" : "100%" }} />
+                  ))}
+                </div>
+              ) : (
+                <textarea
+                  value={yaml}
+                  onChange={e => setYaml(e.target.value)}
+                  spellCheck={false}
+                  style={{
+                    background: "#060810",
+                    color: "#e7ecf3",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: "12.5px",
+                    lineHeight: 1.65,
+                    border: "1px solid var(--border-2)",
+                    borderRadius: 8,
+                    padding: "14px 16px",
+                    width: "100%",
+                    height: 500,
+                    resize: "vertical",
+                    outline: "none",
+                    boxSizing: "border-box"
+                  }}
+                />
+              )}
+
+              {error && (
+                <div style={{
+                  marginTop: 12,
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: "rgba(239, 68, 68, 0.08)",
+                  border: "1px solid rgba(239, 68, 68, 0.25)",
+                  borderLeft: "4px solid #ef4444",
+                  color: "#fca5a5",
+                  fontSize: 12.5,
+                  fontFamily: "var(--font-mono)",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word"
+                }}>
+                  {error}
+                </div>
+              )}
+
+              {saved && (
+                <div style={{
+                  marginTop: 12,
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  background: "rgba(16, 185, 129, 0.08)",
+                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                  borderLeft: "4px solid #10b981",
+                  color: "#6ee7b7",
+                  fontSize: 12.5
+                }}>
+                  ✓ Guardado
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 10,
+              padding: "16px 24px 20px",
+              borderTop: "1px solid var(--border)"
+            }}>
+              <button
+                className="btn-run"
+                onClick={onClose}
+                style={{
+                  fontSize: 12.5,
+                  padding: "8px 18px",
+                  borderColor: "var(--border)",
+                  background: "rgba(255,255,255,0.02)"
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-run"
+                onClick={() => save(false)}
+                disabled={saving || loading}
+                style={{
+                  fontSize: 12.5,
+                  padding: "8px 18px",
+                  borderColor: "rgba(139, 92, 246, 0.45)",
+                  background: "rgba(139, 92, 246, 0.1)"
+                }}
+              >
+                {saving ? "Guardando…" : "Guardar"}
+              </button>
+              <button
+                className="btn-run"
+                onClick={() => save(true)}
+                disabled={saving || loading}
+                style={{
+                  fontSize: 12.5,
+                  padding: "8px 18px",
+                  borderColor: "rgba(16, 185, 129, 0.45)",
+                  background: "rgba(16, 185, 129, 0.1)"
+                }}
+              >
+                {saving ? "Guardando…" : "Guardar y Ejecutar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     function App() {
       const [params, setParams] = useState({
         serviceLevel: 95,
@@ -4787,6 +5001,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const [lastRunAt, setLastRunAt] = useState(null);
       const [alerts, setAlerts] = useState(SEED_ALERTS);
       const [alertsOpen, setAlertsOpen] = useState(false);
+      const [configOpen, setConfigOpen] = useState(false);
       const [activeTab, setActiveTab] = useState("dashboard");
       const [selectedSkuId, setSelectedSkuId] = useState(null);
       const [tabTransitioning, setTabTransitioning] = useState(false);
@@ -5018,6 +5233,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             lastRunAt={lastRunAt}
             onRunPipeline={handleRunPipeline}
             dataStatus={data?.status}
+            onOpenConfig={() => setConfigOpen(true)}
           />
           <main className="canvas canvas-bg">
             <div className={`premium-loading-bar ${tabTransitioning ? "active" : ""}`} />
@@ -5157,6 +5373,13 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               setAlerts={setAlerts}
               onClose={() => setAlertsOpen(false)}
               onActionRun={handleAction}
+            />
+          )}
+
+          {configOpen && (
+            <ConfigModal
+              onClose={() => setConfigOpen(false)}
+              onRunPipeline={handleRunPipeline}
             />
           )}
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from datetime import UTC, datetime
@@ -11,6 +12,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import yaml
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
@@ -948,6 +950,52 @@ def run_whatif(run_name: str, body: WhatIfRequest) -> dict[str, Any]:
 def retrain_model() -> dict[str, str]:
     """Trigger background model retraining simulation."""
     return {"status": "success", "message": "Model recalibration triggered successfully."}
+
+
+_CONFIG_PATH = Path("configs/default.yaml")
+
+
+class ConfigBody(BaseModel):
+    yaml: str
+
+
+@app.get("/api/config")
+def get_config() -> dict[str, str]:
+    """Return the raw YAML text of the default configuration file."""
+    if not _CONFIG_PATH.exists():
+        raise HTTPException(status_code=404, detail=f"Config file not found: {_CONFIG_PATH}")
+    return {"yaml": _CONFIG_PATH.read_text(encoding="utf-8"), "path": str(_CONFIG_PATH)}
+
+
+@app.put("/api/config")
+def put_config(body: ConfigBody) -> dict[str, str]:
+    """Validate and write a new configuration file."""
+    # 1. Parse YAML syntax
+    try:
+        yaml.safe_load(body.yaml)
+    except yaml.YAMLError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid YAML: {exc}") from exc
+
+    # 2. Validate with load_config via a temp file
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        ) as tmp:
+            tmp.write(body.yaml)
+            tmp_path = Path(tmp.name)
+        load_config(tmp_path)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Config validation failed: {exc}") from exc
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    # 3. Write to the real config path
+    _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _CONFIG_PATH.write_text(body.yaml, encoding="utf-8")
+    return {"status": "ok"}
 
 
 @app.post("/predict_orders", response_model=ScoreResponse)
