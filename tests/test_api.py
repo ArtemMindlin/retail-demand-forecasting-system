@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from pathlib import Path
 from unittest import mock
 
@@ -7,9 +8,12 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from retail_forecasting.api.main import app
+from retail_forecasting.api.main import _SESSIONS, app
 
-client = TestClient(app)
+# Inject a valid session token so protected endpoints don't return 401
+_TEST_TOKEN = secrets.token_urlsafe(32)
+_SESSIONS.add(_TEST_TOKEN)
+client = TestClient(app, cookies={"rf_session": _TEST_TOKEN})
 
 
 def test_health_check() -> None:
