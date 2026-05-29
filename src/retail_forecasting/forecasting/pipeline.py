@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
-from retail_forecasting.config import Settings
+from retail_forecasting.config import InventoryConfig, Settings
 from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_tuning import BoostingParams
@@ -928,3 +929,58 @@ def _build_scoring_predictions(
     return attach_inventory_costs(
         frame, settings.inventory, series_cost_profile=series_cost_profile
     )
+
+
+def run_whatif_simulation(
+    predictions: pd.DataFrame,
+    model_name: str,
+    data_strategy: str,
+    c_over: float,
+    c_under: float,
+    capacity: int | None,
+    series_id: str | None = None,
+) -> dict[str, Any]:
+    """Re-simulate inventory policy with custom cost params (used by API what-if endpoint)."""
+    preds = predictions.copy()
+    if "data_strategy" in preds.columns:
+        preds = preds[preds["data_strategy"] == data_strategy]
+    preds = preds[preds["model_name"] == model_name].copy()
+
+    preds["c_over"] = c_over
+    preds["c_under"] = c_under
+    preds["critical_fractile"] = c_under / (c_under + c_over)
+
+    config = InventoryConfig(
+        overstock_cost=c_over,
+        stockout_cost=c_under,
+        use_series_costs=False,
+        global_capacity_units=capacity,
+    )
+    wi_preds = simulate_inventory_policy(
+        predictions=preds, inventory_config=config, series_cost_profile=None
+    )
+    wi_costs = summarize_costs(wi_preds)
+
+    order_col = "order_quantity" if "order_quantity" in wi_preds.columns else None
+    whatif_orders: dict[str, Any] = {}
+    if order_col and series_id and "date" in wi_preds.columns:
+        s = (
+            wi_preds[wi_preds["series_id"] == series_id].sort_values("date")
+            if "series_id" in wi_preds.columns
+            else wi_preds
+        )
+        whatif_orders = {
+            "dates": s["date"].astype(str).tolist(),
+            "order_quantity": s[order_col].tolist(),
+        }
+
+    cost_col = "sim_total_cost" if "sim_total_cost" in wi_costs.columns else "total_cost"
+    sl_col = "sim_service_level" if "sim_service_level" in wi_costs.columns else "service_level"
+
+    return {
+        "wi_preds": wi_preds,
+        "wi_costs": wi_costs,
+        "whatif_orders": whatif_orders,
+        "cost_col": cost_col,
+        "sl_col": sl_col,
+    }

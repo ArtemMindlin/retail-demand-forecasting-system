@@ -18,10 +18,12 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
-from retail_forecasting.config import InventoryConfig, load_config
-from retail_forecasting.evaluation.metrics import summarize_costs
-from retail_forecasting.forecasting.pipeline import run_experiment, run_scoring
-from retail_forecasting.inventory.simulation import simulate_inventory_policy
+from retail_forecasting.config import load_config
+from retail_forecasting.forecasting.pipeline import (
+    run_experiment,
+    run_scoring,
+    run_whatif_simulation,
+)
 
 logger = logging.getLogger("retail_forecasting.api")
 
@@ -890,50 +892,25 @@ def run_whatif(run_name: str, body: WhatIfRequest) -> dict[str, Any]:
     run_path = _resolve_run_path(run_name)
     preds = pd.read_csv(run_path / "predictions.csv")
 
-    # Filter to the requested strategy/model
-    if "data_strategy" in preds.columns:
-        preds = preds[preds["data_strategy"] == body.data_strategy]
-    preds = preds[preds["model_name"] == body.model_name].copy()
-
-    if preds.empty:
+    if preds[preds["model_name"] == body.model_name].empty:
         raise HTTPException(
             status_code=404, detail="No predictions found for the requested filters."
         )
 
-    # Apply what-if cost overrides
-    preds["c_over"] = body.c_over
-    preds["c_under"] = body.c_under
-    preds["critical_fractile"] = body.c_under / (body.c_under + body.c_over)
-
-    custom_config = InventoryConfig(
-        overstock_cost=body.c_over,
-        stockout_cost=body.c_under,
-        use_series_costs=False,
-        global_capacity_units=body.capacity,
-    )
-
-    wi_preds = simulate_inventory_policy(
+    result = run_whatif_simulation(
         predictions=preds,
-        inventory_config=custom_config,
-        series_cost_profile=None,
+        model_name=body.model_name,
+        data_strategy=body.data_strategy,
+        c_over=body.c_over,
+        c_under=body.c_under,
+        capacity=body.capacity,
+        series_id=body.series_id,
     )
-    wi_costs = summarize_costs(wi_preds)
 
-    # Build per-series what-if order quantities for the requested series (chart overlay)
-    whatif_orders: dict[str, Any] = {}
-    order_col = "order_quantity" if "order_quantity" in wi_preds.columns else None
-    target_series = body.series_id
-    if order_col and "date" in wi_preds.columns and target_series:
-        wi_for_series = (
-            wi_preds[wi_preds["series_id"] == target_series]
-            if "series_id" in wi_preds.columns
-            else wi_preds
-        )
-        wi_for_series = wi_for_series.sort_values("date")
-        whatif_orders = {
-            "dates": wi_for_series["date"].astype(str).tolist(),
-            "order_quantity": wi_for_series[order_col].tolist(),
-        }
+    wi_costs = result["wi_costs"]
+    whatif_orders = result["whatif_orders"]
+    cost_col = result["cost_col"]
+    sl_col = result["sl_col"]
 
     # Load base costs for comparison
     base_costs = pd.read_csv(run_path / "cost_summary.csv")
@@ -941,19 +918,16 @@ def run_whatif(run_name: str, body: WhatIfRequest) -> dict[str, Any]:
         base_costs = base_costs[base_costs["data_strategy"] == body.data_strategy]
     base_costs = base_costs[base_costs["model_name"] == body.model_name]
 
-    cost_col = "sim_total_cost" if "sim_total_cost" in wi_costs.columns else "total_cost"
     base_col = "sim_total_cost" if "sim_total_cost" in base_costs.columns else "total_cost"
+    base_sl_col = (
+        "sim_service_level" if "sim_service_level" in base_costs.columns else "service_level"
+    )
 
     wi_total = float(wi_costs[cost_col].sum()) if cost_col in wi_costs.columns else 0.0
     base_total = (
         float(base_costs[base_col].sum())
         if base_col in base_costs.columns and not base_costs.empty
         else 0.0
-    )
-
-    sl_col = "sim_service_level" if "sim_service_level" in wi_costs.columns else "service_level"
-    base_sl_col = (
-        "sim_service_level" if "sim_service_level" in base_costs.columns else "service_level"
     )
     wi_sl = float(wi_costs[sl_col].mean()) if sl_col in wi_costs.columns else 0.0
     base_sl = (
