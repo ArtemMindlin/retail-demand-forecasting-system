@@ -922,6 +922,9 @@
     0% { background-position: 0% 50%; }
     100% { background-position: 200% 50%; }
   }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
 </style>
 
 </head>
@@ -970,6 +973,8 @@
         clock:       <g><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></g>,
         eye:         <g><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></g>,
         slidersIcon: <g><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></g>,
+        settings:    <g><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></g>,
+        logout:      <g><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></g>,
       };
       return <svg {...common}>{paths[name] || null}</svg>;
     };
@@ -1186,7 +1191,7 @@
       );
     }
 
-    function Sidebar({ params, setParams, onRun, running, lastRunAt, onRunPipeline, dataStatus, onOpenConfig }) {
+    function Sidebar({ params, setParams, onRun, running, lastRunAt, onRunPipeline, dataStatus, onOpenConfig, onLogout }) {
       const update = (k) => (v) => setParams((p) => ({ ...p, [k]: v }));
 
       return (
@@ -1471,26 +1476,42 @@
           {/* Footer log */}
           <div style={{
             marginTop: "auto",
-            padding: "14px 22px",
             borderTop: "1px solid var(--border)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 10.5,
-            color: "var(--text-3)",
             background: "rgba(0,0,0,0.18)"
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span>last_run</span>
-              <span style={{ color: "var(--text-2)" }}>
-                {lastRunAt ? lastRunAt : "—"}<span style={{ opacity: 0.5 }}>{running ? "" : ""}</span>
-              </span>
+            <div style={{ padding: "14px 22px", fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--text-3)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>last_run</span>
+                <span style={{ color: "var(--text-2)" }}>
+                  {lastRunAt ? lastRunAt : "—"}<span style={{ opacity: 0.5 }}>{running ? "" : ""}</span>
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+                <span>model</span>
+                <span style={{ color: "var(--text-2)" }}>LightGBM + ICP</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+                <span>calibration</span>
+                <span style={{ color: "var(--c-conf)" }}>holdout · 14d</span>
+              </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
-              <span>model</span>
-              <span style={{ color: "var(--text-2)" }}>LightGBM + ICP</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
-              <span>calibration</span>
-              <span style={{ color: "var(--c-conf)" }}>holdout · 14d</span>
+            <div style={{ padding: "0 22px 16px" }}>
+              <button
+                onClick={onLogout}
+                style={{
+                  width: "100%", padding: "8px 12px",
+                  background: "transparent", border: "1px solid var(--border)",
+                  borderRadius: 8, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  color: "var(--text-3)", fontSize: 12, fontFamily: "var(--font-sans)",
+                  transition: "border-color 0.15s, color 0.15s"
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(245,158,11,0.4)"; e.currentTarget.style.color = "var(--c-drift)"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--text-3)"; }}
+              >
+                <Icon name="logout" size={13} stroke="currentColor" />
+                Cerrar sesión
+              </button>
             </div>
           </div>
         </aside>
@@ -4989,7 +5010,140 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       );
     }
 
+    function LoginScreen({ onLogin }) {
+      const [username, setUsername] = React.useState("");
+      const [password, setPassword] = React.useState("");
+      const [error, setError] = React.useState(null);
+      const [loading, setLoading] = React.useState(false);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError(null);
+        setLoading(true);
+        try {
+          const res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+          if (res.ok) {
+            onLogin();
+          } else {
+            const data = await res.json().catch(() => ({}));
+            setError(data.detail || "Credenciales incorrectas");
+          }
+        } catch {
+          setError("Error de conexión");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div style={{
+          minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+          background: "var(--bg-0)", fontFamily: "var(--font-sans)"
+        }}>
+          <div style={{
+            width: 380, padding: "40px 36px",
+            background: "var(--surface)",
+            border: "1px solid var(--border-2)",
+            borderRadius: 16,
+            boxShadow: "0 0 60px rgba(139,92,246,0.12), 0 24px 64px rgba(0,0,0,0.5)"
+          }}>
+            {/* Logo */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 10,
+                background: "linear-gradient(135deg, var(--c-ai), var(--c-inv))",
+                display: "grid", placeItems: "center",
+                boxShadow: "0 0 20px rgba(139,92,246,0.5)"
+              }}>
+                <Icon name="sparkles" size={18} stroke="#fff" strokeWidth={2} />
+              </div>
+              <div>
+                <div className="h-display" style={{ fontSize: 18, color: "var(--text-1)" }}>
+                  Forecast<span style={{ color: "var(--c-ai)" }}>.ai</span>
+                </div>
+                <div style={{ fontSize: 10.5, color: "var(--text-3)", fontFamily: "var(--font-mono)", letterSpacing: "0.08em" }}>
+                  RETAIL DEMAND FORECASTING
+                </div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 24 }}>
+              Accede al sistema de predicción y gestión de inventario.
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 11.5, color: "var(--text-3)", marginBottom: 6, fontFamily: "var(--font-mono)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                  Usuario
+                </label>
+                <input
+                  type="text" autoComplete="username" required
+                  value={username} onChange={e => setUsername(e.target.value)}
+                  style={{
+                    width: "100%", boxSizing: "border-box", padding: "10px 14px",
+                    background: "var(--bg-1)", border: "1px solid var(--border-2)",
+                    borderRadius: 8, color: "var(--text-1)", fontSize: 13,
+                    fontFamily: "var(--font-sans)", outline: "none",
+                    transition: "border-color 0.15s"
+                  }}
+                  onFocus={e => e.target.style.borderColor = "var(--c-ai)"}
+                  onBlur={e => e.target.style.borderColor = "var(--border-2)"}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 11.5, color: "var(--text-3)", marginBottom: 6, fontFamily: "var(--font-mono)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                  Contraseña
+                </label>
+                <input
+                  type="password" autoComplete="current-password" required
+                  value={password} onChange={e => setPassword(e.target.value)}
+                  style={{
+                    width: "100%", boxSizing: "border-box", padding: "10px 14px",
+                    background: "var(--bg-1)", border: "1px solid var(--border-2)",
+                    borderRadius: 8, color: "var(--text-1)", fontSize: 13,
+                    fontFamily: "var(--font-sans)", outline: "none",
+                    transition: "border-color 0.15s"
+                  }}
+                  onFocus={e => e.target.style.borderColor = "var(--c-ai)"}
+                  onBlur={e => e.target.style.borderColor = "var(--border-2)"}
+                />
+              </div>
+
+              {error && (
+                <div style={{
+                  padding: "10px 14px", borderRadius: 8, fontSize: 12.5,
+                  background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)",
+                  color: "var(--c-drift)"
+                }}>
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit" disabled={loading}
+                className="btn-run"
+                style={{
+                  marginTop: 4, padding: "11px 0",
+                  borderColor: "rgba(139,92,246,0.5)",
+                  background: "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(59,130,246,0.15))",
+                  fontSize: 13.5, fontWeight: 600,
+                  opacity: loading ? 0.6 : 1
+                }}
+              >
+                {loading ? "Verificando…" : "Iniciar sesión"}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
     function App() {
+      const [authed, setAuthed] = React.useState(null); // null=checking, true/false
       const [params, setParams] = useState({
         serviceLevel: 95,
         shortageCost: 18,
@@ -5035,6 +5189,18 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           setToasts(prev => prev.filter(t => t.id !== id));
         }, 5000);
       }, []);
+
+      // Auth check on mount
+      useEffect(() => {
+        fetch("/api/auth/check", { credentials: "same-origin" })
+          .then(r => setAuthed(r.ok))
+          .catch(() => setAuthed(false));
+      }, []);
+
+      const handleLogout = async () => {
+        await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
+        setAuthed(false);
+      };
 
       useEffect(() => {
         if (!data) return;
@@ -5223,6 +5389,13 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         }
       };
 
+      if (authed === null) return (
+        <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--bg-0)" }}>
+          <div style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid var(--border-2)", borderTopColor: "var(--c-ai)", animation: "spin 0.8s linear infinite" }} />
+        </div>
+      );
+      if (!authed) return <LoginScreen onLogin={() => setAuthed(true)} />;
+
       return (
         <div className="app">
           <Sidebar
@@ -5234,6 +5407,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             onRunPipeline={handleRunPipeline}
             dataStatus={data?.status}
             onOpenConfig={() => setConfigOpen(true)}
+            onLogout={handleLogout}
           />
           <main className="canvas canvas-bg">
             <div className={`premium-loading-bar ${tabTransitioning ? "active" : ""}`} />

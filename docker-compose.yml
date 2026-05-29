@@ -29,6 +29,8 @@ services:
       - ./reports:/app/reports
     environment:
       - RETAIL_PROJECT__RUN_MODE=score_daily
+      - AUTH_USERNAME=ArtemMindlin
+      - AUTH_PASSWORD=greita2017saulia2013
     restart: unless-stopped
 
   # 2. MLflow Tracking Server

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import collections
+import hmac
 import logging
+import os
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -14,8 +17,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import yaml
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from retail_forecasting.config import load_config
@@ -33,7 +36,28 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Cache dictionary for predictions dataframe
+# ── Auth ──────────────────────────────────────────────────────────────────────
+_AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "ArtemMindlin")
+_AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "")
+_SESSION_COOKIE = "rf_session"
+_SESSION_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
+_SESSIONS: set[str] = set()
+
+_PUBLIC_PATHS = {"/", "/health", "/api/login", "/api/auth/check"}
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next: Any) -> Any:
+    path = request.url.path
+    if path in _PUBLIC_PATHS or not path.startswith("/api/"):
+        return await call_next(request)
+    token = request.cookies.get(_SESSION_COOKIE)
+    if not token or token not in _SESSIONS:
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+    return await call_next(request)
+
+
+# ── Cache dictionary for predictions dataframe ────────────────────────────────
 _PREDICTIONS_CACHE: dict[str, Any] = {}
 
 # Simple in-memory rate limiter for /api/run (max 3 calls per IP per 10 minutes)
@@ -57,6 +81,48 @@ def _check_rate_limit(ip: str) -> None:
                 detail=f"Demasiadas solicitudes. Máximo {_RATE_LIMIT_MAX} ejecuciones por {_RATE_LIMIT_WINDOW // 60} minutos.",
             )
         bucket.append(now)
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/login")
+def login(body: LoginRequest, response: Response) -> dict[str, str]:
+    valid = hmac.compare_digest(body.username, _AUTH_USERNAME) and hmac.compare_digest(
+        body.password, _AUTH_PASSWORD
+    )
+    if not valid:
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    token = secrets.token_urlsafe(32)
+    _SESSIONS.add(token)
+    response.set_cookie(
+        _SESSION_COOKIE,
+        token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=_SESSION_MAX_AGE,
+    )
+    return {"status": "ok"}
+
+
+@app.post("/api/logout")
+def logout(request: Request, response: Response) -> dict[str, str]:
+    token = request.cookies.get(_SESSION_COOKIE)
+    if token:
+        _SESSIONS.discard(token)
+    response.delete_cookie(_SESSION_COOKIE, samesite="lax")
+    return {"status": "ok"}
+
+
+@app.get("/api/auth/check")
+def auth_check(request: Request) -> dict[str, str]:
+    token = request.cookies.get(_SESSION_COOKIE)
+    if not token or token not in _SESSIONS:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return {"status": "authenticated"}
 
 
 # Server start time for uptime tracking
