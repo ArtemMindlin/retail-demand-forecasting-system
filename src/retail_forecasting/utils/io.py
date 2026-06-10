@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 
@@ -63,6 +64,25 @@ def dataframe_to_markdown(frame: pd.DataFrame, columns: Iterable[str] | None = N
         for row in text_frame.itertuples(index=False, name=None)
     ]
     return "\n".join([f"| {headers} |", f"| {separator} |", *[f"| {row} |" for row in rows]])
+
+
+def rearrange_quantiles(raw_predictions: list[np.ndarray]) -> np.ndarray:
+    """Apply Chernozhukov rearrangement to enforce quantile monotonicity.
+
+    Sorts predicted quantile values in ascending order per sample, ensuring
+    q[1] <= q[2] <= ... <= q[M] without worsening the Pinball loss
+    (Chernozhukov, Fernández-Val & Galichon, Econometrica 2010).
+
+    Args:
+        raw_predictions: List of 1-D arrays, one per quantile level (sorted).
+
+    Returns:
+        2-D array of shape (n_samples, n_quantiles) with monotone rows.
+    """
+    import numpy as np
+
+    matrix = np.column_stack(raw_predictions)
+    return np.sort(matrix, axis=1)
 
 
 def _format_markdown_value(value: object) -> object:

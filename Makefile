@@ -3,7 +3,7 @@
 # Variables
 PYTHON = uv run python
 PYTEST = uv run pytest
-CONFIG = configs/default.yaml
+CONFIG = configs/experiment.yaml
 .PHONY: help install run retrain score simulate eda api mlflow up test test-harness lint format clean
 
 help: ## Show this help message

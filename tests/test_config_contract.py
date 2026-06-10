@@ -21,7 +21,7 @@ from retail_forecasting.config import (
     load_config,
 )
 
-CONFIG_PATH = Path("configs/default.yaml")
+CONFIG_PATH = Path("configs/experiment.yaml")
 
 
 def test_default_config_preserves_experimental_guardrails() -> None:
@@ -65,7 +65,6 @@ def test_default_inventory_costs_are_positive() -> None:
     assert settings.inventory.overstock_cost > 0
     assert settings.inventory.stockout_cost > 0
     assert isinstance(settings.inventory.use_series_costs, bool)
-    assert settings.inventory.series_cost_strategy == "synthetic_series"
     assert settings.inventory.pareto_order_scales
     assert all(scale >= 0.0 for scale in settings.inventory.pareto_order_scales)
     assert sum(synthetic_cost_config.perishability_weights) == pytest.approx(1.0)

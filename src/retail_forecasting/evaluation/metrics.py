@@ -4,6 +4,7 @@ import math
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import mean_pinball_loss
 
 
 def summarize_predictions(
@@ -161,9 +162,7 @@ def _parse_quantile_column(column: str) -> float:
 
 
 def pinball_loss(actual: pd.Series, predicted: pd.Series, quantile: float) -> float:
-    diff = actual - predicted
-    loss = np.maximum(quantile * diff, (quantile - 1.0) * diff)
-    return float(np.mean(loss))
+    return float(mean_pinball_loss(actual, predicted, alpha=quantile))
 
 
 def winkler_score(actual: pd.Series, lower: pd.Series, upper: pd.Series, alpha: float) -> float:

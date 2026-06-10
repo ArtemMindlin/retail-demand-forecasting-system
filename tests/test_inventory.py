@@ -50,7 +50,6 @@ def test_series_cost_profile_builds_row_specific_costs() -> None:
         overstock_cost=1.0,
         stockout_cost=4.0,
         use_series_costs=True,
-        series_cost_strategy="synthetic_series",
     )
 
     profile = build_series_cost_profile(panel, inventory)
@@ -68,13 +67,11 @@ def test_series_cost_profile_uses_synthetic_cost_parameters() -> None:
         overstock_cost=1.0,
         stockout_cost=4.0,
         use_series_costs=True,
-        series_cost_strategy="synthetic_series",
     )
     custom_inventory = InventoryConfig(
         overstock_cost=1.0,
         stockout_cost=4.0,
         use_series_costs=True,
-        series_cost_strategy="synthetic_series",
         synthetic_cost_config=SyntheticCostConfig(
             perishability_base=1.2,
             perishability_multiplier=0.0,
@@ -99,7 +96,6 @@ def test_newsvendor_uses_series_specific_critical_fractile() -> None:
         overstock_cost=1.0,
         stockout_cost=4.0,
         use_series_costs=True,
-        series_cost_strategy="synthetic_series",
     )
     predictions = pd.DataFrame(
         {
@@ -151,7 +147,7 @@ def test_attach_series_costs_falls_back_to_global_costs() -> None:
 
 
 def test_attach_series_costs_reuses_existing_series_cost_columns() -> None:
-    inventory = InventoryConfig(use_series_costs=True, series_cost_strategy="synthetic_series")
+    inventory = InventoryConfig(use_series_costs=True)
     predictions = pd.DataFrame(
         {
             "series_id": ["a"],

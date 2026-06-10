@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-import numpy as np
 import optuna
 import pandas as pd
+from sklearn.metrics import mean_pinball_loss
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +67,6 @@ class HyperparameterTuner:
                 learning_rate=trial.suggest_float("learning_rate", 0.005, 0.2, log=True),
                 max_depth=trial.suggest_int("max_depth", 3, 12),
             )
-            # Introduce loss_function as a categorical hyperparameter
-            loss_function = trial.suggest_categorical("loss_function", ["RMSE", "MAE"])
 
             model = AutoBoostingModel(
                 quantiles=self.settings.models.quantiles,
@@ -76,7 +74,8 @@ class HyperparameterTuner:
                 n_estimators=params.n_estimators,
                 learning_rate=params.learning_rate,
                 max_depth=params.max_depth,
-                loss_function=loss_function,  # Note: AutoBoostingModel must support this argument
+                overstock_cost=self.settings.inventory.overstock_cost,
+                stockout_cost=self.settings.inventory.stockout_cost,
             )
 
             model.fit(t_train.loc[:, feature_columns], t_train[target_col])
@@ -87,8 +86,11 @@ class HyperparameterTuner:
 
             y_true = t_val[target_col].values
 
-            # Objective 1: Predictive Error (MAE)
-            mae = np.abs(preds - y_true).mean()
+            # Objective 1: Pinball Loss at critical fractile q* (cost-aware, consistent with training)
+            critical_fractile = self.settings.inventory.stockout_cost / (
+                self.settings.inventory.stockout_cost + self.settings.inventory.overstock_cost
+            )
+            pinball = mean_pinball_loss(y_true, preds, alpha=critical_fractile)
 
             # Objective 2: Interval Quality (Winkler Score)
             if len(self.settings.models.quantiles) >= 2:
@@ -108,11 +110,11 @@ class HyperparameterTuner:
                     over = (2.0 / alpha) * (y_true - y_high) * (y_true > y_high)
                     winkler = (width + under + over).mean()
                 else:
-                    winkler = mae * 2.0  # Fallback penalty
+                    winkler = float(pinball) * 2.0
             else:
-                winkler = mae * 2.0
+                winkler = float(pinball) * 2.0
 
-            return float(mae), float(winkler)
+            return float(pinball), float(winkler)
 
         # Multi-objective study: Minimize both MAE and Winkler
         study = optuna.create_study(directions=["minimize", "minimize"])
@@ -136,7 +138,7 @@ class HyperparameterTuner:
         # We can pick the one that minimizes the sum of normalized objectives,
         # or simply the one with the lowest MAE on the front for simplicity,
         # but storing the fact it was a multi-objective search.
-        best_trial = min(study.best_trials, key=lambda t: t.values[0] + (t.values[1] * 0.1))
+        best_trial = min(study.best_trials, key=lambda t: t.values[0] + t.values[1])
 
         best_params = BoostingParams(
             n_estimators=int(best_trial.params["n_estimators"]),
@@ -157,7 +159,7 @@ class HyperparameterTuner:
             best_params=best_params,
         )
         print(
-            f"✅ Optuna Multi-Objective Finished. Best Selected MAE: {best_trial.values[0]:.4f}, Winkler: {best_trial.values[1]:.4f}"
+            f"✅ Optuna Multi-Objective Finished. Best Selected Pinball(q*): {best_trial.values[0]:.4f}, Winkler: {best_trial.values[1]:.4f}"
         )
 
         return TuningResult(best_params=best_params, metadata=self.tuning_metadata)

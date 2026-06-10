@@ -63,7 +63,6 @@ class ModelRunMetadata(BaseModel):
 
     models_run: list[str] = Field(min_length=1)
     quantiles: list[float] = Field(min_length=1)
-    optimize_for_cost: bool
     use_tuning: bool
     retrain_each_fold: bool
 

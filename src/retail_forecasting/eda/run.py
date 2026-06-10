@@ -34,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--config",
-        default="configs/default.yaml",
+        default="configs/experiment.yaml",
         help="Path to the YAML experiment configuration.",
     )
     parser.add_argument(

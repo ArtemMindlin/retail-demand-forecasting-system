@@ -102,7 +102,6 @@ class ModelConfig(BaseModel):
     max_depth: int = Field(default=6, gt=0)
     use_tuning: bool = False
     tuning_trials: int = Field(default=20, gt=0)
-    optimize_for_cost: bool = False
 
     @field_validator("quantiles")
     @classmethod
@@ -149,7 +148,6 @@ class InventoryConfig(BaseModel):
     overstock_cost: float = Field(default=1.0, gt=0)
     stockout_cost: float = Field(default=4.0, gt=0)
     use_series_costs: bool = False
-    series_cost_strategy: Literal["synthetic_series"] = "synthetic_series"
     clip_negative_orders: bool = True
     pareto_order_scales: list[float] = Field(
         default_factory=lambda: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3], min_length=1

@@ -6,7 +6,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 
 ## Repo Map
 
-- `configs/`: experiment configuration. `configs/default.yaml` is the canonical v1 config.
+- `configs/`: experiment configuration. `configs/experiment.yaml` is the canonical v1 config.
 - `data/`: local raw/interim/processed caches. Do not commit generated datasets.
 - `docs/`: system of record for architecture, contracts, invariants, and decisions.
 - `notebooks/`: lightweight exploration only. Production pipeline logic belongs in `src/`.
@@ -102,5 +102,5 @@ uv run pytest tests/test_architecture_imports.py tests/test_temporal_leakage_con
 Run the default experiment:
 
 ```bash
-uv run python -m retail_forecasting.run --config configs/default.yaml
+uv run python -m retail_forecasting.run --config configs/experiment.yaml
 ```

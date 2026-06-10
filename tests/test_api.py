@@ -35,7 +35,7 @@ def test_predict_orders_invalid_config() -> None:
 
 def test_predict_orders_returns_recommendations_on_success(tmp_path: pytest.TempPath) -> None:
     config_file = tmp_path / "config.yaml"
-    config_file.write_text(Path("configs/default.yaml").read_text())
+    config_file.write_text(Path("configs/experiment.yaml").read_text())
 
     mock_artifacts = mock.MagicMock()
     mock_artifacts.run_directory = str(tmp_path / "output")

@@ -27,8 +27,8 @@ El objetivo general de este proyecto es diseñar, evaluar y desplegar un sistema
 Para alcanzar este objetivo general, se plantean los siguientes objetivos específicos:
 \begin{itemize}
     \item Desarrollar un \textit{pipeline} de datos reproducible que incluya compuertas de calidad (\textit{Data Quality Gates}) y la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}, verificando que ninguna observación censurada por stockout introduce fuga de información hacia la etiqueta objetivo.
-    \item Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos, obteniendo un Winkler Score en el conjunto de test inferior al de un \textit{baseline} estacional ingenuo (\textit{seasonal naïve}).
-    \item Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con hiper-optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 90\%$ para intervalos al nivel $\alpha = 0.10$ sobre el conjunto de calibración.
+    \item Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos, obteniendo un coste de inventario simulado en el conjunto de test inferior al de un \textit{baseline} estacional ingenuo (\textit{seasonal naïve}).
+    \item Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con hiper-optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 90\%$ para intervalos al nivel $\alpha = 0.10$ sobre el conjunto de test.
     \item Evaluar el rendimiento del sistema completo mediante un gemelo digital logístico (Simulación Dinámica de Inventario $s,S$) con restricciones globales vía Programación Lineal, cuantificando la reducción de coste logístico total frente a una política basada en predicción puntual.
     \item Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software,
     incluyendo seguimiento (MLflow), explicabilidad (SHAP), microservicio (FastAPI) y un
@@ -66,7 +66,7 @@ Las aportaciones originales de este trabajo, diferenciadas del estado del arte r
 
     \item \textbf{Sistema de Apoyo a la Decisión end-to-end con cierre logístico.} La mayoría de los trabajos académicos evalúan el rendimiento predictivo mediante métricas estadísticas (MAE, RMSE) desconectadas de la operativa real. Este trabajo cierra el ciclo integrando el modelo probabilístico con una simulación dinámica de inventario $(s, S)$ (\textit{gemelo digital}) y una etapa de optimización global por Programación Lineal, permitiendo medir el impacto directo de la calidad predictiva en el coste logístico.
 
-    \item \textbf{Optimización multi-objetivo para la selección de hiperparámetros probabilísticos.} Se propone una búsqueda de hiperparámetros simultánea sobre el frente de Pareto entre precisión puntual (MAE) y nitidez probabilística (Winkler Score) mediante NSGA-II, superando la práctica habitual de optimizar una única métrica escalar que puede penalizar la calibración de los intervalos.
+    \item \textbf{Optimización multi-objetivo para la selección de hiperparámetros probabilísticos.} Se propone una búsqueda de hiperparámetros simultánea sobre el frente de Pareto entre coste de predicción puntual (\textit{Pinball Loss} en el fractil crítico $q^*$) y nitidez probabilística (Winkler Score) mediante NSGA-II, superando la práctica habitual de optimizar una única métrica escalar que puede penalizar la calibración de los intervalos.
 
     \item \textbf{Comparativa sistemática de estrategias de corrección de demanda censurada.} Se evalúan y comparan tres enfoques de imputación (escalado estático, media histórica local y modelo supervisor LightGBM) bajo el mismo protocolo de backtesting, cuantificando su efecto tanto en el error predictivo como en el coste logístico simulado.
 
@@ -74,7 +74,7 @@ Las aportaciones originales de este trabajo, diferenciadas del estado del arte r
 \end{enumerate}
 
 \section{Estructura del Documento}
-La presente memoria se organiza en seis capítulos adicionales:
+La presente memoria se organiza en siete capítulos adicionales:
 \begin{itemize}
     \item El \textbf{Capítulo 2: Estado del Arte} revisa la literatura actual sobre series temporales, modelos de \textit{boosting}, conformal prediction y gestión de inventarios.
     \item El \textbf{Capítulo 3: Análisis de Datos} describe el dataset utilizado y su preparación.
@@ -82,4 +82,5 @@ La presente memoria se organiza en seis capítulos adicionales:
     \item El \textbf{Capítulo 5: Implementación y Arquitectura} describe el diseño del software MLOps, la API de despliegue, el sistema de diagnóstico automático y la infraestructura CI/CD.
     \item El \textbf{Capítulo 6: Resultados} presenta el análisis comparativo de los modelos, el impacto de las restricciones globales y la explicabilidad del sistema.
     \item El \textbf{Capítulo 7: Conclusiones} sintetiza los hallazgos principales.
+    \item El \textbf{Capítulo 8: Presupuesto} detalla el coste económico del desarrollo del proyecto.
 \end{itemize}

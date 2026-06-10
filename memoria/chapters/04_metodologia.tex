@@ -2,25 +2,53 @@
 \chapter{Metodología}
 \label{chap:metodologia}
 
-En este capítulo se describe el diseño del sistema, desde la formulación del problema de aprendizaje supervisado hasta el marco de evaluación económica y de Investigación de Operaciones (OR). La metodología se ha rediseñado para trascender la predicción puramente estadística, garantizando la robustez operativa y la resolución de restricciones logísticas reales.
+El sistema se articula en torno a tres bloques funcionales que se corresponden con los cuatro modos de ejecución del pipeline (\texttt{experiment}, \texttt{retrain}, \texttt{score\_daily} y \texttt{simulate\_ops}). El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: reentrenamiento del modelo seleccionado y generación diaria de recomendaciones de pedido bajo restricciones logísticas reales. El \textbf{Bloque III} cubre la fase MLOps: simulación en streaming para determinar la cadencia óptima de reentrenamiento en producción.
 
-\section{Formulación del Problema}
-El objetivo operativo es determinar la cantidad de pedido que debe emitir el responsable de reposición para cada SKU y cada fecha de decisión. Para ello, primero se estima la demanda acumulada de un producto en una tienda específica durante un horizonte de planificación determinado ($H$). Formalmente, definimos la demanda observada para una serie $s$ en el tiempo $t$ como $y_{s,t}$. El objetivo (\textit{target}) de nuestro modelo en el instante $t$ es la demanda total durante el \textit{lead time}, que actúa como entrada para la política de aprovisionamiento:
+% ==============================================================================
+\section{Bloque I: Investigación (\texttt{experiment})}
+% ==============================================================================
+
+\subsection{Formulación del Problema}
+
+\paragraph{Notación.}
+Sea $\mathcal{S}$ el conjunto de series temporales (pares SKU--tienda) y $\mathcal{T}$ el conjunto de instantes de decisión disponibles. Se denota la demanda diaria observada de la serie $s \in \mathcal{S}$ en el instante $t \in \mathcal{T}$ como $y_{s,t}$.
+
+El objetivo operativo es determinar la cantidad de pedido que debe emitir el responsable de reposición para cada SKU y cada fecha de decisión. Para ello, el sistema estima la distribución condicional de la demanda acumulada durante un horizonte $H$ días --- equivalente operativamente al \textit{lead time} del proveedor $L$ ($H \equiv L$) \cite{nikolopoulos2011adida} ---: cuántas unidades se necesitarán hasta la próxima reposición. Formalmente, la variable objetivo es:
 
 \begin{equation}
     Y_{s,t} = \sum_{i=0}^{H-1} y_{s, t+i}
 \end{equation}
 
-Esta formulación alinea el pronóstico con la decisión de inventario: cuántas unidades se necesitan para cubrir el periodo hasta la próxima reposición y, por tanto, qué cantidad debería pedirse mañana para minimizar el coste operativo. Para evitar la fuga de información futura (\textit{data leakage}), los valores futuros se usan únicamente para construir esta etiqueta durante el entrenamiento, mientras que las variables explicativas se calculan exclusivamente con información disponible antes del origen de predicción.
+donde $H$ es el horizonte de agregación del pronóstico, idéntico al \textit{lead time} operativo del sistema de inventario subyacente. Un modelo probabilístico $f_{\theta}$ aprende a estimar los cuantiles de $Y_{s,t}$ a partir del vector de covariables $\mathbf{x}_{s,t}$ disponible en $t$:
 
-\subsection{Corrección de la Demanda Censurada por Stockout}
-Como se identificó en el análisis exploratorio, aproximadamente el 15\% de las observaciones del panel presentan algún grado de \textit{stockout}. Entrenar directamente sobre la demanda observada en esos días introduciría un sesgo negativo sistemático en el modelo. Para corregirlo, el sistema implementa un preprocesador dinámico que estima la demanda latente $\tilde{y}_{s,t}$ en los días afectados por roturas de stock ($h_{s,t} > 0$). Se comparan tres estrategias alternativas de imputación:
+\begin{equation}
+    \hat{Q}_{s,t}(\tau) = f_{\theta}(\mathbf{x}_{s,t}), \quad \tau \in \mathcal{Q}
+\end{equation}
+
+siendo $\mathcal{Q}$ el conjunto de cuantiles objetivo (véase Sección~\ref{sec:pinball}). Esta formulación sigue el enfoque de predicción directa (\textit{direct multi-step forecasting}), que agrega la demanda al nivel del \textit{lead time} antes del entrenamiento, evitando la acumulación de errores de estrategias iterativas.
+
+Para evitar la fuga de información futura (\textit{data leakage}), los valores futuros de $y_{s,t}$ se usan únicamente para construir la etiqueta $Y_{s,t}$ durante el entrenamiento, mientras que las variables explicativas $\mathbf{x}_{s,t}$ se calculan exclusivamente con información disponible en el instante $t$.
+
+\subsubsection{Corrección de la Demanda Censurada por Stockout}
+\label{sec:demanda_censurada}
+Como se identificó en el análisis exploratorio, aproximadamente el 15\% de las observaciones del panel presentan algún grado de \textit{stockout} (demanda censurada, \textit{censored demand} en la literatura anglosajona \cite{nahmias1994demand}). El mecanismo de censura es el siguiente: las ventas observadas $y_{s,t}$ no reflejan la demanda real $D_{s,t}$, sino el mínimo entre ésta y el stock disponible. Sea $h_{s,t} \in [0, 16]$ el número de horas sin stock registradas para la serie $s$ en el día $t$ dentro de la ventana operativa de 16 horas (06:00--22:00):
+
+\begin{equation}
+    y_{s,t} = \min\!\left(D_{s,t},\ \text{stock}_{s,t}\right)
+    \implies \mathbb{E}[y_{s,t} \mid h_{s,t}>0] < \mathbb{E}[D_{s,t}]
+\end{equation}
+
+Para ilustrar el mecanismo, considérese una serie con demanda real $D_{s,t} = 10$ kg y stock disponible de 6 kg en el momento del agotamiento: el sistema registra $y_{s,t} = \min(10, 6) = 6$ kg, aunque la tienda habría vendido 10 de haberlos tenido. Si este patrón se repite a lo largo del histórico, el modelo aprende $\hat{D} \approx 6$ kg y el gestor de compras pide para 6, perpetuando el stockout en el siguiente ciclo.
+
+Entrenar directamente sobre $y_{s,t}$ en esos días introduciría un sesgo negativo sistemático en el modelo. Para corregirlo, el sistema implementa un preprocesador dinámico que estima la demanda latente $\tilde{y}_{s,t}$ en los días afectados por roturas de stock ($h_{s,t} > 0$). Se comparan tres estrategias alternativas de imputación:
 
 \begin{itemize}
     \item \textbf{Clipped Scaling}: Escala de forma lineal la demanda observada $y_{s,t}$
-    por un factor de proporcionalidad estático $\gamma > 1$:
+    por un factor de proporcionalidad estático $\gamma > 1$ y toma el máximo con la
+    demanda observada, garantizando $\tilde{y}_{s,t} \geq y_{s,t}$ por construcción
+    independientemente del valor de $\gamma$:
     \begin{equation}
-        \tilde{y}_{s,t} = y_{s,t} \cdot \gamma
+        \tilde{y}_{s,t} = \max\!\left( y_{s,t},\ y_{s,t} \cdot \gamma \right)
     \end{equation}
 
     \item \textbf{Media Histórica Local}: Reemplaza el valor censurado por el máximo entre
@@ -31,16 +59,21 @@ Como se identificó en el análisis exploratorio, aproximadamente el 15\% de las
         \sum_{\tau \in \mathcal{T}_{\text{clean}}} y_{s,\tau} \right)
     \end{equation}
 
-    \item \textbf{Supervisada (Modelo Profesor LGBM)}: Entrena un modelo LightGBM auxiliar
-    $\hat{g}$ sobre los registros históricos no afectados por stockouts, utilizando como
-    covariables el identificador de serie, el mes y el día de la semana. La demanda latente
-    se estima como:
+    \item \textbf{Supervisada (LightGBM)}: Entrena un modelo LightGBM auxiliar
+    $\hat{g}$ sobre los registros históricos no afectados por stockouts. El vector de
+    covariables $x_{s,t}$ incluye: identificador de serie, mes, día de la semana, día del
+    mes, ratio de stockout $h_{s,t}/16$ (fracción de la ventana operativa sin stock),
+    media histórica de días limpios de la serie como prior, e indicadores contextuales
+    disponibles en el dataset (descuento, festivo, temperatura, precipitación, humedad y
+    viento). La demanda latente se estima como:
     \begin{equation}
         \tilde{y}_{s,t} = \max \left( y_{s,t}, \, \hat{g}(x_{s,t}) \right)
     \end{equation}
 \end{itemize}
 
-\section{Ingeniería de Características}
+Métodos estadísticamente más rigurosos, como el algoritmo EM o el modelo Tobit, quedan fuera del ámbito de este trabajo. La estrategia \textbf{Supervisada (LightGBM)} es la seleccionada en el sistema final por obtener el menor sesgo residual en validación cruzada; la comparación empírica entre las tres estrategias se discute en la Sección~\ref{sec:resultados_imputacion}.
+
+\subsection{Ingeniería de Características}
 \label{sec:feature_engineering}
 
 El sistema de previsión opera sobre un panel diario de series temporales. Dado que los modelos de \textit{Gradient Boosting} no tienen memoria temporal intrínseca, la información histórica debe codificarse explícitamente como columnas del vector de entrada. El proceso de ingeniería de características transforma el panel preparado en un \textit{frame} supervisado donde cada fila representa un origen de predicción con su vector de covariables correspondiente.
@@ -48,11 +81,13 @@ El sistema de previsión opera sobre un panel diario de series temporales. Dado 
 Las características se organizan en cuatro grupos funcionales:
 
 \begin{enumerate}
-    \item \textbf{Características Calendáricas}: Codifican la posición temporal del origen de predicción. Incluyen el día de la semana ($\in [0,6]$), el día del mes, el mes, la semana del año y un indicador binario de fin de semana. Estas variables capturan la estacionalidad semanal y mensual identificada en el análisis exploratorio (véase Capítulo~\ref{chap:analisis_datos}).
+    \item \textbf{Características Calendáricas}: Codifican la posición temporal del origen de predicción. Incluyen el día de la semana ($\in [0,6]$), el día del mes, el mes, la semana del año, un indicador binario de fin de semana, un indicador de festivo (\texttt{holiday\_flag}) y un indicador de actividad promocional especial (\texttt{activity\_flag}). Estas variables capturan la estacionalidad semanal y mensual identificada en el análisis exploratorio (véase Capítulo~\ref{chap:analisis_datos}).
 
-    \item \textbf{Lags de Demanda y Ventanas Deslizantes}: Para capturar la autocorrelación de la serie, se calculan lags de la demanda observada en los instantes $t-1$, $t-7$, $t-14$ y $t-28$, que corresponden al día anterior y a los retardos semanales detectados en el ACF. Sobre ventanas de 7 y 28 días se calculan además la media, la suma y la desviación estándar rodantes. Todos los estadísticos se computan con desplazamiento de un día (\texttt{shift(1)}) para garantizar ausencia de \textit{data leakage}.
+    \item \textbf{Lags de Demanda y Ventanas Deslizantes}: Para capturar la autocorrelación de la serie, se calculan lags de la demanda observada en los instantes $t-1$, $t-7$, $t-14$ y $t-28$. La elección no es arbitraria: el análisis de la función de autocorrelación (ACF) del Capítulo~\ref{chap:analisis_datos} reveló picos significativos en los retardos 7 y 14, correspondientes a la estacionalidad semanal dominante del dataset. El lag $t-1$ captura inercia de corto plazo (efecto del día anterior); $t-7$ y $t-14$ recogen la estacionalidad semanal dominante detectada en el ACF; y $t-28$ aproxima el ciclo mensual de reposición típico en retail fresco. Sobre ventanas de 7 y 28 días se calculan además la media, la suma y la desviación estándar rodantes. Todos los estadísticos se computan con desplazamiento de un día (\texttt{shift(1)}) para garantizar ausencia de \textit{data leakage}.
 
-    \item \textbf{Lags de Variables Exógenas}: Se construyen lags en los mismos instantes ($t-1, t-7, t-14, t-28$) para las variables de descuento (\texttt{discount}), horas de stockout (\texttt{stockout\_hours}) y las cuatro variables meteorológicas (temperatura, precipitación, humedad y viento). Para stockout se añade también la media rodante a 7 y 28 días como indicador de la presión histórica de rotura.
+    \item \textbf{Lags de Variables Exógenas Externas}: Se construyen lags en los instantes $t-1$, $t-7$, $t-14$ y $t-28$ para la variable de descuento (\texttt{discount}) y las cuatro variables meteorológicas (temperatura, precipitación, humedad y viento). Son covariables externas al sistema de inventario que modulan la demanda sin depender del estado del stock.
+
+    \item \textbf{Lags de Stockout}: Las horas diarias sin stock (\texttt{stockout\_hours}) se tratan como grupo propio por su doble rol en el sistema: actúan como señal proxy de la demanda latente en el módulo de imputación (Sección~\ref{sec:demanda_censurada}) y como covariable del modelo de forecasting que informa sobre la presión histórica de rotura. Se calculan lags en los mismos instantes ($t-1, t-7, t-14, t-28$) y medias rodantes a 7 y 28 días.
 
     \item \textbf{Identificadores Estáticos}: Los identificadores jerárquicos (\texttt{store\_id}, \texttt{product\_id}, \texttt{city\_id}, \texttt{management\_group\_id} y las tres categorías) se incluyen directamente como variables categóricas. CatBoost los codifica de forma nativa mediante \textit{Ordered Target Statistics}, evitando la necesidad de \textit{one-hot encoding} y el riesgo de \textit{target leakage} asociado al \textit{target encoding} estándar.
 \end{enumerate}
@@ -64,101 +99,68 @@ La Tabla~\ref{tab:features_summary} resume el número de características result
     \small
     \begin{tabular}{lcc}
         \toprule
-        \textbf{Grupo} & \textbf{Nº características} & \textbf{Ejemplos} \\
+        \textbf{Grupo} & \textbf{N\textordmasculine{} características} & \textbf{Ejemplos} \\
         \midrule
-        Calendáricas & 7 & \texttt{day\_of\_week}, \texttt{is\_weekend} \\
+        Calendáricas & 7 & \texttt{day\_of\_week}, \texttt{holiday\_flag}, \texttt{activity\_flag} \\
         Lags de demanda & 4 & \texttt{demand\_lag\_7}, \texttt{demand\_lag\_28} \\
         Ventanas deslizantes & 6 & \texttt{demand\_roll\_mean\_7}, \texttt{demand\_roll\_std\_28} \\
-        Lags de exógenas & 28 & \texttt{discount\_lag\_7}, \texttt{avg\_temperature\_lag\_1} \\
+        Lags de exógenas & 20 & \texttt{discount\_lag\_7}, \texttt{avg\_temperature\_lag\_1} \\
         Lags de stockout & 6 & \texttt{stockout\_lag\_7}, \texttt{stockout\_roll\_mean\_28} \\
         Identificadores estáticos & 7 & \texttt{store\_id}, \texttt{third\_category\_id} \\
         \midrule
-        \textbf{Total} & \textbf{58} & \\
+        \textbf{Total} & \textbf{50} & \\
         \bottomrule
     \end{tabular}
     \caption{Resumen de características del frame supervisado.}
     \label{tab:features_summary}
 \end{table}
 
-\section{Modelado Probabilístico: Función de Pérdida Pinball}
+\subsection{Modelado Probabilístico: Función de Pérdida Pinball}
+\label{sec:pinball}
 El núcleo de la estimación probabilística de la demanda reside en la optimización directa de cuantiles. En lugar de predecir la media condicional (que asume simetría en los errores y no proporciona cotas de riesgo logístico), el sistema optimiza de forma independiente el conjunto de cuantiles objetivo mediante la función de pérdida asimétrica conocida como \textit{Pinball Loss} (o pérdida cuantílica) \cite{koenker2005quantile}.
 
-Para un cuantil de interés $q \in (0, 1)$, la pérdida \textit{Pinball} asociada a una observación real $y$ y su predicción cuantílica $\hat{q}$ se formula matemáticamente de dos maneras equivalentes:
+Para un cuantil de interés $q \in (0, 1)$, la pérdida \textit{Pinball} asociada a una observación real $y$ y su predicción $\hat{y}_q$ (la cantidad en unidades físicas que el modelo predice al nivel $q$) se formula matemáticamente de dos maneras equivalentes:
 
 \begin{equation}
-    \mathcal{L}_q(y, \hat{q}) = \max \left( q(y - \hat{q}), \, (q - 1)(y - \hat{q}) \right)
+    \mathcal{L}_q(y, \hat{y}_q) = \max \left( q(y - \hat{y}_q), \, (q - 1)(y - \hat{y}_q) \right)
 \end{equation}
 
 O bien, expresada en su forma condicional por tramos para enfatizar la asimetría:
 
 \begin{equation}
-    \mathcal{L}_q(y, \hat{q}) =
+    \mathcal{L}_q(y, \hat{y}_q) =
     \begin{cases}
-        q \cdot (y - \hat{q}) & \text{si } y \ge \hat{q} \quad \text{(infraestimación)} \\
-        (1 - q) \cdot (\hat{q} - y) & \text{si } y < \hat{q} \quad \text{(sobreestimación)}
+        q \cdot (y - \hat{y}_q) & \text{si } y \ge \hat{y}_q \quad \text{(infraestimación)} \\
+        (1 - q) \cdot (\hat{y}_q - y) & \text{si } y < \hat{y}_q \quad \text{(sobreestimación)}
     \end{cases}
 \end{equation}
 
-Desde una perspectiva de la teoría de la decisión estadística, la minimización de la pérdida esperada bajo $\mathcal{L}_q$ tiene como solución óptima el cuantil poblacional $q$-ésimo de la distribución de la demanda:
+Por ejemplo, para $q = 0{,}9$ y una demanda real $y = 10$ kg: si el modelo predice $\hat{y}_q = 8$ kg (subestimación), la pérdida es $0{,}9 \cdot (10 - 8) = 1{,}8$; si predice $\hat{y}_q = 12$ kg (sobreestimación), es $0{,}1 \cdot (12 - 10) = 0{,}2$. La penalización por subestimar es nueve veces mayor, lo que incentiva al modelo a situarse en el percentil 90 de la demanda.
+
+La minimización de la pérdida esperada bajo $\mathcal{L}_q$ tiene como solución óptima el cuantil $q$ de la distribución de la demanda:
 
 \begin{equation}
-    \arg\min_{\hat{q}} \mathbb{E}_{Y} \left[ \mathcal{L}_q(Y, \hat{q}) \right] = F_{Y}^{-1}(q)
+    \arg\min_{\hat{y}_q} \mathbb{E}_{Y} \left[ \mathcal{L}_q(Y, \hat{y}_q) \right] = F_{Y}^{-1}(q)
 \end{equation}
 
-Donde $F_Y$ representa la función de distribución acumulada (CDF) de la demanda. Esta formulación establece un puente directo con el modelo del \textit{Newsvendor} \cite{silver1998inventory}: el \textit{fractil crítico} $q^* = c_u / (c_u + c_o)$ es exactamente el cuantil que debe predecir el modelo para minimizar el coste logístico esperado. Al entrenar con \textit{Pinball} configurada en $q = q^*$, el modelo no solo aprende una curva estadística, sino que optimiza implícitamente la decisión de aprovisionamiento.
+Donde $F_Y^{-1}(q)$ es simplemente el cuantil $q$ de la demanda: el valor por debajo del cual cae el $q \cdot 100\%$ de las observaciones históricas. Esta formulación establece un puente directo con el modelo del \textit{Newsvendor} \cite{silver1998inventory}: el \textit{fractil crítico} $q^* = c_u / (c_u + c_o)$ es exactamente el cuantil que debe predecir el modelo para minimizar el coste logístico esperado. Al entrenar con \textit{Pinball} configurada en $q = q^*$, el modelo no solo aprende una curva estadística, sino que optimiza implícitamente la decisión de aprovisionamiento. Esta es una decisión de diseño deliberada del sistema: entrenar con RMSE o MAE minimiza el error estadístico, no el coste logístico, lo cual es inconsistente con el objetivo operativo del DSS. Por tanto, el entrenamiento orientado a costes es el único modo soportado.
 
-\subsection{Arquitectura Multi-Modelo y Mitigación del Quantile Crossing}
-Dado que los frameworks estándar de Gradient Boosting están diseñados para optimizar un único objetivo escalar por modelo, el sistema implementa un \textbf{Wrapper Cuantílico Multi-Modelo} (patrón \textit{Strategy}). Este componente instancia y entrena de forma independiente $M$ estimadores, cada uno sintonizado para un cuantil específico del conjunto $\mathcal{Q} = \{q_1, q_2, \dots, q_M\}$, donde $q_1 < q_2 < \dots < q_M$.
+\subsection{Arquitectura Multi-Modelo y Corrección del Quantile Crossing}
+Dado que los frameworks estándar de Gradient Boosting están diseñados para optimizar un único objetivo escalar por modelo, el sistema implementa un \textbf{Wrapper Cuantílico Multi-Modelo}. Este componente instancia y entrena de forma independiente $M$ estimadores, cada uno sintonizado para un cuantil específico del conjunto $\mathcal{Q} = \{q_1, q_2, \dots, q_M\}$, donde $q_1 < q_2 < \dots < q_M$.
 
-Sin embargo, esta aproximación introduce el \textbf{cruzamiento de cuantiles} (\textit{quantile crossing}) \cite{koenker2005quantile}: dado que cada modelo se entrena independientemente, no hay garantía de monotonicidad. Para resolverlo sin coste computacional adicional, se aplica un post-procesamiento vectorizado que proyecta las predicciones crudas sobre el cono convexo de vectores monótonos:
+Sin embargo, esta aproximación introduce el \textbf{cruzamiento de cuantiles} (\textit{quantile crossing}) \cite{koenker2005quantile}: al entrenarse cada modelo sin información sobre las predicciones de los demás, nada impide que el modelo del cuantil 0{,}7 prediga un valor mayor que el del cuantil 0{,}9 en alguna observación concreta. Para corregirlo, se aplica el \textbf{\textit{rearrangement}} de Chernozhukov \cite{chernozhukov2010quantile}: dado el vector de predicciones crudas $\tilde{\mathbf{y}}_{s,t} = (\tilde{y}_{s,t}^{(1)}, \dots, \tilde{y}_{s,t}^{(M)})$, simplemente se reordenan en orden ascendente. Este procedimiento, equivalente a aplicar \texttt{np.sort} sobre el eje de cuantiles, tiene complejidad $\mathcal{O}(M \log M)$ y posee una propiedad teórica relevante \cite{chernozhukov2010quantile}: el \textit{rearrangement} reduce la pérdida cuantílica \textbf{integrada sobre todos los niveles de cuantil} respecto a las estimaciones originales, mientras que la regresión isotónica (PAVA), al minimizar la proyección L2, no ofrece garantías equivalentes sobre la pérdida \textit{Pinball}. Formalmente:
 
 \begin{equation}
-    \hat{q}_{s,t}^{(1)} = \tilde{q}_{s,t}^{(1)}, \qquad
-    \hat{q}_{s,t}^{(j)} = \max \left( \hat{q}_{s,t}^{(j-1)}, \, \tilde{q}_{s,t}^{(j)} \right)
-    \quad \forall j \in \{2, \dots, M\}
+    \hat{\mathbf{y}}_{s,t} = \text{sort}\!\left(\tilde{\mathbf{y}}_{s,t}\right)
 \end{equation}
 
-Esta operación, implementada mediante \texttt{np.maximum.accumulate} con complejidad $\mathcal{O}(M)$, garantiza:
+Esta operación garantiza:
 
 \begin{equation}
-    \hat{q}_{s,t}^{(1)} \le \hat{q}_{s,t}^{(2)} \le \dots \le \hat{q}_{s,t}^{(M)}
+    \hat{y}_{s,t}^{(1)} \le \hat{y}_{s,t}^{(2)} \le \dots \le \hat{y}_{s,t}^{(M)}
 \end{equation}
 
-\section{Perfiles de Coste Sintéticos por SKU}
-\label{sec:cost_profiles}
-
-Un supuesto limitante en muchas aplicaciones académicas de inventario es la utilización de costes de rotura ($c_u$) y exceso ($c_o$) uniformes para todo el catálogo. En un entorno real de \textit{retail} fresco, la penalización por una rotura de stock en un producto básico es muy superior a la de un producto de nicho, del mismo modo que el coste de exceso es crítico en productos de alta caducidad.
-
-Ante la ausencia de datos financieros transaccionales explícitos en el dataset original, el sistema implementa un motor de \textbf{inferencia de perfiles de coste sintéticos} que analiza el comportamiento histórico de cada serie $s$ para derivar coeficientes personalizados. El proceso se articula en tres dimensiones:
-
-\begin{enumerate}
-    \item \textbf{Factor de Perecederos ($F_{perish}$)}: Se estima mediante una combinación lineal del ranking de intermitencia y la inestabilidad de la categoría (CV medio). Captura el riesgo de obsolescencia:
-    \begin{equation}
-        Score_{perish} = w_1 \cdot Rank(Z_{cat}) + w_2 \cdot Rank(CV_{cat}) + w_3 \cdot Rank(Z_s)
-    \end{equation}
-    Donde $Z$ es la tasa de ceros y $CV$ el coeficiente de variación.
-
-    \item \textbf{Factor de Baja Rotación ($F_{slow}$)}: Identifica productos donde el sobrestock es financieramente peligroso debido a su baja velocidad de salida.
-    \begin{equation}
-        Score_{slow} = w_4 \cdot Rank(Z_s) + w_5 \cdot (1 - Rank(\mu_s))
-    \end{equation}
-
-    \item \textbf{Factor de Criticidad de Servicio ($F_{crit}$)}: Incrementa la presión sobre el modelo para evitar roturas en productos de alta demanda o con tensiones históricas de stock.
-    \begin{equation}
-        Score_{crit} = w_6 \cdot Rank(\mu_s) + w_7 \cdot Rank(StockoutRate_s)
-    \end{equation}
-\end{enumerate}
-
-Los costes operativos del Newsvendor se recalculan dinámicamente para cada serie $s$:
-
-\begin{equation}
-    c_o^{(s)} = \bar{c}_o \cdot F_{perish}^{(s)} \cdot F_{slow}^{(s)}, \qquad
-    c_u^{(s)} = \bar{c}_u \cdot F_{crit}^{(s)}
-\end{equation}
-
-Esta arquitectura convierte el \textit{fractil crítico} $q^*$ en una \textbf{variable de estado por SKU}: el sistema asigna de forma autónoma mayores niveles de servicio a productos críticos y protege el capital circulante reduciendo el stock en productos perecederos de baja demanda.
-
-\section{Optimización Multi-Objetivo y Frente de Pareto}
+\subsection{Optimización Multi-Objetivo y Frente de Pareto}
 Históricamente, los modelos de \textit{demand forecasting} minimizaban una única métrica de error promedio, como el MAE o el RMSE. Sin embargo, en un problema de optimización de inventarios donde la gestión de la incertidumbre es vital, buscar únicamente reducir la media del error puede resultar en modelos con varianza infraestimada o sobreajustada.
 
 Para abordar este problema, el sistema implementa una \textbf{Búsqueda de Hiperparámetros Multi-Objetivo}
@@ -166,61 +168,85 @@ utilizando \textit{Optuna} \cite{akiba2019optuna}. Durante la fase de sintonizac
 evolutivo (basado en NSGA-II \cite{deb2002nsga2}) optimiza simultáneamente dos funciones de pérdida en conflicto:
 
 \begin{enumerate}
-    \item \textbf{Precisión Puntual (MAE)}: Penaliza la magnitud absoluta del error de la predicción central. Su rol dentro de la búsqueda no es ser la métrica de evaluación final del sistema ---que recae sobre el coste logístico simulado---, sino actuar como regularizador que evita soluciones degeneradas donde el modelo produce intervalos calibrados pero predicciones centrales absurdas.
-    \item \textbf{Nitidez Probabilística (Winkler Score)}: Penaliza simultáneamente la amplitud de los intervalos de confianza predichos (penalizando intervalos vagos o excesivamente anchos) y la penalización asimétrica si el valor real cae fuera del intervalo (asegurando cobertura empírica).
+    \item \textbf{Coste de Predicción Puntual (Pinball Loss en $q^*$)}: Evalúa el error del modelo en el fractil crítico, es decir, con la misma función de pérdida con la que fue entrenado. Esta coherencia garantiza que los hiperparámetros se seleccionen en función del coste logístico real, no de una métrica estadística genérica como el MAE.
+    \item \textbf{Nitidez Probabilística (Winkler Score)}: Penaliza simultáneamente la amplitud de los intervalos de confianza predichos (penalizando intervalos vagos o excesivamente anchos) y la cobertura empírica si el valor real cae fuera del intervalo.
 \end{enumerate}
 
-El resultado no es una única configuración de hiperparámetros ``óptima'', sino un \textbf{Frente de Pareto} donde cada punto representa un compromiso inmejorable entre la precisión de la estimación central y la fiabilidad de las cotas de incertidumbre. El orquestador selecciona automáticamente la configuración más equilibrada antes de iniciar el \textit{backtesting} global.
+El resultado no es una única configuración de hiperparámetros ``óptima'', sino un \textbf{Frente de Pareto} donde cada punto representa un compromiso inmejorable entre el coste logístico de la predicción central y la fiabilidad de las cotas de incertidumbre. El orquestador selecciona el punto del frente que minimiza la suma ponderada $\text{Pinball}(q^*) + \text{Winkler}$ antes de iniciar el \textit{backtesting} global.
 
-\section{Calibración: Mondrian Conformal Prediction}
-Para soportar la toma de decisiones bajo riesgo, el sistema requiere garantías matemáticas sobre
-los intervalos de confianza generados. Aunque técnicas previas como el \textit{Split Conformal
-Prediction} \cite{angelopoulos2021gentle} ofrecen garantías de cobertura \textit{marginal}
-(ej. 90\% de acierto en media para todo el conjunto de datos), esta propiedad suele enmascarar
-desigualdades críticas en \textit{retail}: el modelo podría estar acertando el 98\% de las
-veces en productos estables y fallando estrepitosamente en productos intermitentes o estacionales.
+\subsection{Calibración: Mondrian Conformal Prediction}
+El modelo entrenado con \textit{Pinball Loss} en $q = 0{,}9$ debería, en teoría, producir
+predicciones que la demanda real supere solo el 10\% de las veces. En la práctica esto no
+está garantizado: el modelo puede estar sistemáticamente sesgado, haber sobreajustado, o
+simplemente no haber visto suficientes muestras de ciertos SKUs. La calibración conformal
+resuelve este problema de forma agnóstica al modelo: ajusta los intervalos \textit{a
+posteriori} para que la cobertura empírica sobre un conjunto de holdout genuinamente no
+visto sea exactamente $(1-\alpha)$, con garantía finita y sin supuestos sobre la
+distribución de la demanda.
 
-Para solucionar este sesgo estructural, se ha implementado \textbf{Mondrian Conformal Prediction}
-\cite{vovk2005algorithmic}. Este marco extiende la calibración de manera condicional mediante
-los siguientes pasos:
+El sistema utiliza \textbf{Split Conformal Prediction} \cite{angelopoulos2021gentle} como
+mecanismo de calibración: tras entrenar el modelo, se reserva un subconjunto de calibración
+sobre el que se calculan los errores de cobertura; a partir de ellos se obtiene un factor
+corrector $\hat{q}$ que, aplicado en predicción, garantiza que el $(1-\alpha)\cdot 100\%$ de
+las observaciones futuras caigan dentro del intervalo.
+
+La garantía de un $\hat{q}$ global es de cobertura \textbf{marginal}: el 90\% de cobertura
+se cumple \textit{en media sobre todo el catálogo}, pero puede enmascarar desigualdades
+críticas por familia de producto --- el modelo podría cubrir el 99\% de los productos
+estables y solo el 70\% de los intermitentes, y la media seguiría siendo 90\%.
+
+Para obtener cobertura \textbf{condicional por categoría}, el sistema extiende Split CP
+con la estrategia \textbf{Mondrian} \cite{vovk2005algorithmic}: en lugar de un único
+$\hat{q}$ global, se calcula un $\hat{q}_g$ independiente para cada grupo taxonómico $g$,
+garantizando que la cobertura se cumpla dentro de cada familia de producto por separado.
+El $\hat{q}$ global se conserva como valor de seguridad (\textit{fallback}) para SKUs cuya
+categoría no haya aparecido en el set de calibración. El procedimiento completo es el
+siguiente:
 
 \begin{enumerate}
     \item \textbf{Partición Taxonómica}: Las series temporales se agrupan en categorías homogéneas
-    (ej. mediante su identificador categórico de jerarquía \texttt{third\_category\_id}).
-    \item \textbf{Score de No-Conformidad Local}: Para cada observación $i$ en el conjunto de
-    calibración $\mathcal{I}_{\text{cal}}$, el sistema calcula una puntuación de no-conformidad
-    $s_i$, la cual mide la desviación del modelo respecto a la realidad. Dependiendo de la
-    capacidad del modelo base $\hat{f}$, el cálculo sigue dos metodologías:
-    \begin{itemize}
-        \item \textbf{Modelo de Cuantiles}: Si el modelo estima cuantiles nativos (ej. pérdida
-        \textit{Pinball}), se evalúa la distancia firmada a los cuantiles para un nivel $\alpha$:
-        \begin{equation}
-            s_i = \max \left( \hat{q}_{\alpha/2}(x_i) - y_i, \,
-            y_i - \hat{q}_{1 - \alpha/2}(x_i) \right)
-        \end{equation}
-        \item \textbf{Modelo Puntual}: Si el modelo únicamente genera una predicción puntual
-        $\hat{y}_i$, la puntuación se calcula mediante el residuo absoluto:
-        \begin{equation}
-            s_i = |y_i - \hat{f}(x_i)|
-        \end{equation}
-    \end{itemize}
-    \item \textbf{Cálculo de Cotas e Intervalos por Categoría}: Para cada grupo taxonómico $g$,
-    se recopila el subconjunto de puntuaciones de calibración locales $\mathcal{S}_g = \{s_i :
-    \text{SKU}_i \in g\}$. El factor de corrección de grupo, $\hat{q}_g$, se determina como el
-    cuantil empírico inflado de dicha distribución local:
+    mediante su identificador jerárquico \texttt{third\_category\_id}, asegurando que la
+    calibración refleje el comportamiento propio de cada familia de productos.
+
+    \item \textbf{Score de No-Conformidad Local (CQR)}: Para cada observación $i$ en el conjunto
+    de calibración $\mathcal{I}_{\text{cal}}$, se calcula la puntuación de no-conformidad
+    siguiendo el método \textit{Conformalized Quantile Regression} \cite{romano2019conformalized}.
+    Dado que el sistema siempre produce predicciones cuantílicas (sección~\ref{sec:pinball}),
+    el score mide cuánto se desvía la observación real de los extremos del intervalo predicho:
     \begin{equation}
-        \hat{q}_g = \text{Quantile} \left( \mathcal{S}_g, \,
-        (1 - \alpha) \left( 1 + \frac{1}{|\mathcal{S}_g|} \right), \,
-        \text{method='higher'} \right)
+        s_i = \max \left( \hat{y}_{\alpha/2}(x_i) - y_i, \;
+        y_i - \hat{y}_{1-\alpha/2}(x_i) \right)
     \end{equation}
-    \item \textbf{Ajuste Condicional de Cuantiles}: El cuantil ajustado final garantiza que el
-    error de cobertura esté acotado teóricamente dentro de \textit{cada categoría}, asegurando
-    que tanto los productos de alta rotación (cuya incertidumbre es baja) como los lentos y
-    ruidosos reciben el nivel de servicio deseado, ensanchando o contrayendo los intervalos de
-    forma justa y localizada usando el vector de corrección $\hat{q}_g$.
+    donde $\hat{y}_{\alpha/2}$ y $\hat{y}_{1-\alpha/2}$ son las predicciones en los cuantiles
+    inferior y superior del intervalo. Si $y_i$ cae dentro del intervalo, $s_i < 0$; si cae
+    fuera, $s_i > 0$ y mide la distancia al borde más cercano.
+
+    \item \textbf{Factor de Corrección por Categoría}: Para cada grupo taxonómico $g$,
+    se recopila el subconjunto de scores locales $\mathcal{S}_g = \{s_i : \text{SKU}_i \in g\}$.
+    El factor de corrección $\hat{q}_g$ se obtiene como el cuantil empírico inflado de esa
+    distribución, que incorpora la corrección finita de Bonferroni:
+    \begin{equation}
+        \hat{q}_g = \text{Quantile} \left( \mathcal{S}_g, \;
+        (1 - \alpha) \left(1 + \frac{1}{|\mathcal{S}_g|}\right) \right)
+    \end{equation}
+
+    \item \textbf{Ajuste Simétrico de los Cuantiles}: En predicción, el factor $\hat{q}_g$
+    se aplica simétricamente: se resta a los cuantiles inferiores (ensanchando el borde bajo)
+    y se suma a los superiores (ensanchando el borde alto), dejando la mediana intacta:
+    \begin{equation}
+        \hat{y}_{q}^{\,\text{adj}}(x) =
+        \begin{cases}
+            \max\!\left(\hat{y}_q(x) - \hat{q}_g,\; 0\right) & \text{si } q < 0{,}5 \\
+            \hat{y}_q(x) & \text{si } q = 0{,}5 \\
+            \max\!\left(\hat{y}_q(x) + \hat{q}_g,\; 0\right) & \text{si } q > 0{,}5
+        \end{cases}
+    \end{equation}
+    El resultado es que cada categoría recibe su propio nivel de ensanchamiento: productos
+    con alta incertidumbre obtienen intervalos más anchos, mientras que los estables los
+    mantienen ajustados, con cobertura condicional garantizada dentro de cada grupo.
 \end{enumerate}
 
-\subsection{Métricas de Evaluación de Intervalos de Confianza}
+\subsubsection{Métricas de Evaluación de Intervalos de Confianza}
 Para evaluar la calidad de los intervalos de confianza generados por la capa conformal,
 se formulan tres métricas probabilísticas fundamentales:
 
@@ -252,7 +278,7 @@ se formulan tres métricas probabilísticas fundamentales:
     \end{equation}
 \end{itemize}
 
-\section{Protocolo de Evaluación: Backtesting Walk-Forward}
+\subsection{Protocolo de Evaluación: Backtesting Walk-Forward}
 \label{sec:backtesting}
 
 La evaluación de modelos de series temporales requiere respetar el orden cronológico de los datos. La validación cruzada estándar (\textit{k-fold}) mezclaría observaciones futuras con pasadas, introduciendo \textit{data leakage} y produciendo estimaciones de rendimiento optimistas e irreales.
@@ -263,11 +289,51 @@ El sistema implementa un \textbf{backtesting walk-forward} con $K=3$ folds tempo
     \text{Fold}_k: \quad \text{Train} = \{t < t_k\}, \quad \text{Test} = \{t_k \leq t < t_k + H\}
 \end{equation}
 
-donde $H = 7$ días es el horizonte de planificación. Los cortes $t_1 < t_2 < t_3$ dividen el periodo de observación en cuatro segmentos iguales, asegurando que cada fold tenga suficiente historia para construir los lags de 28 días. La calibración conformal se realiza sobre el último 20\% de cada ventana de entrenamiento, que actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el entrenamiento del modelo base.
+donde $H = 7$ días es el horizonte de planificación. Los cortes $t_1 < t_2 < t_3$ dividen el periodo de observación en cuatro segmentos iguales, asegurando que cada fold tenga suficiente historia para construir los lags de 28 días. La calibración conformal descrita en la sección anterior se realiza sobre el último 20\% de cada ventana de entrenamiento, que actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el entrenamiento del modelo base.
 
 El modelo \textbf{baseline} de referencia es el \textit{Seasonal Naïve}: para cada serie y fecha de predicción, replica la demanda observada en el mismo día de la semana hace 7 días. Este baseline es el más exigente en contextos con estacionalidad semanal fuerte ---como el confirmado en el análisis exploratorio--- y es el estándar de comparación utilizado en la competición M5 \cite{makridakis2022m5}. Un modelo que no supere al \textit{Seasonal Naïve} en Winkler Score no aporta valor respecto a una heurística trivial.
 
-\section{El Gemelo Digital Logístico: Simulación Dinámica (s, S)}
+\subsection{Perfiles de Coste Sintéticos por SKU}
+\label{sec:cost_profiles}
+
+Un supuesto limitante en muchas aplicaciones académicas de inventario es la utilización de costes de rotura ($c_u$) y exceso ($c_o$) uniformes para todo el catálogo. En un entorno real de \textit{retail} fresco, la penalización por una rotura de stock en un producto básico es muy superior a la de un producto de nicho, del mismo modo que el coste de exceso es crítico en productos de alta caducidad.
+
+Ante la ausencia de datos financieros transaccionales explícitos en el dataset original, el sistema implementa un motor de \textbf{inferencia de perfiles de coste sintéticos} que analiza el comportamiento histórico de cada serie $s$ para derivar coeficientes personalizados. Todas las variables se normalizan como \textbf{rangos percentílicos} $\in [0, 1]$ antes de combinarse: $Rank(x_s)$ no refleja el valor absoluto de la variable, sino la posición relativa de la serie $s$ respecto al resto del catálogo. Por ejemplo, el SKU con mayor intermitencia recibe $Rank = 1{,}0$ y el de menor intermitencia $Rank = 0{,}0$, independientemente de sus valores absolutos. El proceso se articula en tres dimensiones:
+
+\begin{enumerate}
+    \item \textbf{Factor de Perecederos ($F_{perish}$)}: Se estima mediante una combinación lineal del ranking de intermitencia y la inestabilidad de la categoría (CV medio). Captura el riesgo de obsolescencia:
+    \begin{equation}
+        Score_{perish} = w_1 \cdot Rank(Z_{cat}) + w_2 \cdot Rank(CV_{cat}) + w_3 \cdot Rank(Z_s)
+    \end{equation}
+    Donde $Z$ es la tasa de ceros y $CV$ el coeficiente de variación.
+
+    \item \textbf{Factor de Baja Rotación ($F_{slow}$)}: Identifica productos donde el sobrestock es financieramente peligroso debido a su baja velocidad de salida.
+    \begin{equation}
+        Score_{slow} = w_4 \cdot Rank(Z_s) + w_5 \cdot (1 - Rank(\mu_s))
+    \end{equation}
+
+    \item \textbf{Factor de Criticidad de Servicio ($F_{crit}$)}: Incrementa la presión sobre el modelo para evitar roturas en productos de alta demanda o con tensiones históricas de stock.
+    \begin{equation}
+        Score_{crit} = w_6 \cdot Rank(\mu_s) + w_7 \cdot Rank(StockoutRate_s)
+    \end{equation}
+\end{enumerate}
+
+Cada score se transforma en un factor mediante una reescala lineal parametrizada que garantiza que el factor sea siempre positivo y acotado:
+
+\begin{equation}
+    F = \beta_0 + \beta_1 \cdot Score
+\end{equation}
+
+donde $\beta_0 > 0$ es el valor base (factor mínimo cuando el score es 0) y $\beta_1 \geq 0$ controla la amplitud del ajuste. Los costes operativos del Newsvendor se recalculan dinámicamente para cada serie $s$:
+
+\begin{equation}
+    c_o^{(s)} = \bar{c}_o \cdot F_{perish}^{(s)} \cdot F_{slow}^{(s)}, \qquad
+    c_u^{(s)} = \bar{c}_u \cdot F_{crit}^{(s)}
+\end{equation}
+
+Esta arquitectura convierte el \textit{fractil crítico} $q^*$ en una \textbf{variable de estado por SKU}: el sistema asigna de forma autónoma mayores niveles de servicio a productos críticos y protege el capital circulante reduciendo el stock en productos perecederos de baja demanda. Estos costes per-SKU son los que alimentan directamente la simulación descrita a continuación.
+
+\subsection{El Gemelo Digital Logístico: Simulación Dinámica (s, S)}
 La evaluación tradicional en forecasting asume modelos estáticos (o de un solo periodo), como
 el modelo básico del \textit{Newsvendor} \cite{silver1998inventory}. Sin embargo, este supuesto
 ignora el hecho físico de que el inventario no vendido un día permanece en la estantería al
@@ -282,7 +348,7 @@ El proyecto rompe con esta limitación mediante el desarrollo de una \textbf{Sim
 
 Bajo esta simulación, la orden sugerida $Q$ se ajusta restando la \textit{Posición del Inventario} actual del nivel óptimo sugerido por el cuantil del pronóstico probabilístico $S$. De este modo, la evaluación de costes operativos captura fielmente el impacto devastador a largo plazo de errores correlacionados y del ``efecto látigo''.
 
-\subsection{Formulación Matemática de la Política Logística Dinámica $(s, S)$}
+\subsubsection{Formulación Matemática de la Política Logística Dinámica $(s, S)$}
 En el Gemelo Digital Logístico, la posición de inventario $IP_{s,t}$ para una serie $s$ en el
 día $t$ se define de forma dinámica considerando los pedidos en tránsito:
 \begin{equation}
@@ -307,7 +373,30 @@ La cantidad de pedido a emitir cada día, $Q_{s,t}$, se calcula aplicando la pol
 \end{equation}
 Donde el punto de pedido $s_{s,t}$ actúa como disparador calibrado para cubrir el lead time.
 
-\section{Simulación Operacional en Streaming: Evaluación de Cadencias de Reentrenamiento}
+% ==============================================================================
+\section{Bloque II: Operación (\texttt{retrain} y \texttt{score\_daily})}
+% ==============================================================================
+
+Una vez identificado el modelo óptimo en la fase de investigación, el sistema entra en modo operacional. El modo \texttt{retrain} reentrena el modelo champion sobre la totalidad de los datos disponibles y lo persiste. El modo \texttt{score\_daily} carga ese modelo y genera diariamente las recomendaciones de pedido para cada SKU, aplicando las restricciones logísticas reales mediante programación lineal.
+
+\subsection{Resolución de Conflictos: Optimización Global por Programación Lineal}
+Las recomendaciones individuales de cada SKU pueden ser matemáticamente óptimas a nivel aislado, pero el despliegue en un supermercado real está sujeto a severas restricciones de volumen físico de almacenaje o de capital presupuestario.
+
+Para cerrar la brecha entre Machine Learning e Investigación de Operaciones (OR), la decisión final se orquesta a través de un \textbf{Módulo de Programación Lineal (LP)}. El problema se plantea como un \textit{Continuous Knapsack}:
+
+\begin{itemize}
+    \item \textbf{Variables de Decisión}: Cantidad a pedir de cada SKU.
+    \item \textbf{Función Objetivo}: Maximizar la utilidad marginal (evitar el coste de oportunidad por rotura, fuertemente penalizado por la criticidad del producto).
+    \item \textbf{Restricciones}: La suma total de unidades pedidas en el catálogo no debe exceder una constante $C_{max}$ (ej. Límite del camión logístico).
+\end{itemize}
+
+El motor utiliza el \textit{solver} moderno \texttt{highs} de \textit{SciPy} para recortar inventario inteligentemente allí donde el impacto económico de la rotura sea menor, dotando al sistema de total capacidad de actuación bajo estrés operativo real.
+
+% ==============================================================================
+\section{Bloque III: MLOps (\texttt{simulate\_ops})}
+% ==============================================================================
+
+\subsection{Simulación Operacional en Streaming: Evaluación de Cadencias de Reentrenamiento}
 \label{sec:simulate_ops}
 
 La validación cruzada temporal (\textit{walk-forward backtesting}) estima el rendimiento del modelo en condiciones experimentales controladas. Sin embargo, en producción surge una pregunta adicional de naturaleza MLOps: \emph{\textquestiondown con qué frecuencia debe reentrenarse el modelo a medida que llegan datos nuevos?} Reentrenar demasiado frecuentemente supone un coste computacional elevado; hacerlo demasiado esporádicamente puede degradar las predicciones conforme el modelo queda desactualizado respecto a los patrones recientes.
@@ -328,16 +417,3 @@ Para responder esta pregunta de forma empírica sobre datos genuinamente no vist
 \end{enumerate}
 
 Los artefactos generados incluyen \texttt{cadence\_summary.csv} con métricas agregadas por cadencia (coste total, nivel de servicio, \textit{fill rate}, número de reentrenamientos) y \texttt{cumulative\_cost.png} con la evolución temporal del coste para cada política. Esta simulación constituye la evidencia empírica para justificar la política de reentrenamiento operacional del sistema.
-
-\section{Resolución de Conflictos: Optimización Global por Programación Lineal}
-Las recomendaciones individuales de cada SKU pueden ser matemáticamente óptimas a nivel aislado, pero el despliegue en un supermercado real está sujeto a severas restricciones de volumen físico de almacenaje o de capital presupuestario.
-
-Para cerrar la brecha entre Machine Learning e Investigación de Operaciones (OR), la decisión final se orquesta a través de un \textbf{Módulo de Programación Lineal (LP)}. El problema se plantea como un \textit{Continuous Knapsack}:
-
-\begin{itemize}
-    \item \textbf{Variables de Decisión}: Cantidad a pedir de cada SKU.
-    \item \textbf{Función Objetivo}: Maximizar la utilidad marginal (evitar el coste de oportunidad por rotura, fuertemente penalizado por la criticidad del producto).
-    \item \textbf{Restricciones}: La suma total de unidades pedidas en el catálogo no debe exceder una constante $C_{max}$ (ej. Límite del camión logístico).
-\end{itemize}
-
-El motor utiliza el \textit{solver} moderno \texttt{highs} de \textit{SciPy} para recortar inventario inteligentemente allí donde el impacto económico de la rotura sea menor, dotando al sistema de total capacidad de actuación bajo estrés operativo real.

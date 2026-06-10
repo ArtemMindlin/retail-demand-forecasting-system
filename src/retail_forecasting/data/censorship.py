@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-from typing import Literal, Protocol, cast
+from typing import Literal, cast
 
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-
-
-class RegressorProtocol(Protocol):
-    def fit(self, X: pd.DataFrame, y: pd.Series) -> object: ...
-
-    def predict(self, X: pd.DataFrame) -> np.ndarray: ...
 
 
 class LatentDemandImputer:
@@ -33,7 +27,7 @@ class LatentDemandImputer:
         self.stockout_col = stockout_col
         self.target_col = target_col
         self.scaling_factor = scaling_factor
-        self.model: RegressorProtocol | None = None
+        self.model: lgb.LGBMRegressor | None = None
 
     def impute(self, panel: pd.DataFrame) -> pd.DataFrame:
         """Correct censored demand in the input panel based on selected strategy.
@@ -79,28 +73,54 @@ class LatentDemandImputer:
     def _impute_supervised(
         self, df: pd.DataFrame, is_clean: pd.Series, is_censored: pd.Series
     ) -> pd.DataFrame:
-        """Original teacher-model (LGBM) approach."""
-        # Simple features
+        """LGBM teacher-model with rich covariates."""
         df_feat = df.copy()
         df_feat["month"] = df_feat["date"].dt.month
         df_feat["day_of_week"] = df_feat["date"].dt.dayofweek
+        df_feat["day_of_month"] = df_feat["date"].dt.day
+        df_feat["series_cat"] = df_feat["series_id"].astype("category")
+
+        # Stockout severity: fraction of operative window without stock
+        df_feat["stockout_ratio"] = df_feat[self.stockout_col] / 16.0
+
+        # Series-level clean-day mean as a prior (mirrors historical_mean but as a feature)
+        series_means = df_feat[is_clean].groupby("series_id")[self.target_col].mean()
+        df_feat["series_mean_demand"] = df_feat["series_id"].map(series_means)
+        global_mean = float(df_feat[is_clean][self.target_col].mean())
+        df_feat["series_mean_demand"] = df_feat["series_mean_demand"].fillna(global_mean)
+
+        optional_cols = [
+            "discount",
+            "holiday_flag",
+            "avg_temperature",
+            "precpt",
+            "avg_humidity",
+            "avg_wind_level",
+        ]
+        extra_features = [c for c in optional_cols if c in df_feat.columns]
+
+        feature_cols = [
+            "month",
+            "day_of_week",
+            "day_of_month",
+            "series_cat",
+            "stockout_ratio",
+            "series_mean_demand",
+        ] + extra_features
 
         train_df = df_feat[is_clean].copy()
-        train_df["series_cat"] = train_df["series_id"].astype("category")
-
-        X_train = train_df[["month", "day_of_week", "series_cat"]]
+        X_train = train_df[feature_cols]
         y_train = train_df[self.target_col]
 
         self.model = lgb.LGBMRegressor(
-            n_estimators=100, learning_rate=0.1, random_state=42, verbosity=-1
+            n_estimators=200, learning_rate=0.05, max_depth=6, random_state=42, verbosity=-1
         )
         self.model.fit(X_train, y_train)
 
         censored_df = df_feat[is_censored].copy()
-        censored_df["series_cat"] = censored_df["series_id"].astype("category")
-        X_censored = censored_df[["month", "day_of_week", "series_cat"]]
+        X_censored = censored_df[feature_cols]
 
-        predicted_latent = self.model.predict(X_censored)
+        predicted_latent = np.asarray(self.model.predict(X_censored), dtype=float)
 
         df.loc[is_censored, "latent_demand_est"] = np.maximum(
             df.loc[is_censored, self.target_col], predicted_latent
@@ -134,8 +154,9 @@ class LatentDemandImputer:
         self, df: pd.DataFrame, is_clean: pd.Series, is_censored: pd.Series
     ) -> pd.DataFrame:
         """Baseline: Simply scale up the observed demand by a fixed factor during stockouts."""
-        df.loc[is_censored, "latent_demand_est"] = (
-            df.loc[is_censored, self.target_col] * self.scaling_factor
+        df.loc[is_censored, "latent_demand_est"] = np.maximum(
+            df.loc[is_censored, self.target_col],
+            df.loc[is_censored, self.target_col] * self.scaling_factor,
         )
         df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, self.target_col]
         return df

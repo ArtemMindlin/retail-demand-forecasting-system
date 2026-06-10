@@ -267,7 +267,6 @@ def run_sensitivity_analysis(
             overstock_cost=base_inventory_config.overstock_cost,
             stockout_cost=base_inventory_config.overstock_cost * ratio,
             use_series_costs=base_inventory_config.use_series_costs,
-            series_cost_strategy=base_inventory_config.series_cost_strategy,
             clip_negative_orders=base_inventory_config.clip_negative_orders,
         )
         adjusted_series_cost_profile = series_cost_profile

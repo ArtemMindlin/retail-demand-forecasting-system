@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor
 
-from retail_forecasting.utils.io import quantile_column_name
+from retail_forecasting.utils.io import quantile_column_name, rearrange_quantiles
 
 
 @dataclass
@@ -24,26 +24,35 @@ class CatBoostingModel:
     n_estimators: int
     learning_rate: float
     max_depth: int
+    overstock_cost: float = 1.0
+    stockout_cost: float = 4.0  # must be > 0; drives the critical fractile q* = cu/(cu+co)
     model_name: str = "catboost"
     backend_name: str = field(init=False, default="catboost_official")
 
     def fit(self, features: pd.DataFrame, target: pd.Series) -> CatBoostingModel:
-        # Identify categorical features
+        if self.stockout_cost <= 0:
+            raise ValueError(
+                "stockout_cost must be > 0. Provide valid inventory costs in the configuration."
+            )
+        critical_fractile = self.stockout_cost / (self.stockout_cost + self.overstock_cost)
         cat_features = features.select_dtypes(include=["category", "object"]).columns.tolist()
 
-        # 1. Fit Point Model (Root Mean Square Error)
+        # 1. Fit Point Model at critical fractile q* (cost-aware, pinball loss)
         self.point_model_ = CatBoostRegressor(
             iterations=self.n_estimators,
             learning_rate=self.learning_rate,
             depth=min(self.max_depth, 16),
             random_seed=self.random_seed,
-            loss_function="RMSE",
+            loss_function=f"Quantile:alpha={critical_fractile}",
             task_type="CPU",
             l2_leaf_reg=3.0,
             nan_mode="Min",
             verbose=False,
             allow_writing_files=False,
             thread_count=-1,
+        )
+        print(
+            f"🎯 Cost-Aware Training: Optimizing point model for critical fractil τ = {critical_fractile:.4f}"  # noqa: E501
         )
         self.point_model_.fit(features, target, cat_features=cat_features)
 
@@ -84,8 +93,8 @@ class CatBoostingModel:
             for q in ordered_quantiles
         ]
 
-        # Ensure monotonicity
-        monotonic = np.maximum.accumulate(np.column_stack(raw_predictions), axis=1)
+        # Ensure monotonicity via Chernozhukov rearrangement (Econometrica, 2010)
+        monotonic = rearrange_quantiles(raw_predictions)
         for index, q in enumerate(ordered_quantiles):
             quantile_predictions[quantile_column_name(q)] = monotonic[:, index]
 

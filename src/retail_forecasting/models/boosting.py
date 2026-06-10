@@ -5,9 +5,9 @@ from typing import Any, Protocol, cast, runtime_checkable
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor, HistGradientBoostingRegressor
+from sklearn.ensemble import GradientBoostingRegressor
 
-from retail_forecasting.utils.io import quantile_column_name
+from retail_forecasting.utils.io import quantile_column_name, rearrange_quantiles
 
 
 @runtime_checkable
@@ -40,8 +40,7 @@ class AutoBoostingModel:
     learning_rate: float
     max_depth: int
     overstock_cost: float = 1.0
-    stockout_cost: float = 0.0  # 0.0 means standard regression
-    loss_function: str = "RMSE"
+    stockout_cost: float = 4.0  # must be > 0; drives the critical fractile q* = cu/(cu+co)
     model_name: str = "auto_boosting"
     backend_name: str = field(init=False, default="unknown")
     point_model_: BaseRegressor | None = field(init=False, default=None)
@@ -79,69 +78,25 @@ class AutoBoostingModel:
             )
             for quantile in ordered_quantiles
         ]
-        monotonic = np.maximum.accumulate(np.column_stack(raw_predictions), axis=1)
+        monotonic = rearrange_quantiles(raw_predictions)
         for index, quantile in enumerate(ordered_quantiles):
             quantile_predictions[quantile_column_name(quantile)] = monotonic[:, index]
         return quantile_predictions
 
     def _build_point_model(self) -> BaseRegressor:
-        # Calculate critical fractil if costs are provided
-        if self.stockout_cost > 0:
-            critical_fractil = self.stockout_cost / (self.stockout_cost + self.overstock_cost)
-            print(
-                f"🎯 Cost-Aware Training: Optimizing point model for critical fractil τ = {critical_fractil:.4f}"  # noqa: E501
+        # The point model always optimizes the critical fractile (pinball at q*).
+        # Training against RMSE/MAE is inconsistent with the system's objective of
+        # minimizing logistical cost, so it is not supported.
+        if self.stockout_cost <= 0:
+            raise ValueError(
+                "stockout_cost must be > 0. Provide valid inventory costs in the configuration."
             )
-            self.backend_name = "lightgbm" if _lightgbm_available() else "sklearn_gradient_boosting"
-            return self._build_quantile_model(critical_fractil)
-
-        # Default to standard regression (MSE-like)
-        if _lightgbm_available():
-            import lightgbm as lgb
-
-            self.backend_name = "lightgbm"
-            objective = "regression" if self.loss_function == "RMSE" else "regression_l1"
-            model: BaseRegressor = lgb.LGBMRegressor(
-                objective=objective,
-                random_state=self.random_seed,
-                n_estimators=self.n_estimators,
-                learning_rate=self.learning_rate,
-                num_leaves=31,
-                max_depth=self.max_depth,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                n_jobs=-1,
-                verbosity=-1,
-            )
-            return model
-
-        if _xgboost_available():
-            from xgboost import XGBRegressor
-
-            self.backend_name = "xgboost"
-            objective = "reg:squarederror" if self.loss_function == "RMSE" else "reg:absoluteerror"
-            model = XGBRegressor(
-                objective=objective,
-                random_state=self.random_seed,
-                n_estimators=self.n_estimators,
-                learning_rate=self.learning_rate,
-                max_depth=self.max_depth,
-                subsample=0.8,
-                colsample_bytree=0.8,
-            )
-            return cast(BaseRegressor, model)
-
-        self.backend_name = "sklearn_hist_gradient_boosting"
-        loss = "squared_error" if self.loss_function == "RMSE" else "absolute_error"
-        return cast(
-            BaseRegressor,
-            HistGradientBoostingRegressor(
-                loss=loss,
-                learning_rate=self.learning_rate,
-                max_depth=self.max_depth,
-                max_iter=self.n_estimators,
-                random_state=self.random_seed,
-            ),
+        critical_fractil = self.stockout_cost / (self.stockout_cost + self.overstock_cost)
+        print(
+            f"🎯 Cost-Aware Training: Optimizing point model for critical fractil τ = {critical_fractil:.4f}"  # noqa: E501
         )
+        self.backend_name = "lightgbm" if _lightgbm_available() else "sklearn_gradient_boosting"
+        return self._build_quantile_model(critical_fractil)
 
     def _build_quantile_model(self, quantile: float) -> BaseRegressor:
         if _lightgbm_available():

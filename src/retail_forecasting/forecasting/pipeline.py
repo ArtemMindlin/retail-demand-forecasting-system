@@ -74,7 +74,11 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     # 2. Run Strategy A: Observed Demand (Baseline)
     print("--- Running Strategy A: Observed Demand ---")
     artifacts_obs = run_experiment_from_frame(
-        raw_panel, settings, data_strategy="Observed", holdout_panel=holdout_panel
+        raw_panel,
+        settings,
+        data_strategy="Observed",
+        holdout_panel=holdout_panel,
+        save_artifacts=False,
     )
 
     # 3. Run Strategy B: Latent Demand (Imputed)
@@ -92,6 +96,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         settings,
         data_strategy=f"Latent_{strategy_name}",
         holdout_panel=imputed_holdout,
+        save_artifacts=False,
     )
 
     # 4. Merge Artifacts
@@ -126,7 +131,6 @@ def run_experiment(settings: Settings) -> RunArtifacts:
                 "models": ModelRunMetadata(
                     models_run=sorted(merged_predictions["model_name"].dropna().unique().tolist()),
                     quantiles=settings.models.quantiles,
-                    optimize_for_cost=settings.models.optimize_for_cost,
                     use_tuning=settings.models.use_tuning,
                     retrain_each_fold=settings.validation.retrain_each_fold,
                 ),
@@ -164,6 +168,7 @@ def run_experiment_from_frame(
     settings: Settings,
     data_strategy: str = "Observed",
     holdout_panel: pd.DataFrame | None = None,
+    save_artifacts: bool = True,
 ) -> RunArtifacts:
     """Run the full backtesting pipeline from an in-memory panel."""
     quality_report = validate_prepared_panel(panel, settings)
@@ -308,12 +313,8 @@ def run_experiment_from_frame(
                 n_estimators=best_boosting_params.n_estimators,
                 learning_rate=best_boosting_params.learning_rate,
                 max_depth=best_boosting_params.max_depth,
-                overstock_cost=(
-                    settings.inventory.overstock_cost if settings.models.optimize_for_cost else 1.0
-                ),
-                stockout_cost=(
-                    settings.inventory.stockout_cost if settings.models.optimize_for_cost else 0.0
-                ),
+                overstock_cost=settings.inventory.overstock_cost,
+                stockout_cost=settings.inventory.stockout_cost,
             )
             boosting_model = ConformalForecaster(base_lgb)
             boosting_model.fit(
@@ -347,6 +348,8 @@ def run_experiment_from_frame(
                 n_estimators=best_boosting_params.n_estimators,
                 learning_rate=best_boosting_params.learning_rate,
                 max_depth=best_boosting_params.max_depth,
+                overstock_cost=settings.inventory.overstock_cost,
+                stockout_cost=settings.inventory.stockout_cost,
             )
             cat_model = ConformalForecaster(base_cat)
             cat_model.fit(
@@ -420,12 +423,8 @@ def run_experiment_from_frame(
             n_estimators=best_boosting_params.n_estimators,
             learning_rate=best_boosting_params.learning_rate,
             max_depth=best_boosting_params.max_depth,
-            overstock_cost=(
-                settings.inventory.overstock_cost if settings.models.optimize_for_cost else 1.0
-            ),
-            stockout_cost=(
-                settings.inventory.stockout_cost if settings.models.optimize_for_cost else 0.0
-            ),
+            overstock_cost=settings.inventory.overstock_cost,
+            stockout_cost=settings.inventory.stockout_cost,
         )
         holdout_boosting_model = ConformalForecaster(base_lgb_final)
         holdout_boosting_model.fit(
@@ -446,6 +445,8 @@ def run_experiment_from_frame(
             n_estimators=best_boosting_params.n_estimators,
             learning_rate=best_boosting_params.learning_rate,
             max_depth=best_boosting_params.max_depth,
+            overstock_cost=settings.inventory.overstock_cost,
+            stockout_cost=settings.inventory.stockout_cost,
         )
         holdout_cat_model = ConformalForecaster(base_cat_final)
         holdout_cat_model.fit(
@@ -566,7 +567,6 @@ def run_experiment_from_frame(
         models=ModelRunMetadata(
             models_run=sorted(predictions["model_name"].dropna().unique().tolist()),
             quantiles=settings.models.quantiles,
-            optimize_for_cost=settings.models.optimize_for_cost,
             use_tuning=settings.models.use_tuning,
             retrain_each_fold=settings.validation.retrain_each_fold,
         ),
@@ -612,6 +612,8 @@ def run_experiment_from_frame(
         backtest_metadata=backtest_metadata,
         shap_values=shap_values,
     )
+    if not save_artifacts:
+        return artifacts
     return write_run_artifacts(artifacts, settings)
 
 
@@ -731,6 +733,8 @@ def _instantiate_champion_base_model(settings: Settings) -> CatBoostingModel | A
             n_estimators=settings.models.n_estimators,
             learning_rate=settings.models.learning_rate,
             max_depth=settings.models.max_depth,
+            overstock_cost=settings.inventory.overstock_cost,
+            stockout_cost=settings.inventory.stockout_cost,
         )
     return AutoBoostingModel(
         quantiles=settings.models.quantiles,
@@ -738,12 +742,8 @@ def _instantiate_champion_base_model(settings: Settings) -> CatBoostingModel | A
         n_estimators=settings.models.n_estimators,
         learning_rate=settings.models.learning_rate,
         max_depth=settings.models.max_depth,
-        overstock_cost=(
-            settings.inventory.overstock_cost if settings.models.optimize_for_cost else 1.0
-        ),
-        stockout_cost=(
-            settings.inventory.stockout_cost if settings.models.optimize_for_cost else 0.0
-        ),
+        overstock_cost=settings.inventory.overstock_cost,
+        stockout_cost=settings.inventory.stockout_cost,
     )
 
 

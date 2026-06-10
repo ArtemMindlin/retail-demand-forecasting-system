@@ -14,7 +14,7 @@ Las conclusiones principales se resumen en los siguientes puntos:
 
     \item \textbf{La trampa del MAE y el valor del modelo probabilístico}: El Seasonal Naïve obtiene el mejor MAE del backtesting (2,74 bajo estrategia Latent) al tiempo que incurre en el mayor coste logístico (38.197 frente a 34.558 de CatBoost, una diferencia del \textbf{9,5\%}). Este resultado reproduce el fenómeno teórico advertido en el Capítulo~\ref{chap:estado_del_arte} y constituye la justificación empírica más sólida del diseño probabilístico: optimizar el MAE no equivale a optimizar la política de inventario.
 
-    \item \textbf{Calibración Conformal: garantías teóricas y limitaciones prácticas}: La implementación de \textit{Mondrian Conformal Prediction} proporciona las herramientas correctas para la calibración condicional por categoría. En el subset de evaluación reducido (50 observaciones por fold, estratificadas en varios grupos Mondrian), la cobertura promedio fue del 38\% para CatBoost, con alta varianza entre folds (14\% en folds 0-1, 86\% en fold 2). La garantía teórica de la CP requiere conjuntos de calibración suficientemente grandes por estrato; el fold 2, con mejor representatividad, reproduce el comportamiento esperado y confirma que el método es correcto, pero que la escala del experimento de evaluación limita su verificación.
+    \item \textbf{Calibración Conformal: garantías teóricas y limitaciones prácticas}: La implementación de \textit{Mondrian Conformal Prediction} proporciona las herramientas correctas para la calibración condicional por categoría. En el subset de evaluación base (50 series), la cobertura promedio fue del 38\% para CatBoost con varianza extrema entre folds (14\%--86\%). La validación a escala con 500 series confirmó el diagnóstico parcialmente: la cobertura sube al 63{,}5\% y la inestabilidad entre folds desaparece, pero persiste una infracobertura residual atribuible a la no-intercambiabilidad temporal entre la ventana de calibración y el periodo de test en un panel de solo 90 días. Esta evidencia delimita con precisión el supuesto que falla (intercambiabilidad, no tamaño muestral) y motiva la adopción de Conformal Prediction adaptativa como evolución natural del sistema.
 
     \item \textbf{El Gemelo Digital Logístico}: La evaluación estática (aislada por día) oculta el impacto acumulativo de los errores de inventario. La integración de la \textbf{Simulación Dinámica $(s, S)$} permite medir el verdadero coste logístico con estado de inventario persistente, exponiendo el \textit{efecto látigo} que los modelos evaluados en aislamiento no pueden detectar.
 
@@ -54,11 +54,12 @@ de ética algorítmica, responsabilidad social corporativa y cumplimiento legal:
 La arquitectura modular desarrollada deja el camino preparado para futuras expansiones. Las líneas propuestas fluyen directamente de las limitaciones identificadas en el capítulo de resultados:
 
 \begin{itemize}
-    \item \textbf{Conjuntos de Calibración Mayores para Mondrian CP}: El hallazgo más inmediato del
-    capítulo de resultados es que la cobertura conformal es inestable con pocos ejemplos por estrato.
-    La línea prioritaria es ejecutar el protocolo de evaluación sobre el dataset completo (50.000
-    series, folds de varias semanas), donde cada estrato Mondrian recibirá cientos de observaciones
-    de calibración y la garantía teórica del 90\% podrá verificarse empíricamente.
+    \item \textbf{Conformal Prediction Adaptativa (EnbPI)}: La validación a escala demostró que,
+    eliminada la inestabilidad por estratos pequeños, la brecha de cobertura restante proviene de la
+    no-intercambiabilidad temporal entre calibración y test. La línea prioritaria es sustituir el
+    Split CP estático por métodos adaptativos como EnbPI \cite{xu2021conformal}, que reajustan el
+    ancho del intervalo con los errores recientes observados, y verificar la convergencia hacia el
+    90\% sobre el dataset completo (50.000 series) con historia más larga.
 
     \item \textbf{Costes Reales e Integración ERP}: Los perfiles de coste sintéticos ($c_u$, $c_o$)
     utilizados en este trabajo son una aproximación necesaria dado que los datos del dataset no
@@ -73,10 +74,31 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     \cite{makridakis2022m5} sugieren que estos modelos son competitivos cuando el volumen de
     datos es suficiente.
 
+    \item \textbf{Recuperación de Demanda Latente a Granularidad Horaria}: El módulo
+    \texttt{LatentDemandImputer} opera a nivel diario: si un día presenta \texttt{stockout\_hours} $>
+    0$, la imputación se aplica sobre la demanda agregada de ese día completo, independientemente de
+    si el stockout duró 2 horas o 22. El dataset FreshRetailNet-50K contiene registros de ventas y
+    estado de stock hora a hora, granularidad que el paper de referencia del dataset
+    \cite{freshretailnet2025} explota explícitamente: su pipeline reconstruye la demanda latente
+    únicamente en las horas sin stock y suma la demanda observada en las horas con stock, logrando
+    una imputación quirúrgica que elimina el sesgo sistemático de -7{,}37\% en la predicción. La
+    extensión natural de este trabajo es operar el imputer a granularidad horaria, agregar después a
+    nivel diario, y comparar el efecto sobre el Winkler Score frente a la imputación diaria actual.
+
     \item \textbf{Imputación de Censura Multi-Producto}: El módulo actual de \texttt{LatentDemandImputer}
     trata cada serie de forma independiente. Una extensión natural es modelar la canibalización y
     sustitución entre productos de la misma categoría durante un stockout, incorporando efectos
     cruzados en la estimación de la demanda latente.
+
+    \item \textbf{Modelos Hurdle para Demanda Intermitente}: El 3{,}3\% de observaciones con demanda
+    genuinamente nula (días sin ninguna venta, excluidos los ceros inducidos por stockout) no justifica
+    un modelo de dos etapas para el catálogo general, pero sí para los SKUs de alta intermitencia
+    donde la probabilidad de venta cero es estructuralmente distinta de la magnitud cuando sí se
+    vende. La arquitectura natural es un clasificador binario (¿hay venta?) seguido de un regresor
+    sobre el subconjunto positivo, análogo al modelo \textit{zero-inflated} clásico
+    \cite{lambert1992zero}: la primera etapa filtra los días sin demanda y la segunda predice la
+    cantidad condicionada a que haya venta. En el contexto de forecasting de series temporales,
+    este enfoque se ha aplicado con éxito a demanda esporádica en retail \cite{syntetos2005accuracy}.
 
     \item \textbf{Aprendizaje por Refuerzo para Política de Reposición}: Transicionar de un
     pipeline secuencial (pronóstico $\rightarrow$ Newsvendor $\rightarrow$ simulación) a un agente

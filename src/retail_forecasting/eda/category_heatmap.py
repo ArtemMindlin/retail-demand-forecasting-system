@@ -15,7 +15,7 @@ from retail_forecasting.data.dataset import load_prepared_panel
 
 
 def _load_profiles() -> tuple[pd.DataFrame, dict[str, str], pd.Series]:
-    settings = load_config("configs/default.yaml")
+    settings = load_config("configs/experiment.yaml")
     eda_dataset_config = settings.dataset.model_copy(
         update={"top_n_series": None, "max_rows": None}
     )

@@ -14,7 +14,7 @@ from retail_forecasting.data.dataset import load_prepared_panel
 
 
 def generate_acf_demand(output_path: Path, max_lags: int = 28) -> None:
-    settings = load_config("configs/default.yaml")
+    settings = load_config("configs/experiment.yaml")
     eda_dataset_config = settings.dataset.model_copy(
         update={"top_n_series": None, "max_rows": None}
     )

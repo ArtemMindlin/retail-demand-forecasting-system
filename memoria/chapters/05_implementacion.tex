@@ -33,7 +33,7 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
 
 %% ── CAPA 2: FEATURES ────────────────────────────────────────────
 \node[featblk, below=of hf]    (cens)  {Corrección\\Censura};
-\node[featblk, right=of cens]  (feng)  {Feature\\Engineering\\(58 features)};
+\node[featblk, right=of cens]  (feng)  {Feature\\Engineering\\(50 features)};
 \node[featblk, right=of feng]  (frame) {Frame\\Supervisado};
 
 %% ── CAPA 3: MODELADO ────────────────────────────────────────────
@@ -89,7 +89,7 @@ La estructura del código se organiza en torno a cuatro capas especializadas:
 
 \begin{enumerate}
     \item \textbf{Capa de Datos}: Ingesta desde Hugging Face con un \textit{Data Quality Gate} que aborta la ejecución si detecta anomalías (datos obsoletos, duplicados o series incompletas) antes de contaminar los modelos.
-    \item \textbf{Capa de Features}: Corrección de demanda censurada por stockout e ingeniería de 58 características temporales, exógenas y estáticas sin \textit{data leakage}.
+    \item \textbf{Capa de Features}: Corrección de demanda censurada por stockout e ingeniería de 50 características temporales, exógenas y estáticas sin \textit{data leakage}.
     \item \textbf{Capa de Modelado}: Búsqueda Pareto de hiperparámetros (Optuna NSGA-II), entrenamiento multi-cuantil (CatBoost con Pinball Loss) y calibración de intervalos (Mondrian Conformal Prediction).
     \item \textbf{Capa de Decisión}: Transformación de cuantiles en órdenes de pedido vía el fractil crítico del Newsvendor, simulación dinámica $(s,S)$ y resolución de restricciones globales por Programación Lineal.
 \end{enumerate}
@@ -188,7 +188,7 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
 \node[s2, right=of raw]   (qgate)  {Data Quality Gate\\(7 checks)};
 \node[s3, right=of qgate] (panel)  {Panel Preparado\\(series\_id, date)};
 \node[s4, right=of panel] (cens)   {LatentDemand\\Imputer};
-\node[s5, right=of cens]  (frame)  {Frame Supervisado\\(58 features + target)};
+\node[s5, right=of cens]  (frame)  {Frame Supervisado\\(50 features + target)};
 
 \draw[arr] (raw)   -- (qgate);
 \draw[arr] (qgate) -- (panel);
@@ -248,7 +248,7 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
 \end{figure}
 
 \begin{enumerate}
-    \item \textbf{Fase de Optimización Mensual (Optuna)}: Ejecutado mediante el modo \texttt{experiment}, este ciclo realiza una búsqueda exhaustiva en el espacio de hiperparámetros utilizando \textit{Optuna}. Dado el volumen de datos (4.5M de filas), el sistema implementa un \textbf{muestreo estratificado por serie temporal}, limitando el entrenamiento del tuning a un máximo de 500k registros representativos. Esto garantiza que la convergencia de Optuna sea ágil sin perder la significancia estadística. Los resultados son validados mediante un análisis humano de estabilidad (comparando MAE y Winkler Score), y si se identifican mejoras significativas, se actualiza el archivo \texttt{configs/default.yaml}.
+    \item \textbf{Fase de Optimización Mensual (Optuna)}: Ejecutado mediante el modo \texttt{experiment}, este ciclo realiza una búsqueda exhaustiva en el espacio de hiperparámetros utilizando \textit{Optuna}. Dado el volumen de datos (4.5M de filas), el sistema implementa un \textbf{muestreo estratificado por serie temporal}, limitando el entrenamiento del tuning a un máximo de 500k registros representativos. Esto garantiza que la convergencia de Optuna sea ágil sin perder la significancia estadística. Los resultados son validados mediante un análisis humano de estabilidad (comparando Pinball Loss en $q^*$ y Winkler Score), y si se identifican mejoras significativas, se actualiza el archivo \texttt{configs/default.yaml}.
     \item \textbf{Fase de Reentrenamiento Operacional (Daily)}: Ejecutado mediante el modo \texttt{retrain}, este proceso es determinista y utiliza la configuración fija definida en \texttt{default.yaml}. Su función es la integración de los datos de ventas más recientes, manteniendo la lógica del modelo estable.
 \end{enumerate}
 

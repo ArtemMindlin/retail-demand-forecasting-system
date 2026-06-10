@@ -258,7 +258,7 @@ class ForecastRequest(BaseModel):
 
 class ScoreRequest(BaseModel):
     config_path: str = Field(
-        default="configs/default.yaml",
+        default="configs/experiment.yaml",
         description="Path to the base configuration YAML.",
     )
     run_name: str | None = Field(
@@ -277,7 +277,7 @@ class ScoreResponse(BaseModel):
 def run_pipeline(
     request: Request,
     background_tasks: BackgroundTasks,
-    config_path: str = "configs/default.yaml",
+    config_path: str = "configs/experiment.yaml",
 ) -> dict[str, str]:
     """Trigger pipeline execution in a background task."""
     client_ip = request.client.host if request.client else "unknown"
@@ -1020,7 +1020,7 @@ def retrain_model() -> dict[str, str]:
     return {"status": "success", "message": "Model recalibration triggered successfully."}
 
 
-_CONFIG_PATH = Path("configs/default.yaml")
+_CONFIG_PATH = Path("configs/experiment.yaml")
 
 
 class ConfigBody(BaseModel):
