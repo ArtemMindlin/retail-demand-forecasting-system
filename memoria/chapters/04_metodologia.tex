@@ -13,7 +13,7 @@ El sistema se articula en torno a tres bloques funcionales que se corresponden c
 \paragraph{Notación.}
 Sea $\mathcal{S}$ el conjunto de series temporales (pares SKU--tienda) y $\mathcal{T}$ el conjunto de instantes de decisión disponibles. Se denota la demanda diaria observada de la serie $s \in \mathcal{S}$ en el instante $t \in \mathcal{T}$ como $y_{s,t}$.
 
-El objetivo operativo es determinar la cantidad de pedido que debe emitir el responsable de reposición para cada SKU y cada fecha de decisión. Para ello, el sistema estima la distribución condicional de la demanda acumulada durante un horizonte $H$ días --- equivalente operativamente al \textit{lead time} del proveedor $L$ ($H \equiv L$) \cite{nikolopoulos2011adida} ---: cuántas unidades se necesitarán hasta la próxima reposición. Formalmente, la variable objetivo es:
+El objetivo operativo es determinar la cantidad de pedido que debe emitir el responsable de reposición para cada SKU y cada fecha de decisión. Para ello, el sistema predice probabilísticamente la demanda acumulada durante un horizonte $H$ días (equivalente al \textit{lead time} del proveedor $L$, con $H \equiv L$): no solo la cantidad esperada, sino también la incertidumbre asociada, para poder tomar la decisión de pedido con garantías estadísticas. Formalmente, la variable objetivo es:
 
 \begin{equation}
     Y_{s,t} = \sum_{i=0}^{H-1} y_{s, t+i}
@@ -31,7 +31,7 @@ Para evitar la fuga de información futura (\textit{data leakage}), los valores 
 
 \subsubsection{Corrección de la Demanda Censurada por Stockout}
 \label{sec:demanda_censurada}
-Como se identificó en el análisis exploratorio, aproximadamente el 15\% de las observaciones del panel presentan algún grado de \textit{stockout} (demanda censurada, \textit{censored demand} en la literatura anglosajona \cite{nahmias1994demand}). El mecanismo de censura es el siguiente: las ventas observadas $y_{s,t}$ no reflejan la demanda real $D_{s,t}$, sino el mínimo entre ésta y el stock disponible. Sea $h_{s,t} \in [0, 16]$ el número de horas sin stock registradas para la serie $s$ en el día $t$ dentro de la ventana operativa de 16 horas (06:00--22:00):
+Como se identificó en el análisis exploratorio, aproximadamente el 15\% de las observaciones del panel presentan algún grado de \textit{stockout} (demanda censurada, \textit{censored demand} en la literatura anglosajona \cite{nahmias1994demand}). El dataset \textit{FreshRetailNet-50K} \cite{freshretailnet2025} anota explícitamente estas roturas mediante el número de horas sin stock por día, lo que permite estimar la demanda latente de forma directa sin recurrir a supuestos sobre el mecanismo de censura. El mecanismo de censura es el siguiente: las ventas observadas $y_{s,t}$ no reflejan la demanda real $D_{s,t}$, sino el mínimo entre ésta y el stock disponible. Sea $h_{s,t} \in [0, 16]$ el número de horas sin stock registradas para la serie $s$ en el día $t$ dentro de la ventana operativa de 16 horas (06:00--22:00):
 
 \begin{equation}
     y_{s,t} = \min\!\left(D_{s,t},\ \text{stock}_{s,t}\right)
@@ -43,10 +43,10 @@ Para ilustrar el mecanismo, considérese una serie con demanda real $D_{s,t} = 1
 Entrenar directamente sobre $y_{s,t}$ en esos días introduciría un sesgo negativo sistemático en el modelo. Para corregirlo, el sistema implementa un preprocesador dinámico que estima la demanda latente $\tilde{y}_{s,t}$ en los días afectados por roturas de stock ($h_{s,t} > 0$). Se comparan tres estrategias alternativas de imputación:
 
 \begin{itemize}
-    \item \textbf{Clipped Scaling}: Escala de forma lineal la demanda observada $y_{s,t}$
-    por un factor de proporcionalidad estático $\gamma > 1$ y toma el máximo con la
-    demanda observada, garantizando $\tilde{y}_{s,t} \geq y_{s,t}$ por construcción
-    independientemente del valor de $\gamma$:
+    \item \textbf{Clipped Scaling}: Multiplica la demanda observada por un factor configurable
+    $\gamma > 0$ (valor por defecto $\gamma = 1{,}2$). Para $\gamma > 1$ e $y_{s,t} > 0$
+    la estimación es simplemente $\gamma \cdot y_{s,t}$; el $\max$ actúa como salvaguarda
+    ante configuraciones con $\gamma \leq 1$:
     \begin{equation}
         \tilde{y}_{s,t} = \max\!\left( y_{s,t},\ y_{s,t} \cdot \gamma \right)
     \end{equation}
@@ -71,7 +71,7 @@ Entrenar directamente sobre $y_{s,t}$ en esos días introduciría un sesgo negat
     \end{equation}
 \end{itemize}
 
-Métodos estadísticamente más rigurosos, como el algoritmo EM o el modelo Tobit, quedan fuera del ámbito de este trabajo. La estrategia \textbf{Supervisada (LightGBM)} es la seleccionada en el sistema final por obtener el menor sesgo residual en validación cruzada; la comparación empírica entre las tres estrategias se discute en la Sección~\ref{sec:resultados_imputacion}.
+Métodos estadísticamente más rigurosos, como el algoritmo EM o el modelo Tobit, quedan fuera del ámbito de este trabajo. En el benchmark oficial del propio dataset \cite{freshretailnet2025} se evalúan enfoques de aprendizaje profundo (TimesNet, CSDI, SAITS) que obtienen mejores métricas de recuperación, pero a un coste computacional incompatible con un despliegue operacional ligero; las tres estrategias aquí propuestas priorizan interpretabilidad y velocidad de inferencia. La estrategia \textbf{Supervisada (LightGBM)} es la seleccionada en el sistema final por obtener el menor sesgo residual en validación cruzada; la comparación empírica entre las tres estrategias se discute en la Sección~\ref{sec:resultados_imputacion}.
 
 \subsection{Ingeniería de Características}
 \label{sec:feature_engineering}
@@ -143,7 +143,7 @@ La minimización de la pérdida esperada bajo $\mathcal{L}_q$ tiene como soluci�
     \arg\min_{\hat{y}_q} \mathbb{E}_{Y} \left[ \mathcal{L}_q(Y, \hat{y}_q) \right] = F_{Y}^{-1}(q)
 \end{equation}
 
-Donde $F_Y^{-1}(q)$ es simplemente el cuantil $q$ de la demanda: el valor por debajo del cual cae el $q \cdot 100\%$ de las observaciones históricas. Esta formulación establece un puente directo con el modelo del \textit{Newsvendor} \cite{silver1998inventory}: el \textit{fractil crítico} $q^* = c_u / (c_u + c_o)$ es exactamente el cuantil que debe predecir el modelo para minimizar el coste logístico esperado. Al entrenar con \textit{Pinball} configurada en $q = q^*$, el modelo no solo aprende una curva estadística, sino que optimiza implícitamente la decisión de aprovisionamiento. Esta es una decisión de diseño deliberada del sistema: entrenar con RMSE o MAE minimiza el error estadístico, no el coste logístico, lo cual es inconsistente con el objetivo operativo del DSS. Por tanto, el entrenamiento orientado a costes es el único modo soportado.
+Donde $F_Y^{-1}(q)$ es simplemente el cuantil $q$ de la demanda: el valor por debajo del cual cae el $q \cdot 100\%$ de las observaciones históricas. Esta formulación establece un puente directo con el modelo del \textit{Newsvendor} \cite{silver1998inventory}: el \textit{fractil crítico} $q^* = c_u / (c_u + c_o)$ es exactamente el cuantil que debe predecir el modelo para minimizar el coste logístico esperado. Al entrenar con \textit{Pinball} configurada en $q = q^*$, el modelo no solo aprende una curva estadística, sino que optimiza implícitamente la decisión de aprovisionamiento. Entrenar con RMSE o MAE minimiza el error estadístico, no el coste logístico, lo que resulta inconsistente con el objetivo operativo del sistema. Por eso se optó por entrenamiento orientado a costes como único modo disponible.
 
 \subsection{Arquitectura Multi-Modelo y Corrección del Quantile Crossing}
 Dado que los frameworks estándar de Gradient Boosting están diseñados para optimizar un único objetivo escalar por modelo, el sistema implementa un \textbf{Wrapper Cuantílico Multi-Modelo}. Este componente instancia y entrena de forma independiente $M$ estimadores, cada uno sintonizado para un cuantil específico del conjunto $\mathcal{Q} = \{q_1, q_2, \dots, q_M\}$, donde $q_1 < q_2 < \dots < q_M$.
@@ -246,6 +246,16 @@ siguiente:
     mantienen ajustados, con cobertura condicional garantizada dentro de cada grupo.
 \end{enumerate}
 
+\paragraph{Limitación: intercambiabilidad en series temporales.}
+La garantía de cobertura de Split CP y CQR asume que las observaciones de calibración y test son
+intercambiables, es decir, que su distribución conjunta es invariante a permutaciones. Esta
+propiedad no se cumple en series temporales con dependencia temporal o no-estacionariedad: los
+residuos de calibración (últimos días del split de entrenamiento) pueden no ser representativos
+del comportamiento del periodo de evaluación. Las implicaciones empíricas de esta limitación
+se discuten en la Sección~\ref{sec:resultados_conformal}; algoritmos que relajan este supuesto
+--- como EnbPI \cite{xu2021conformal} o ACI \cite{gibbs2021adaptive} --- quedan como línea de
+trabajo futuro.
+
 \subsubsection{Métricas de Evaluación de Intervalos de Confianza}
 Para evaluar la calidad de los intervalos de confianza generados por la capa conformal,
 se formulan tres métricas probabilísticas fundamentales:
@@ -339,7 +349,7 @@ el modelo básico del \textit{Newsvendor} \cite{silver1998inventory}. Sin embarg
 ignora el hecho físico de que el inventario no vendido un día permanece en la estantería al
 día siguiente.
 
-El proyecto rompe con esta limitación mediante el desarrollo de una \textbf{Simulación Dinámica de Política Order-Up-To}. Para cada \textit{fold} de la validación cruzada temporal, el simulador mantiene el estado físico de cada SKU, incluyendo:
+Para superar esta limitación, se implementa una \textbf{Simulación Dinámica de Política Order-Up-To}. Para cada \textit{fold} de la validación cruzada temporal, el simulador mantiene el estado físico de cada SKU, incluyendo:
 \begin{itemize}
     \item \textbf{Stock Remanente (\textit{On-Hand})}: Unidades físicas disponibles.
     \item \textbf{Pedidos en Curso (\textit{On-Order})}: Unidades compradas que aún no han llegado debido al \textit{lead time}.
@@ -348,30 +358,32 @@ El proyecto rompe con esta limitación mediante el desarrollo de una \textbf{Sim
 
 Bajo esta simulación, la orden sugerida $Q$ se ajusta restando la \textit{Posición del Inventario} actual del nivel óptimo sugerido por el cuantil del pronóstico probabilístico $S$. De este modo, la evaluación de costes operativos captura fielmente el impacto devastador a largo plazo de errores correlacionados y del ``efecto látigo''.
 
-\subsubsection{Formulación Matemática de la Política Logística Dinámica $(s, S)$}
-En el Gemelo Digital Logístico, la posición de inventario $IP_{s,t}$ para una serie $s$ en el
-día $t$ se define de forma dinámica considerando los pedidos en tránsito:
+\subsubsection{Formulación Matemática de la Política Logística Dinámica Order-Up-To}
+En el simulador, la posición de inventario $IP_{s,t}$ para una serie $s$ en el
+día $t$ incorpora tanto el stock físico como los pedidos en tránsito:
 \begin{equation}
     IP_{s,t} = OH_{s,t} + OO_{s,t} - BL_{s,t}
 \end{equation}
-Donde $OH_{s,t}$ es el stock disponible en estante (\textit{on-hand}), $OO_{s,t}$ son las
+donde $OH_{s,t}$ es el stock disponible en estante (\textit{on-hand}), $OO_{s,t}$ son las
 unidades compradas en tránsito (\textit{on-order}), y $BL_{s,t}$ representa la demanda acumulada
 no satisfecha (\textit{backlog}).
 
-El objetivo óptimo de stock $S_{s,t}$ (order-up-to level) se define a partir del cuantil de la
+El nivel objetivo de stock $S_{s,t}$ (\textit{order-up-to level}) se fija en el cuantil de la
 demanda acumulada del lead time correspondiente al fractil crítico $q^*$:
 \begin{equation}
     S_{s,t} = \hat{q}_{q^*}(Y_{s,t})
 \end{equation}
 
-La cantidad de pedido a emitir cada día, $Q_{s,t}$, se calcula aplicando la política de revisión:
+La cantidad de pedido diaria $Q_{s,t}$ cubre exactamente la brecha entre el nivel objetivo
+y la posición actual de inventario:
 \begin{equation}
-    Q_{s,t} = \begin{cases}
-        S_{s,t} - IP_{s,t} & \text{si } IP_{s,t} \le s_{s,t} \\
-        0 & \text{si } IP_{s,t} > s_{s,t}
-    \end{cases}
+    Q_{s,t} = \max\!\left(0,\ S_{s,t} - IP_{s,t}\right)
 \end{equation}
-Donde el punto de pedido $s_{s,t}$ actúa como disparador calibrado para cubrir el lead time.
+
+Esta política se revisa cada día: si $IP_{s,t} \geq S_{s,t}$ no se emite ningún pedido; si
+cae por debajo, se pide lo justo para volver al nivel objetivo. La implementación es equivalente
+a una política base-stock de revisión continua, que es el caso límite de la familia $(s,S)$
+cuando el coste fijo de pedido es nulo \cite{silver1998inventory}.
 
 % ==============================================================================
 \section{Bloque II: Operación (\texttt{retrain} y \texttt{score\_daily})}
@@ -390,7 +402,7 @@ Para cerrar la brecha entre Machine Learning e Investigación de Operaciones (OR
     \item \textbf{Restricciones}: La suma total de unidades pedidas en el catálogo no debe exceder una constante $C_{max}$ (ej. Límite del camión logístico).
 \end{itemize}
 
-El motor utiliza el \textit{solver} moderno \texttt{highs} de \textit{SciPy} para recortar inventario inteligentemente allí donde el impacto económico de la rotura sea menor, dotando al sistema de total capacidad de actuación bajo estrés operativo real.
+El módulo utiliza el solver \texttt{HiGHS} de SciPy para reducir las órdenes allí donde el impacto de una rotura sea menor, permitiendo tomar decisiones de pedido razonables incluso cuando el presupuesto o el espacio son limitados.
 
 % ==============================================================================
 \section{Bloque III: MLOps (\texttt{simulate\_ops})}
