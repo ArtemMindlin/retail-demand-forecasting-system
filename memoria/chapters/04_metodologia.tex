@@ -2,13 +2,43 @@
 \chapter{Metodología}
 \label{chap:metodologia}
 
-El sistema se articula en torno a tres bloques funcionales que se corresponden con los cuatro modos de ejecución del pipeline (\texttt{experiment}, \texttt{retrain}, \texttt{score\_daily} y \texttt{simulate\_ops}). El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: reentrenamiento del modelo seleccionado y generación diaria de recomendaciones de pedido bajo restricciones logísticas reales. El \textbf{Bloque III} cubre la fase MLOps: simulación en streaming para determinar la cadencia óptima de reentrenamiento en producción.
+Este capítulo describe \textbf{cómo} se resuelve el problema planteado en el Capítulo~\ref{chap:introduccion}: dado el histórico de ventas de un supermercado, ¿cuántas unidades debe pedir mañana cada producto? La idea central es que predecir solo la media de la demanda no es suficiente --- hay que predecir también la incertidumbre, para que la decisión de pedido tenga garantías estadísticas. A partir de ahí, el modelo se conecta directamente con la política de inventario óptima.
+
+El capítulo se organiza en tres bloques, que se corresponden con las tres fases del ciclo de vida del sistema (véase Figura~\ref{fig:bloques_metodologia}):
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+    node distance=1.2cm and 0.6cm,
+    every node/.style={font=\sffamily\small, align=center},
+    blk/.style={draw, rounded corners=4pt, minimum width=3.4cm, minimum height=1.1cm,
+                text width=3.2cm, fill=blue!8},
+    arr/.style={->, thick}
+]
+\node[blk] (inv) {\textbf{Bloque I}\\ Investigación\\ \footnotesize Entrenar y evaluar};
+\node[blk, right=of inv] (ops) {\textbf{Bloque II}\\ Operación\\ \footnotesize Desplegar y recomendar};
+\node[blk, right=of ops] (mlo) {\textbf{Bloque III}\\ MLOps\\ \footnotesize Monitorizar y reentrenar};
+\draw[arr] (inv) -- (ops);
+\draw[arr] (ops) -- (mlo);
+\end{tikzpicture}
+\shorthandon{>}%
+\caption{Los tres bloques metodológicos del sistema y su secuencia lógica.}
+\label{fig:bloques_metodologia}
+\end{figure}
+
+El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: reentrenamiento del modelo seleccionado y generación diaria de recomendaciones de pedido bajo restricciones logísticas reales. El \textbf{Bloque III} cubre la fase MLOps: simulación en streaming para determinar la cadencia óptima de reentrenamiento en producción.
 
 % ==============================================================================
 \section{Bloque I: Investigación (\texttt{experiment})}
 % ==============================================================================
 
 \subsection{Formulación del Problema}
+
+En términos prácticos, el sistema trabaja con un panel de series temporales: cada par
+\textit{(producto, tienda)} genera una serie de ventas diarias, y el objetivo es predecir
+cuántas unidades se venderán durante los próximos $H$ días (el tiempo que tarda en llegar
+un pedido al almacén). La siguiente notación formaliza estas ideas.
 
 \paragraph{Notación.}
 Sea $\mathcal{S}$ el conjunto de series temporales (pares SKU--tienda) y $\mathcal{T}$ el conjunto de instantes de decisión disponibles. Se denota la demanda diaria observada de la serie $s \in \mathcal{S}$ en el instante $t \in \mathcal{T}$ como $y_{s,t}$.
@@ -143,7 +173,19 @@ La minimización de la pérdida esperada bajo $\mathcal{L}_q$ tiene como soluci�
     \arg\min_{\hat{y}_q} \mathbb{E}_{Y} \left[ \mathcal{L}_q(Y, \hat{y}_q) \right] = F_{Y}^{-1}(q)
 \end{equation}
 
-Donde $F_Y^{-1}(q)$ es simplemente el cuantil $q$ de la demanda: el valor por debajo del cual cae el $q \cdot 100\%$ de las observaciones históricas. Esta formulación establece un puente directo con el modelo del \textit{Newsvendor} \cite{silver1998inventory}: el \textit{fractil crítico} $q^* = c_u / (c_u + c_o)$ es exactamente el cuantil que debe predecir el modelo para minimizar el coste logístico esperado. Al entrenar con \textit{Pinball} configurada en $q = q^*$, el modelo no solo aprende una curva estadística, sino que optimiza implícitamente la decisión de aprovisionamiento. Entrenar con RMSE o MAE minimiza el error estadístico, no el coste logístico, lo que resulta inconsistente con el objetivo operativo del sistema. Por eso se optó por entrenamiento orientado a costes como único modo disponible.
+donde $F_Y^{-1}(q)$ es el cuantil $q$ de la demanda: el valor por debajo del cual cae el
+$q \cdot 100\%$ de las observaciones históricas.
+
+\begin{center}
+\fbox{\begin{minipage}{0.88\textwidth}
+\textbf{Nexo metodológico: Pinball Loss $\leftrightarrow$ Newsvendor.}\\[4pt]
+El modelo del \textit{Newsvendor} \cite{silver1998inventory} demuestra que la cantidad óptima de pedido bajo costes asimétricos es el \textit{fractil crítico}:
+$$q^* = \frac{c_u}{c_u + c_o}$$
+donde $c_u$ es el coste por unidad no servida (rotura de stock) y $c_o$ el coste por unidad sobrante. Este es exactamente el cuantil que minimiza la Pinball Loss. Por tanto, \textbf{entrenar el modelo con Pinball en $q = q^*$ es equivalente a optimizar directamente la política de pedido}, sin ninguna etapa de postproceso adicional. Esto diferencia al sistema de los enfoques que predicen la media y después aplican un nivel de servicio fijo: aquí la decisión de inventario está integrada en el proceso de entrenamiento.
+\end{minipage}}
+\end{center}
+
+Al entrenar con RMSE o MAE se minimiza el error estadístico pero no el coste logístico, lo que es inconsistente con el objetivo operativo del sistema. Por eso el entrenamiento orientado a costes es el único modo disponible.
 
 \subsection{Arquitectura Multi-Modelo y Corrección del Quantile Crossing}
 Dado que los frameworks estándar de Gradient Boosting están diseñados para optimizar un único objetivo escalar por modelo, el sistema implementa un \textbf{Wrapper Cuantílico Multi-Modelo}. Este componente instancia y entrena de forma independiente $M$ estimadores, cada uno sintonizado para un cuantil específico del conjunto $\mathcal{Q} = \{q_1, q_2, \dots, q_M\}$, donde $q_1 < q_2 < \dots < q_M$.
@@ -220,6 +262,12 @@ siguiente:
     donde $\hat{y}_{\alpha/2}$ y $\hat{y}_{1-\alpha/2}$ son las predicciones en los cuantiles
     inferior y superior del intervalo. Si $y_i$ cae dentro del intervalo, $s_i < 0$; si cae
     fuera, $s_i > 0$ y mide la distancia al borde más cercano.
+
+    \textit{Ejemplo}: si el modelo predice el intervalo $[8, 14]$ kg y la demanda real es
+    17 kg, el score es $s_i = 17 - 14 = 3$ (la demanda superó el límite superior por 3 kg).
+    Si la demanda real fuera 11 kg (dentro del intervalo), el score sería negativo y no se
+    penalizaría. El $\hat{q}_g$ del paso siguiente recoge cuánto hay que ensanchar el
+    intervalo para que este tipo de fallos no supere el $\alpha\%$ de las veces.
 
     \item \textbf{Factor de Corrección por Categoría}: Para cada grupo taxonómico $g$,
     se recopila el subconjunto de scores locales $\mathcal{S}_g = \{s_i : \text{SKU}_i \in g\}$.
@@ -311,22 +359,37 @@ Un supuesto limitante en muchas aplicaciones académicas de inventario es la uti
 Ante la ausencia de datos financieros transaccionales explícitos en el dataset original, el sistema implementa un motor de \textbf{inferencia de perfiles de coste sintéticos} que analiza el comportamiento histórico de cada serie $s$ para derivar coeficientes personalizados. Todas las variables se normalizan como \textbf{rangos percentílicos} $\in [0, 1]$ antes de combinarse: $Rank(x_s)$ no refleja el valor absoluto de la variable, sino la posición relativa de la serie $s$ respecto al resto del catálogo. Por ejemplo, el SKU con mayor intermitencia recibe $Rank = 1{,}0$ y el de menor intermitencia $Rank = 0{,}0$, independientemente de sus valores absolutos. El proceso se articula en tres dimensiones:
 
 \begin{enumerate}
-    \item \textbf{Factor de Perecederos ($F_{perish}$)}: Se estima mediante una combinación lineal del ranking de intermitencia y la inestabilidad de la categoría (CV medio). Captura el riesgo de obsolescencia:
+    \item \textbf{Factor de Perecederos ($F_{perish}$)}: Captura el riesgo de obsolescencia
+    combinando la intermitencia de la categoría, su coeficiente de variación medio y la
+    intermitencia propia de la serie:
     \begin{equation}
-        Score_{perish} = w_1 \cdot Rank(Z_{cat}) + w_2 \cdot Rank(CV_{cat}) + w_3 \cdot Rank(Z_s)
+        Score_{perish} = 0{,}5 \cdot Rank(Z_{cat}) + 0{,}3 \cdot Rank(CV_{cat}) + 0{,}2 \cdot Rank(Z_s)
     \end{equation}
-    Donde $Z$ es la tasa de ceros y $CV$ el coeficiente de variación.
+    donde $Z$ es la tasa de ceros y $CV$ el coeficiente de variación. El mayor peso a nivel
+    de categoría (0,5) refleja que la caducidad es principalmente una propiedad del tipo de
+    producto, no de la tienda concreta.
 
-    \item \textbf{Factor de Baja Rotación ($F_{slow}$)}: Identifica productos donde el sobrestock es financieramente peligroso debido a su baja velocidad de salida.
+    \item \textbf{Factor de Baja Rotación ($F_{slow}$)}: Identifica productos donde el
+    sobrestock es peligroso por su baja velocidad de salida:
     \begin{equation}
-        Score_{slow} = w_4 \cdot Rank(Z_s) + w_5 \cdot (1 - Rank(\mu_s))
+        Score_{slow} = 0{,}6 \cdot Rank(Z_s) + 0{,}4 \cdot (1 - Rank(\mu_s))
     \end{equation}
 
-    \item \textbf{Factor de Criticidad de Servicio ($F_{crit}$)}: Incrementa la presión sobre el modelo para evitar roturas en productos de alta demanda o con tensiones históricas de stock.
+    \item \textbf{Factor de Criticidad de Servicio ($F_{crit}$)}: Aumenta la presión para
+    evitar roturas en productos de alta demanda o con tensiones históricas de stock:
     \begin{equation}
-        Score_{crit} = w_6 \cdot Rank(\mu_s) + w_7 \cdot Rank(StockoutRate_s)
+        Score_{crit} = 0{,}7 \cdot Rank(\mu_s) + 0{,}3 \cdot Rank(StockoutRate_s)
     \end{equation}
+    El mayor peso sobre la demanda media (0,7) refleja que los productos de alto volumen
+    causan el mayor impacto en ventas perdidas cuando hay rotura.
 \end{enumerate}
+
+Los valores de los pesos son los valores por defecto del sistema, validados sobre el
+experimento base; todos están expuestos como parámetros configurables en
+\texttt{SyntheticCostConfig} para su ajuste operacional. Los factores de escala son:
+$\beta_0^{perish}=0{,}8$, $\beta_1^{perish}=0{,}8$,
+$\beta_0^{slow}=0{,}9$, $\beta_1^{slow}=0{,}5$,
+$\beta_0^{crit}=0{,}9$, $\beta_1^{crit}=0{,}5$.
 
 Cada score se transforma en un factor mediante una reescala lineal parametrizada que garantiza que el factor sea siempre positivo y acotado:
 

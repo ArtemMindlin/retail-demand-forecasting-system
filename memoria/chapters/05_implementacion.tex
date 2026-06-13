@@ -334,40 +334,27 @@ Para garantizar que la deuda técnica no limite el escalado del sistema, se han 
 
 \subsection{Estrategia de Testing: Pirámide de Verificación}
 
-El sistema cuenta con 19 módulos de test bajo \texttt{tests/} organizados en cinco niveles de la pirámide de verificación, cada uno orientado a un tipo de fallo diferente. La Tabla~\ref{tab:test_strategy} resume la clasificación.
+El sistema cuenta con 19 módulos de test organizados en cinco niveles, cada uno orientado a un tipo de fallo diferente (Tabla~\ref{tab:test_strategy}).
 
 \begin{table}[htbp]
     \centering
     \small
-    \begin{tabular}{lp{4.2cm}p{5.6cm}}
+    \begin{tabular}{lp{9.5cm}}
         \toprule
-        \textbf{Nivel} & \textbf{Módulos de test} & \textbf{Qué verifica} \\
+        \textbf{Nivel} & \textbf{Qué verifica} \\
         \midrule
-        Contratos de datos & \texttt{test\_dataframe\_contracts} \newline \texttt{test\_raw\_column\_boundaries} \newline \texttt{test\_generated\_artifact\_boundaries} & Que los DataFrames producidos por cada etapa del pipeline cumplen los esquemas de columnas, tipos y rangos esperados. \\
-        \midrule
-        Anti-\textit{data leakage} & \texttt{test\_temporal\_leakage\_contract} & Que ninguna feature contiene información del periodo de predicción (target futuro, covariables del mismo día, ventanas deslizantes mal calculadas). \\
-        \midrule
-        Contratos de configuración & \texttt{test\_config\_contract} \newline \texttt{test\_quantile\_contract} & Que la configuración por defecto preserva los guardarraíles experimentales y que las métricas de cobertura se calculan con los cuantiles reales del modelo, no \textit{hardcodeados}. \\
-        \midrule
-        Unitarios de lógica & \texttt{test\_features} \newline \texttt{test\_metrics} \newline \texttt{test\_inventory} \newline \texttt{test\_backtesting} \newline \texttt{test\_data\_quality} & Correctitud aritmética de lags, ventanas deslizantes, Pinball Loss, Winkler Score, lógica del Newsvendor y validaciones del Data Quality Gate. \\
-        \midrule
-        Integración y humo & \texttt{test\_smoke} \newline \texttt{test\_business\_outputs} \newline \texttt{test\_operational\_simulation} \newline \texttt{test\_api} \newline \texttt{test\_run\_cli} \newline \texttt{test\_architecture\_imports} \newline \texttt{test\_docs\_references} \newline \texttt{test\_eda\_module} & Pipeline end-to-end sobre datos sintéticos, endpoints FastAPI, ciclo operacional completo, ausencia de dependencias cíclicas entre módulos. \\
+        Contratos de datos & Esquemas, tipos y rangos de los DataFrames producidos por cada etapa. \\
+        Anti-\textit{data leakage} & Que ninguna feature contiene información del periodo de predicción. \\
+        Contratos de configuración & Que los guardarraíles experimentales se preservan ante cambios de config. \\
+        Unitarios de lógica & Correctitud aritmética de lags, Pinball Loss, Winkler Score y Newsvendor. \\
+        Integración y humo & Pipeline end-to-end sobre datos sintéticos, endpoints FastAPI y CI/CD. \\
         \bottomrule
     \end{tabular}
-    \caption{Estrategia de testing por niveles: 19 módulos clasificados por tipo de fallo que detectan.}
+    \caption{Estrategia de testing por niveles: 19 módulos clasificados por tipo de fallo.}
     \label{tab:test_strategy}
 \end{table}
 
-El nivel más crítico ---y menos habitual en sistemas de ML--- es el de los \textbf{tests anti-\textit{data leakage}}. El módulo \texttt{test\_temporal\_leakage\_contract} verifica cuatro invariantes que garantizan la validez del backtesting:
-
-\begin{enumerate}
-    \item Que el \texttt{target\_lead\_time\_demand} es la suma de la demanda de los $H$ días siguientes a la fecha de decisión, no del día actual.
-    \item Que los \textit{lags} de demanda (ej. \texttt{demand\_lag\_1}) contienen el valor del día anterior, no del día actual, y que \texttt{observed\_demand} nunca aparece como columna de features.
-    \item Que las covariables realizadas (descuento, horas de stockout, variables climáticas) solo entran al modelo como \textit{lags} del pasado, no como valores del día de decisión.
-    \item Que el backtesting walk-forward respeta el \textit{gap} de $H$ días entre el último día de entrenamiento y el primer día de validación, evitando que el target del train se solape con el input del test.
-\end{enumerate}
-
-Estos tests se ejecutan como parte del pipeline de CI antes de cada merge, garantizando que ninguna refactorización del módulo de features introduce inadvertidamente fuga de información hacia el futuro.
+El nivel más crítico es el de los \textbf{tests anti-\textit{data leakage}}, poco habitual en proyectos de ML pero imprescindible aquí: verifican que ningún lag usa el valor del propio día de predicción, que las covariables realizadas (descuento, stockout, clima) solo entran al modelo como pasado, y que el backtesting walk-forward respeta el gap de $H$ días entre el último día de entrenamiento y el primero de test. Estos tests se ejecutan automáticamente en el pipeline de CI antes de cada \textit{merge}.
 
 \section{Explicabilidad y Diagnóstico Automático}
 Un sistema de apoyo a la decisión en \textit{retail} pierde su valor si opera como una caja negra. Por ello, se han integrado módulos de observabilidad (\textit{Observability}):
