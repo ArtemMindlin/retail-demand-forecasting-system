@@ -11,75 +11,63 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
 \begin{figure}[H]
 \centering
 \shorthandoff{>}%
-\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
-    node distance=0.65cm and 1.1cm,
     every node/.style={font=\sffamily\footnotesize, align=center},
-    block/.style={draw, rectangle, rounded corners=3pt, minimum width=2.7cm, minimum height=0.9cm, text width=2.6cm},
-    datablk/.style={block, fill=blue!12},
-    featblk/.style={block, fill=teal!15},
-    modelblk/.style={block, fill=orange!18},
-    decblk/.style={block, fill=red!12},
-    outblk/.style={block, fill=green!15},
-    sideblk/.style={block, fill=gray!12, dashed},
+    band/.style={draw, rectangle, rounded corners=5pt,
+                 minimum width=12.5cm, minimum height=1.05cm, text width=12.3cm},
+    s1/.style={band, fill=blue!10},
+    s2/.style={band, fill=teal!12},
+    s3/.style={band, fill=orange!14},
+    s4/.style={band, fill=red!10},
+    s5/.style={draw, rectangle, rounded corners=5pt,
+               minimum width=8cm, minimum height=0.9cm, text width=7.8cm, fill=green!14},
+    mlf/.style={draw, rectangle, rounded corners=4pt, dashed,
+                minimum width=2.4cm, minimum height=0.9cm, fill=gray!10},
+    lbl/.style={font=\sffamily\scriptsize\bfseries, gray!75},
     arr/.style={->, thick},
-    darr/.style={->, thick, dashed, gray!70}
+    darr/.style={->, thick, dashed, gray!60}
 ]
+  %% ── BANDAS ─────────────────────────────────────────────────────
+  \node[s1] (datos)  at (0, 0)    {HF Dataset
+    $\;\to\;$ Data Quality Gate (7 checks)
+    $\;\to\;$ Panel Preparado};
 
-%% ── CAPA 1: DATOS ──────────────────────────────────────────────
-\node[datablk] (hf)    {Hugging Face\\Dataset};
-\node[datablk, right=of hf]  (qgate) {Data Quality\\Gate};
-\node[datablk, right=of qgate] (panel) {Panel\\Preparado};
+  \node[s2] (feats)  at (0,-1.6)  {Corrección Censura (LightGBM / media histórica)
+    $\;\to\;$ Feature Engineering
+    $\;\to\;$ Frame Supervisado (50 features)};
 
-%% ── CAPA 2: FEATURES ────────────────────────────────────────────
-\node[featblk, below=of hf]    (cens)  {Corrección\\Censura};
-\node[featblk, right=of cens]  (feng)  {Feature\\Engineering\\(50 features)};
-\node[featblk, right=of feng]  (frame) {Frame\\Supervisado};
+  \node[s3] (model)  at (0,-3.2)  {Optuna NSGA-II (Pareto)
+    $\;\to\;$ CatBoost Multi-Cuantil (Pinball Loss)
+    $\;\to\;$ Mondrian Conformal Prediction};
 
-%% ── CAPA 3: MODELADO ────────────────────────────────────────────
-\node[modelblk, below=of cens]   (optuna) {Optuna\\NSGA-II\\(Pareto)};
-\node[modelblk, right=of optuna] (catb)   {CatBoost\\Multi-Cuantil\\(Pinball)};
-\node[modelblk, right=of catb]   (conf)   {Mondrian\\Conformal\\Prediction};
+  \node[s4] (dec)    at (0,-4.8)  {Newsvendor $q^*$
+    $\;\to\;$ Simulación Dinámica Order-Up-To
+    $\;\to\;$ LP Optimizer (Knapsack)};
 
-%% ── CAPA 4: DECISIÓN ────────────────────────────────────────────
-\node[decblk, below=of optuna] (nv)  {Newsvendor\\fractil $q^*$};
-\node[decblk, right=of nv]     (sim) {Simulación\\Dinámica $(s,S)$};
-\node[decblk, right=of sim]    (lp)  {LP Optimizer\\(Knapsack)};
+  \node[s5] (reco)   at (0,-6.2)  {\texttt{reorder\_recommendations.csv}
+    $\;\to\;$ FastAPI\,/\,Dashboard};
 
-%% ── OUTPUT ──────────────────────────────────────────────────────
-\node[outblk, below=of sim] (reco) {\texttt{reorder\_recommendations}\\$\rightarrow$ FastAPI / Dashboard};
+  %% ── MLflow lateral ──────────────────────────────────────────────
+  \node[mlf] (mlflow) at (7.8,-3.2) {MLflow\\Tracking};
 
-%% ── LATERAL: MLflow ─────────────────────────────────────────────
-\node[sideblk, right=1.1cm of conf, yshift=-1.5cm] (mlflow) {MLflow\\Tracking};
+  %% ── ETIQUETAS DE CAPA ──────────────────────────────────────────
+  \node[lbl, left=0.15cm of datos] {Datos};
+  \node[lbl, left=0.15cm of feats] {Features};
+  \node[lbl, left=0.15cm of model] {Modelado};
+  \node[lbl, left=0.15cm of dec]   {Decisión};
 
-%% ── FLECHAS PRINCIPALES ─────────────────────────────────────────
-\draw[arr] (hf)     -- (qgate);
-\draw[arr] (qgate)  -- (panel);
-\draw[arr] (panel)  -- (cens);
-\draw[arr] (cens)   -- (feng);
-\draw[arr] (feng)   -- (frame);
-\draw[arr] (frame)  -- (optuna);
-\draw[arr] (optuna) -- (catb);
-\draw[arr] (catb)   -- (conf);
-\draw[arr] (conf)   -- (nv);
-\draw[arr] (nv)     -- (sim);
-\draw[arr] (sim)    -- (lp);
-\draw[arr] (lp)     -- (reco);
-\draw[arr] (sim)    -- (reco);
+  %% ── FLECHAS VERTICALES ─────────────────────────────────────────
+  \draw[arr] (datos.south) -- (feats.north);
+  \draw[arr] (feats.south) -- (model.north);
+  \draw[arr] (model.south) -- (dec.north);
+  \draw[arr] (dec.south)   -- (reco.north);
 
-%% ── FLECHAS MLflow ──────────────────────────────────────────────
-\draw[darr] (catb)  -- (mlflow);
-\draw[darr] (conf)  -- (mlflow);
-\draw[darr] (sim)   to[bend right=15] (mlflow);
-
-%% ── ETIQUETAS DE CAPA ───────────────────────────────────────────
-\node[left=0.25cm of hf,     rotate=90, anchor=south, font=\sffamily\scriptsize\bfseries, gray!80] {Datos};
-\node[left=0.25cm of cens,   rotate=90, anchor=south, font=\sffamily\scriptsize\bfseries, gray!80] {Features};
-\node[left=0.25cm of optuna, rotate=90, anchor=south, font=\sffamily\scriptsize\bfseries, gray!80] {Modelado};
-\node[left=0.25cm of nv,     rotate=90, anchor=south, font=\sffamily\scriptsize\bfseries, gray!80] {Decisión};
+  %% ── MLflow ──────────────────────────────────────────────────────
+  \draw[darr] (model.east) -- (mlflow.west);
+  \draw[darr] (dec.east)   to[out=0,in=-90] (mlflow.south);
 
 \end{tikzpicture}
-}
+\shorthandon{>}%
 \caption{Arquitectura end-to-end del sistema: flujo de datos desde la ingesta hasta la recomendación de pedido.}
 \label{fig:arquitectura_sistema}
 \shorthandon{>}%
@@ -173,9 +161,9 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
 \centering
 \shorthandoff{>}%
 \begin{tikzpicture}[
-    node distance=0.55cm and 0.9cm,
+    node distance=0.45cm and 0.45cm,
     every node/.style={font=\sffamily\footnotesize, align=center},
-    stage/.style={draw, rectangle, rounded corners=4pt, minimum width=3.2cm, minimum height=0.85cm, text width=3.0cm},
+    stage/.style={draw, rectangle, rounded corners=4pt, minimum width=2.5cm, minimum height=0.85cm, text width=2.3cm},
     s1/.style={stage, fill=blue!10},
     s2/.style={stage, fill=red!10},
     s3/.style={stage, fill=orange!10},
@@ -241,7 +229,7 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
 
         % Notas
         \node[above of=optuna, yshift=-0.5cm] {\textbf{Optimización}\\\textbf{Estructural}};
-        \node[above of=retrain, yshift=-0.5cm] {\textbf{Adaptación}\\\textbf{Operativa}};
+        \node[above of=data, yshift=-0.4cm] {\textbf{Adaptación}\\\textbf{Operativa}};
     \end{tikzpicture}
     \caption{Ciclo de vida MLOps: Optimización mensual vs. Reentrenamiento operativo.}
     \label{fig:mlops_flow}
@@ -265,7 +253,49 @@ Al término de cada ejecución en modo \texttt{experiment}, el sistema evalúa a
     \item \textbf{Guardarraíl de nivel de servicio}: El \textit{challenger} no debe degradar el nivel de servicio más allá de un margen configurable (\texttt{champion\_max\_service\_level\_degradation}). Si $\Delta_{\text{sl}} < -\delta_{\text{sl}}$, el candidato es descartado aunque mejore el coste.
 \end{enumerate}
 
-Entre todos los \textit{challengers} que superan ambos guardarraíles, se selecciona el de menor coste total (con el nivel de servicio como criterio de desempate). La decisión ---incluyendo los valores exactos de $\Delta_{\text{cost}}$, $\Delta_{\text{sl}}$, el motivo de aceptación o rechazo y los identificadores de ambos modelos--- queda registrada en el campo \texttt{promotion} del metadato de la ejecución, garantizando una trazabilidad completa del historial de cambios de modelo.
+Entre todos los \textit{challengers} que superan ambos guardarraíles, se selecciona el de menor coste total (con el nivel de servicio como criterio de desempate). La decisión ---incluyendo los valores exactos de $\Delta_{\text{cost}}$, $\Delta_{\text{sl}}$, el motivo de aceptación o rechazo y los identificadores de ambos modelos--- queda registrada en el campo \texttt{promotion} del metadato de la ejecución, garantizando una trazabilidad completa del historial de cambios de modelo. La Figura~\ref{fig:champion_promotion} muestra el flujo de decisión completo.
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+    node distance=0.85cm and 1.6cm,
+    box/.style={rectangle, draw=gray!70, fill=gray!10, rounded corners=3pt,
+                minimum width=3.8cm, minimum height=0.65cm,
+                font=\sffamily\footnotesize, align=center},
+    dec/.style={diamond, draw=blue!60, fill=blue!10, aspect=2.4,
+                minimum width=3.8cm, minimum height=0.65cm,
+                font=\sffamily\footnotesize, align=center, inner sep=1pt},
+    yes/.style={font=\sffamily\scriptsize, midway, left},
+    no/.style={font=\sffamily\scriptsize, midway, above},
+    rej/.style={rectangle, draw=red!50, fill=red!8, rounded corners=3pt,
+                minimum width=2.8cm, minimum height=0.55cm,
+                font=\sffamily\footnotesize, align=center},
+    ok/.style={rectangle, draw=green!50!black, fill=green!10, rounded corners=3pt,
+               minimum width=3.8cm, minimum height=0.65cm,
+               font=\sffamily\footnotesize, align=center}]
+  % Nodes
+  \node[box]  (start)  {Ejecutar \texttt{experiment}\\obtener frente de Pareto};
+  \node[dec,  below=of start]  (c1) {$\Delta_{\text{cost}} \geq \theta_{\text{cost}}$?};
+  \node[dec,  below=of c1]     (c2) {$\Delta_{\text{sl}} \geq -\delta_{\text{sl}}$?};
+  \node[box,  below=of c2]     (sel){Seleccionar \textit{challenger}\\de menor coste};
+  \node[ok,   below=of sel]    (promo){Promover \textit{challenger}\\como nuevo campeón};
+  \node[rej,  right=of c1]     (rj1){Mantener\\campeón actual};
+  \node[rej,  right=of c2]     (rj2){Mantener\\campeón actual};
+  % Arrows
+  \draw[->,thick] (start) -- (c1);
+  \draw[->,thick] (c1)    -- node[yes]{Sí} (c2);
+  \draw[->,thick] (c1)    -- node[no]{No} (rj1);
+  \draw[->,thick] (c2)    -- node[yes]{Sí} (sel);
+  \draw[->,thick] (c2)    -- node[no]{No} (rj2);
+  \draw[->,thick] (sel)   -- (promo);
+\end{tikzpicture}
+\shorthandon{>}%
+\caption{Flujo de decisión de la \textit{promotion logic} del campeón. Un \textit{challenger}
+solo reemplaza al modelo actual si supera simultáneamente el umbral de mejora de coste
+($\theta_{\text{cost}}$) y el guardarraíl de nivel de servicio ($\delta_{\text{sl}}$).}
+\label{fig:champion_promotion}
+\end{figure}
 
 \subsection{Seguimiento de Experimentos con MLflow}
 \label{sec:mlflow_tracking}
@@ -345,8 +375,8 @@ El sistema cuenta con 19 módulos de test organizados en cinco niveles, cada uno
         \midrule
         Contratos de datos & Esquemas, tipos y rangos de los DataFrames producidos por cada etapa. \\
         Anti-\textit{data leakage} & Que ninguna feature contiene información del periodo de predicción. \\
-        Contratos de configuración & Que los guardarraíles experimentales se preservan ante cambios de config. \\
-        Unitarios de lógica & Correctitud aritmética de lags, Pinball Loss, Winkler Score y Newsvendor. \\
+        Contratos de configuración & Que los guardarraíles experimentales se preservan ante cambios de config; correctitud aritmética de Pinball Loss por cuantil. \\
+        Unitarios de lógica & Correctitud aritmética de lags, Winkler Score y Newsvendor. \\
         Integración y humo & Pipeline end-to-end sobre datos sintéticos, endpoints FastAPI y CI/CD. \\
         \bottomrule
     \end{tabular}
@@ -360,5 +390,5 @@ El nivel más crítico es el de los \textbf{tests anti-\textit{data leakage}}, p
 Un sistema de apoyo a la decisión en \textit{retail} pierde su valor si opera como una caja negra. Por ello, se han integrado módulos de observabilidad (\textit{Observability}):
 \begin{itemize}
     \item \textbf{Explicabilidad Global (SHAP)}: El sistema genera valores de Shapley Aditivos \cite{lundberg2017shap} (\texttt{shap}) para el modelo Campeón, documentando gráficamente el peso real de los \textit{lags}, las variables climáticas o las jerarquías en la predicción.
-    \item \textbf{Diagnóstico Post-Mortem}: Si un SKU genera sobrecostes excesivos en la simulación, un módulo automático incluye en el reporte final una explicación de la causa más probable: \textit{concept drift} detectado con el algoritmo Page-Hinkley, \textit{cold start} por falta de historial suficiente, o alta intermitencia estructural de la serie. Esto evita tener que revisar manualmente los logs para entender qué fue mal.
+    \item \textbf{Diagnóstico Post-Mortem}: Si un SKU genera sobrecostes excesivos en la simulación, un módulo automático (\texttt{evaluation/post\_mortem.py}) incluye en el reporte final una explicación de la causa más probable: \textit{concept drift} detectado con el algoritmo Page-Hinkley, alta intermitencia estructural de la serie (más del 60\% de periodos con demanda cero), o baja predictibilidad intrínseca (MAE superior al 80\% de la demanda media). Esto evita tener que revisar manualmente los logs para entender qué fue mal.
 \end{itemize}

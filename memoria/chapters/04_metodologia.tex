@@ -70,7 +70,61 @@ Como se identificó en el análisis exploratorio, aproximadamente el 15\% de las
 
 Para ilustrar el mecanismo, considérese una serie con demanda real $D_{s,t} = 10$ kg y stock disponible de 6 kg en el momento del agotamiento: el sistema registra $y_{s,t} = \min(10, 6) = 6$ kg, aunque la tienda habría vendido 10 de haberlos tenido. Si este patrón se repite a lo largo del histórico, el modelo aprende $\hat{D} \approx 6$ kg y el gestor de compras pide para 6, perpetuando el stockout en el siguiente ciclo.
 
-Entrenar directamente sobre $y_{s,t}$ en esos días introduciría un sesgo negativo sistemático en el modelo. Para corregirlo, el sistema implementa un preprocesador dinámico que estima la demanda latente $\tilde{y}_{s,t}$ en los días afectados por roturas de stock ($h_{s,t} > 0$). Se comparan tres estrategias alternativas de imputación:
+Entrenar directamente sobre $y_{s,t}$ en esos días introduciría un sesgo negativo sistemático en el modelo. La Figura~\ref{fig:censored_demand} ilustra el problema y la corrección.
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[xscale=1.05, yscale=0.42]
+  % Stockout background shading
+  \fill[gray!12] (3.05,0) rectangle (5.45,10.5);
+  % Axes
+  \draw[->,thick] (-0.1,0) -- (8.8,0) node[right,font=\sffamily\footnotesize] {Día};
+  \draw[->,thick] (0,-0.3) -- (0,11.2) node[above,font=\sffamily\footnotesize] {Demanda (kg)};
+  \foreach \y in {2,4,6,8,10} {
+    \draw[gray!60] (0,\y) -- (8.6,\y);
+    \node[left,font=\sffamily\scriptsize,gray] at (0,\y) {\y};
+  }
+  % Day labels
+  \foreach \x/\d in {0.75/1,1.75/2,2.75/3,3.75/4,4.75/5,5.75/6,6.75/7,7.75/8} {
+    \node[below,font=\sffamily\scriptsize] at (\x,-0.3) {\d};
+  }
+  % Normal days: single blue bar
+  \fill[blue!55]  (0.3,0) rectangle (1.2,7);   % day 1
+  \fill[blue!55]  (1.3,0) rectangle (2.2,6);   % day 2
+  \fill[blue!55]  (2.3,0) rectangle (3.2,8);   % day 3
+  \fill[blue!55]  (5.3,0) rectangle (6.2,7);   % day 6
+  \fill[blue!55]  (6.3,0) rectangle (7.2,6.5); % day 7
+  \fill[blue!55]  (7.3,0) rectangle (8.2,8);   % day 8
+  % Stockout days: blue (observed) + orange extension (latent)
+  \fill[blue!55]  (3.3,0) rectangle (4.2,4);   % day 4 observed
+  \fill[orange!70](3.3,4) rectangle (4.2,7.5); % day 4 latent extra
+  \fill[blue!55]  (4.3,0) rectangle (5.2,3);   % day 5 observed
+  \fill[orange!70](4.3,3) rectangle (5.2,6.5); % day 5 latent extra
+  % Bar outlines
+  \foreach \xa/\xb/\h in {0.3/1.2/7, 1.3/2.2/6, 2.3/3.2/8, 5.3/6.2/7, 6.3/7.2/6.5, 7.3/8.2/8} {
+    \draw[blue!80,thin] (\xa,0) rectangle (\xb,\h);
+  }
+  \draw[blue!80,thin]   (3.3,0) rectangle (4.2,4);
+  \draw[orange!80,thin] (3.3,4) rectangle (4.2,7.5);
+  \draw[blue!80,thin]   (4.3,0) rectangle (5.2,3);
+  \draw[orange!80,thin] (4.3,3) rectangle (5.2,6.5);
+  % Stockout label
+  \node[font=\sffamily\scriptsize,gray!70] at (4.25,10.8) {días con \textit{stockout}};
+  % Legend
+  \fill[blue!55]  (0.2,9.5) rectangle (0.8,10.2);
+  \node[right,font=\sffamily\scriptsize] at (0.85,9.85) {Ventas observadas $y_{s,t}$};
+  \fill[orange!70](4.0,9.5) rectangle (4.6,10.2);
+  \node[right,font=\sffamily\scriptsize] at (4.65,9.85) {Demanda latente estimada $\tilde{y}_{s,t}$};
+\end{tikzpicture}
+\shorthandon{>}%
+\caption{Efecto de la censura por stockout: en los días con rotura (fondo gris), las ventas
+registradas (azul) son inferiores a la demanda real. La estimación de la demanda latente
+(naranja) corrige el sesgo antes del entrenamiento.}
+\label{fig:censored_demand}
+\end{figure}
+
+Para corregirlo, el sistema implementa un preprocesador dinámico que estima la demanda latente $\tilde{y}_{s,t}$ en los días afectados por roturas de stock ($h_{s,t} > 0$). Se comparan tres estrategias alternativas de imputación:
 
 \begin{itemize}
     \item \textbf{Clipped Scaling}: Multiplica la demanda observada por un factor configurable
@@ -101,7 +155,7 @@ Entrenar directamente sobre $y_{s,t}$ en esos días introduciría un sesgo negat
     \end{equation}
 \end{itemize}
 
-Métodos estadísticamente más rigurosos, como el algoritmo EM o el modelo Tobit, quedan fuera del ámbito de este trabajo. En el benchmark oficial del propio dataset \cite{freshretailnet2025} se evalúan enfoques de aprendizaje profundo (TimesNet, CSDI, SAITS) que obtienen mejores métricas de recuperación, pero a un coste computacional incompatible con un despliegue operacional ligero; las tres estrategias aquí propuestas priorizan interpretabilidad y velocidad de inferencia. La estrategia \textbf{Supervisada (LightGBM)} es la seleccionada en el sistema final por obtener el menor sesgo residual en validación cruzada; la comparación empírica entre las tres estrategias se discute en la Sección~\ref{sec:resultados_imputacion}.
+En el benchmark oficial del propio dataset \cite{freshretailnet2025} se evalúan enfoques de aprendizaje profundo (TimesNet, CSDI, SAITS) que obtienen mejores métricas de recuperación, pero a un coste computacional incompatible con un despliegue operacional ligero; las tres estrategias aquí propuestas priorizan interpretabilidad y velocidad de inferencia. La estrategia \textbf{Supervisada (LightGBM)} es la seleccionada en el sistema final por obtener el menor sesgo residual en validación cruzada; la comparación empírica entre las tres estrategias se discute en la Sección~\ref{sec:resultados_imputacion}.
 
 \subsection{Ingeniería de Características}
 \label{sec:feature_engineering}
@@ -166,6 +220,37 @@ O bien, expresada en su forma condicional por tramos para enfatizar la asimetrí
 \end{equation}
 
 Por ejemplo, para $q = 0{,}9$ y una demanda real $y = 10$ kg: si el modelo predice $\hat{y}_q = 8$ kg (subestimación), la pérdida es $0{,}9 \cdot (10 - 8) = 1{,}8$; si predice $\hat{y}_q = 12$ kg (sobreestimación), es $0{,}1 \cdot (12 - 10) = 0{,}2$. La penalización por subestimar es nueve veces mayor, lo que incentiva al modelo a situarse en el percentil 90 de la demanda.
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[xscale=0.75, yscale=0.9]
+  % Axes
+  \draw[->,thick] (-4.4,0) -- (4.6,0) node[right,font=\sffamily\footnotesize] {$\hat{y}_q - y$ (error)};
+  \draw[->,thick] (0,-0.15) -- (0,4.3) node[above,font=\sffamily\footnotesize] {$\mathcal{L}_q$};
+  % Zero label
+  \node[below,font=\sffamily\scriptsize] at (0,-0.15) {$0$};
+  % Dashed vertical
+  \draw[dashed,gray!50] (0,0) -- (0,4.0);
+  % q=0.9: slope 0.9 left (steep), slope 0.1 right (flat)
+  \draw[blue!70,very thick] (-4,3.6) -- (0,0) -- (4,0.4);
+  % q=0.1: slope 0.1 left (flat), slope 0.9 right (steep)
+  \draw[orange!80,very thick] (-4,0.4) -- (0,0) -- (4,3.6);
+  % Region labels
+  \node[font=\sffamily\scriptsize,gray!70] at (-2.6,-0.55) {subestimación};
+  \node[font=\sffamily\scriptsize,gray!70] at (2.6,-0.55) {sobreestimación};
+  % Legend — placed right of y-axis, top area (clear of both arms)
+  \fill[blue!70]   (0.4,4.0) rectangle (1.0,4.3);
+  \node[right,font=\sffamily\scriptsize] at (1.1,4.15) {$q=0{,}9$ (percentil alto)};
+  \fill[orange!80] (0.4,3.55) rectangle (1.0,3.85);
+  \node[right,font=\sffamily\scriptsize] at (1.1,3.70) {$q=0{,}1$ (percentil bajo)};
+\end{tikzpicture}
+\shorthandon{>}%
+\caption{Asimetría de la función de pérdida \textit{pinball} para dos cuantiles extremos.
+Para $q=0{,}9$ (azul), subestimar la demanda se penaliza nueve veces más que sobreestimarla,
+empujando las predicciones hacia valores altos. Para $q=0{,}1$ (naranja), el efecto es inverso.}
+\label{fig:pinball_asymmetry}
+\end{figure}
 
 La minimización de la pérdida esperada bajo $\mathcal{L}_q$ tiene como solución óptima el cuantil $q$ de la distribución de la demanda:
 
@@ -309,31 +394,55 @@ Para evaluar la calidad de los intervalos de confianza generados por la capa con
 se formulan tres métricas probabilísticas fundamentales:
 
 \begin{itemize}
-    \item \textbf{Winkler Score}: Evalúa la amplitud del intervalo y penaliza de forma
-    asimétrica los fallos de cobertura. Para un intervalo $[L_{s,t}, \, U_{s,t}]$ con un
-    nivel de significancia $\alpha$:
+    \item \textbf{Winkler Score}: Es la métrica principal para evaluar intervalos de predicción.
+    Su idea es sencilla: un intervalo bueno es aquel que es \emph{estrecho} (no dice
+    \textit{``la demanda estará entre 0 y 1000 kg''}) pero a la vez \emph{cubre} el valor real la mayoría
+    de las veces. El Winkler Score penaliza ambos fallos en una sola cifra.
+
+    Para un intervalo $[L_{s,t},\, U_{s,t}]$ predicho con nivel de significancia $\alpha$
+    (en nuestro caso $\alpha = 0{,}2$ para el intervalo P10--P90):
+
     \begin{equation}
         W(L, U, y) = \begin{cases}
-            (U_{s,t} - L_{s,t}) & \text{si } L_{s,t} \le y_{s,t} \le U_{s,t} \\
-            (U_{s,t} - L_{s,t}) + \frac{2}{\alpha}(L_{s,t} - y_{s,t})
-            & \text{si } y_{s,t} < L_{s,t} \\
-            (U_{s,t} - L_{s,t}) + \frac{2}{\alpha}(y_{s,t} - U_{s,t})
+            (U_{s,t} - L_{s,t}) & \text{si } L_{s,t} \le y_{s,t} \le U_{s,t} \\[4pt]
+            (U_{s,t} - L_{s,t}) + \dfrac{2}{\alpha}(L_{s,t} - y_{s,t})
+            & \text{si } y_{s,t} < L_{s,t} \\[4pt]
+            (U_{s,t} - L_{s,t}) + \dfrac{2}{\alpha}(y_{s,t} - U_{s,t})
             & \text{si } y_{s,t} > U_{s,t}
         \end{cases}
     \end{equation}
 
-    \item \textbf{PICP (Prediction Interval Coverage Probability)}: Mide la proporción real
-    de observaciones que caen dentro del intervalo predicho, validando la garantía de cobertura:
+    El primer caso es el \emph{pago base}: siempre se paga la amplitud del intervalo
+    $(U - L)$, incentivando intervalos ajustados. Si el valor real cae \emph{fuera}
+    del intervalo se añade una penalización extra proporcional a lo lejos que quedó,
+    amplificada por el factor $2/\alpha$ (en nuestro caso $\times 10$). Esto hace
+    que un solo fallo de cobertura cueste mucho más que tener un intervalo
+    ligeramente más ancho, alineando la métrica con el criterio logístico real.
+    La métrica se promedia sobre todas las predicciones para obtener el Winkler Score final;
+    \textbf{valores más bajos son mejores}.
+
+    \item \textbf{PICP (Prediction Interval Coverage Probability)}: Mide simplemente
+    qué fracción de las observaciones reales cayó dentro del intervalo predicho:
     \begin{equation}
         \text{PICP} = \frac{1}{N} \sum_{i=1}^N \mathbb{I} \left( L_i \le y_i \le U_i \right)
     \end{equation}
-    Donde $\mathbb{I}$ es la función indicadora y $N$ es el número total de muestras.
+    Donde $\mathbb{I}(\cdot)$ vale 1 si la condición se cumple y 0 si no.
+    Con cuantiles P10--P90, la cobertura teórica garantizada por Predicción Conformal es
+    $1 - \alpha = 0{,}80$. Un PICP de 0,78 significaría que el intervalo contiene el valor
+    real el 78\% de las veces --- prácticamente lo prometido. Un PICP muy inferior a 0,80
+    indica infracobertura (el modelo es demasiado confiado); muy superior indica
+    supercobertura (intervalos excesivamente conservadores).
 
-    \item \textbf{PINAW (Prediction Interval Normalized Average Width)}: Mide la amplitud media
-    de los intervalos normalizada por el rango de la demanda real:
+    \item \textbf{MPIW (Mean Prediction Interval Width)}: Mide la amplitud media de los
+    intervalos:
     \begin{equation}
-        \text{PINAW} = \frac{1}{N \cdot (y_{\max} - y_{\min})} \sum_{i=1}^N (U_i - L_i)
+        \text{MPIW} = \frac{1}{N} \sum_{i=1}^N (U_i - L_i)
     \end{equation}
+    Un MPIW bajo significa que el modelo predice con precisión (intervalos estrechos).
+    Siempre debe leerse junto al PICP: un modelo que prediga siempre $[0, +\infty)$
+    obtendría PICP $= 1{,}0$ perfecto pero MPIW infinito; un modelo que prediga
+    un único valor obtendría MPIW $= 0$ pero PICP $\approx 0$. El Winkler Score
+    integra ambas dimensiones en una sola métrica de optimización.
 \end{itemize}
 
 \subsection{Protocolo de Evaluación: Backtesting Walk-Forward}
@@ -347,9 +456,52 @@ El sistema implementa un \textbf{backtesting walk-forward} con $K=3$ folds tempo
     \text{Fold}_k: \quad \text{Train} = \{t < t_k\}, \quad \text{Test} = \{t_k \leq t < t_k + H\}
 \end{equation}
 
-donde $H = 7$ días es el horizonte de planificación. Los cortes $t_1 < t_2 < t_3$ dividen el periodo de observación en cuatro segmentos iguales, asegurando que cada fold tenga suficiente historia para construir los lags de 28 días. La calibración conformal descrita en la sección anterior se realiza sobre el último 20\% de cada ventana de entrenamiento, que actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el entrenamiento del modelo base.
+donde $H = 7$ días es el horizonte de planificación. Los cortes $t_1 < t_2 < t_3$ dividen el periodo de observación en cuatro segmentos iguales, asegurando que cada fold tenga suficiente historia para construir los lags de 28 días. La calibración conformal descrita en la sección anterior se realiza sobre el último 20\% de cada ventana de entrenamiento, que actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el entrenamiento del modelo base. La Figura~\ref{fig:backtesting_walkforward} ilustra la estructura de los tres folds.
 
-El modelo \textbf{baseline} de referencia es el \textit{Seasonal Naïve}: para cada serie y fecha de predicción, replica la demanda observada en el mismo día de la semana hace 7 días. Este baseline es el más exigente en contextos con estacionalidad semanal fuerte ---como el confirmado en el análisis exploratorio--- y es el estándar de comparación utilizado en la competición M5 \cite{makridakis2022m5}. Un modelo que no supere al \textit{Seasonal Naïve} en Winkler Score no aporta valor respecto a una heurística trivial.
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[xscale=0.97, yscale=1.0,
+    train/.style={fill=blue!40, draw=blue!60, minimum height=0.48cm},
+    calib/.style={fill=violet!35, draw=violet!60, minimum height=0.48cm},
+    test/.style={fill=orange!55, draw=orange!70, minimum height=0.48cm},
+    fold/.style={font=\sffamily\scriptsize, anchor=east}]
+  % Time axis
+  \draw[->,thick] (-0.15,0.1) -- (10.5,0.1) node[right,font=\sffamily\footnotesize] {tiempo};
+  % Tick marks at t1,t2,t3,end
+  \foreach \x/\lab in {2.5/$t_1$, 5.0/$t_2$, 7.5/$t_3$, 9.5/} {
+    \draw[gray!60,dashed] (\x,0.1) -- (\x,3.35);
+    \ifx\lab\empty\else \node[below,font=\sffamily\scriptsize,gray] at (\x,-0.05) {\lab}; \fi
+  }
+  % Fold 1
+  \node[fold] at (-0.1,2.9) {Fold 1};
+  \node[train, minimum width=2.0cm, anchor=west] at (0.0,2.65) {};
+  \node[calib, minimum width=0.5cm, anchor=west] at (2.0,2.65) {};
+  \node[test,  minimum width=0.9cm, anchor=west] at (2.5,2.65) {};
+  % Fold 2
+  \node[fold] at (-0.1,2.0) {Fold 2};
+  \node[train, minimum width=4.5cm, anchor=west] at (0.0,1.75) {};
+  \node[calib, minimum width=0.5cm, anchor=west] at (4.5,1.75) {};
+  \node[test,  minimum width=0.9cm, anchor=west] at (5.0,1.75) {};
+  % Fold 3
+  \node[fold] at (-0.1,1.1) {Fold 3};
+  \node[train, minimum width=7.0cm, anchor=west] at (0.0,0.85) {};
+  \node[calib, minimum width=0.5cm, anchor=west] at (7.0,0.85) {};
+  \node[test,  minimum width=0.9cm, anchor=west] at (7.5,0.85) {};
+  % Legend
+  \fill[blue!40]   (0.0,3.55) rectangle (0.55,3.85); \node[right,font=\sffamily\scriptsize] at (0.6,3.70) {Entrenamiento};
+  \fill[violet!35] (3.3,3.55) rectangle (3.85,3.85); \node[right,font=\sffamily\scriptsize] at (3.9,3.70) {Calibración conformal};
+  \fill[orange!55] (7.0,3.55) rectangle (7.55,3.85); \node[right,font=\sffamily\scriptsize] at (7.6,3.70) {Test ($H=7$d)};
+\end{tikzpicture}
+\shorthandon{>}%
+\caption{Esquema del \textit{backtesting walk-forward} con $K=3$ folds temporales. El conjunto
+de entrenamiento (azul) se expande progresivamente con cada fold; el 20\% final de cada ventana
+de entrenamiento se reserva como calibración conformal (violeta); la evaluación se realiza sobre
+los 7 días siguientes al corte (naranja).}
+\label{fig:backtesting_walkforward}
+\end{figure}
+
+El modelo \textbf{baseline} de referencia es el \textit{Seasonal Naïve}: para cada serie y fecha de predicción, replica la demanda observada en el mismo día de la semana hace 7 días. Este baseline es el más exigente en contextos con estacionalidad semanal fuerte (como el confirmado en el análisis exploratorio) y es el estándar de comparación utilizado en la competición M5 \cite{makridakis2022m5}. Un modelo que no supere al \textit{Seasonal Naïve} en Winkler Score no aporta valor respecto a una heurística trivial.
 
 \subsection{Perfiles de Coste Sintéticos por SKU}
 \label{sec:cost_profiles}
@@ -404,9 +556,60 @@ donde $\beta_0 > 0$ es el valor base (factor mínimo cuando el score es 0) y $\b
     c_u^{(s)} = \bar{c}_u \cdot F_{crit}^{(s)}
 \end{equation}
 
-Esta arquitectura convierte el \textit{fractil crítico} $q^*$ en una \textbf{variable de estado por SKU}: el sistema asigna de forma autónoma mayores niveles de servicio a productos críticos y protege el capital circulante reduciendo el stock en productos perecederos de baja demanda. Estos costes per-SKU son los que alimentan directamente la simulación descrita a continuación.
+Esta arquitectura convierte el \textit{fractil crítico} $q^*$ en una \textbf{variable de estado por SKU}: el sistema asigna de forma autónoma mayores niveles de servicio a productos críticos y protege el capital circulante reduciendo el stock en productos perecederos de baja demanda. Estos costes per-SKU son los que alimentan directamente la simulación descrita a continuación. La Figura~\ref{fig:cost_profiles} resume el flujo completo.
 
-\subsection{El Gemelo Digital Logístico: Simulación Dinámica (s, S)}
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  node distance=0.5cm and 0.7cm,
+  every node/.style={font=\sffamily\footnotesize, align=center},
+  input/.style={draw, rectangle, rounded corners=3pt, fill=blue!10,
+                minimum width=2.8cm, minimum height=0.7cm},
+  factor/.style={draw, rectangle, rounded corners=3pt,
+                minimum width=3.4cm, minimum height=0.7cm, text width=3.2cm},
+  output/.style={draw, rectangle, rounded corners=3pt,
+                minimum width=2.6cm, minimum height=0.7cm},
+  arr/.style={->, thick}
+]
+  % Input
+  \node[input] (sku) {Serie $s$\\(historial)};
+
+  % Three factor nodes to the right, stacked vertically
+  \node[factor, fill=orange!15, right=1.2cm of sku, yshift=1.4cm]  (fp) {$F_{perish}$\\{\tiny $0{,}5\cdot Rank(Z_{cat})+\ldots$}};
+  \node[factor, fill=yellow!20, right=1.2cm of sku]                 (fs) {$F_{slow}$\\{\tiny $0{,}6\cdot Rank(Z_s)+\ldots$}};
+  \node[factor, fill=red!12,   right=1.2cm of sku, yshift=-1.4cm]  (fc) {$F_{crit}$\\{\tiny $0{,}7\cdot Rank(\mu_s)+\ldots$}};
+
+  % Cost nodes
+  \node[output, fill=orange!25, right=1.1cm of fp, yshift=-0.7cm]  (co) {$c_o^{(s)} = \bar{c}_o \cdot F_{perish} \cdot F_{slow}$};
+  \node[output, fill=red!20,   right=1.1cm of fc, yshift=0.7cm]    (cu) {$c_u^{(s)} = \bar{c}_u \cdot F_{crit}$};
+
+  % q* final node
+  \node[draw, diamond, fill=green!15, aspect=2.2,
+        font=\sffamily\footnotesize, right=0.9cm of co, yshift=-0.7cm] (qs) {$q_s^* = \dfrac{c_u^{(s)}}{c_u^{(s)}+c_o^{(s)}}$};
+
+  % Arrows from SKU to factors
+  \draw[arr] (sku) -- (fp);
+  \draw[arr] (sku) -- (fs);
+  \draw[arr] (sku) -- (fc);
+  % Arrows factors to costs
+  \draw[arr] (fp) -- (co);
+  \draw[arr] (fs) -- (co);
+  \draw[arr] (fc) -- (cu);
+  % Arrows costs to q*
+  \draw[arr] (co) -- (qs);
+  \draw[arr] (cu) -- (qs);
+\end{tikzpicture}%
+}% end resizebox
+\shorthandon{>}%
+\caption{Flujo de inferencia de perfiles de coste sintéticos por SKU. A partir del historial de
+cada serie se calculan tres factores dimensionales que determinan los costes de exceso $c_o^{(s)}$
+y rotura $c_u^{(s)}$, lo que fija el fractil crítico $q^*_s$ específico para ese producto.}
+\label{fig:cost_profiles}
+\end{figure}
+
+\subsection{El Gemelo Digital Logístico: Simulación Dinámica Order-Up-To}
 La evaluación tradicional en forecasting asume modelos estáticos (o de un solo periodo), como
 el modelo básico del \textit{Newsvendor} \cite{silver1998inventory}. Sin embargo, este supuesto
 ignora el hecho físico de que el inventario no vendido un día permanece en la estantería al
@@ -467,20 +670,30 @@ Para cerrar la brecha entre Machine Learning e Investigación de Operaciones (OR
 
 El módulo utiliza el solver \texttt{HiGHS} de SciPy para reducir las órdenes allí donde el impacto de una rotura sea menor, permitiendo tomar decisiones de pedido razonables incluso cuando el presupuesto o el espacio son limitados.
 
+\subsection{Criterio de Promoción del Modelo Campeón}
+
+El ciclo de operación no es estático: tras cada ejecución del modo \texttt{experiment}, el sistema evalúa si alguno de los modelos candidatos (\textit{challengers}) del frente de Pareto debe reemplazar al modelo actualmente en producción. La promoción no se decide por una única métrica, sino por dos guardarraíles independientes:
+
+\begin{enumerate}
+    \item \textbf{Mejora de coste mínima} ($\Delta_{\text{cost}}$): el \textit{challenger} debe reducir el coste de inventario simulado respecto al campeón actual en al menos un umbral configurable $\theta_{\text{cost}}$.
+    \item \textbf{Guardarraíl de nivel de servicio} ($\Delta_{\text{sl}}$): el \textit{challenger} no puede degradar el nivel de servicio por encima de un margen $\delta_{\text{sl}}$ configurable, aunque mejore el coste.
+\end{enumerate}
+
+Este diseño prioriza la estabilidad operacional frente a la optimización agresiva: un modelo que recorte costes a costa de roturas frecuentes nunca alcanzará producción. La implementación detallada y el flujo de decisión se describen en la Sección~\ref{sec:champion_promotion}.
+
 % ==============================================================================
 \section{Bloque III: MLOps (\texttt{simulate\_ops})}
 % ==============================================================================
 
-\subsection{Simulación Operacional en Streaming: Evaluación de Cadencias de Reentrenamiento}
 \label{sec:simulate_ops}
 
 La validación cruzada temporal (\textit{walk-forward backtesting}) estima el rendimiento del modelo en condiciones experimentales controladas. Sin embargo, en producción surge una pregunta adicional de naturaleza MLOps: \emph{\textquestiondown con qué frecuencia debe reentrenarse el modelo a medida que llegan datos nuevos?} Reentrenar demasiado frecuentemente supone un coste computacional elevado; hacerlo demasiado esporádicamente puede degradar las predicciones conforme el modelo queda desactualizado respecto a los patrones recientes.
 
-Para responder esta pregunta de forma empírica sobre datos genuinamente no vistos, el sistema implementa una \textbf{Simulación Operacional en Streaming} sobre el split de evaluación. El procedimiento es el siguiente:
+Para responder esta pregunta de forma empírica sobre datos genuinamente no vistos, el sistema implementa una \textbf{Simulación Operacional en Streaming} sobre el split de evaluación. El esquema sigue el protocolo de \textbf{evaluación prequential} (\textit{interleaved test-then-train}), estándar en aprendizaje automático sobre flujos de datos: cada observación se evalúa primero y luego se incorpora al entrenamiento, eliminando cualquier filtración de información futura \cite{hyndman2021forecasting}. El procedimiento es el siguiente:
 
 \begin{enumerate}
     \item Se entrena un modelo \textit{champion} inicial exclusivamente sobre el split de entrenamiento. Este modelo representa el estado del sistema en el día de despliegue, antes de que llegue ningún dato del periodo de evaluación.
-    \item Se define un conjunto de \textbf{cadencias de reentrenamiento} $K = \{k_1, k_2, \ldots, k_n, \text{nunca}\}$, donde cada $k_i$ representa el número de días entre dos reentrenamientos consecutivos. La cadencia \textit{nunca} sirve como \textit{baseline}: el modelo inicial nunca se actualiza.
+    \item Se define un conjunto de \textbf{cadencias de reentrenamiento} $K = \{k_1, k_2, \ldots, k_n, \text{nunca}\}$, donde cada $k_i$ es el número de días entre reentrenamientos consecutivos y el parámetro configurable \texttt{simulation\_days} permite limitar la ventana de evaluación. La cadencia \textit{nunca} sirve como \textit{baseline}: el modelo inicial nunca se actualiza.
     \item Se itera día a día sobre el split de evaluación. Para cada fecha de decisión $t$ y cada cadencia $k$:
     \begin{itemize}
         \item Se construye la \textbf{historia disponible} $\mathcal{H}_t = \text{train} \cup \text{eval}[\text{date} < t]$, garantizando ausencia de \textit{leakage}.
@@ -491,4 +704,4 @@ Para responder esta pregunta de forma empírica sobre datos genuinamente no vist
     \item Al finalizar el streaming, se dispone de curvas de \textbf{coste acumulado} por cadencia sobre el mismo periodo y los mismos datos, lo que permite una comparación directa y equitativa.
 \end{enumerate}
 
-Los artefactos generados incluyen \texttt{cadence\_summary.csv} con métricas agregadas por cadencia (coste total, nivel de servicio, \textit{fill rate}, número de reentrenamientos) y \texttt{cumulative\_cost.png} con la evolución temporal del coste para cada política. Esta simulación constituye la evidencia empírica para justificar la política de reentrenamiento operacional del sistema.
+Los artefactos generados son: \texttt{cadence\_summary.csv} (coste total, nivel de servicio, \textit{fill rate} y número de reentrenamientos por cadencia), \texttt{cumulative\_cost.png} (evolución temporal del coste acumulado), \texttt{predictions\_by\_day.parquet} (predicciones diarias por cadencia y serie), \texttt{retrain\_events.json} (registro de cada evento de reentrenamiento con fecha, duración y tamaño del histórico), y \texttt{report.md} (informe narrativo en Markdown con tabla resumen e interpretación). Esta simulación constituye la evidencia empírica para justificar la política de reentrenamiento operacional del sistema.
