@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import secrets
 from pathlib import Path
 from unittest import mock
@@ -122,15 +123,38 @@ def test_api_skus_with_mock_df() -> None:
         assert "q_star" in data[0]
 
 
-def test_api_drift() -> None:
-    response = client.get("/api/drift", params={"service_level": 95.0})
-    assert response.status_code == 200
-    data = response.json()
-    assert isinstance(data, list)
-    assert len(data) > 0
-    assert "psi" in data[0]
-    assert "pre" in data[0]
-    assert "post" in data[0]
+def test_api_drift_serves_real_report(tmp_path: pytest.TempPath) -> None:
+    from retail_forecasting.api.main import _PREDICTIONS_CACHE
+
+    drift_report = [
+        {
+            "name": "demand_roll_mean_7",
+            "type": "numeric",
+            "importance": 0.31,
+            "psi": 0.27,
+            "status": "critical",
+            "pre": [0.5, 0.5],
+            "post": [0.2, 0.8],
+        }
+    ]
+    (tmp_path / "drift_report.json").write_text(json.dumps(drift_report), encoding="utf-8")
+    previous = _PREDICTIONS_CACHE.get("run_path")
+    _PREDICTIONS_CACHE["run_path"] = tmp_path
+    try:
+        response = client.get("/api/drift", params={"service_level": 95.0})
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert data[0]["name"] == "demand_roll_mean_7"
+        assert "psi" in data[0]
+        assert "pre" in data[0]
+        assert "post" in data[0]
+    finally:
+        if previous is not None:
+            _PREDICTIONS_CACHE["run_path"] = previous
+        else:
+            _PREDICTIONS_CACHE.pop("run_path", None)
 
 
 def test_api_alerts() -> None:

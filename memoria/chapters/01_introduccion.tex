@@ -45,7 +45,7 @@ El presente trabajo se enmarca en el contexto de la previsión de demanda a cort
     \item Datos de granularidad diaria provenientes del benchmark \textit{Fresh RetailNet}, que cubre 50.000 combinaciones tienda-producto a lo largo de 90 días de observación.
     \item Corrección del sesgo por demanda censurada (stockout) mediante técnicas de imputación supervisada.
     \item Cuantificación de la incertidumbre con garantías estadísticas formales (Mondrian Conformal Prediction) y optimización multi-objetivo de hiperparámetros.
-    \item Simulación de inventario a nivel de tienda bajo una política de reposición dinámica $(s, S)$ y resolución de conflictos mediante Programación Lineal.
+    \item Simulación de inventario a nivel de tienda bajo una política de reposición dinámica Order-Up-To y resolución de conflictos mediante Programación Lineal.
     \item Operativización del sistema mediante estándares MLOps (MLflow, FastAPI, CI/CD) y visualización interactiva.
 \end{itemize}
 
@@ -64,7 +64,7 @@ Las aportaciones originales de este trabajo, diferenciadas del estado del arte r
 \begin{enumerate}
     \item \textbf{Aplicación de Mondrian Conformal Prediction a demanda censurada en retail.} Si bien la Conformal Prediction con garantías de cobertura marginal es una técnica consolidada, su extensión estratificada (Mondrian) al contexto de demanda censurada por stockout en productos frescos constituye una combinación no explorada en la literatura de distribución masiva. La estratificación por categoría de producto permite obtener garantías de cobertura condicional respetando la heterogeneidad del catálogo demostrada en el análisis exploratorio.
 
-    \item \textbf{Sistema de Apoyo a la Decisión con cierre logístico.} La mayoría de los trabajos académicos evalúan el rendimiento predictivo mediante métricas estadísticas (MAE, RMSE) desconectadas de la operativa real. Este trabajo cierra el ciclo integrando el modelo probabilístico con una simulación dinámica de inventario $(s, S)$ (\textit{gemelo digital}) y una etapa de optimización global por Programación Lineal, permitiendo medir el impacto directo de la calidad predictiva en el coste logístico.
+    \item \textbf{Sistema de Apoyo a la Decisión con cierre logístico.} La mayoría de los trabajos académicos evalúan el rendimiento predictivo mediante métricas estadísticas (MAE, RMSE) desconectadas de la operativa real. Este trabajo cierra el ciclo integrando el modelo probabilístico con una simulación dinámica de inventario Order-Up-To (\textit{gemelo digital}) y una etapa de optimización global por Programación Lineal, permitiendo medir el impacto directo de la calidad predictiva en el coste logístico.
 
     \item \textbf{Optimización multi-objetivo para la selección de hiperparámetros probabilísticos.} Se propone una búsqueda de hiperparámetros simultánea sobre el frente de Pareto entre coste de predicción puntual (\textit{Pinball Loss} en el fractil crítico $q^*$) y nitidez probabilística (Winkler Score) mediante NSGA-II, superando la práctica habitual de optimizar una única métrica escalar que puede penalizar la calibración de los intervalos.
 

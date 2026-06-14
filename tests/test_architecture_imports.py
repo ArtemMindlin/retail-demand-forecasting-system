@@ -8,13 +8,13 @@ FIRST_PARTY_PREFIX = "retail_forecasting"
 
 ALLOWED_LAYER_IMPORTS = {
     "__init__": set(),
-    "api": {"config", "forecasting"},
+    "api": {"config", "drift", "forecasting"},
     "config": {"contracts"},
     "contracts": set(),
     "data": {"config", "contracts", "utils"},
     "drift": {"contracts"},
     "eda": {"config", "contracts", "data", "eda", "utils"},
-    "evaluation": {"config", "contracts", "utils", "visualization"},
+    "evaluation": {"config", "contracts", "drift", "utils", "visualization"},
     "features": {"config", "contracts"},
     "forecasting": {
         "config",

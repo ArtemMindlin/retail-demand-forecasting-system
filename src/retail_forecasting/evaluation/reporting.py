@@ -221,6 +221,18 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
                     output_path=run_dir / "shap_summary.png",
                 )
 
+                from retail_forecasting.drift.psi import build_feature_drift_report
+
+                drift_report = build_feature_drift_report(
+                    supervised_frame=artifacts.supervised_frame,
+                    shap_values=artifacts.shap_values,
+                )
+                if drift_report:
+                    (run_dir / "drift_report.json").write_text(
+                        json.dumps(drift_report, indent=2),
+                        encoding="utf-8",
+                    )
+
         report_text = build_markdown_report(artifacts=artifacts, settings=settings)
         (run_dir / "report.md").write_text(report_text, encoding="utf-8")
 

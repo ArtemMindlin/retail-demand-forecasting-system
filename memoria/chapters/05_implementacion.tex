@@ -29,7 +29,7 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
 ]
   %% ── BANDAS ─────────────────────────────────────────────────────
   \node[s1] (datos)  at (0, 0)    {HF Dataset
-    $\;\to\;$ Data Quality Gate (7 checks)
+    $\;\to\;$ Data Quality Gate (6 checks)
     $\;\to\;$ Panel Preparado};
 
   \node[s2] (feats)  at (0,-1.6)  {Corrección Censura (LightGBM / media histórica)
@@ -79,7 +79,7 @@ La estructura del código se organiza en torno a cuatro capas especializadas:
     \item \textbf{Capa de Datos}: Ingesta desde Hugging Face con un \textit{Data Quality Gate} que aborta la ejecución si detecta anomalías (datos obsoletos, duplicados o series incompletas) antes de contaminar los modelos.
     \item \textbf{Capa de Features}: Corrección de demanda censurada por stockout e ingeniería de 50 características temporales, exógenas y estáticas sin \textit{data leakage}.
     \item \textbf{Capa de Modelado}: Búsqueda Pareto de hiperparámetros (Optuna NSGA-II), entrenamiento multi-cuantil (CatBoost con Pinball Loss) y calibración de intervalos (Mondrian Conformal Prediction).
-    \item \textbf{Capa de Decisión}: Transformación de cuantiles en órdenes de pedido vía el fractil crítico del Newsvendor, simulación dinámica $(s,S)$ y resolución de restricciones globales por Programación Lineal.
+    \item \textbf{Capa de Decisión}: Transformación de cuantiles en órdenes de pedido vía el fractil crítico del Newsvendor, simulación dinámica Order-Up-To y resolución de restricciones globales por Programación Lineal.
 \end{enumerate}
 
 \section{Stack Tecnológico}
@@ -132,24 +132,24 @@ El pipeline de datos transforma los registros de ventas crudos en el \textit{fra
 
 \subsection{Ingesta y Normalización (\texttt{dataset.py})}
 
-La función \texttt{load\_raw\_split()} descarga el dataset \textit{FreshRetailNet-50K} \cite{freshretailnet2025} desde Hugging Face con caché local, seleccionando el split \texttt{train} por defecto. El resultado es un \texttt{DataFrame} con las 14 columnas brutas definidas en la especificación del dataset: siete identificadores estáticos de jerarquía (\texttt{city\_id}, \texttt{store\_id}, \texttt{management\_group\_id}, tres niveles de categoría y \texttt{product\_id}), la fecha (\texttt{dt}), las ventas brutas (\texttt{sale\_amount}) y las covariables exógenas (descuento, horas de disponibilidad, indicadores de festivo y promoción, precipitación, temperatura, humedad, viento).
+La función \texttt{load\_raw\_split()} descarga el dataset \textit{FreshRetailNet-50K} \cite{freshretailnet2025} desde Hugging Face con caché local, seleccionando el split \texttt{train} por defecto. El resultado es un \texttt{DataFrame} con las 17 columnas brutas definidas en la especificación del dataset: siete identificadores estáticos de jerarquía (\texttt{city\_id}, \texttt{store\_id}, \texttt{management\_group\_id}, tres niveles de categoría y \texttt{product\_id}), la fecha (\texttt{dt}), las ventas brutas (\texttt{sale\_amount}) y las covariables exógenas (descuento, horas de disponibilidad, indicadores de festivo y promoción, precipitación, temperatura, humedad, viento).
 
-La normalización construye el \texttt{series\_id} como concatenación de \texttt{store\_id} y \texttt{product\_id}, renombra \texttt{sale\_amount} a \texttt{observed\_demand} y \texttt{stock\_hour6\_22\_cnt} a \texttt{stockout\_hours}. El resultado es el \textbf{panel preparado}: una tabla indexada por (\texttt{series\_id}, \texttt{date}) sin duplicados, base para todas las etapas posteriores.
+La normalización construye el \texttt{series\_id} como concatenación de \texttt{store\_id} y \texttt{product\_id}, renombra \texttt{sale\_amount} a \texttt{observed\_demand} y \texttt{stock\_hour6\_22\_cnt} a \texttt{stockout\_hours}. En esta misma etapa se descartan las filas con ventas negativas (\texttt{drop\_negative\_sales}) y las series cuyo historial es inferior a \texttt{min\_history\_days} observaciones, garantizando que cada serie tiene longitud suficiente para construir los \textit{lags}. El resultado es el \textbf{panel preparado}: una tabla indexada por (\texttt{series\_id}, \texttt{date}) sin duplicados, base para todas las etapas posteriores.
 
 \subsection{Puerta de Calidad de Datos (\texttt{quality.py})}
 
 Antes de iniciar ningún cálculo, el módulo \texttt{validate\_prepared\_panel()} ejecuta una batería de validaciones clasificadas en dos niveles de severidad:
 
 \begin{itemize}
-    \item \textbf{Errores bloqueantes}: La ejecución se aborta si se detectan columnas obligatorias ausentes (\texttt{date}, \texttt{series\_id}, \texttt{observed\_demand}, \texttt{stockout\_hours}), pares (\texttt{series\_id}, \texttt{date}) duplicados, nulos en columnas clave, fechas con formato inválido, valores negativos de demanda o datos obsoletos en modo operacional (\texttt{score\_daily}) con una antigüedad superior a \texttt{max\_data\_age\_days}.
-    \item \textbf{Advertencias no bloqueantes}: Se registran en el reporte final si la fracción de valores faltantes en alguna covariable supera el umbral configurado (\texttt{max\_missing\_fraction\_warning}) o si alguna serie tiene una cobertura temporal inferior al mínimo requerido.
+    \item \textbf{Errores bloqueantes}: La ejecución se aborta si se detectan columnas obligatorias ausentes (\texttt{date}, \texttt{series\_id}, \texttt{observed\_demand}, \texttt{stockout\_hours}), pares (\texttt{series\_id}, \texttt{date}) duplicados, nulos en columnas clave, fechas con formato inválido o datos obsoletos en modo operacional (\texttt{score\_daily}) con una antigüedad superior a \texttt{max\_data\_age\_days}.
+    \item \textbf{Advertencias no bloqueantes}: Se registran en el reporte final si la fracción de valores faltantes en alguna covariable supera el umbral configurado (\texttt{max\_missing\_fraction\_warning}).
 \end{itemize}
 
 Este diseño de \textit{fail-fast} garantiza que ningún error de datos alcanza la fase de entrenamiento. Los umbrales son configurables en \texttt{DataQualityConfig} para adaptarse a distintos entornos sin modificar el código.
 
 \subsection{Corrección de Demanda Censurada (\texttt{censorship.py})}
 
-El módulo \texttt{LatentDemandImputer} implementa las tres estrategias de corrección descritas en la Sección~\ref{sec:demanda_censurada} --- \texttt{supervised} (modelo auxiliar, estrategia por defecto), \texttt{historical\_mean} (media histórica de la serie en días sin rotura) y \texttt{clipped\_scaling} (escalado proporcional con factor configurable) --- más el modo \texttt{none}, que desactiva la corrección y sirve de \textit{baseline} para cuantificar el impacto de la censura. La estrategia activa es configurable en \texttt{PreprocessingConfig.censorship\_strategy}, lo que permite comparaciones controladas entre enfoques.
+El módulo \texttt{LatentDemandImputer} implementa las tres estrategias de corrección descritas en la Sección~\ref{sec:demanda_censurada} --- \texttt{supervised} (modelo auxiliar, estrategia por defecto), \texttt{historical\_mean} (media histórica de la serie en días sin rotura) y \texttt{clipped\_scaling} (escalado proporcional con factor configurable) --- más el modo \texttt{none}, que desactiva la corrección y sirve de \textit{baseline} para cuantificar el impacto de la censura. La estrategia activa es configurable en \texttt{PreprocessingConfig.imputation\_strategy}, lo que permite comparaciones controladas entre enfoques.
 
 La estrategia \texttt{supervised} entrena un regresor LightGBM sobre las observaciones limpias (días con \texttt{stockout\_hours == 0}), usando como covariables los lags históricos de demanda, las variables de calendario y los indicadores exógenos. Después predice la demanda latente en los días censurados. El módulo añade tres columnas al panel: \texttt{latent\_demand\_est} (estimación de la demanda real), \texttt{original\_observed\_demand} (copia de las ventas originales para auditoría) e \texttt{is\_imputed} (indicador binario de las filas corregidas). El campo \texttt{observed\_demand} es sobreescrito con la estimación latente para que el pipeline de features no requiera lógica condicional.
 
@@ -173,7 +173,7 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
     modfont/.style={font=\ttfamily\tiny, gray!70}
 ]
 \node[s1] (raw)   {Hugging Face\\FreshRetailNet-50K};
-\node[s2, right=of raw]   (qgate)  {Data Quality Gate\\(7 checks)};
+\node[s2, right=of raw]   (qgate)  {Data Quality Gate\\(6 checks)};
 \node[s3, right=of qgate] (panel)  {Panel Preparado\\(series\_id, date)};
 \node[s4, right=of panel] (cens)   {LatentDemand\\Imputer};
 \node[s5, right=of cens]  (frame)  {Frame Supervisado\\(50 features + target)};
@@ -328,7 +328,7 @@ La Tabla~\ref{tab:api_endpoints} describe los endpoints operacionales del servic
         \texttt{POST /api/run} & Ejecución asíncrona & Lanza el pipeline completo en un subproceso en segundo plano. Devuelve inmediatamente una respuesta de aceptación; el progreso y los logs de ejecución son consultables vía \texttt{GET /api/run/status}. \\
         \texttt{POST /api/forecast} & Simulador \textit{What-If} & Recalcula en tiempo real los cuantiles conformes empíricos y la cantidad óptima $q^*$ del Newsvendor dado un conjunto de parámetros (\texttt{serviceLevel}, \texttt{shortageCost}, \texttt{holdingCost}, \texttt{capacity}) y un \texttt{selectedSkuId}. \\
         \texttt{GET /api/skus} & Catálogo de SKUs & Devuelve hasta 50 SKUs con métricas calculadas sobre las predicciones del último run: cobertura empírica, PSI de drift, $q^*$ y estado operacional (\textit{ok}/\textit{drift}/\textit{shortage}/\textit{overstock}). \\
-        \texttt{GET /api/drift} & Monitor de drift & Devuelve el PSI (\textit{Population Stability Index}) de las siete features de mayor importancia SHAP, con su distribución pre/post para diagnóstico visual. \\
+        \texttt{GET /api/drift} & Monitor de drift & Devuelve el PSI (\textit{Population Stability Index}) de las siete features de mayor importancia SHAP, calculado comparando la distribución de la ventana de entrenamiento (mitad antigua) con la reciente, junto con ambos histogramas pre/post para diagnóstico visual. \\
         \texttt{GET /api/alerts} & Alertas operacionales & Extrae las filas marcadas en \texttt{exceptions.csv} del último run y las serializa como alertas con severidad (\textit{critical}/\textit{warning}), descripción y endpoint de acción sugerida. \\
         \texttt{GET /health} & Sonda de disponibilidad & Devuelve estado del servicio, versión, \textit{uptime} y si las predicciones están cargadas en caché; pensada para integrarse con herramientas de monitorización externas. \\
         \bottomrule
@@ -346,7 +346,7 @@ El endpoint raíz \texttt{GET /} sirve un dashboard React de página única (\te
 
     \item \textbf{Panel de Catálogo de SKUs}: Vista tabular de los 50 SKUs más activos con su estado operacional codificado en color, la tendencia de demanda de los últimos 14 días y las métricas clave. Permite seleccionar un SKU para actualizar el panel de pronóstico.
 
-    \item \textbf{Panel de Drift}: Gráfico de barras con el PSI de cada feature de importancia, marcando en naranja (PSI $> 0.10$) y rojo (PSI $> 0.20$) las features que han sufrido cambios distribucionales significativos desde el entrenamiento.
+    \item \textbf{Panel de Drift}: Gráfico de barras con el PSI de cada feature de importancia, calculado por el módulo \texttt{drift/psi.py} y persistido como \texttt{drift\_report.json} al término de cada \texttt{experiment}. Se marca en naranja (PSI $> 0.10$) y rojo (PSI $> 0.20$) las features que han sufrido cambios distribucionales significativos desde el entrenamiento.
 
     \item \textbf{Panel de Alertas}: Lista priorizada de alertas operacionales con enlace directo al endpoint de acción sugerida (reoptimización, reentrenamiento o revisión manual), extraídas del fichero \texttt{exceptions.csv} del último run.
 \end{itemize}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections
 import hmac
+import json
 import logging
 import os
 import secrets
@@ -22,6 +23,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from retail_forecasting.config import load_config
+from retail_forecasting.drift.psi import compute_psi
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
     run_scoring,
@@ -485,9 +487,10 @@ def post_forecast(request: ForecastRequest) -> dict[str, Any]:
     inv_cost = round(tot_cost, 2)
     inv_delta = -((cs - 18.0) * 0.4 + (request.capacity - 12000.0) * 0.0009 + (95.0 - sl) * 0.5)
 
-    # Dynamic PSI based on SKU identifier to show responsive alerts
-    val = sum(ord(c) for c in sku)
-    psi = 0.02 + (val % 27) * 0.01
+    # Real per-SKU drift: PSI of the SKU's own demand, older half vs recent.
+    demand = sku_df["y_true"].to_numpy(dtype=float)
+    half = len(demand) // 2
+    psi = round(compute_psi(demand[:half], demand[half:])[0], 3) if half >= 1 else 0.0
     psi_delta = (psi - 0.20) * 100.0
 
     util = min(100.0, round((q_star / request.capacity) * 100.0, 1))
@@ -558,8 +561,14 @@ def get_skus(
         q_star = max(0.0, last_pred + cr_quantile)
         q_star = min(q_star, capacity)
 
-        val = sum(ord(c) for c in sku)
-        drift_psi = 0.02 + (val % 27) * 0.01
+        # Real per-SKU drift: PSI of the SKU's own demand, older half vs recent.
+        demand = sku_df["y_true"].to_numpy(dtype=float)
+        half = len(demand) // 2
+        if half >= 1:
+            drift_psi, _, _ = compute_psi(demand[:half], demand[half:])
+            drift_psi = round(drift_psi, 3)
+        else:
+            drift_psi = 0.0
 
         status = "ok"
         if drift_psi > 0.2:
@@ -569,7 +578,12 @@ def get_skus(
         elif emp_coverage > service_level + 2:
             status = "overstock"
 
-        margin = round(0.15 + (val % 31) * 0.01, 2)
+        # Cost-asymmetry proxy from the real per-SKU critical fractile
+        # (c_under / (c_under + c_over)); higher ratio ⇒ higher-criticality item.
+        if "critical_fractile" in sku_df.columns:
+            margin = round(float(sku_df["critical_fractile"].iloc[-1]), 2)
+        else:
+            margin = round(cr, 2)
         trend = [float(x) for x in sku_df["y_true"].tail(14).tolist()]
 
         skus_list.append(
@@ -592,52 +606,29 @@ def get_skus(
 
 @app.get("/api/drift")
 def get_drift(service_level: float = 95.0) -> list[dict[str, Any]]:
-    """Return feature PSI values and pre/post distributions."""
-    features: list[dict[str, Any]] = [
-        {"name": "temperature_7d", "base": 0.27, "type": "numeric", "importance": 0.32},
-        {"name": "weekend_flag", "base": 0.05, "type": "binary", "importance": 0.21},
-        {"name": "promo_intensity", "base": 0.22, "type": "numeric", "importance": 0.19},
-        {"name": "price_lag_1", "base": 0.14, "type": "numeric", "importance": 0.11},
-        {"name": "category_id", "base": 0.07, "type": "categoric", "importance": 0.09},
-        {"name": "competitor_idx", "base": 0.18, "type": "numeric", "importance": 0.05},
-        {"name": "is_holiday", "base": 0.03, "type": "binary", "importance": 0.03},
-    ]
+    """Return real per-feature PSI from the latest run's ``drift_report.json``.
 
-    result = []
-    for i, f in enumerate(features):
-        psi = max(0.005, f["base"] + (i * service_level % 3 - 1) * 0.01)
-        status = "ok"
-        if psi > 0.20:
-            status = "critical"
-        elif psi > 0.10:
-            status = "warning"
+    The artifact is produced during an ``experiment`` run: PSI is computed over
+    the top-importance features (mean absolute SHAP) by comparing the older and
+    most recent halves of the supervised frame. If the latest run predates this
+    artifact (or ran without explainability plots), an empty list is returned
+    rather than fabricated values.
+    """
+    try:
+        load_latest_predictions()
+    except Exception:
+        pass
 
-        bins = 8
-        pre = []
-        post = []
-        for b in range(bins):
-            x = (b - bins / 2) / 1.2
-            pre_val = np.exp(-x * x / 2)
-            shift = min(1.6, psi * 5.0)
-            post_val = np.exp(-((x - shift) ** 2) / 2)
-            pre.append(float(pre_val))
-            post.append(float(post_val))
-
-        sum_pre = sum(pre)
-        sum_post = sum(post)
-
-        result.append(
-            {
-                "name": f["name"],
-                "type": f["type"],
-                "importance": f["importance"],
-                "psi": round(psi, 3),
-                "status": status,
-                "pre": [v / sum_pre for v in pre],
-                "post": [v / sum_post for v in post],
-            }
-        )
-    return sorted(result, key=lambda x: x["psi"], reverse=True)
+    run_path = _PREDICTIONS_CACHE.get("run_path")
+    drift_path = run_path / "drift_report.json" if run_path else None
+    if drift_path and drift_path.exists():
+        try:
+            report = json.loads(drift_path.read_text(encoding="utf-8"))
+            if isinstance(report, list) and report:
+                return sorted(report, key=lambda item: item.get("psi", 0.0), reverse=True)
+        except Exception:
+            logger.warning("Failed to parse drift_report.json at %s", drift_path)
+    return []
 
 
 @app.get("/api/alerts")
