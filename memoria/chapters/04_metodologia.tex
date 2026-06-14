@@ -299,7 +299,7 @@ evolutivo (basado en NSGA-II \cite{deb2002nsga2}) optimiza simultáneamente dos 
     \item \textbf{Nitidez Probabilística (Winkler Score)}: Penaliza simultáneamente la amplitud de los intervalos de confianza predichos (penalizando intervalos vagos o excesivamente anchos) y la cobertura empírica si el valor real cae fuera del intervalo.
 \end{enumerate}
 
-El resultado no es una única configuración de hiperparámetros ``óptima'', sino un \textbf{Frente de Pareto} donde cada punto representa un compromiso inmejorable entre el coste logístico de la predicción central y la fiabilidad de las cotas de incertidumbre. El orquestador selecciona el punto del frente que minimiza la suma ponderada $\text{Pinball}(q^*) + \text{Winkler}$ antes de iniciar el \textit{backtesting} global.
+El resultado no es una única configuración de hiperparámetros ``óptima'', sino un \textbf{Frente de Pareto} donde cada punto representa un compromiso inmejorable entre el coste logístico de la predicción central y la fiabilidad de las cotas de incertidumbre. El orquestador selecciona el punto del frente que minimiza la suma $\text{Pinball}(q^*) + \text{Winkler}$ (ambos objetivos con igual peso) antes de iniciar el \textit{backtesting} global.
 
 \subsection{Calibración: Mondrian Conformal Prediction}
 El modelo entrenado con \textit{Pinball Loss} en $q = 0{,}9$ debería, en teoría, producir
