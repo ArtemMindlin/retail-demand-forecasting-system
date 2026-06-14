@@ -356,15 +356,15 @@ Para garantizar que la deuda técnica no limite el escalado del sistema, se han 
 \begin{itemize}
     \item \textbf{Contratos Estrictos (Pydantic)}: Toda la configuración y los metadatos transitan a través de esquemas validados y tipados estáticamente, rechazando configuraciones incoherentes o derivas de datos no controladas.
     \item \textbf{Contenerización (Docker)}: La API (que sirve el microservicio FastAPI y
-    la interfaz React integrada), el servidor MLflow y el almacenamiento local están orquestados
+    la interfaz React integrada), el servidor MLflow y un proxy inverso Caddy están orquestados
     conjuntamente mediante \texttt{docker-compose.yml}, garantizando que cualquier investigador
     pueda levantar la arquitectura completa con un solo comando en cualquier sistema operativo.
-    \item \textbf{Integración Continua (GitHub Actions)}: El repositorio cuenta con un pipeline de CI (\texttt{ci.yml}) que, ante cada nuevo \textit{commit}, despliega un entorno virgen, formatea el código (Ruff) y ejecuta la batería de tests automatizados descritos en la sección siguiente.
+    \item \textbf{Integración Continua (GitHub Actions)}: El repositorio cuenta con un pipeline de CI (\texttt{ci.yml}) que, ante cada nuevo \textit{commit}, despliega un entorno virgen, verifica el estilo y el formato del código (Ruff), comprueba los tipos estáticos (Mypy) y ejecuta la batería de tests automatizados descritos en la sección siguiente.
 \end{itemize}
 
 \subsection{Estrategia de Testing: Pirámide de Verificación}
 
-El sistema cuenta con 19 módulos de test organizados en cinco niveles, cada uno orientado a un tipo de fallo diferente (Tabla~\ref{tab:test_strategy}).
+El sistema cuenta con 20 módulos de test organizados en cinco niveles, cada uno orientado a un tipo de fallo diferente (Tabla~\ref{tab:test_strategy}).
 
 \begin{table}[htbp]
     \centering
@@ -380,7 +380,7 @@ El sistema cuenta con 19 módulos de test organizados en cinco niveles, cada uno
         Integración y humo & Pipeline end-to-end sobre datos sintéticos, endpoints FastAPI y CI/CD. \\
         \bottomrule
     \end{tabular}
-    \caption{Estrategia de testing por niveles: 19 módulos clasificados por tipo de fallo.}
+    \caption{Estrategia de testing por niveles: 20 módulos clasificados por tipo de fallo.}
     \label{tab:test_strategy}
 \end{table}
 
