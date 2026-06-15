@@ -4784,23 +4784,32 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     // ═══════════════════════════════════════════════════════════════════════
 
     // ═══════════════════════════════════════════════════════════════════════
-    // EdaView — EDA figure gallery
+    // EdaView — EDA figure gallery with side nav and expandable interpretations
     // ═══════════════════════════════════════════════════════════════════════
     function EdaView() {
       const { useState, useEffect } = React;
       const [meta, setMeta] = useState(null);
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState(null);
+      const [expanded, setExpanded] = useState({});
+      const [activeNav, setActiveNav] = useState(null);
 
       useEffect(() => {
         fetch("/api/eda")
-          .then(r => {
-            if (!r.ok) throw new Error("EDA no disponible");
-            return r.json();
-          })
+          .then(r => { if (!r.ok) throw new Error("EDA no disponible"); return r.json(); })
           .then(d => { setMeta(d); setLoading(false); })
           .catch(e => { setError(e.message); setLoading(false); });
       }, []);
+
+      const scrollTo = (name) => {
+        setActiveNav(name);
+        const el = document.getElementById(`eda-fig-${name}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+
+      const toggleExpanded = (name) => {
+        setExpanded(prev => ({ ...prev, [name]: !prev[name] }));
+      };
 
       if (loading) return (
         <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
@@ -4815,7 +4824,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       );
 
       const s = meta?.summary ?? {};
-      const fmtNum = (v, d = 0) => v == null ? "—" : Number(v).toLocaleString("es-ES", { maximumFractionDigits: d });
+      const figures = meta?.figures ?? [];
+      const fmtNum = (v) => v == null ? "—" : Number(v).toLocaleString("es-ES", { maximumFractionDigits: 0 });
       const fmtPct = (v) => v == null ? "—" : (v * 100).toFixed(1) + "%";
 
       const statCards = [
@@ -4826,47 +4836,98 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       ];
 
       return (
-        <div>
-          {/* Header */}
-          <div style={{ marginBottom: 20 }}>
-            <div className="label-mono" style={{ marginBottom: 4 }}>análisis exploratorio · dataset preparado</div>
-            <div className="h-display" style={{ fontSize: 20, color: "var(--text-1)" }}>
-              Exploratory Data Analysis
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginTop: 4 }}>
-              {meta?.run ?? ""}
+        <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+
+          {/* ── Left sticky nav ── */}
+          <div style={{ width: 190, flexShrink: 0 }}>
+            <div style={{ position: "sticky", top: 20 }}>
+              <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>
+                Figuras
+              </div>
+              {figures.map(fig => (
+                <button
+                  key={fig.name}
+                  onClick={() => scrollTo(fig.name)}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    background: activeNav === fig.name ? "rgba(139,92,246,0.1)" : "transparent",
+                    border: "none",
+                    borderLeft: `2px solid ${activeNav === fig.name ? "var(--c-ai)" : "var(--border)"}`,
+                    padding: "7px 12px",
+                    color: activeNav === fig.name ? "var(--text-1)" : "var(--text-2)",
+                    fontSize: 12, cursor: "pointer", lineHeight: 1.4,
+                    marginBottom: 2, borderRadius: "0 6px 6px 0",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {fig.nav_label || fig.caption}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Summary stat cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 28 }}>
-            {statCards.map(c => (
-              <div key={c.label} className="glass" style={{ padding: "14px 18px" }}>
-                <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  {c.label}
-                </div>
-                <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: c.color, fontFamily: "var(--font-display)" }}>
-                  {c.value}
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* ── Main content ── */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Header */}
+            <div style={{ marginBottom: 20 }}>
+              <div className="label-mono" style={{ marginBottom: 4 }}>análisis exploratorio · dataset preparado</div>
+              <div className="h-display" style={{ fontSize: 20, color: "var(--text-1)" }}>Exploratory Data Analysis</div>
+              <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginTop: 4 }}>{meta?.run ?? ""}</div>
+            </div>
 
-          {/* Figure gallery — 2 columns */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            {(meta?.figures ?? []).map(fig => (
-              <div key={fig.name} className="glass" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <img
-                  src={`/api/eda/figure/${fig.name}`}
-                  alt={fig.caption}
-                  style={{ width: "100%", borderRadius: 8, background: "#fff", display: "block" }}
-                  loading="lazy"
-                />
-                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-1)", lineHeight: 1.4 }}>
-                  {fig.caption}
+            {/* Stat cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 28 }}>
+              {statCards.map(c => (
+                <div key={c.label} className="glass" style={{ padding: "14px 18px" }}>
+                  <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{c.label}</div>
+                  <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: c.color, fontFamily: "var(--font-display)" }}>{c.value}</div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            {/* Figure gallery — 2 columns */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              {figures.map(fig => (
+                <div key={fig.name} id={`eda-fig-${fig.name}`} className="glass" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10, scrollMarginTop: 20 }}>
+                  <img
+                    src={`/api/eda/figure/${fig.name}`}
+                    alt={fig.caption}
+                    style={{ width: "100%", borderRadius: 8, background: "#fff", display: "block" }}
+                    loading="lazy"
+                  />
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-1)", lineHeight: 1.4 }}>
+                      {fig.caption}
+                    </div>
+                    {fig.interpretation && (
+                      <button
+                        onClick={() => toggleExpanded(fig.name)}
+                        style={{
+                          flexShrink: 0, fontSize: 11, padding: "4px 10px",
+                          borderRadius: 6, border: "1px solid var(--border-2)",
+                          background: expanded[fig.name] ? "rgba(139,92,246,0.12)" : "transparent",
+                          color: expanded[fig.name] ? "var(--c-ai)" : "var(--text-3)",
+                          cursor: "pointer", whiteSpace: "nowrap",
+                        }}
+                      >
+                        {expanded[fig.name] ? "Ocultar" : "Interpretación"}
+                      </button>
+                    )}
+                  </div>
+                  {expanded[fig.name] && fig.interpretation && (
+                    <div style={{
+                      padding: "10px 14px",
+                      background: "rgba(139,92,246,0.06)",
+                      borderLeft: "3px solid var(--c-ai)",
+                      borderRadius: "0 8px 8px 0",
+                      fontSize: 13, color: "var(--text-2)", lineHeight: 1.65,
+                    }}>
+                      {fig.interpretation}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       );
@@ -5475,7 +5536,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
       return (
         <div className="app">
-          <Sidebar
+          {activeTab !== "eda" && <Sidebar
             params={params}
             setParams={setParams}
             onRun={handleRun}

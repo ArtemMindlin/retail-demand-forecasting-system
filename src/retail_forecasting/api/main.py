@@ -393,33 +393,57 @@ def download_costs() -> FileResponse:
 _EDA_FIGURES: list[dict[str, str]] = [
     {
         "name": "observed_demand_distribution",
+        "nav_label": "Distribución de demanda",
         "caption": "Distribución global de la demanda observada",
+        "interpretation": "La distribución muestra concentración en rangos bajos y una cola hacia valores mayores, lo que es coherente con un problema retail heterogéneo y alejado de una distribución gaussiana simple.",
     },
-    {"name": "weekday_demand_profile", "caption": "Perfil semanal de demanda (media y mediana)"},
+    {
+        "name": "weekday_demand_profile",
+        "nav_label": "Perfil semanal",
+        "caption": "Perfil semanal de demanda (media y mediana)",
+        "interpretation": "El patrón semanal visible justifica el uso de variables de calendario y retardos de 7 días en la etapa de ingeniería de características.",
+    },
     {
         "name": "observed_demand_boxplot_top_series",
+        "nav_label": "Dispersión top series",
         "caption": "Dispersión de la demanda en las series de mayor volumen",
+        "interpretation": "Incluso entre las series de mayor volumen persisten diferencias relevantes en nivel medio y variabilidad, lo que refuerza la conveniencia de incorporar contexto de serie en el modelado.",
     },
     {
         "name": "zero_demand_rate_by_series",
+        "nav_label": "Intermitencia por serie",
         "caption": "Series más intermitentes (proporción de demanda cero)",
+        "interpretation": "La intermitencia no es homogénea entre series, por lo que el problema no debe interpretarse como uniforme para todas las combinaciones tienda-producto.",
     },
     {
         "name": "stockout_hours_distribution",
+        "nav_label": "Distribución stockout",
         "caption": "Distribución de horas de stockout en el panel",
+        "interpretation": "La frecuencia de stockouts confirma que la falta de disponibilidad forma parte del régimen operativo del dataset y no constituye un fenómeno aislado.",
     },
     {
         "name": "stockout_band_demand",
+        "nav_label": "Demanda por banda stockout",
         "caption": "Demanda media y observaciones por banda de stockout",
+        "interpretation": "La caída de la demanda observada bajo stockouts severos es consistente con la hipótesis de censura operativa por falta de disponibilidad.",
     },
     {
         "name": "stockout_vs_demand_scatter",
+        "nav_label": "Stockout vs demanda",
         "caption": "Relación entre horas de stockout y demanda observada",
+        "interpretation": "La tendencia agregada negativa sugiere que las horas de stockout aportan señal contextual relevante, aunque con elevada dispersión entre observaciones.",
     },
-    {"name": "correlation_heatmap", "caption": "Correlaciones entre features numéricas y demanda"},
+    {
+        "name": "correlation_heatmap",
+        "nav_label": "Correlaciones",
+        "caption": "Correlaciones entre features numéricas y demanda",
+        "interpretation": "Las asociaciones marginales son en general moderadas, lo que respalda el uso de modelos flexibles capaces de capturar interacciones y no linealidades.",
+    },
     {
         "name": "representative_series_panels",
+        "nav_label": "Series representativas",
         "caption": "Pequeños múltiplos de demanda con overlay de stockout",
+        "interpretation": "La visualización conjunta de demanda y stockout resume la complejidad del problema: estacionalidad, heterogeneidad entre series y posible compresión de ventas observadas.",
     },
 ]
 
