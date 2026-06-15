@@ -5002,6 +5002,190 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     // ═══════════════════════════════════════════════════════════════════════
     // ConfigModal — YAML config editor
     // ═══════════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
+    // OpsView — operational plane: week-by-week production simulation playback.
+    // Plays back the walk-forward backtest artifact (/api/ops/*): at each weekly
+    // origin the model forecasts the next week with a conformal band, a Newsvendor
+    // order is placed, and the realized demand closes the loop.
+    // ═══════════════════════════════════════════════════════════════════════
+    function OpsView() {
+      const { useState, useEffect } = React;
+      const [meta, setMeta] = useState(null);
+      const [error, setError] = useState(null);
+      const [cadence, setCadence] = useState("every_7d");
+      const [series, setSeries] = useState(null);
+      const [traj, setTraj] = useState(null);
+      const [week, setWeek] = useState(0);
+
+      useEffect(() => {
+        fetch("/api/ops/weeks")
+          .then(r => { if (!r.ok) throw new Error("Simulación OPS no disponible"); return r.json(); })
+          .then(d => {
+            setMeta(d);
+            if (d.series?.length) setSeries(d.series[0]);
+            // Default to the last fully-revealed week.
+            const complete = d.weeks.filter(w => w.by_cadence?.[cadence]?.actuals_complete);
+            setWeek((complete.length ? complete[complete.length - 1] : d.weeks[d.weeks.length - 1]).week_index);
+          })
+          .catch(e => setError(e.message));
+      }, []);
+
+      useEffect(() => {
+        if (!series) return;
+        fetch(`/api/ops/series/${encodeURIComponent(series)}?cadence=${cadence}`)
+          .then(r => r.ok ? r.json() : Promise.reject())
+          .then(setTraj)
+          .catch(() => setTraj(null));
+      }, [series, cadence]);
+
+      if (error) return (
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+          {error}<div style={{ marginTop: 8, fontSize: 11 }}>Ejecuta la simulación: <code>make simulate CONFIG=configs/simulation.yaml</code></div>
+        </div>
+      );
+      if (!meta) return (
+        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+          <div style={{ width: 32, height: 32, borderRadius: "50%", border: "3px solid var(--border-2)", borderTopColor: "var(--c-ai)", animation: "spin 0.8s linear infinite" }} />
+        </div>
+      );
+
+      const weeks = meta.weeks || [];
+      const cur = weeks.find(w => w.week_index === week) || weeks[0];
+      const curBlock = cur?.by_cadence?.[cadence] || {};
+      const target = meta.target_coverage ?? 0.8;
+      const fmtPct = (v) => v == null ? "—" : (v * 100).toFixed(1) + "%";
+      const fmtNum = (v) => v == null ? "—" : Number(v).toLocaleString("es-ES", { maximumFractionDigits: 0 });
+      const covColor = (curBlock.coverage ?? 0) >= target - 0.05 ? "var(--c-conf)" : (curBlock.coverage ?? 0) >= target - 0.25 ? "var(--c-drift)" : "#ef4444";
+
+      // Cost comparison across cadences for this week.
+      const costWeekly = cur?.by_cadence?.every_7d?.total_cost;
+      const costNever = cur?.by_cadence?.never?.total_cost;
+
+      const kpis = [
+        { label: "Cobertura realizada", value: fmtPct(curBlock.coverage), sub: `objetivo ${fmtPct(target)}`, color: covColor },
+        { label: "Coste de inventario (sem.)", value: "$" + fmtNum(curBlock.total_cost), sub: cadence === "every_7d" ? "política producción" : "sin reentreno", color: "var(--c-inv)" },
+        { label: "MAE demanda lead-time", value: fmtNum(curBlock.mae), sub: `${curBlock.n_series ?? 0} series`, color: "var(--c-ai)" },
+        { label: "Ahorro vs sin reentreno", value: (costNever && costWeekly) ? fmtPct(1 - costWeekly / costNever) : "—", sub: "coste semanal", color: "var(--c-conf)" },
+      ];
+
+      return (
+        <div>
+          {/* Header */}
+          <div style={{ marginBottom: 18 }}>
+            <div className="label-mono" style={{ marginBottom: 4 }}>plano de operación · backtest walk-forward</div>
+            <div className="h-display" style={{ fontSize: 22, color: "var(--text-1)" }}>Simulación de producción semana a semana</div>
+            <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 4 }}>
+              El modelo elegido corre en el tiempo: cada semana pronostica con banda conformal, decide el pedido (Newsvendor) y se revela la demanda real.
+            </div>
+          </div>
+
+          {/* Cadence toggle + week stepper */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", marginBottom: 18 }}>
+            <div style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}>
+              {(meta.cadences || []).map(c => (
+                <button key={c} onClick={() => setCadence(c)}
+                  style={{ fontSize: 11.5, fontFamily: "var(--font-mono)", padding: "6px 12px", borderRadius: 7, cursor: "pointer", border: "none",
+                    background: cadence === c ? "rgba(139,92,246,0.18)" : "transparent",
+                    color: cadence === c ? "var(--text-1)" : "var(--text-3)" }}>
+                  {c === "every_7d" ? "Reentreno semanal" : c === "never" ? "Sin reentreno" : c}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-3)", whiteSpace: "nowrap" }}>
+                Semana {week + 1}/{weeks.length} · {cur?.origin_date}
+              </span>
+              <input type="range" min={weeks[0]?.week_index ?? 0} max={weeks[weeks.length - 1]?.week_index ?? 0} step={1}
+                value={week} onChange={e => setWeek(Number(e.target.value))}
+                style={{ "--track-fill": "var(--c-ai)", "--track-percent": `${weeks.length > 1 ? (week / (weeks.length - 1)) * 100 : 0}%`, flex: 1 }} />
+              {curBlock.actuals_complete === false && (
+                <span style={{ fontSize: 10, color: "var(--c-drift)", fontFamily: "var(--font-mono)" }}>semana parcial</span>
+              )}
+            </div>
+          </div>
+
+          {/* KPIs */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
+            {kpis.map(k => (
+              <div key={k.label} className="glass" style={{ padding: "14px 18px" }}>
+                <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k.label}</div>
+                <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "var(--font-display)" }}>{k.value}</div>
+                <div style={{ fontSize: 10.5, color: "var(--text-mute)", marginTop: 2 }}>{k.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Trajectory chart + series selector */}
+          <div className="glass chart-card" style={{ padding: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-1)" }}>Trayectoria de la serie · pronóstico vs realidad</div>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>banda conformal {fmtPct(target)} · línea = predicción · puntos = demanda real (verde dentro de banda, rojo fuera)</div>
+              </div>
+              <select value={series || ""} onChange={e => setSeries(e.target.value)}
+                style={{ background: "var(--surface)", color: "var(--text-1)", border: "1px solid var(--border-2)", borderRadius: 8, padding: "7px 10px", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                {(meta.series || []).map(s => <option key={s} value={s}>SKU {s}</option>)}
+              </select>
+            </div>
+            <OpsTrajChart points={traj?.points || []} selectedWeek={week} />
+          </div>
+        </div>
+      );
+    }
+
+    // SVG line chart: conformal band + point forecast + revealed actuals over weeks.
+    function OpsTrajChart({ points, selectedWeek }) {
+      if (!points.length) return (
+        <div style={{ height: 300, display: "grid", placeItems: "center", color: "var(--text-3)", fontSize: 12 }}>Sin datos para esta serie</div>
+      );
+      const W = 760, H = 320, pad = { l: 48, r: 16, t: 16, b: 36 };
+      const xs = points.map((_, i) => i);
+      const allY = points.flatMap(p => [p.lower, p.upper, p.y_pred, p.y_true].filter(v => v != null));
+      const yMin = Math.min(...allY), yMax = Math.max(...allY);
+      const yPad = (yMax - yMin) * 0.1 || 1;
+      const y0 = yMin - yPad, y1 = yMax + yPad;
+      const px = (i) => pad.l + (points.length === 1 ? 0.5 : i / (points.length - 1)) * (W - pad.l - pad.r);
+      const py = (v) => pad.t + (1 - (v - y0) / (y1 - y0)) * (H - pad.t - pad.b);
+
+      const bandTop = points.map((p, i) => `${px(i)},${py(p.upper)}`).join(" ");
+      const bandBot = points.map((p, i) => `${px(i)},${py(p.lower)}`).reverse().join(" ");
+      const predLine = points.map((p, i) => `${px(i)},${py(p.y_pred)}`).join(" ");
+
+      const yticks = [y0, (y0 + y1) / 2, y1];
+
+      return (
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+          {/* Y grid + labels */}
+          {yticks.map((v, i) => (
+            <g key={i}>
+              <line x1={pad.l} x2={W - pad.r} y1={py(v)} y2={py(v)} stroke="rgba(148,163,184,0.10)" />
+              <text x={pad.l - 8} y={py(v) + 3} textAnchor="end" fontFamily="var(--font-mono)" fontSize="10" fill="var(--text-3)">{v.toFixed(0)}</text>
+            </g>
+          ))}
+          {/* Selected week marker */}
+          {points[selectedWeek] !== undefined && points.some(p => p.week_index === selectedWeek) && (() => {
+            const idx = points.findIndex(p => p.week_index === selectedWeek);
+            return idx >= 0 ? <line x1={px(idx)} x2={px(idx)} y1={pad.t} y2={H - pad.b} stroke="var(--c-ai)" strokeWidth="1" strokeDasharray="4 4" opacity="0.5" /> : null;
+          })()}
+          {/* Conformal band */}
+          <polygon points={`${bandTop} ${bandBot}`} fill="rgba(59,130,246,0.14)" stroke="none" />
+          <polyline points={predLine} fill="none" stroke="var(--c-inv)" strokeWidth="2" />
+          {/* Actuals */}
+          {points.map((p, i) => p.y_true != null && (
+            <circle key={i} cx={px(i)} cy={py(p.y_true)} r="4.5"
+              fill={p.covered ? "var(--c-conf)" : "#ef4444"} stroke="#0b0f15" strokeWidth="1.5" />
+          ))}
+          {/* X labels (origin dates) */}
+          {points.map((p, i) => (
+            <text key={i} x={px(i)} y={H - pad.b + 16} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="9.5" fill="var(--text-3)">
+              {p.origin_date.slice(5)}
+            </text>
+          ))}
+        </svg>
+      );
+    }
+
     function ConfigModal({ onClose, onRunPipeline }) {
       const [yaml, setYaml] = useState("");
       const [loading, setLoading] = useState(true);
@@ -5342,6 +5526,23 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const [alerts, setAlerts] = useState(SEED_ALERTS);
       const [alertsOpen, setAlertsOpen] = useState(false);
       const [configOpen, setConfigOpen] = useState(false);
+      // Two-level navigation: top-level mode (research vs operations) → sub-tabs.
+      const MODES = [
+        { id: "operacion", label: "Operación", icon: "zap", tabs: [
+          { id: "ops", label: "Simulación OPS", icon: "activity" },
+          { id: "dashboard", label: "Dashboard", icon: "cpu" },
+          { id: "skus", label: "Análisis SKU", icon: "package" },
+          { id: "drift", label: "Monitor de Drift", icon: "trendingUp" },
+        ]},
+        { id: "analisis", label: "Análisis", icon: "sigma", tabs: [
+          { id: "eda", label: "EDA", icon: "layers" },
+          { id: "experiments", label: "Experimentos", icon: "sparkles" },
+        ]},
+      ];
+      // Tabs that show the what-if Sidebar (the rest get the full-width canvas).
+      const SIDEBAR_TABS = ["dashboard", "skus", "drift"];
+
+      const [activeMode, setActiveMode] = useState("operacion");
       const [activeTab, setActiveTab] = useState("dashboard");
       const [selectedSkuId, setSelectedSkuId] = useState(null);
       const [tabTransitioning, setTabTransitioning] = useState(false);
@@ -5357,6 +5558,16 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           }, 60);
         }, 180);
       };
+
+      const changeMode = (modeId) => {
+        if (modeId === activeMode) return;
+        const mode = MODES.find(m => m.id === modeId);
+        if (!mode) return;
+        setActiveMode(modeId);
+        changeTab(mode.tabs[0].id);
+      };
+
+      const showSidebar = SIDEBAR_TABS.includes(activeTab);
 
       const [toasts, setToasts] = useState([]);
       const [pipelineRunning, setPipelineRunning] = useState(false);
@@ -5601,8 +5812,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       if (!authed) return <LoginScreen onLogin={() => setAuthed(true)} />;
 
       return (
-        <div className="app" style={activeTab === "eda" ? { gridTemplateColumns: "1fr" } : {}}>
-          {activeTab !== "eda" && <Sidebar
+        <div className="app" style={showSidebar ? {} : { gridTemplateColumns: "1fr" }}>
+          {showSidebar && <Sidebar
             params={params}
             setParams={setParams}
             onRun={handleRun}
@@ -5632,41 +5843,54 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               />
             ) : (
               <>
-                {/* Premium Tab Navigation Bar */}
-                <div style={{
-                  display: "flex",
-                  gap: 8,
-                  borderBottom: "1px solid var(--border)",
-                  paddingBottom: 16,
-                  marginBottom: 20
-                }}>
-                  {[
-                    { id: "dashboard", label: "Dashboard General", icon: "activity" },
-                    { id: "skus", label: "Análisis SKU", icon: "package" },
-                    { id: "drift", label: "Monitor de Drift", icon: "zap" },
-                    { id: "experiments", label: "Experimentos", icon: "layers" },
-                    { id: "eda", label: "EDA", icon: "bar-chart-2" }
-                  ].map(t => (
-                    <button
-                      key={t.id}
-                      className={`filter-tab ${activeTab === t.id ? "active" : ""}`}
-                      onClick={() => changeTab(t.id)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        fontSize: 12.5,
-                        padding: "10px 16px",
-                        borderRadius: "8px",
-                        background: activeTab === t.id ? "rgba(139, 92, 246, 0.12)" : "rgba(255,255,255,0.02)",
-                        color: activeTab === t.id ? "#fff" : "var(--text-2)",
-                        borderColor: activeTab === t.id ? "rgba(139, 92, 246, 0.45)" : "var(--border)"
-                      }}
-                    >
-                      <Icon name={t.icon} size={14} />
-                      {t.label}
-                    </button>
-                  ))}
+                {/* Two-level navigation: mode toggle + sub-tabs */}
+                <div style={{ marginBottom: 18 }}>
+                  {/* Mode toggle */}
+                  <div style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", marginBottom: 14 }}>
+                    {MODES.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => changeMode(m.id)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8,
+                          fontSize: 13, fontWeight: 600, fontFamily: "var(--font-display)",
+                          padding: "8px 18px", borderRadius: 9, cursor: "pointer",
+                          border: "none",
+                          background: activeMode === m.id ? "linear-gradient(135deg, var(--c-ai), var(--c-inv))" : "transparent",
+                          color: activeMode === m.id ? "#fff" : "var(--text-3)",
+                          boxShadow: activeMode === m.id ? "0 0 18px rgba(139,92,246,0.35)" : "none",
+                          transition: "all 0.18s ease",
+                        }}
+                      >
+                        <Icon name={m.icon} size={15} />
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Sub-tabs for the active mode */}
+                  <div style={{
+                    display: "flex", gap: 8, flexWrap: "wrap",
+                    borderBottom: "1px solid var(--border)", paddingBottom: 16,
+                  }}>
+                    {(MODES.find(m => m.id === activeMode)?.tabs || []).map(t => (
+                      <button
+                        key={t.id}
+                        className={`filter-tab ${activeTab === t.id ? "active" : ""}`}
+                        onClick={() => changeTab(t.id)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8,
+                          fontSize: 12.5, padding: "10px 16px", borderRadius: "8px",
+                          background: activeTab === t.id ? "rgba(139, 92, 246, 0.12)" : "rgba(255,255,255,0.02)",
+                          color: activeTab === t.id ? "#fff" : "var(--text-2)",
+                          borderColor: activeTab === t.id ? "rgba(139, 92, 246, 0.45)" : "var(--border)"
+                        }}
+                      >
+                        <Icon name={t.icon} size={14} />
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {activeTab === "dashboard" && (
@@ -5725,6 +5949,10 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
                 {activeTab === "eda" && (
                   <EdaView />
+                )}
+
+                {activeTab === "ops" && (
+                  <OpsView />
                 )}
               </>
             )}
