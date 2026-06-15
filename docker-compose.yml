@@ -27,10 +27,10 @@ services:
       - ./configs:/app/configs
       - ./data:/app/data
       - ./reports:/app/reports
+    env_file:
+      - .env
     environment:
       - RETAIL_PROJECT__RUN_MODE=score_daily
-      - AUTH_USERNAME=ArtemMindlin
-      - AUTH_PASSWORD=greita2017saulia2013
     restart: unless-stopped
 
   # 2. MLflow Tracking Server
