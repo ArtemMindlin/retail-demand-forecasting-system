@@ -396,7 +396,6 @@ _EDA_FIGURES: list[dict[str, str]] = [
         "caption": "Distribución global de la demanda observada",
     },
     {"name": "weekday_demand_profile", "caption": "Perfil semanal de demanda (media y mediana)"},
-    {"name": "coverage_heatmap", "caption": "Cobertura temporal del panel por serie y fecha"},
     {
         "name": "observed_demand_boxplot_top_series",
         "caption": "Dispersión de la demanda en las series de mayor volumen",
@@ -418,7 +417,6 @@ _EDA_FIGURES: list[dict[str, str]] = [
         "caption": "Relación entre horas de stockout y demanda observada",
     },
     {"name": "correlation_heatmap", "caption": "Correlaciones entre features numéricas y demanda"},
-    {"name": "top_series_total_demand", "caption": "Ranking de series por demanda total acumulada"},
     {
         "name": "representative_series_panels",
         "caption": "Pequeños múltiplos de demanda con overlay de stockout",
