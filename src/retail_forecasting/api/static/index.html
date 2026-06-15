@@ -1108,47 +1108,41 @@
     }
 
 
-    // --- Real API fetches with mock fallback ---
     const realFetch = async (endpoint, payload = {}) => {
-      try {
-        if (endpoint === "/api/forecast") {
-          const res = await fetch("/api/forecast", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-          if (!res.ok) throw new Error("API error " + res.status);
-          return await res.json();
-        } else if (endpoint === "/api/skus") {
-          const query = new URLSearchParams({
-            service_level: String(payload.serviceLevel ?? 95),
-            shortage_cost: String(payload.shortageCost ?? 18),
-            holding_cost: String(payload.holdingCost ?? 4),
-            capacity: String(payload.capacity ?? 12000)
-          });
-          const res = await fetch(`/api/skus?${query.toString()}`);
-          if (!res.ok) throw new Error("API error " + res.status);
-          return await res.json();
-        } else if (endpoint === "/api/drift") {
-          const query = new URLSearchParams({
-            service_level: String(payload.serviceLevel ?? 95)
-          });
-          const res = await fetch(`/api/drift?${query.toString()}`);
-          if (!res.ok) throw new Error("API error " + res.status);
-          return await res.json();
-        } else if (endpoint === "/api/alerts") {
-          const res = await fetch("/api/alerts");
-          if (!res.ok) throw new Error("API error " + res.status);
-          return await res.json();
-        }
-      } catch (err) {
-        console.warn(`Fallback to mock for ${endpoint}:`, err);
-        return mockFetch(endpoint, payload);
+      if (endpoint === "/api/forecast") {
+        const res = await fetch("/api/forecast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error("API error " + res.status);
+        return await res.json();
+      } else if (endpoint === "/api/skus") {
+        const query = new URLSearchParams({
+          service_level: String(payload.serviceLevel ?? 95),
+          shortage_cost: String(payload.shortageCost ?? 18),
+          holding_cost: String(payload.holdingCost ?? 4),
+          capacity: String(payload.capacity ?? 12000)
+        });
+        const res = await fetch(`/api/skus?${query.toString()}`);
+        if (!res.ok) throw new Error("API error " + res.status);
+        return await res.json();
+      } else if (endpoint === "/api/drift") {
+        const query = new URLSearchParams({
+          service_level: String(payload.serviceLevel ?? 95)
+        });
+        const res = await fetch(`/api/drift?${query.toString()}`);
+        if (!res.ok) throw new Error("API error " + res.status);
+        return await res.json();
+      } else if (endpoint === "/api/alerts") {
+        const res = await fetch("/api/alerts");
+        if (!res.ok) throw new Error("API error " + res.status);
+        return await res.json();
       }
-      return mockFetch(endpoint, payload);
+      throw new Error("Unknown endpoint: " + endpoint);
     };
 
-    window.api = { mockFetch, fetch: realFetch };
+    window.api = { fetch: realFetch };
 
     window.fmt = { fmtCurrency, fmtPct, fmtUnits };
   </script>
