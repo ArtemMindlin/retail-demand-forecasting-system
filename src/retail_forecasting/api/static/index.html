@@ -5535,7 +5535,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       if (!authed) return <LoginScreen onLogin={() => setAuthed(true)} />;
 
       return (
-        <div className="app">
+        <div className="app" style={activeTab === "eda" ? { gridTemplateColumns: "1fr" } : {}}>
           {activeTab !== "eda" && <Sidebar
             params={params}
             setParams={setParams}
