@@ -504,6 +504,129 @@ def get_eda_figure(name: str) -> FileResponse:
     return FileResponse(path=figure_path, media_type="image/png")
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# Operational simulation (OPS plane) — walk-forward week-by-week playback.
+# Reads the artifact produced by run_operational_simulation
+# (reports/<run>/simulation/predictions_by_day.parquet) and serves it indexed
+# by weekly origin. Pure artifact reads — no live compute, no pipeline lock.
+# ──────────────────────────────────────────────────────────────────────────
+
+# Conformal band [q_0_1, q_0_9] is a nominal 80% interval (models.quantiles).
+_OPS_TARGET_COVERAGE = 0.80
+_OPS_LOWER_COL = "q_0_1"
+_OPS_UPPER_COL = "q_0_9"
+_OPS_CACHE: dict[str, Any] = {}
+
+
+def _get_ops_sim_df() -> pd.DataFrame | None:
+    """Load and cache the operational-simulation prediction artifact."""
+    cached = _OPS_CACHE.get("df")
+    if cached is not None:
+        return cached
+
+    reports_dir = Path("reports")
+    if not reports_dir.exists():
+        return None
+    candidates = sorted(reports_dir.glob("*/simulation/predictions_by_day.parquet"))
+    if not candidates:
+        return None
+    artifact = max(candidates, key=lambda p: p.stat().st_mtime)
+
+    df = pd.read_parquet(artifact)
+    df["decision_date"] = pd.to_datetime(df["decision_date"])
+    # Weekly playback: keep origins on a 7-day grid (the retrain cadence boundary).
+    df["week_index"] = (df["day_index"] // 7).astype(int)
+    df["is_weekly_origin"] = df["day_index"] % 7 == 0
+    df["covered"] = (df["y_true"] >= df[_OPS_LOWER_COL]) & (df["y_true"] <= df[_OPS_UPPER_COL])
+    _OPS_CACHE["df"] = df
+    _OPS_CACHE["run"] = artifact.parent.parent.name
+    return df
+
+
+def _ops_cadence_block(group: pd.DataFrame) -> dict[str, Any]:
+    """Per-cadence aggregate for one weekly origin (fully-revealed rows only)."""
+    complete = group[group["actuals_complete"]]
+    base = complete if not complete.empty else group
+    coverage = float(base["covered"].mean()) if not base.empty else None
+    mae = float((base["y_pred"] - base["y_true"]).abs().mean()) if not base.empty else None
+    return {
+        "coverage": coverage,
+        "total_cost": float(group["total_cost"].sum()),
+        "mae": mae,
+        "n_series": int(group["series_id"].nunique()),
+        "retrained": bool(group["retrained_this_step"].any()),
+        "actuals_complete": bool(group["actuals_complete"].all()),
+    }
+
+
+@app.get("/api/ops/weeks")
+def get_ops_weeks() -> dict[str, Any]:
+    """Per-week summary across cadences plus the series catalogue (for the slider)."""
+    df = _get_ops_sim_df()
+    if df is None:
+        raise HTTPException(status_code=404, detail="No operational simulation artifact found.")
+
+    weekly = df[df["is_weekly_origin"]]
+    cadences = sorted(df["cadence"].unique().tolist())
+
+    weeks: list[dict[str, Any]] = []
+    for week_index, wk in weekly.groupby("week_index"):
+        by_cadence = {cad: _ops_cadence_block(grp) for cad, grp in wk.groupby("cadence")}
+        weeks.append(
+            {
+                "week_index": int(week_index),
+                "origin_date": wk["decision_date"].iloc[0].date().isoformat(),
+                "by_cadence": by_cadence,
+            }
+        )
+
+    # Series catalogue ordered by total realized demand (liveliest first).
+    volume = weekly.groupby("series_id")["y_true"].sum().sort_values(ascending=False)
+    series = [str(s) for s in volume.head(60).index.tolist()]
+
+    return {
+        "run": _OPS_CACHE.get("run", "ops_sim"),
+        "horizon": 7,
+        "target_coverage": _OPS_TARGET_COVERAGE,
+        "cadences": cadences,
+        "series": series,
+        "weeks": weeks,
+    }
+
+
+@app.get("/api/ops/series/{series_id}")
+def get_ops_series(series_id: str, cadence: str = "every_7d") -> dict[str, Any]:
+    """Weekly forecast/band/actual trajectory for one series (closes the loop)."""
+    df = _get_ops_sim_df()
+    if df is None:
+        raise HTTPException(status_code=404, detail="No operational simulation artifact found.")
+
+    sel = df[
+        (df["series_id"].astype(str) == series_id)
+        & (df["cadence"] == cadence)
+        & (df["is_weekly_origin"])
+    ].sort_values("week_index")
+    if sel.empty:
+        raise HTTPException(status_code=404, detail="Series not found in simulation.")
+
+    points = [
+        {
+            "week_index": int(r.week_index),
+            "origin_date": r.decision_date.date().isoformat(),
+            "y_pred": float(r.y_pred),
+            "lower": float(getattr(r, _OPS_LOWER_COL)),
+            "upper": float(getattr(r, _OPS_UPPER_COL)),
+            "y_true": None if pd.isna(r.y_true) else float(r.y_true),
+            "order_quantity": float(r.order_quantity),
+            "total_cost": float(r.total_cost),
+            "covered": bool(r.covered),
+            "actuals_complete": bool(r.actuals_complete),
+        }
+        for r in sel.itertuples(index=False)
+    ]
+    return {"series_id": series_id, "cadence": cadence, "points": points}
+
+
 @app.get("/health")
 def health_check() -> dict[str, Any]:
     """Liveness probe for Railway and BetterStack uptime monitoring."""
