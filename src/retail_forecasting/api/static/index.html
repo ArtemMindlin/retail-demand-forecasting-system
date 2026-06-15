@@ -5237,11 +5237,11 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         setLastRunAt(t.toTimeString().slice(0, 8));
       }, [params]);
 
-      // Initial load (slightly longer to show the skeleton)
+      // Initial load — wait until auth is confirmed to avoid a spurious 401 before login
       useEffect(() => {
-        reload(900);
+        if (authed === true) reload(900);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, []);
+      }, [authed]);
 
       // Auto-refresh as the user drags sliders (debounced)
       useEffect(() => {
