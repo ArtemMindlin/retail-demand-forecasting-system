@@ -390,7 +390,7 @@ def download_costs() -> FileResponse:
         ) from e
 
 
-_EDA_FIGURES: list[dict[str, str]] = [
+_EDA_FIGURES: list[dict[str, Any]] = [
     {
         "name": "observed_demand_distribution",
         "nav_label": "Distribución de demanda",
@@ -444,6 +444,7 @@ _EDA_FIGURES: list[dict[str, str]] = [
         "nav_label": "Series representativas",
         "caption": "Pequeños múltiplos de demanda con overlay de stockout",
         "interpretation": "La visualización conjunta de demanda y stockout resume la complejidad del problema: estacionalidad, heterogeneidad entre series y posible compresión de ventas observadas.",
+        "wide": True,
     },
 ]
 
