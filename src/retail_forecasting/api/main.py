@@ -450,8 +450,7 @@ def get_eda_meta() -> dict[str, Any]:
         try:
             df = pd.read_csv(summary_csv)
             if not df.empty:
-                row = df.iloc[0]
-                summary = {k: (None if pd.isna(v) else v) for k, v in row.items()}
+                summary = json.loads(df.iloc[[0]].to_json(orient="records"))[0]
         except Exception:
             pass
 
