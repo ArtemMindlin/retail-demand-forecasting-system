@@ -134,6 +134,10 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Deploy-target-local overrides (machine-specific infra, not part of the repo)
+docker-compose.override.yml
+caddy-conf.d/*.caddy
+
 # Environments
 .env
 .envrc

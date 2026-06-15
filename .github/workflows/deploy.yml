@@ -16,7 +16,14 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /root/retail-demand-forecasting-system
-            git pull origin main
+            # Hard-reset to origin so machine-local edits to tracked files can
+            # never block the deploy (a failed `git pull` used to leave the VPS
+            # on a stale commit while the build cache served old code). All
+            # VPS-specific config lives in gitignored files (.env,
+            # docker-compose.override.yml, caddy-conf.d/*.caddy) which reset
+            # leaves untouched.
+            git fetch origin main
+            git reset --hard origin/main
             docker compose down || true
             docker ps -q --filter publish=80 | xargs -r docker stop || true
             docker ps -q --filter publish=443 | xargs -r docker stop || true

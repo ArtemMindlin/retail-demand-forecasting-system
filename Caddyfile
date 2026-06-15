@@ -1,3 +1,9 @@
 artemmindlin.site {
 	reverse_proxy api:8000
 }
+
+# Host-specific extra site blocks (e.g. VPN, internal tooling) live in
+# caddy-conf.d/*.caddy on the deploy target. These files are gitignored so the
+# VPS can keep machine-local routing without diverging from the repo. The glob
+# is silently ignored when no files match (e.g. local dev).
+import /etc/caddy/conf.d/*.caddy
