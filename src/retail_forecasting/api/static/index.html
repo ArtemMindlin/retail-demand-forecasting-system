@@ -3628,30 +3628,6 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           </div>
 
           <div style={{ display: "flex", gap: 8 }}>
-            <a
-              href="/docs"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                ...btnGhost,
-                textDecoration: "none",
-                display: "inline-flex",
-                background: "rgba(139, 92, 246, 0.06)",
-                borderColor: "rgba(139, 92, 246, 0.25)",
-                color: "var(--text-1)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(139, 92, 246, 0.15)";
-                e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.5)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(139, 92, 246, 0.06)";
-                e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.25)";
-              }}
-            >
-              <Icon name="terminal" size={13} stroke="var(--c-ai)" />
-              <span>Doc API Swagger</span>
-            </a>
             <button style={btnGhost} onClick={onRefresh}>
               <Icon name="refresh" size={13} /> Refrescar
             </button>
