@@ -1317,11 +1317,17 @@
               fontFamily: "var(--font-mono)",
               fontSize: 11
             }}>
-              <div style={{ color: "var(--text-3)", marginBottom: 4 }}>derived</div>
-              <div style={{ color: "var(--text-1)" }}>
+              <div style={{ color: "var(--text-3)", marginBottom: 6 }}>derived</div>
+              <div style={{ color: "var(--text-1)", marginBottom: 4 }}>
                 <span style={{ color: "var(--c-ai)" }}>CR*</span> = c_s / (c_s + c_h) ={" "}
                 <span className="tnum" style={{ color: "#fff", fontWeight: 600 }}>
                   {(params.shortageCost / (params.shortageCost + params.holdingCost)).toFixed(3)}
+                </span>
+              </div>
+              <div style={{ color: "var(--text-1)" }}>
+                <span style={{ color: "var(--c-conf)" }}>α</span> = 1 − SL ={" "}
+                <span className="tnum" style={{ color: "#fff", fontWeight: 600 }}>
+                  {(1 - params.serviceLevel / 100).toFixed(3)}
                 </span>
               </div>
             </div>
@@ -3613,10 +3619,6 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           <div>
             <div className="h-display" style={{ fontSize: 26, color: "var(--text-1)" }}>
               Analítica Predictiva &amp; Decisiones de Inventario
-            </div>
-            <div style={{ fontSize: 13, color: "var(--text-3)", marginTop: 2 }}>
-              Sesión activa  ·  SKU bundle <span style={{ color: "var(--text-2)", fontFamily: "var(--font-mono)" }}>RT-029-A</span>
-              {" "}· horizon 8d  ·  α = {(1 - params.serviceLevel / 100).toFixed(3)}
             </div>
           </div>
 
