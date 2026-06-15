@@ -5347,6 +5347,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         setConsoleError(null);
         setConsoleLogs("Iniciando pipeline de forecasting e inventario en background...\n");
         try {
+          await fetch("/api/run/reset", { method: "POST" });
           const res = await fetch("/api/run", {
             method: "POST"
           });

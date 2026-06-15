@@ -322,6 +322,18 @@ def get_run_status() -> dict[str, Any]:
     }
 
 
+@app.post("/api/run/reset")
+def reset_pipeline_lock() -> dict[str, str]:
+    """Force-release the pipeline lock and reset run state. Use when the process died mid-run."""
+    if _RUN_LOCK.locked():
+        _RUN_LOCK.release()
+    _RUN_STATE["status"] = "idle"
+    _RUN_STATE["error"] = None
+    _RUN_STATE["start_time"] = None
+    _RUN_STATE["end_time"] = None
+    return {"status": "reset", "message": "Pipeline lock released."}
+
+
 @app.get("/api/download/predictions")
 def download_predictions() -> FileResponse:
     """Download the predictions.csv file from the latest run."""
