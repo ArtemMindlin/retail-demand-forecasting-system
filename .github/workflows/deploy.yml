@@ -18,4 +18,6 @@ jobs:
             cd /root/retail-demand-forecasting-system
             git pull origin main
             docker compose down || true
+            fuser -k 80/tcp || true
+            fuser -k 443/tcp || true
             docker compose up -d --build
