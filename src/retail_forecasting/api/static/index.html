@@ -4784,6 +4784,95 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     // ═══════════════════════════════════════════════════════════════════════
 
     // ═══════════════════════════════════════════════════════════════════════
+    // EdaView — EDA figure gallery
+    // ═══════════════════════════════════════════════════════════════════════
+    function EdaView() {
+      const { useState, useEffect } = React;
+      const [meta, setMeta] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+
+      useEffect(() => {
+        fetch("/api/eda")
+          .then(r => {
+            if (!r.ok) throw new Error("EDA no disponible");
+            return r.json();
+          })
+          .then(d => { setMeta(d); setLoading(false); })
+          .catch(e => { setError(e.message); setLoading(false); });
+      }, []);
+
+      if (loading) return (
+        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+          <div style={{ width: 32, height: 32, borderRadius: "50%", border: "3px solid var(--border-2)", borderTopColor: "var(--c-ai)", animation: "spin 0.8s linear infinite" }} />
+        </div>
+      );
+
+      if (error) return (
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+          {error}
+        </div>
+      );
+
+      const s = meta?.summary ?? {};
+      const fmtNum = (v, d = 0) => v == null ? "—" : Number(v).toLocaleString("es-ES", { maximumFractionDigits: d });
+      const fmtPct = (v) => v == null ? "—" : (v * 100).toFixed(1) + "%";
+
+      const statCards = [
+        { label: "Series únicas", value: fmtNum(s.unique_series), color: "var(--c-ai)" },
+        { label: "Filas en panel", value: fmtNum(s.rows), color: "var(--c-inv)" },
+        { label: "Tasa stockout", value: fmtPct(s.stockout_day_rate), color: "var(--c-drift)" },
+        { label: "Demanda cero", value: fmtPct(s.zero_demand_rate), color: "var(--c-conf)" },
+      ];
+
+      return (
+        <div>
+          {/* Header */}
+          <div style={{ marginBottom: 20 }}>
+            <div className="label-mono" style={{ marginBottom: 4 }}>análisis exploratorio · dataset preparado</div>
+            <div className="h-display" style={{ fontSize: 20, color: "var(--text-1)" }}>
+              Exploratory Data Analysis
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginTop: 4 }}>
+              {meta?.run ?? ""}
+            </div>
+          </div>
+
+          {/* Summary stat cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 28 }}>
+            {statCards.map(c => (
+              <div key={c.label} className="glass" style={{ padding: "14px 18px" }}>
+                <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  {c.label}
+                </div>
+                <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: c.color, fontFamily: "var(--font-display)" }}>
+                  {c.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Figure gallery — 2 columns */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            {(meta?.figures ?? []).map(fig => (
+              <div key={fig.name} className="glass" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                <img
+                  src={`/api/eda/figure/${fig.name}`}
+                  alt={fig.caption}
+                  style={{ width: "100%", borderRadius: 8, background: "#fff", display: "block" }}
+                  loading="lazy"
+                />
+                <div style={{ fontSize: 11.5, color: "var(--text-2)", lineHeight: 1.4 }}>
+                  {fig.caption}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ConfigModal — YAML config editor
     // ═══════════════════════════════════════════════════════════════════════
     function ConfigModal({ onClose, onRunPipeline }) {
@@ -5428,7 +5517,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     { id: "dashboard", label: "Dashboard General", icon: "activity" },
                     { id: "skus", label: "Análisis SKU", icon: "package" },
                     { id: "drift", label: "Monitor de Drift", icon: "zap" },
-                    { id: "experiments", label: "Experimentos", icon: "layers" }
+                    { id: "experiments", label: "Experimentos", icon: "layers" },
+                    { id: "eda", label: "EDA", icon: "bar-chart-2" }
                   ].map(t => (
                     <button
                       key={t.id}
@@ -5504,6 +5594,10 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
                 {activeTab === "experiments" && (
                   <ExperimentsView />
+                )}
+
+                {activeTab === "eda" && (
+                  <EdaView />
                 )}
               </>
             )}

@@ -390,6 +390,98 @@ def download_costs() -> FileResponse:
         ) from e
 
 
+_EDA_FIGURES: list[dict[str, str]] = [
+    {
+        "name": "observed_demand_distribution",
+        "caption": "Distribución global de la demanda observada",
+    },
+    {"name": "weekday_demand_profile", "caption": "Perfil semanal de demanda (media y mediana)"},
+    {"name": "coverage_heatmap", "caption": "Cobertura temporal del panel por serie y fecha"},
+    {
+        "name": "observed_demand_boxplot_top_series",
+        "caption": "Dispersión de la demanda en las series de mayor volumen",
+    },
+    {
+        "name": "zero_demand_rate_by_series",
+        "caption": "Series más intermitentes (proporción de demanda cero)",
+    },
+    {
+        "name": "stockout_hours_distribution",
+        "caption": "Distribución de horas de stockout en el panel",
+    },
+    {
+        "name": "stockout_band_demand",
+        "caption": "Demanda media y observaciones por banda de stockout",
+    },
+    {
+        "name": "stockout_vs_demand_scatter",
+        "caption": "Relación entre horas de stockout y demanda observada",
+    },
+    {"name": "correlation_heatmap", "caption": "Correlaciones entre features numéricas y demanda"},
+    {"name": "top_series_total_demand", "caption": "Ranking de series por demanda total acumulada"},
+    {
+        "name": "representative_series_panels",
+        "caption": "Pequeños múltiplos de demanda con overlay de stockout",
+    },
+]
+
+
+def _get_latest_eda_path() -> Path | None:
+    """Find the most-recent EDA report directory in reports/."""
+    reports_dir = Path("reports")
+    if not reports_dir.exists():
+        return None
+    eda_dirs = [d for d in reports_dir.iterdir() if d.is_dir() and d.name.startswith("eda_")]
+    if not eda_dirs:
+        return None
+    return max(eda_dirs, key=lambda d: d.name)
+
+
+@app.get("/api/eda")
+def get_eda_meta() -> dict[str, Any]:
+    """Return EDA summary stats and list of available figure names from the latest EDA run."""
+    eda_path = _get_latest_eda_path()
+    if eda_path is None:
+        raise HTTPException(status_code=404, detail="No EDA report found in reports/.")
+
+    summary: dict[str, Any] = {}
+    summary_csv = eda_path / "dataset_summary.csv"
+    if summary_csv.exists():
+        try:
+            df = pd.read_csv(summary_csv)
+            if not df.empty:
+                row = df.iloc[0]
+                summary = {k: (None if pd.isna(v) else v) for k, v in row.items()}
+        except Exception:
+            pass
+
+    available_figures = [fig for fig in _EDA_FIGURES if (eda_path / f"{fig['name']}.png").exists()]
+
+    return {"run": eda_path.name, "summary": summary, "figures": available_figures}
+
+
+@app.get("/api/eda/figure/{name}")
+def get_eda_figure(name: str) -> FileResponse:
+    """Serve a specific EDA figure PNG from the latest EDA run."""
+    safe_name = Path(name).name
+    if not safe_name or safe_name != name or "/" in name or ".." in name:
+        raise HTTPException(status_code=404, detail="Figure not found.")
+
+    known_names = {fig["name"] for fig in _EDA_FIGURES}
+    if safe_name not in known_names:
+        raise HTTPException(status_code=404, detail="Figure not found.")
+
+    eda_path = _get_latest_eda_path()
+    if eda_path is None:
+        raise HTTPException(status_code=404, detail="No EDA report found.")
+
+    figure_path = eda_path / f"{safe_name}.png"
+    if not figure_path.exists():
+        raise HTTPException(status_code=404, detail=f"Figure '{safe_name}' not found.")
+
+    return FileResponse(path=figure_path, media_type="image/png")
+
+
 @app.get("/health")
 def health_check() -> dict[str, Any]:
     """Liveness probe for Railway and BetterStack uptime monitoring."""
