@@ -5373,6 +5373,19 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         }
       };
 
+      // When in no_predictions state, check if a previous run failed and surface the error
+      useEffect(() => {
+        if (data?.status !== "no_predictions" || consoleStatus === "running") return;
+        fetch("/api/run/status")
+          .then(r => r.ok ? r.json() : null)
+          .then(result => {
+            if (result?.status === "failed" && result?.error) {
+              setConsoleError(result.error);
+            }
+          })
+          .catch(() => {});
+      }, [data?.status]);
+
       const handleRun = () => {
         if (data?.status === "no_predictions") {
           handleRunPipeline();
