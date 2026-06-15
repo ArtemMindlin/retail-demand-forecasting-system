@@ -4868,44 +4868,46 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const seenCount = Object.keys(seen).length;
       const lightboxFig = lightbox !== null ? figures[lightbox] : null;
 
+      const lightboxEl = lightboxFig ? ReactDOM.createPortal(
+        <div
+          onClick={closeLightbox}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.88)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, overflow: "hidden", maxWidth: "90vw", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
+            <img
+              src={`/api/eda/figure/${lightboxFig.name}`}
+              alt={lightboxFig.caption}
+              style={{ maxWidth: "88vw", maxHeight: "78vh", objectFit: "contain", display: "block" }}
+            />
+            <div style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: 16, borderTop: "1px solid #f1f5f9" }}>
+              <button
+                onClick={() => setLightbox(i => Math.max(i - 1, 0))}
+                disabled={lightbox === 0}
+                style={{ background: "transparent", border: "1px solid #e2e8f0", borderRadius: 6, padding: "6px 14px", cursor: lightbox === 0 ? "not-allowed" : "pointer", color: "#64748b", opacity: lightbox === 0 ? 0.35 : 1, fontSize: 16 }}
+              >←</button>
+              <div style={{ flex: 1, textAlign: "center" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{lightboxFig.caption}</div>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{lightbox + 1} / {figures.length} · Esc para cerrar</div>
+              </div>
+              <button
+                onClick={() => setLightbox(i => Math.min(i + 1, figures.length - 1))}
+                disabled={lightbox === figures.length - 1}
+                style={{ background: "transparent", border: "1px solid #e2e8f0", borderRadius: 6, padding: "6px 14px", cursor: lightbox === figures.length - 1 ? "not-allowed" : "pointer", color: "#64748b", opacity: lightbox === figures.length - 1 ? 0.35 : 1, fontSize: 16 }}
+              >→</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      ) : null;
+
       return (
         <>
-          {/* ── Lightbox ── */}
-          {lightboxFig && (
-            <div
-              onClick={closeLightbox}
-              style={{
-                position: "fixed", inset: 0, zIndex: 9999,
-                background: "rgba(0,0,0,0.88)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                padding: 24,
-              }}
-            >
-              <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, overflow: "hidden", maxWidth: "90vw", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
-                <img
-                  src={`/api/eda/figure/${lightboxFig.name}`}
-                  alt={lightboxFig.caption}
-                  style={{ maxWidth: "88vw", maxHeight: "78vh", objectFit: "contain", display: "block" }}
-                />
-                <div style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: 16, borderTop: "1px solid #f1f5f9" }}>
-                  <button
-                    onClick={() => setLightbox(i => Math.max(i - 1, 0))}
-                    disabled={lightbox === 0}
-                    style={{ background: "transparent", border: "1px solid #e2e8f0", borderRadius: 6, padding: "6px 14px", cursor: lightbox === 0 ? "not-allowed" : "pointer", color: "#64748b", opacity: lightbox === 0 ? 0.35 : 1, fontSize: 16 }}
-                  >←</button>
-                  <div style={{ flex: 1, textAlign: "center" }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{lightboxFig.caption}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{lightbox + 1} / {figures.length} · Esc para cerrar</div>
-                  </div>
-                  <button
-                    onClick={() => setLightbox(i => Math.min(i + 1, figures.length - 1))}
-                    disabled={lightbox === figures.length - 1}
-                    style={{ background: "transparent", border: "1px solid #e2e8f0", borderRadius: 6, padding: "6px 14px", cursor: lightbox === figures.length - 1 ? "not-allowed" : "pointer", color: "#64748b", opacity: lightbox === figures.length - 1 ? 0.35 : 1, fontSize: 16 }}
-                  >→</button>
-                </div>
-              </div>
-            </div>
-          )}
+          {lightboxEl}
 
           {/* ── Layout ── */}
           <div style={{ display: "flex", gap: 24, alignItems: "stretch" }}>
