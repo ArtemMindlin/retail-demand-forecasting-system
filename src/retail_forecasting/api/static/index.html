@@ -5247,11 +5247,15 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         loadAlerts();
       }, [params]);
 
-      // Initial load + debounced reload on param changes (simulates fetch /api/forecast & /api/kpis)
+      // Initial load + debounced reload on param changes
       const reload = useCallback(async (latency = 650) => {
         setLoading(true);
-        const res = await api.fetch("/api/forecast", { ...params, selectedSkuId }, latency);
-        setData(res);
+        try {
+          const res = await api.fetch("/api/forecast", { ...params, selectedSkuId }, latency);
+          setData(res);
+        } catch (_err) {
+          setData({ status: "no_predictions" });
+        }
         setLoading(false);
         const t = new Date();
         setLastRunAt(t.toTimeString().slice(0, 8));
