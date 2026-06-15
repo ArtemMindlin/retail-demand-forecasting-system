@@ -17,5 +17,5 @@ jobs:
           script: |
             cd /root/retail-demand-forecasting-system
             git pull origin main
-            docker rm -f retail_forecasting_mlflow retail_forecasting_api || true
+            docker compose down || true
             docker compose up -d --build
