@@ -55,13 +55,17 @@ from retail_forecasting.utils.io import quantile_column_name
 def run_experiment(settings: Settings) -> RunArtifacts:
     """Run the end-to-end experiment comparing Observed vs Latent demand."""
     # 1. Load Original Panel
+    print("📂 Loading train panel...")
     raw_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
         split="train",
     )
+    n_series = raw_panel["series_id"].nunique() if "series_id" in raw_panel.columns else "?"
+    print(f"✅ Train panel loaded: {len(raw_panel):,} rows, {n_series} series")
     quality_report = validate_prepared_panel(raw_panel, settings)
     raise_on_blocking_data_quality(quality_report)
+    print("✅ Data quality checks passed")
 
     # Load external holdout (eval) split
     print("📥 Loading external holdout (eval) split...")
@@ -110,6 +114,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     if settings.inventory.use_series_costs:
         sample_series_cost_profile = build_series_cost_profile(raw_panel, settings.inventory)
 
+    print("📦 Running inventory simulation...")
     # Run dynamic inventory simulation on merged results
     merged_predictions = simulate_inventory_policy(
         merged_predictions,
@@ -151,7 +156,9 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         backtest_metadata=combined_metadata,
     )
 
+    print("💾 Writing run artifacts...")
     artifacts_with_files = write_run_artifacts(final_artifacts, settings)
+    print(f"✅ Artifacts saved to: {artifacts_with_files.run_directory}")
 
     try:
         from retail_forecasting.evaluation.mlflow_logger import log_experiment_to_mlflow
@@ -178,12 +185,14 @@ def run_experiment_from_frame(
     series_cost_profile = None
     if settings.inventory.use_series_costs:
         series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)
+    print(f"  🔧 [{data_strategy}] Building supervised frame (feature engineering)...")
     supervised_frame, feature_metadata = build_supervised_frame(
         panel=prepared_panel,
         feature_config=settings.features,
         horizon=settings.dataset.horizon,
     )
     feature_columns = feature_metadata.feature_columns
+    print(f"  ✅ [{data_strategy}] {len(feature_columns)} features built")
 
     # Build holdout supervised frame separately. Concatenating panel+holdout gives the
     # holdout rows correct lag history, but we only keep holdout-date rows in the result.
@@ -248,7 +257,11 @@ def run_experiment_from_frame(
         horizon=settings.dataset.horizon,
     ).fit(panel)
 
+    print(f"  📅 [{data_strategy}] {len(folds)} walk-forward folds")
     for fold in folds:
+        print(
+            f"  ▶ [{data_strategy}] Fold {fold.fold_id}/{len(folds)} — train up to {fold.train_end_date.date()}, val {fold.validation_start_date.date()}→{fold.validation_end_date.date()}"
+        )
         # Prepare training and validation frames
         train_mask = supervised_frame["date"] <= fold.train_end_date
         validation_mask = (supervised_frame["date"] >= fold.validation_start_date) & (
@@ -307,6 +320,7 @@ def run_experiment_from_frame(
             or settings.validation.retrain_each_fold
             or current_fold_retrained
         ):
+            print(f"    🌲 [{data_strategy}] Training LightGBM (fold {fold.fold_id})...")
             base_lgb = AutoBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
@@ -342,6 +356,7 @@ def run_experiment_from_frame(
 
         # 3. CatBoost (Boosting)
         if cat_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
+            print(f"    🐱 [{data_strategy}] Training CatBoost (fold {fold.fold_id})...")
             base_cat = CatBoostingModel(
                 quantiles=settings.models.quantiles,
                 random_seed=settings.project.random_seed,
