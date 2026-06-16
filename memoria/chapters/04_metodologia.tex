@@ -270,6 +270,23 @@ donde $c_u$ es el coste por unidad no servida (rotura de stock) y $c_o$ el coste
 \end{minipage}}
 \end{center}
 
+En la práctica, el modelo minimiza la pérdida esperada de forma conjunta
+sobre todas las series $s \in \mathcal{S}$ y todos los instantes de decisión
+$t \in \mathcal{T}$:
+
+\begin{equation}
+    \hat{\theta} = \arg\min_{\theta}
+    \frac{1}{|\mathcal{S}||\mathcal{T}|}
+    \sum_{s \in \mathcal{S}} \sum_{t \in \mathcal{T}}
+    \mathcal{L}_{q_s^*}\!\left(Y_{s,t},\; f_\theta(\mathbf{x}_{s,t})\right)
+    \label{eq:training_objective}
+\end{equation}
+
+donde $q_s^*$ es el fractil crítico específico de la serie $s$
+(Sección~\ref{sec:cost_profiles}) y $f_\theta(\mathbf{x}_{s,t})$ es la
+predicción del modelo en el cuantil $q_s^*$ condicionada al vector de
+covariables disponible en $t$.
+
 Al entrenar con RMSE o MAE se minimiza el error estadístico pero no el coste logístico, lo que es inconsistente con el objetivo operativo del sistema. Por eso el entrenamiento orientado a costes es el único modo disponible.
 
 \subsection{Arquitectura Multi-Modelo y Corrección del Quantile Crossing}
