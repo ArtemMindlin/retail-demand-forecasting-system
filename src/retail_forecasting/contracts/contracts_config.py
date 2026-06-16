@@ -100,7 +100,7 @@ class ModelConfig(BaseModel):
     n_estimators: int = Field(default=200, gt=0)
     learning_rate: float = Field(default=0.05, gt=0)
     max_depth: int = Field(default=6, gt=0)
-    use_tuning: bool = False
+    use_tuning: bool = True
     tuning_trials: int = Field(default=20, gt=0)
 
     @field_validator("quantiles")
@@ -149,18 +149,8 @@ class InventoryConfig(BaseModel):
     stockout_cost: float = Field(default=4.0, gt=0)
     use_series_costs: bool = False
     clip_negative_orders: bool = True
-    pareto_order_scales: list[float] = Field(
-        default_factory=lambda: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3], min_length=1
-    )
     synthetic_cost_config: SyntheticCostConfig = Field(default_factory=SyntheticCostConfig)
     global_capacity_units: int | None = Field(default=None, gt=0)
-
-    @field_validator("pareto_order_scales")
-    @classmethod
-    def validate_scales(cls, v: list[float]) -> list[float]:
-        if any(scale < 0.0 for scale in v):
-            raise ValueError("inventory.pareto_order_scales must contain only non-negative scales.")
-        return v
 
 
 class BusinessConfig(BaseModel):

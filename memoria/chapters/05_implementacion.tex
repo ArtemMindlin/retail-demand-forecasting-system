@@ -245,7 +245,7 @@ Esta separación hace que el comportamiento del sistema sea predecible y auditab
 \subsection{Lógica de Promoción del Modelo Campeón}
 \label{sec:champion_promotion}
 
-Al término de cada ejecución en modo \texttt{experiment}, el sistema evalúa automáticamente si algún \textit{challenger} del frente de Pareto debe reemplazar al modelo \textit{champion} actualmente registrado en \texttt{champion\_registry.json}. La decisión sigue un protocolo con dos guardarraíles configurables:
+Al término de cada ejecución en modo \texttt{experiment}, el sistema evalúa automáticamente si algún modelo \textit{challenger} debe reemplazar al \textit{champion} actualmente registrado en \texttt{champion\_registry.json}. La decisión sigue un protocolo con dos guardarraíles configurables:
 
 \begin{enumerate}
     \item \textbf{Mejora de coste mínima}: Se calcula la mejora relativa en coste de inventario simulado respecto al campeón actual como $\Delta_{\text{cost}} = \frac{C_{\text{champion}} - C_{\text{challenger}}}{C_{\text{champion}}} \times 100$\%. El \textit{challenger} solo es candidato si $\Delta_{\text{cost}} \geq \theta_{\text{cost}}$, donde $\theta_{\text{cost}}$ es el umbral \texttt{champion\_min\_cost\_improvement\_pct} (por defecto 0\%, modificable en \texttt{BusinessConfig}).
@@ -275,7 +275,7 @@ Entre todos los \textit{challengers} que superan ambos guardarraíles, se selecc
                minimum width=3.8cm, minimum height=0.65cm,
                font=\sffamily\footnotesize, align=center}]
   % Nodes
-  \node[box]  (start)  {Ejecutar \texttt{experiment}\\obtener frente de Pareto};
+  \node[box]  (start)  {Ejecutar \texttt{experiment}\\evaluar modelos candidatos};
   \node[dec,  below=of start]  (c1) {$\Delta_{\text{cost}} \geq \theta_{\text{cost}}$?};
   \node[dec,  below=of c1]     (c2) {$\Delta_{\text{sl}} \geq -\delta_{\text{sl}}$?};
   \node[box,  below=of c2]     (sel){Seleccionar \textit{challenger}\\de menor coste};

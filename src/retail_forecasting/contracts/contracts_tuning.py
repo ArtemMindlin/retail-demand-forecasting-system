@@ -37,8 +37,21 @@ class TuningMetadata(BaseModel):
         return pd.Timestamp(value)
 
 
+class ParetoTrial(BaseModel):
+    """A single Optuna trial on the multi-objective (Pinball vs Winkler) plane."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    trial_number: int = Field(ge=0)
+    pinball: float = Field(ge=0)
+    winkler: float
+    is_on_front: bool
+    is_selected: bool
+
+
 class TuningResult(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     best_params: BoostingParams
     metadata: TuningMetadata
+    pareto_front: list[ParetoTrial] = Field(default_factory=list)

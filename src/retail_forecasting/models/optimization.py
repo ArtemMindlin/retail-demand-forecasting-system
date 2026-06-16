@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 from retail_forecasting.config import Settings
 from retail_forecasting.contracts.contracts_tuning import (
     BoostingParams,
+    ParetoTrial,
     TuningMetadata,
     TuningResult,
 )
@@ -140,6 +141,22 @@ class HyperparameterTuner:
         # but storing the fact it was a multi-objective search.
         best_trial = min(study.best_trials, key=lambda t: t.values[0] + t.values[1])
 
+        # Capture the full multi-objective plane so the front can be visualized:
+        # every completed trial with its (Pinball, Winkler) pair, flagging which
+        # trials lie on the Pareto front and which one was finally selected.
+        front_numbers = {trial.number for trial in study.best_trials}
+        pareto_front = [
+            ParetoTrial(
+                trial_number=trial.number,
+                pinball=float(trial.values[0]),
+                winkler=float(trial.values[1]),
+                is_on_front=trial.number in front_numbers,
+                is_selected=trial.number == best_trial.number,
+            )
+            for trial in study.trials
+            if trial.values is not None
+        ]
+
         best_params = BoostingParams(
             n_estimators=int(best_trial.params["n_estimators"]),
             learning_rate=float(best_trial.params["learning_rate"]),
@@ -162,4 +179,8 @@ class HyperparameterTuner:
             f"✅ Optuna Multi-Objective Finished. Best Selected Pinball(q*): {best_trial.values[0]:.4f}, Winkler: {best_trial.values[1]:.4f}"
         )
 
-        return TuningResult(best_params=best_params, metadata=self.tuning_metadata)
+        return TuningResult(
+            best_params=best_params,
+            metadata=self.tuning_metadata,
+            pareto_front=pareto_front,
+        )

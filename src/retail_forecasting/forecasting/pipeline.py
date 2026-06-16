@@ -41,7 +41,6 @@ from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
     run_sensitivity_analysis,
-    summarize_pareto_frontier,
 )
 from retail_forecasting.inventory.simulation import simulate_inventory_policy
 from retail_forecasting.models.boosting import AutoBoostingModel
@@ -125,7 +124,12 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     merged_metrics, merged_folds = summarize_predictions(merged_predictions)
     merged_costs = summarize_costs(merged_predictions)
     merged_sens = run_sensitivity_analysis(merged_predictions, settings.inventory)
-    merged_pareto = summarize_pareto_frontier(merged_predictions, settings.inventory)
+    tuning_fronts = [
+        front
+        for front in (artifacts_obs.tuning_pareto, artifacts_latent.tuning_pareto)
+        if front is not None
+    ]
+    merged_tuning_pareto = pd.concat(tuning_fronts, ignore_index=True) if tuning_fronts else None
 
     combined_metadata = None
     if artifacts_obs.backtest_metadata is not None:
@@ -150,7 +154,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         fold_metrics=merged_folds,
         cost_summary=merged_costs,
         sensitivity_summary=merged_sens,
-        pareto_frontier=merged_pareto,
+        tuning_pareto=merged_tuning_pareto,
         data_quality_report=quality_report,
         drifts=artifacts_obs.drifts,
         backtest_metadata=combined_metadata,
@@ -229,6 +233,7 @@ def run_experiment_from_frame(
         max_depth=settings.models.max_depth,
     )
     tuning_metadata = None
+    tuning_pareto = None
     if settings.models.use_tuning:
         print(f"🔍 Starting Optuna Tuning for {data_strategy} strategy...")
         # Tuning only uses data available in the first fold's training set
@@ -237,6 +242,11 @@ def run_experiment_from_frame(
         tuning_result = tuner.tune_boosting(tuning_train_frame, feature_columns)
         best_boosting_params = tuning_result.best_params
         tuning_metadata = tuning_result.metadata
+        if tuning_result.pareto_front:
+            tuning_pareto = pd.DataFrame(
+                [trial.model_dump() for trial in tuning_result.pareto_front]
+            )
+            tuning_pareto.insert(0, "data_strategy", data_strategy)
 
     # Drift detection state
     drift_detector = PageHinkleyDetector(
@@ -538,7 +548,6 @@ def run_experiment_from_frame(
         base_inventory_config=settings.inventory,
         series_cost_profile=series_cost_profile,
     )
-    pareto_frontier = summarize_pareto_frontier(predictions, settings.inventory)
 
     report_extra = ""
     if detected_drifts:
@@ -620,7 +629,7 @@ def run_experiment_from_frame(
         fold_metrics=fold_metrics,
         cost_summary=cost_summary,
         sensitivity_summary=sensitivity_summary,
-        pareto_frontier=pareto_frontier,
+        tuning_pareto=tuning_pareto,
         data_quality_report=quality_report,
         drifts=detected_drifts,
         report_extra=report_extra,

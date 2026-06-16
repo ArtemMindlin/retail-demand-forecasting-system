@@ -1059,7 +1059,7 @@ def get_run_filters(run_name: str) -> dict[str, Any]:
         any("Latent_" in s for s in preds.get("data_strategy", pd.Series([])).dropna())
         and "original_observed_demand" in preds.columns
     )
-    has_pareto = (run_path / "pareto_frontier.csv").exists()
+    has_pareto = (run_path / "tuning_pareto.csv").exists()
     has_sensitivity = (run_path / "sensitivity_summary.csv").exists()
     drift_alert = _parse_drift_alert(run_path)
 
@@ -1157,9 +1157,9 @@ def get_run_latent(
 
 @app.get("/api/runs/{run_name}/pareto")
 def get_run_pareto(run_name: str) -> list[dict[str, Any]]:
-    """Return pareto_frontier.csv as a list of dicts ([] if not found)."""
+    """Return tuning_pareto.csv (Pinball vs Winkler front) as a list of dicts ([] if not found)."""
     run_path = _resolve_run_path(run_name)
-    pareto_path = run_path / "pareto_frontier.csv"
+    pareto_path = run_path / "tuning_pareto.csv"
     if not pareto_path.exists():
         return []
     df = pd.read_csv(pareto_path)

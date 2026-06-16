@@ -103,108 +103,6 @@ def attach_inventory_costs(
     return evaluated
 
 
-def summarize_pareto_frontier(
-    predictions: pd.DataFrame,
-    inventory_config: InventoryConfig,
-) -> pd.DataFrame:
-    """Evaluate candidate inventory policies and mark Pareto-efficient trade-offs.
-
-    Candidate policies scale the already selected order quantity. This keeps the
-    frontier independent from model training and works for point and quantile
-    forecasters.
-    """
-    required_columns = {
-        "y_true",
-        "order_quantity",
-        "c_over",
-        "c_under",
-        "model_name",
-        "backend_name",
-    }
-    missing_columns = required_columns - set(predictions.columns)
-    if missing_columns:
-        raise ValueError(
-            "Cannot compute Pareto frontier without required columns: "
-            f"{', '.join(sorted(missing_columns))}"
-        )
-
-    order_scales = _validated_order_scales(inventory_config.pareto_order_scales)
-    group_cols = ["model_name", "backend_name"]
-    if "data_strategy" in predictions.columns:
-        group_cols.insert(0, "data_strategy")
-
-    records = []
-    for keys, subset in predictions.groupby(group_cols, dropna=False):
-        key_values = keys if isinstance(keys, tuple) else (keys,)
-        group_values = dict(zip(group_cols, key_values, strict=False))
-        for order_scale in order_scales:
-            candidate = subset.copy()
-            candidate["candidate_order_quantity"] = (
-                candidate["order_quantity"].to_numpy(dtype=float) * order_scale
-            )
-            if inventory_config.clip_negative_orders:
-                candidate["candidate_order_quantity"] = np.maximum(
-                    candidate["candidate_order_quantity"],
-                    0.0,
-                )
-
-            overstock_units = np.maximum(
-                candidate["candidate_order_quantity"] - candidate["y_true"],
-                0.0,
-            )
-            stockout_units = np.maximum(
-                candidate["y_true"] - candidate["candidate_order_quantity"],
-                0.0,
-            )
-            overstock_cost = candidate["c_over"].to_numpy(dtype=float) * overstock_units
-            stockout_cost = candidate["c_under"].to_numpy(dtype=float) * stockout_units
-            actual_demand = candidate["y_true"].to_numpy(dtype=float)
-            filled_units = np.minimum(
-                actual_demand,
-                candidate["candidate_order_quantity"].to_numpy(dtype=float),
-            )
-            demand_denominator = actual_demand.sum()
-
-            records.append(
-                {
-                    **group_values,
-                    "policy_name": f"order_scale_{order_scale:g}",
-                    "order_scale": order_scale,
-                    "observations": int(len(candidate)),
-                    "mean_order_quantity": float(candidate["candidate_order_quantity"].mean()),
-                    "total_overstock_units": float(overstock_units.sum()),
-                    "total_stockout_units": float(stockout_units.sum()),
-                    "total_overstock_cost": float(overstock_cost.sum()),
-                    "total_stockout_cost": float(stockout_cost.sum()),
-                    "total_cost": float(overstock_cost.sum() + stockout_cost.sum()),
-                    "mean_cost": float((overstock_cost + stockout_cost).mean()),
-                    "service_level": float((stockout_units <= 0.0).mean()),
-                    "fill_rate": float(
-                        filled_units.sum() / demand_denominator if demand_denominator > 0.0 else 1.0
-                    ),
-                }
-            )
-
-    frontier = pd.DataFrame(records)
-    if frontier.empty:
-        return frontier
-
-    frontier["is_pareto_efficient"] = False
-    for _, index in frontier.groupby(group_cols, dropna=False).groups.items():
-        objectives = frontier.loc[
-            index,
-            ["total_cost", "total_overstock_units", "total_stockout_units"],
-        ].to_numpy(dtype=float)
-        frontier.loc[index, "is_pareto_efficient"] = _pareto_efficient_mask(objectives)
-
-    sort_columns = group_cols + ["is_pareto_efficient", "total_cost"]
-    sort_ascending = [True] * len(group_cols) + [False, True]
-    return frontier.sort_values(
-        sort_columns,
-        ascending=sort_ascending,
-    ).reset_index(drop=True)
-
-
 def _interpolate_quantile(levels: np.ndarray, values: np.ndarray, target_level: float) -> float:
     if target_level <= levels[0]:
         return float(values[0])
@@ -213,28 +111,6 @@ def _interpolate_quantile(levels: np.ndarray, values: np.ndarray, target_level: 
     return float(np.interp(target_level, levels, values))
 
 
-def _validated_order_scales(order_scales: list[float]) -> list[float]:
-    unique_scales = sorted({float(scale) for scale in order_scales})
-    if not unique_scales:
-        raise ValueError("Pareto frontier requires at least one order scale.")
-    if any(scale < 0.0 for scale in unique_scales):
-        raise ValueError("Pareto order scales must be non-negative.")
-    return unique_scales
-
-
-def _pareto_efficient_mask(objectives: np.ndarray) -> np.ndarray:
-    efficient = np.ones(objectives.shape[0], dtype=bool)
-    for idx, candidate in enumerate(objectives):
-        if not efficient[idx]:
-            continue
-        dominated = np.all(objectives <= candidate, axis=1) & np.any(
-            objectives < candidate,
-            axis=1,
-        )
-        dominated[idx] = False
-        if dominated.any():
-            efficient[idx] = False
-    return efficient
 
 
 def run_sensitivity_analysis(
