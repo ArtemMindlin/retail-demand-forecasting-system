@@ -718,23 +718,29 @@ def post_forecast(request: ForecastRequest) -> dict[str, Any]:
     emp_coverage = float(covered.mean()) * 100.0
     cov_delta = emp_coverage - sl
 
-    # MAE of the selected SKU
+    # MAE of the selected SKU; delta = second-half MAE − first-half MAE (negative = improving)
     mae = float(abs_residuals.mean())
-    mae_delta = -8.4 + (sl - 95.0) * 0.4
+    half_idx = len(abs_residuals) // 2
+    if half_idx >= 1:
+        mae_delta = float(
+            abs_residuals.iloc[half_idx:].mean() - abs_residuals.iloc[:half_idx].mean()
+        )
+    else:
+        mae_delta = 0.0
 
     # Calculate aggregate inventory cost over all dates for this SKU
     tot_cost = 0.0
+    naive_cost = 0.0
     for row in sku_df.itertuples():
-        q_day = max(0.0, float(row.y_pred) + cr_quantile)
-        q_day = min(q_day, request.capacity)
+        q_day = min(max(0.0, float(row.y_pred) + cr_quantile), request.capacity)
+        q_naive = min(float(row.y_pred), request.capacity)
         d_day = float(row.y_true)
-        if q_day > d_day:
-            tot_cost += (q_day - d_day) * ch
-        else:
-            tot_cost += (d_day - q_day) * cs
+        tot_cost += (d_day - q_day) * cs if d_day > q_day else (q_day - d_day) * ch
+        naive_cost += (d_day - q_naive) * cs if d_day > q_naive else (q_naive - d_day) * ch
 
     inv_cost = round(tot_cost, 2)
-    inv_delta = -((cs - 18.0) * 0.4 + (request.capacity - 12000.0) * 0.0009 + (95.0 - sl) * 0.5)
+    # Negative delta means Newsvendor policy costs less than naïve point-forecast ordering
+    inv_delta = round(inv_cost - naive_cost, 2)
 
     # Real per-SKU drift: PSI of the SKU's own demand, older half vs recent.
     demand = sku_df["y_true"].to_numpy(dtype=float)

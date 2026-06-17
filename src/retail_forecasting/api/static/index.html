@@ -1016,98 +1016,6 @@
       return x - Math.floor(x);
     };
 
-    // ----- Mock fetch (simulating FastAPI endpoints) -----
-    // The real frontend will swap these for `await fetch("/api/...")`.
-    const mockFetch = (endpoint, payload, latencyMs = 650) =>
-      new Promise((resolve) => {
-        setTimeout(() => resolve(buildResponse(endpoint, payload)), latencyMs);
-      });
-
-    function buildResponse(endpoint, p = {}) {
-      // p contains: serviceLevel (0–100), shortageCost, holdingCost, capacity
-      const sl = p.serviceLevel ?? 95;
-      const cs = p.shortageCost ?? 18;
-      const ch = p.holdingCost ?? 4;
-      const cap = p.capacity ?? 12000;
-
-      // ----- /api/forecast — 30-day series
-      const days = 30;
-      const series = [];
-      for (let i = 0; i < days; i++) {
-        const weekly = Math.sin((i / 7) * Math.PI * 2) * 38;
-        const trend = i * 1.4;
-        const base = 320 + trend + weekly;
-        const noise = (seededNoise(i, 11) - 0.5) * 50;
-        const actual = i < 22 ? Math.max(0, base + noise) : null; // last 8 days = future
-        const predicted = base + (seededNoise(i, 23) - 0.5) * 10;
-
-        // conformal interval width grows mildly with horizon
-        const horizonFactor = i < 22 ? 0.06 : 0.10 + (i - 22) * 0.012;
-        const widenForSL = 0.6 + ((sl - 80) / 20) * 0.9; // higher SL -> wider band
-        const half = predicted * horizonFactor * widenForSL;
-
-        series.push({
-          day: i + 1,
-          label: `D${String(i + 1).padStart(2, "0")}`,
-          actual: actual !== null ? Math.round(actual) : null,
-          predicted: Math.round(predicted),
-          lower: Math.round(predicted - half),
-          upper: Math.round(predicted + half),
-        });
-      }
-
-      // ----- /api/kpis — depend on simulator inputs
-      // Newsvendor critical ratio
-      const cr = cs / (cs + ch);
-      const targetCR = sl / 100;
-      const ratioDelta = (targetCR - cr) * 100; // pts off
-
-      // Inventory cost — scales w/ holding cost & service level (more SL => more safety stock => more cost)
-      const invCost = Math.round((84000 + (sl - 90) * 4200 + (ch - 4) * 3800) * 1);
-      const invDelta = -((cs - 18) * 0.4 + (cap - 12000) * 0.0009 + (95 - sl) * 0.5);
-
-      // Conformal coverage: closely tracks target SL, with small empirical drift
-      const empCoverage = Math.max(80, Math.min(99.4, sl - 0.6 + (seededNoise(sl, 5) - 0.5) * 0.8));
-      const covDelta = empCoverage - sl;
-
-      // MAE — improves slightly w/ tighter coverage requirements via re-fit
-      const mae = +(11.2 - (sl - 90) * 0.06 + (ch - 4) * 0.04).toFixed(2);
-      const maeDelta = -8.4 + (sl - 95) * 0.4;
-
-      // Drift PSI
-      const psi = +(0.18 + (seededNoise(sl + ch, 9) - 0.5) * 0.06).toFixed(3);
-      const psiDelta = (psi - 0.20) * 100;
-
-      // Recommended order quantity (newsvendor): inverse CDF approximation
-      // For demonstration: avg predicted * (1 + z*sigma), z ~ from sl
-      const z = sl >= 99 ? 2.33 : sl >= 97 ? 1.88 : sl >= 95 ? 1.65 : sl >= 90 ? 1.28 : 0.84;
-      const avgPred = series.slice(22).reduce((s, r) => s + r.predicted, 0) / 8;
-      const sigma = avgPred * 0.18;
-      const qStar = Math.round(avgPred + z * sigma);
-
-      // Capacity utilization
-      const util = Math.min(100, Math.round((qStar * 4 / cap) * 100));
-
-      return {
-        forecast: series,
-        kpis: {
-          inventoryCost: { value: invCost, delta: invDelta },
-          coverage:      { value: empCoverage, target: sl, delta: covDelta },
-          mae:           { value: mae, delta: maeDelta },
-          driftPSI:      { value: psi, delta: psiDelta },
-        },
-        recommendation: {
-          qStar,
-          z,
-          criticalRatio: cr,
-          targetCR,
-          ratioDelta,
-          utilization: util,
-        },
-      };
-    }
-
-
     const realFetch = async (endpoint, payload = {}) => {
       if (endpoint === "/api/forecast") {
         const res = await fetch("/api/forecast", {
@@ -1350,7 +1258,7 @@
               textAlign: "center",
               letterSpacing: "0.04em"
             }}>
-              POST /api/optimize
+              POST /api/forecast
             </div>
           </div>
 
@@ -2363,7 +2271,7 @@
     <span class="k">return</span> np.quantile(samples, cr)
 
 
-<span class="c"># En el endpoint /api/optimize:</span>
+<span class="c"># En el endpoint /api/forecast (campo recommendation.qStar):</span>
 q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
                       c_s=req.shortage_cost, c_h=req.holding_cost)`,
         pills: (p, r) => ([
@@ -2524,35 +2432,7 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
     window.Sparkline = Sparkline;
 
     // ============ SKU view ============
-    function buildSkus(params) {
-      const categories = ["Bebidas", "Lácteos", "Snacks", "Limpieza", "Frescos", "Congelados", "Higiene"];
-      const skus = [];
-      for (let i = 0; i < 28; i++) {
-        const id = `SKU-${(1000 + i * 17).toString()}`;
-        const cat = categories[i % categories.length];
-        const baseDemand = 80 + (i * 19) % 320;
-        const series = [];
-        for (let d = 0; d < 14; d++) {
-          const n = seededNoise(i * 13 + d, 7) - 0.5;
-          series.push(Math.round(baseDemand + Math.sin(d / 2 + i) * baseDemand * 0.12 + n * baseDemand * 0.18));
-        }
-        const margin = +(0.18 + ((i * 7) % 40) / 100).toFixed(2);
-        const stock = Math.round(baseDemand * (2 + ((i * 3) % 5)) * (1 - (params.serviceLevel - 95) / 200));
-        const coverageTarget = params.serviceLevel;
-        const empCoverage = Math.max(75, Math.min(99.8, coverageTarget - 1.4 + (seededNoise(i, 5) - 0.5) * 10));
-        const driftPsi = +(0.05 + ((i * 0.027) % 0.4)).toFixed(3);
-        const lastActual = series[series.length - 1];
-        const lastPred = Math.round(lastActual * (1 + (seededNoise(i + 99, 3) - 0.5) * 0.18));
-        const status =
-          driftPsi > 0.2 ? "drift" :
-          empCoverage < coverageTarget - 3 ? "shortage" :
-          empCoverage > coverageTarget + 2 ? "overstock" :
-          "ok";
-        const q_star = Math.round(lastPred * 1.25);
-        skus.push({ id, cat, series, margin, stock, q_star, empCoverage, coverageTarget, driftPsi, lastActual, lastPred, status });
-      }
-      return skus;
-    }
+
 
     const STATUS_COLORS = {
       ok: { color: "var(--c-conf)",  label: "OK" },
@@ -3244,7 +3124,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 { k: "mínimo", v: "88%" },
                 { k: "α", v: (1 - params.serviceLevel / 100).toFixed(3) },
               ],
-              endpoint: "POST /api/optimize",
+              endpoint: "POST /api/forecast",
               actionLabel: "Subir SL al 95%",
               time: "ahora",
               ts: 0,
@@ -3360,7 +3240,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           { k: "cobertura", v: "91.2%" },
           { k: "target", v: "95.0%" },
         ],
-        endpoint: "POST /api/optimize",
+        endpoint: "POST /api/forecast",
         actionLabel: "Reoptimizar política",
         time: "hace 12 min",
         ts: 12,
@@ -5987,7 +5867,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8
             }}>
               <span>
-                GET /api/forecast?h=30 · GET /api/kpis · POST /api/optimize · GET /api/alerts
+                POST /api/forecast · GET /api/skus · GET /api/drift · GET /api/alerts
               </span>
               <span>
                 fastapi 0.110 · uvicorn · python 3.11
