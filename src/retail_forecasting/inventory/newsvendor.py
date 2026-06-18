@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
@@ -111,6 +113,75 @@ def _interpolate_quantile(levels: np.ndarray, values: np.ndarray, target_level: 
     return float(np.interp(target_level, levels, values))
 
 
+def _config_for_ratio(base_config: InventoryConfig, ratio: float) -> InventoryConfig:
+    """Clone the base inventory config with stockout_cost set to overstock_cost * ratio."""
+    return InventoryConfig(
+        overstock_cost=base_config.overstock_cost,
+        stockout_cost=base_config.overstock_cost * ratio,
+        use_series_costs=base_config.use_series_costs,
+        clip_negative_orders=base_config.clip_negative_orders,
+    )
+
+
+def _rescale_under_cost(
+    df: pd.DataFrame, base_config: InventoryConfig, ratio: float
+) -> pd.DataFrame:
+    """Scale c_under (and recompute critical_fractile) so the effective Cs/Co matches `ratio`."""
+    scale = (base_config.overstock_cost * ratio) / base_config.stockout_cost
+    rescaled = df.copy()
+    rescaled["c_under"] = rescaled["c_under"] * scale
+    rescaled["critical_fractile"] = rescaled["c_under"] / (rescaled["c_under"] + rescaled["c_over"])
+    return rescaled
+
+
+def _summarize_group(
+    model_preds: pd.DataFrame,
+    model_name: str,
+    data_strategy: str | None,
+    ratio: float,
+    temp_config: InventoryConfig,
+    quantile_columns: list[str],
+    quantile_levels: list[float],
+    series_cost_profile: pd.DataFrame | None,
+    base_config: InventoryConfig,
+) -> dict[str, Any]:
+    """Re-cost one model group under `temp_config` and return its summary row."""
+    if (
+        series_cost_profile is None
+        and temp_config.use_series_costs
+        and {"c_over", "c_under", "critical_fractile"}.issubset(model_preds.columns)
+    ):
+        model_preds = _rescale_under_cost(model_preds, base_config, ratio)
+
+    # Use quantiles only when the model actually produced (non-null) ones.
+    has_quantiles = any(
+        c.startswith("q_") and model_preds[c].notna().any() for c in model_preds.columns
+    )
+    model_preds["order_quantity"] = choose_order_quantity(
+        predictions=model_preds,
+        inventory_config=temp_config,
+        quantile_columns=quantile_columns if has_quantiles else [],
+        quantile_levels=quantile_levels if has_quantiles else [],
+        series_cost_profile=series_cost_profile,
+    )
+    if not has_quantiles:
+        model_preds["order_quantity"] = model_preds["y_pred"]
+
+    cost_preds = attach_inventory_costs(
+        model_preds, temp_config, series_cost_profile=series_cost_profile
+    )
+
+    res_dict = {
+        "ratio": ratio,
+        "model_name": model_name,
+        "total_cost": cost_preds["total_cost"].sum(),
+        "overstock_cost": cost_preds["overstock_cost"].sum(),
+        "stockout_cost": cost_preds["stockout_cost"].sum(),
+        "mean_order_quantity": cost_preds["order_quantity"].mean(),
+    }
+    if data_strategy is not None:
+        res_dict["data_strategy"] = data_strategy
+    return res_dict
 
 
 def run_sensitivity_analysis(
@@ -132,92 +203,39 @@ def run_sensitivity_analysis(
     if ratios is None:
         ratios = [1.0, 2.0, 4.0, 8.0, 10.0]
 
-    # Identify available quantile columns
     quantile_columns = [c for c in predictions.columns if c.startswith("q_")]
     quantile_levels = [float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns]
 
+    group_cols = ["model_name"]
+    if "data_strategy" in predictions.columns:
+        group_cols.append("data_strategy")
+
     results = []
     for ratio in ratios:
-        # Create a temporary config for this ratio
-        temp_config = InventoryConfig(
-            overstock_cost=base_inventory_config.overstock_cost,
-            stockout_cost=base_inventory_config.overstock_cost * ratio,
-            use_series_costs=base_inventory_config.use_series_costs,
-            clip_negative_orders=base_inventory_config.clip_negative_orders,
-        )
-        adjusted_series_cost_profile = series_cost_profile
+        temp_config = _config_for_ratio(base_inventory_config, ratio)
+        adjusted_profile = series_cost_profile
         if series_cost_profile is not None and temp_config.use_series_costs:
-            adjusted_series_cost_profile = series_cost_profile.copy()
-            target_stockout_cost = base_inventory_config.overstock_cost * ratio
-            stockout_scale = target_stockout_cost / base_inventory_config.stockout_cost
-            adjusted_series_cost_profile["c_under"] = (
-                adjusted_series_cost_profile["c_under"] * stockout_scale
+            adjusted_profile = _rescale_under_cost(
+                series_cost_profile, base_inventory_config, ratio
             )
-            adjusted_series_cost_profile["critical_fractile"] = adjusted_series_cost_profile[
-                "c_under"
-            ] / (adjusted_series_cost_profile["c_under"] + adjusted_series_cost_profile["c_over"])
-
-        # Determine grouping keys based on column presence
-        group_cols = ["model_name"]
-        if "data_strategy" in predictions.columns:
-            group_cols.append("data_strategy")
 
         for keys, group_df in predictions.groupby(group_cols):
-            model_preds = group_df.copy()
             if len(group_cols) == 2:
                 model_name, data_strategy = keys
             else:
-                model_name = keys
-                data_strategy = None
-
-            if (
-                adjusted_series_cost_profile is None
-                and temp_config.use_series_costs
-                and {"c_over", "c_under", "critical_fractile"}.issubset(model_preds.columns)
-            ):
-                target_stockout_cost = base_inventory_config.overstock_cost * ratio
-                stockout_scale = target_stockout_cost / base_inventory_config.stockout_cost
-                model_preds["c_under"] = model_preds["c_under"] * stockout_scale
-                model_preds["critical_fractile"] = model_preds["c_under"] / (
-                    model_preds["c_under"] + model_preds["c_over"]
+                model_name, data_strategy = keys, None
+            results.append(
+                _summarize_group(
+                    group_df.copy(),
+                    model_name,
+                    data_strategy,
+                    ratio,
+                    temp_config,
+                    quantile_columns,
+                    quantile_levels,
+                    adjusted_profile,
+                    base_inventory_config,
                 )
-
-            # Identify if this model has quantiles with actual (non-null) values
-            has_quantiles = any(
-                c.startswith("q_") and model_preds[c].notna().any() for c in model_preds.columns
             )
-
-            # Recalculate order quantity for this specific ratio
-            model_preds["order_quantity"] = choose_order_quantity(
-                predictions=model_preds,
-                inventory_config=temp_config,
-                quantile_columns=quantile_columns if has_quantiles else [],
-                quantile_levels=quantile_levels if has_quantiles else [],
-                series_cost_profile=adjusted_series_cost_profile,
-            )
-
-            # Fallback for models without quantiles
-            if not has_quantiles:
-                model_preds["order_quantity"] = model_preds["y_pred"]
-
-            # Calculate resulting costs
-            cost_preds = attach_inventory_costs(
-                model_preds,
-                temp_config,
-                series_cost_profile=adjusted_series_cost_profile,
-            )
-
-            # Summarize
-            res_dict = {
-                "ratio": ratio,
-                "model_name": model_name,
-                "total_cost": cost_preds["total_cost"].sum(),
-                "overstock_cost": cost_preds["overstock_cost"].sum(),
-                "stockout_cost": cost_preds["stockout_cost"].sum(),
-                "mean_order_quantity": cost_preds["order_quantity"].mean(),
-            }
-            if data_strategy is not None:
-                res_dict["data_strategy"] = data_strategy
-            results.append(res_dict)
 
     return pd.DataFrame(results)

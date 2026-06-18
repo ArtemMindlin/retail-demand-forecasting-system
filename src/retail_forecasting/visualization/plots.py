@@ -16,6 +16,7 @@ def render_standard_plots(
     cost_summary: pd.DataFrame,
     output_dir: str | Path,
 ) -> None:
+    """Render the standard backtest plots (cost-by-model, error-cost tradeoff) to disk."""
     target_dir = Path(output_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
     _plot_total_cost(cost_summary, target_dir / "cost_by_model.png")
@@ -38,17 +39,18 @@ def render_shap_summary(
 
 
 def _plot_total_cost(cost_summary: pd.DataFrame, output_path: Path) -> None:
+    """Bar chart of total operating cost by model."""
     if cost_summary.empty:
         return
 
-    plt.figure(figsize=(8, 4))
-    plt.bar(cost_summary["model_name"], cost_summary["total_cost"])
-    plt.ylabel("Total cost")
-    plt.xlabel("Model")
-    plt.title("Total operating cost by model")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
-    plt.close()
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.bar(cost_summary["model_name"], cost_summary["total_cost"])
+    ax.set_ylabel("Total cost")
+    ax.set_xlabel("Model")
+    ax.set_title("Total operating cost by model")
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
 
 
 def _plot_error_cost_tradeoff(
@@ -56,6 +58,7 @@ def _plot_error_cost_tradeoff(
     cost_summary: pd.DataFrame,
     output_path: Path,
 ) -> None:
+    """Scatter of point error (MAE) against total logistic cost per model."""
     if metrics_summary.empty or cost_summary.empty:
         return
 
@@ -67,13 +70,13 @@ def _plot_error_cost_tradeoff(
     if merged.empty:
         return
 
-    plt.figure(figsize=(6, 5))
-    plt.scatter(merged["mae"], merged["total_cost"])
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.scatter(merged["mae"], merged["total_cost"])
     for row in merged.itertuples(index=False):
-        plt.annotate(row.model_name, (row.mae, row.total_cost))
-    plt.xlabel("MAE")
-    plt.ylabel("Total cost")
-    plt.title("Error-cost tradeoff")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
-    plt.close()
+        ax.annotate(row.model_name, (row.mae, row.total_cost))
+    ax.set_xlabel("MAE")
+    ax.set_ylabel("Total cost")
+    ax.set_title("Error-cost tradeoff")
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)

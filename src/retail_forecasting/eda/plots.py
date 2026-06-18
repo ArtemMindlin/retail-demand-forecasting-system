@@ -117,8 +117,8 @@ def _plot_observed_demand_boxplot_top_series(
     series_summary: pd.DataFrame,
     output_path: Path,
 ) -> None:
-    n = TOP_SERIES_PLOT_COUNT // 3 * 3
-    per_group = n // 3
+    # Split the plot budget into three equal bands: top / middle / bottom volume.
+    per_group = TOP_SERIES_PLOT_COUNT // 3
     top = series_summary.head(per_group)["series_id"].tolist()
     mid_start = len(series_summary) // 2
     mid = series_summary.iloc[mid_start : mid_start + per_group]["series_id"].tolist()
@@ -273,7 +273,7 @@ def _plot_coverage_heatmap(
     ax.set_xlabel("Date index")
     ax.set_ylabel("Series")
     ax.set_title(f"Coverage heatmap (top {len(selected_series)} series by demand)")
-    fig.colorbar(image, ax=ax, fraction=0.02, pad=0.02, label="Observed row")
+    fig.colorbar(image, ax=ax, fraction=0.02, pad=0.02, label="Present (1) / missing (0)")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -432,6 +432,22 @@ def _plot_correlation_heatmap(panel: pd.DataFrame, output_path: Path) -> None:
     plt.close(fig)
 
 
+def _make_grid(
+    n_items: int,
+    n_cols: int,
+    width: float,
+    row_height: float,
+    sharex: bool = False,
+) -> tuple[plt.Figure, np.ndarray]:
+    """Create a grid of subplots sized for ``n_items`` and hide the unused cells."""
+    n_rows = int(np.ceil(n_items / n_cols))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(width, row_height * n_rows), sharex=sharex)
+    axes_flat = np.atleast_1d(axes).flatten()
+    for axis in axes_flat[n_items:]:
+        axis.axis("off")
+    return fig, axes_flat
+
+
 def _plot_covariate_vs_demand_grid(panel: pd.DataFrame, output_path: Path) -> None:
     candidate_columns = [
         "discount",
@@ -446,9 +462,7 @@ def _plot_covariate_vs_demand_grid(panel: pd.DataFrame, output_path: Path) -> No
 
     n_bins = 20
     n_cols = 3
-    n_rows = int(np.ceil(len(columns) / n_cols))
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 4 * n_rows))
-    axes_flat = np.atleast_1d(axes).flatten()
+    fig, axes_flat = _make_grid(len(columns), n_cols, width=14, row_height=4)
 
     for axis, column in zip(axes_flat, columns, strict=False):
         col_data = panel[[column, "observed_demand"]].dropna()
@@ -482,9 +496,6 @@ def _plot_covariate_vs_demand_grid(panel: pd.DataFrame, output_path: Path) -> No
         axis.set_ylabel("Mean observed demand")
         axis.set_title(f"{column} vs observed demand")
         axis.legend(fontsize=8)
-
-    for axis in axes_flat[len(columns) :]:
-        axis.axis("off")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -553,9 +564,7 @@ def _plot_representative_series_panels(
 
     subset = panel.loc[panel["series_id"].isin(selected_series)].copy()
     n_cols = 3
-    n_rows = int(np.ceil(len(selected_series) / n_cols))
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, 3.6 * n_rows), sharex=True)
-    axes_flat = np.atleast_1d(axes).flatten()
+    fig, axes_flat = _make_grid(len(selected_series), n_cols, width=16, row_height=3.6, sharex=True)
 
     for axis, series_id in zip(axes_flat, selected_series, strict=False):
         series_frame = subset.loc[subset["series_id"] == series_id].sort_values("date")
@@ -585,9 +594,6 @@ def _plot_representative_series_panels(
         axis.set_title(series_id)
         axis.tick_params(axis="x", rotation=45)
         axis.set_ylabel("Demand")
-
-    for axis in axes_flat[len(selected_series) :]:
-        axis.axis("off")
 
     fig.suptitle(
         "Representative series panels (line: demand, shaded: stockout hours)",
@@ -646,32 +652,3 @@ def _sample_panel(panel: pd.DataFrame) -> pd.DataFrame:
     if len(panel) <= SCATTER_SAMPLE_SIZE:
         return panel
     return panel.sample(SCATTER_SAMPLE_SIZE, random_state=42)
-
-
-def _binned_average(
-    panel: pd.DataFrame,
-    feature_column: str,
-    bins: int = 20,
-) -> pd.DataFrame:
-    feature = panel[feature_column]
-    if feature.nunique(dropna=True) <= 1:
-        return pd.DataFrame(columns=[feature_column, "observed_demand_mean"])
-
-    quantile_bins = min(bins, feature.nunique(dropna=True))
-    try:
-        binned = pd.qcut(feature, q=quantile_bins, duplicates="drop")
-    except ValueError:
-        return pd.DataFrame(columns=[feature_column, "observed_demand_mean"])
-
-    grouped = (
-        panel.assign(_bin=binned)
-        .groupby("_bin", observed=False)
-        .agg(
-            feature_center=(feature_column, "mean"),
-            observed_demand_mean=("observed_demand", "mean"),
-        )
-        .dropna()
-        .reset_index(drop=True)
-        .rename(columns={"feature_center": feature_column})
-    )
-    return grouped

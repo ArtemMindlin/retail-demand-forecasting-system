@@ -43,17 +43,13 @@ def _cadence_label(cadence: int | None) -> str:
     return "never" if cadence is None else f"every_{cadence}d"
 
 
-def _format_horizon(horizon: int) -> pd.Timedelta:
-    return pd.Timedelta(days=horizon)
-
-
 def _reveal_actuals(
     panel: pd.DataFrame,
     decision_date: pd.Timestamp,
     horizon: int,
 ) -> pd.DataFrame:
     """Sum observed demand per series across [decision_date, decision_date + H - 1]."""
-    end_exclusive = decision_date + _format_horizon(horizon)
+    end_exclusive = decision_date + pd.Timedelta(days=horizon)
     window = panel[(panel["date"] >= decision_date) & (panel["date"] < end_exclusive)]
     if window.empty:
         return pd.DataFrame(columns=["series_id", "y_true", "actuals_days_observed"])
@@ -85,6 +81,141 @@ def _score_one_step(
         settings=settings,
         series_cost_profile=series_cost_profile,
     )
+
+
+def _setup_cadence_models(
+    settings: Settings,
+    train_panel: pd.DataFrame,
+    sim_models_root: Path,
+) -> tuple[dict[str, Path], dict[str, int | None]]:
+    """Train the initial champion and seed one model copy per retrain cadence.
+
+    Returns ``(cadence_paths, cadence_int)`` mapping each cadence label to its
+    model file and to its retrain period (``None`` = never retrain).
+    """
+    print(f"🔧 Training initial champion on train split ({len(train_panel)} rows)...")
+    base_model_path = train_and_save_champion(
+        settings, train_panel, models_dir=sim_models_root / "initial"
+    )
+    print(f"   ↳ saved to {base_model_path}")
+
+    cadence_paths: dict[str, Path] = {}
+    cadence_int: dict[str, int | None] = {}
+    for cadence in settings.simulation.retrain_cadences:
+        label = _cadence_label(cadence)
+        cadence_dir = sim_models_root / label
+        cadence_dir.mkdir(parents=True, exist_ok=True)
+        cadence_model_path = cadence_dir / base_model_path.name
+        shutil.copy2(base_model_path, cadence_model_path)
+        cadence_paths[label] = cadence_model_path
+        cadence_int[label] = cadence
+    return cadence_paths, cadence_int
+
+
+def _run_streaming_loop(
+    eval_dates: list[Any],
+    combined_panel: pd.DataFrame,
+    eval_panel: pd.DataFrame,
+    cadence_paths: dict[str, Path],
+    cadence_int: dict[str, int | None],
+    horizon: int,
+    settings: Settings,
+    series_cost_profile: pd.DataFrame | None,
+) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+    """Stream eval days: for each day×cadence score, retrain on schedule, cost the window.
+
+    Returns ``(predictions_by_day, retrain_events)``.
+    """
+    retrain_events: list[dict[str, Any]] = []
+    rows: list[pd.DataFrame] = []
+
+    print(
+        f"▶️  Streaming {len(eval_dates)} eval days across "
+        f"{len(cadence_paths)} cadences (horizon={horizon})..."
+    )
+
+    for day_index, current_date in enumerate(eval_dates):
+        available_history = combined_panel[combined_panel["date"] < current_date]
+        actuals = _reveal_actuals(eval_panel, current_date, horizon)
+        actuals_complete = not actuals.empty and bool(
+            (actuals["actuals_days_observed"] >= horizon).all()
+        )
+
+        for label, model_path in cadence_paths.items():
+            cadence_k = cadence_int[label]
+            retrained_this_step = False
+            if cadence_k is not None and (day_index + 1) % cadence_k == 0:
+                t0 = time.perf_counter()
+                train_and_save_champion(settings, available_history, models_dir=model_path.parent)
+                retrain_events.append(
+                    {
+                        "cadence": label,
+                        "day_index": day_index,
+                        "decision_date": current_date.isoformat(),
+                        "duration_seconds": round(time.perf_counter() - t0, 3),
+                        "history_rows": int(len(available_history)),
+                    }
+                )
+                retrained_this_step = True
+
+            preds = _score_one_step(
+                panel=available_history,
+                model_path=model_path,
+                settings=settings,
+                series_cost_profile=series_cost_profile,
+            )
+            preds = preds.merge(
+                actuals[["series_id", "y_true"]],
+                on="series_id",
+                how="left",
+                suffixes=("", "_actual"),
+            )
+            if "y_true_actual" in preds.columns:
+                preds["y_true"] = preds["y_true_actual"]
+                preds = preds.drop(columns=["y_true_actual"])
+
+            preds = attach_inventory_costs(
+                preds, settings.inventory, series_cost_profile=series_cost_profile
+            )
+            preds["decision_date"] = current_date
+            preds["day_index"] = day_index
+            preds["cadence"] = label
+            preds["retrained_this_step"] = retrained_this_step
+            preds["actuals_complete"] = actuals_complete
+            rows.append(preds)
+
+        if (day_index + 1) % 5 == 0 or day_index == len(eval_dates) - 1:
+            print(
+                f"   day {day_index + 1}/{len(eval_dates)} ({current_date.date()}) "
+                f"— retrains so far: {len(retrain_events)}"
+            )
+
+    return pd.concat(rows, ignore_index=True), retrain_events
+
+
+def _persist_simulation_outputs(
+    sim_root: Path,
+    predictions_by_day: pd.DataFrame,
+    cadence_summary: pd.DataFrame,
+    retrain_events: list[dict[str, Any]],
+    settings: Settings,
+    eval_dates: list[Any],
+) -> tuple[Path | None, Path]:
+    """Write simulation artifacts to disk; return ``(plot_path, report_path)``."""
+    predictions_by_day.to_parquet(sim_root / "predictions_by_day.parquet", index=False)
+    cadence_summary.to_csv(sim_root / "cadence_summary.csv", index=False)
+    (sim_root / "retrain_events.json").write_text(
+        json.dumps(retrain_events, indent=2), encoding="utf-8"
+    )
+
+    plot_path: Path | None = None
+    if settings.simulation.make_plots:
+        plot_path = _plot_cumulative_cost(predictions_by_day, retrain_events, sim_root)
+
+    report_path = _write_simulation_report(
+        sim_root, cadence_summary, retrain_events, settings, eval_dates
+    )
+    return plot_path, report_path
 
 
 def run_operational_simulation(settings: Settings) -> OperationalSimulationArtifacts:
@@ -126,25 +257,7 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
     sim_models_root = sim_root / "models"
     sim_models_root.mkdir(parents=True, exist_ok=True)
 
-    print(f"🔧 Training initial champion on train split ({len(train_panel)} rows)...")
-    base_model_path = train_and_save_champion(
-        settings,
-        train_panel,
-        models_dir=sim_models_root / "initial",
-    )
-    print(f"   ↳ saved to {base_model_path}")
-
-    cadences = settings.simulation.retrain_cadences
-    cadence_paths: dict[str, Path] = {}
-    cadence_int: dict[str, int | None] = {}
-    for cadence in cadences:
-        label = _cadence_label(cadence)
-        cadence_dir = sim_models_root / label
-        cadence_dir.mkdir(parents=True, exist_ok=True)
-        cadence_model_path = cadence_dir / base_model_path.name
-        shutil.copy2(base_model_path, cadence_model_path)
-        cadence_paths[label] = cadence_model_path
-        cadence_int[label] = cadence
+    cadence_paths, cadence_int = _setup_cadence_models(settings, train_panel, sim_models_root)
 
     # Combined panel keeps lag continuity across the train→eval boundary.
     combined_panel = pd.concat([train_panel, eval_panel], ignore_index=True)
@@ -156,94 +269,20 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
             label_all_regimes(train_panel), settings.inventory
         )
 
-    retrain_events: list[dict[str, Any]] = []
-    rows: list[pd.DataFrame] = []
-
-    print(
-        f"▶️  Streaming {len(eval_dates)} eval days across "
-        f"{len(cadences)} cadences (horizon={horizon})..."
+    predictions_by_day, retrain_events = _run_streaming_loop(
+        eval_dates=eval_dates,
+        combined_panel=combined_panel,
+        eval_panel=eval_panel,
+        cadence_paths=cadence_paths,
+        cadence_int=cadence_int,
+        horizon=horizon,
+        settings=settings,
+        series_cost_profile=series_cost_profile,
     )
-
-    for day_index, current_date in enumerate(eval_dates):
-        available_history = combined_panel[combined_panel["date"] < current_date]
-        actuals = _reveal_actuals(eval_panel, current_date, horizon)
-        actuals_complete = not actuals.empty and bool(
-            (actuals["actuals_days_observed"] >= horizon).all()
-        )
-
-        for label, model_path in cadence_paths.items():
-            cadence_k = cadence_int[label]
-            retrained_this_step = False
-            retrain_seconds = 0.0
-            if cadence_k is not None and (day_index + 1) % cadence_k == 0:
-                t0 = time.perf_counter()
-                train_and_save_champion(
-                    settings,
-                    available_history,
-                    models_dir=model_path.parent,
-                )
-                retrain_seconds = time.perf_counter() - t0
-                retrained_this_step = True
-                retrain_events.append(
-                    {
-                        "cadence": label,
-                        "day_index": day_index,
-                        "decision_date": current_date.isoformat(),
-                        "duration_seconds": round(retrain_seconds, 3),
-                        "history_rows": int(len(available_history)),
-                    }
-                )
-
-            preds = _score_one_step(
-                panel=available_history,
-                model_path=model_path,
-                settings=settings,
-                series_cost_profile=series_cost_profile,
-            )
-            preds = preds.merge(
-                actuals[["series_id", "y_true"]],
-                on="series_id",
-                how="left",
-                suffixes=("", "_actual"),
-            )
-            if "y_true_actual" in preds.columns:
-                preds["y_true"] = preds["y_true_actual"]
-                preds = preds.drop(columns=["y_true_actual"])
-
-            preds = attach_inventory_costs(
-                preds,
-                settings.inventory,
-                series_cost_profile=series_cost_profile,
-            )
-            preds["decision_date"] = current_date
-            preds["day_index"] = day_index
-            preds["cadence"] = label
-            preds["retrained_this_step"] = retrained_this_step
-            preds["actuals_complete"] = actuals_complete
-            rows.append(preds)
-
-        if (day_index + 1) % 5 == 0 or day_index == len(eval_dates) - 1:
-            print(
-                f"   day {day_index + 1}/{len(eval_dates)} ({current_date.date()}) "
-                f"— retrains so far: {len(retrain_events)}"
-            )
-
-    predictions_by_day = pd.concat(rows, ignore_index=True)
     cadence_summary = _summarize_cadences(predictions_by_day, retrain_events)
 
-    predictions_path = sim_root / "predictions_by_day.parquet"
-    predictions_by_day.to_parquet(predictions_path, index=False)
-    cadence_summary.to_csv(sim_root / "cadence_summary.csv", index=False)
-    (sim_root / "retrain_events.json").write_text(
-        json.dumps(retrain_events, indent=2), encoding="utf-8"
-    )
-
-    plot_path: Path | None = None
-    if settings.simulation.make_plots:
-        plot_path = _plot_cumulative_cost(predictions_by_day, retrain_events, sim_root)
-
-    report_path = _write_simulation_report(
-        sim_root, cadence_summary, retrain_events, settings, eval_dates
+    plot_path, report_path = _persist_simulation_outputs(
+        sim_root, predictions_by_day, cadence_summary, retrain_events, settings, eval_dates
     )
 
     print(

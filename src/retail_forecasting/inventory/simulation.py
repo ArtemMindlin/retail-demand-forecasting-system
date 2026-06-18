@@ -93,6 +93,8 @@ def simulate_inventory_policy(
 
     # Identify available quantile columns for the decider
     quantile_columns = [c for c in predictions.columns if c.startswith("q_")]
+    # NB: parsed inline (not via utils.quantile_level_from_column) because the
+    # `inventory` layer is intentionally restricted to importing only `config`.
     quantile_levels = [float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns]
 
     # Process independently for each experimental strategy (data_strategy, model_name, backend_name)

@@ -1,10 +1,21 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_pinball_loss
+
+from retail_forecasting.utils.io import quantile_level_from_column, winkler_score
+
+__all__ = ["summarize_predictions", "summarize_costs", "pinball_loss", "winkler_score"]
+
+
+def _split_group_keys(keys: Any, group_cols: list[str]) -> dict[str, Any]:
+    """Map a pandas groupby key (tuple or scalar) to a {column: value} dict."""
+    values = keys if isinstance(keys, tuple) else (keys,)
+    return dict(zip(group_cols, values, strict=True))
 
 
 def summarize_predictions(
@@ -18,29 +29,19 @@ def summarize_predictions(
         group_cols.insert(0, "data_strategy")
 
     for keys, subset in predictions.groupby(group_cols, dropna=False):
-        if "data_strategy" in group_cols:
-            strategy, model_name, backend_name = keys
-        else:
-            model_name, backend_name = keys
-            strategy = None
-
-        record = _build_metric_record(subset, model_name, backend_name)
-        if strategy:
-            record["data_strategy"] = strategy
+        key_map = _split_group_keys(keys, group_cols)
+        record = _build_metric_record(subset, key_map["model_name"], key_map["backend_name"])
+        if key_map.get("data_strategy"):
+            record["data_strategy"] = key_map["data_strategy"]
         records.append(record)
 
-    fold_group_cols = ["fold_id"] + group_cols
+    fold_group_cols = ["fold_id", *group_cols]
     for keys, subset in predictions.groupby(fold_group_cols, dropna=False):
-        if "data_strategy" in group_cols:
-            fold_id, strategy, model_name, backend_name = keys
-        else:
-            fold_id, model_name, backend_name = keys
-            strategy = None
-
-        record = _build_metric_record(subset, model_name, backend_name)
-        record["fold_id"] = fold_id
-        if strategy:
-            record["data_strategy"] = strategy
+        key_map = _split_group_keys(keys, fold_group_cols)
+        record = _build_metric_record(subset, key_map["model_name"], key_map["backend_name"])
+        record["fold_id"] = key_map["fold_id"]
+        if key_map.get("data_strategy"):
+            record["data_strategy"] = key_map["data_strategy"]
         fold_records.append(record)
 
     return pd.DataFrame(records), pd.DataFrame(fold_records)
@@ -136,7 +137,7 @@ def _build_metric_record(
         # PICP: Prediction Interval Coverage Probability
         coverage_val = float(((y_true >= lower) & (y_true <= upper)).mean())
         record["interval_coverage"] = coverage_val
-        # Legacy name for backward compatibility with existing tests
+        # Legacy name kept for backward compatibility (asserted by tests/test_quantile_contract.py)
         record[f"coverage_{lower_column}_{upper_column}"] = coverage_val
 
         # MPIW: Mean Prediction Interval Width
@@ -150,29 +151,12 @@ def _build_metric_record(
 
 def _find_quantile_columns(predictions: pd.DataFrame) -> list[tuple[float, str]]:
     quantile_pairs = [
-        (_parse_quantile_column(column), column)
+        (quantile_level_from_column(column), column)
         for column in predictions.columns
         if column.startswith("q_") and predictions[column].notna().any()
     ]
     return sorted(quantile_pairs, key=lambda item: item[0])
 
 
-def _parse_quantile_column(column: str) -> float:
-    return float(column.replace("q_", "").replace("_", "."))
-
-
 def pinball_loss(actual: pd.Series, predicted: pd.Series, quantile: float) -> float:
     return float(mean_pinball_loss(actual, predicted, alpha=quantile))
-
-
-def winkler_score(actual: pd.Series, lower: pd.Series, upper: pd.Series, alpha: float) -> float:
-    """
-    Calculate the Winkler Score for prediction intervals.
-    A proper scoring rule that penalizes both wide intervals and values outside the interval.
-    Lower is better.
-    """
-    width = upper - lower
-    under_penalty = (2.0 / alpha) * (lower - actual) * (actual < lower)
-    over_penalty = (2.0 / alpha) * (actual - upper) * (actual > upper)
-    score = width + under_penalty + over_penalty
-    return float(np.mean(score))

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 import pandas as pd
-from pandas.core.groupby.generic import SeriesGroupBy
+from pandas.core.groupby.generic import DataFrameGroupBy, SeriesGroupBy
 
 from retail_forecasting.config import FeatureConfig
 from retail_forecasting.contracts import FeatureMetadata, InferenceFallbackMetadata
@@ -11,6 +11,34 @@ from retail_forecasting.contracts import FeatureMetadata, InferenceFallbackMetad
 logger = logging.getLogger(__name__)
 
 DROP_WARNING_FRACTION = 0.2
+
+
+def _add_lag_features(
+    frame: pd.DataFrame,
+    grouped: DataFrameGroupBy,
+    source_col: str,
+    lags: list[int],
+    prefix: str,
+) -> list[str]:
+    """Add shifted lag columns ``{prefix}_lag_{lag}`` to ``frame``; return their names."""
+    added = []
+    for lag in sorted(set(lags)):
+        column = f"{prefix}_lag_{lag}"
+        frame[column] = grouped[source_col].shift(lag)
+        added.append(column)
+    return added
+
+
+def _rolling_feature(
+    grouped: DataFrameGroupBy,
+    source_col: str,
+    window: int,
+    agg: str,
+) -> pd.Series:
+    """Past-only rolling aggregate (shift(1) avoids leaking the current day)."""
+    return grouped[source_col].transform(
+        lambda series, w=window: getattr(series.shift(1).rolling(window=w, min_periods=w), agg)()
+    )
 
 
 def build_feature_frame(
@@ -41,44 +69,31 @@ def build_feature_frame(
         ]
     )
 
-    demand_series = grouped["observed_demand"]
-    for lag in sorted(set(feature_config.lags)):
-        column = f"demand_lag_{lag}"
-        frame[column] = demand_series.shift(lag)
-        feature_columns.append(column)
+    feature_columns.extend(
+        _add_lag_features(frame, grouped, "observed_demand", feature_config.lags, "demand")
+    )
 
     for window in sorted(set(feature_config.rolling_windows)):
         mean_column = f"demand_roll_mean_{window}"
         sum_column = f"demand_roll_sum_{window}"
         std_column = f"demand_roll_std_{window}"
-        frame[mean_column] = grouped["observed_demand"].transform(
-            lambda series, w=window: series.shift(1).rolling(window=w, min_periods=w).mean()
-        )
-        frame[sum_column] = grouped["observed_demand"].transform(
-            lambda series, w=window: series.shift(1).rolling(window=w, min_periods=w).sum()
-        )
-        frame[std_column] = grouped["observed_demand"].transform(
-            lambda series, w=window: series.shift(1).rolling(window=w, min_periods=w).std()
-        )
-        frame[std_column] = frame[std_column].fillna(0.0)
+        frame[mean_column] = _rolling_feature(grouped, "observed_demand", window, "mean")
+        frame[sum_column] = _rolling_feature(grouped, "observed_demand", window, "sum")
+        frame[std_column] = _rolling_feature(grouped, "observed_demand", window, "std").fillna(0.0)
         feature_columns.extend([mean_column, sum_column, std_column])
 
     if feature_config.include_discount_lags:
-        for lag in sorted(set(feature_config.lags)):
-            column = f"discount_lag_{lag}"
-            frame[column] = grouped["discount"].shift(lag)
-            feature_columns.append(column)
+        feature_columns.extend(
+            _add_lag_features(frame, grouped, "discount", feature_config.lags, "discount")
+        )
 
     if feature_config.include_stockout_lags:
-        for lag in sorted(set(feature_config.lags)):
-            column = f"stockout_lag_{lag}"
-            frame[column] = grouped["stockout_hours"].shift(lag)
-            feature_columns.append(column)
+        feature_columns.extend(
+            _add_lag_features(frame, grouped, "stockout_hours", feature_config.lags, "stockout")
+        )
         for window in sorted(set(feature_config.rolling_windows)):
             column = f"stockout_roll_mean_{window}"
-            frame[column] = grouped["stockout_hours"].transform(
-                lambda series, w=window: series.shift(1).rolling(window=w, min_periods=w).mean()
-            )
+            frame[column] = _rolling_feature(grouped, "stockout_hours", window, "mean")
             feature_columns.append(column)
 
     if feature_config.include_weather_lags:
@@ -89,10 +104,9 @@ def build_feature_frame(
             "avg_wind_level",
         ]
         for source_column in weather_columns:
-            for lag in sorted(set(feature_config.lags)):
-                column = f"{source_column}_lag_{lag}"
-                frame[column] = grouped[source_column].shift(lag)
-                feature_columns.append(column)
+            feature_columns.extend(
+                _add_lag_features(frame, grouped, source_column, feature_config.lags, source_column)
+            )
 
     if feature_config.include_static_ids:
         static_columns = [

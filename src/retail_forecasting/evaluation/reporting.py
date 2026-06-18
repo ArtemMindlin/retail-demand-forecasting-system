@@ -146,6 +146,55 @@ class RunArtifacts:
     shap_values: shap.Explanation | None = None
 
 
+def _render_experiment_plots(run_dir: Path, artifacts: RunArtifacts) -> None:
+    """Render the standard plots plus, when SHAP is available, the SHAP summary and drift report."""
+    render_standard_plots(
+        metrics_summary=artifacts.metrics_summary,
+        cost_summary=artifacts.cost_summary,
+        output_dir=run_dir,
+    )
+    if artifacts.shap_values is None:
+        return
+
+    from retail_forecasting.visualization.plots import render_shap_summary
+
+    render_shap_summary(
+        shap_values=artifacts.shap_values,
+        output_path=run_dir / "shap_summary.png",
+    )
+
+    from retail_forecasting.drift.psi import build_feature_drift_report
+
+    drift_report = build_feature_drift_report(
+        supervised_frame=artifacts.supervised_frame,
+        shap_values=artifacts.shap_values,
+    )
+    if drift_report:
+        (run_dir / "drift_report.json").write_text(
+            json.dumps(drift_report, indent=2),
+            encoding="utf-8",
+        )
+
+
+def _persist_experiment_artifacts(
+    run_dir: Path, artifacts: RunArtifacts, settings: Settings
+) -> None:
+    """Write the full experiment outputs: prediction/metric/cost CSVs, plots and report."""
+    artifacts.predictions.to_csv(run_dir / "predictions.csv", index=False)
+    artifacts.metrics_summary.to_csv(run_dir / "metrics_summary.csv", index=False)
+    artifacts.fold_metrics.to_csv(run_dir / "fold_metrics.csv", index=False)
+    artifacts.cost_summary.to_csv(run_dir / "cost_summary.csv", index=False)
+    if artifacts.sensitivity_summary is not None:
+        artifacts.sensitivity_summary.to_csv(run_dir / "sensitivity_summary.csv", index=False)
+    if artifacts.tuning_pareto is not None:
+        artifacts.tuning_pareto.to_csv(run_dir / "tuning_pareto.csv", index=False)
+    if settings.reporting.make_plots:
+        _render_experiment_plots(run_dir, artifacts)
+
+    report_text = build_markdown_report(artifacts=artifacts, settings=settings)
+    (run_dir / "report.md").write_text(report_text, encoding="utf-8")
+
+
 def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtifacts:
     run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -199,42 +248,7 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
             encoding="utf-8",
         )
     else:
-        artifacts.predictions.to_csv(run_dir / "predictions.csv", index=False)
-        artifacts.metrics_summary.to_csv(run_dir / "metrics_summary.csv", index=False)
-        artifacts.fold_metrics.to_csv(run_dir / "fold_metrics.csv", index=False)
-        artifacts.cost_summary.to_csv(run_dir / "cost_summary.csv", index=False)
-        if artifacts.sensitivity_summary is not None:
-            artifacts.sensitivity_summary.to_csv(run_dir / "sensitivity_summary.csv", index=False)
-        if artifacts.tuning_pareto is not None:
-            artifacts.tuning_pareto.to_csv(run_dir / "tuning_pareto.csv", index=False)
-        if settings.reporting.make_plots:
-            render_standard_plots(
-                metrics_summary=artifacts.metrics_summary,
-                cost_summary=artifacts.cost_summary,
-                output_dir=run_dir,
-            )
-            if artifacts.shap_values is not None:
-                from retail_forecasting.visualization.plots import render_shap_summary
-
-                render_shap_summary(
-                    shap_values=artifacts.shap_values,
-                    output_path=run_dir / "shap_summary.png",
-                )
-
-                from retail_forecasting.drift.psi import build_feature_drift_report
-
-                drift_report = build_feature_drift_report(
-                    supervised_frame=artifacts.supervised_frame,
-                    shap_values=artifacts.shap_values,
-                )
-                if drift_report:
-                    (run_dir / "drift_report.json").write_text(
-                        json.dumps(drift_report, indent=2),
-                        encoding="utf-8",
-                    )
-
-        report_text = build_markdown_report(artifacts=artifacts, settings=settings)
-        (run_dir / "report.md").write_text(report_text, encoding="utf-8")
+        _persist_experiment_artifacts(run_dir, artifacts, settings)
 
     artifacts.reorder_recommendations = reorder_recommendations
     artifacts.exceptions = exceptions
@@ -354,6 +368,17 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
     return "\n".join(report)
 
 
+def _apply_flag(recommendations: pd.DataFrame, mask: pd.Series, flag: str, note: str) -> None:
+    """Assign a risk flag and note to masked rows that are not already flagged.
+
+    Enforces a "first flag wins" precedence so earlier (higher-priority) flags
+    are never overwritten by later ones.
+    """
+    target = mask & recommendations["risk_flag"].isna()
+    recommendations.loc[target, "risk_flag"] = flag
+    recommendations.loc[target, "notes"] = note
+
+
 def build_reorder_recommendations(artifacts: RunArtifacts, settings: Settings) -> pd.DataFrame:
     recommendations = artifacts.predictions.copy()
     recommendations["decision_date"] = recommendations["date"]
@@ -374,20 +399,20 @@ def build_reorder_recommendations(artifacts: RunArtifacts, settings: Settings) -
     recommendations["notes"] = pd.Series(pd.NA, index=recommendations.index, dtype="object")
 
     if settings.business.flag_cold_start:
-        cold_start_mask = recommendations["prediction_source"] == "cold_start_fallback"
-        recommendations.loc[cold_start_mask, "risk_flag"] = "cold_start"
-        recommendations.loc[cold_start_mask, "notes"] = (
-            "Fallback recommendation generated due to incomplete model features."
+        _apply_flag(
+            recommendations,
+            recommendations["prediction_source"] == "cold_start_fallback",
+            "cold_start",
+            "Fallback recommendation generated due to incomplete model features.",
         )
 
     if settings.business.flag_drift_watch and artifacts.drifts:
         drift_fold_ids = {event.fold_id for event in artifacts.drifts}
-        drift_mask = (
-            recommendations["fold_id"].isin(drift_fold_ids) & recommendations["risk_flag"].isna()
-        )
-        recommendations.loc[drift_mask, "risk_flag"] = "drift_watch"
-        recommendations.loc[drift_mask, "notes"] = (
-            "Recommendation belongs to a fold flagged for drift monitoring."
+        _apply_flag(
+            recommendations,
+            recommendations["fold_id"].isin(drift_fold_ids),
+            "drift_watch",
+            "Recommendation belongs to a fold flagged for drift monitoring.",
         )
 
     lower_quantile = "q_0_1"
@@ -403,12 +428,11 @@ def build_reorder_recommendations(artifacts: RunArtifacts, settings: Settings) -
             width_threshold = float(
                 positive_width.quantile(settings.business.high_uncertainty_interval_quantile)
             )
-            high_uncertainty_mask = (interval_width >= width_threshold) & recommendations[
-                "risk_flag"
-            ].isna()
-            recommendations.loc[high_uncertainty_mask, "risk_flag"] = "high_uncertainty"
-            recommendations.loc[high_uncertainty_mask, "notes"] = (
-                "Prediction interval width exceeds the configured review threshold."
+            _apply_flag(
+                recommendations,
+                interval_width >= width_threshold,
+                "high_uncertainty",
+                "Prediction interval width exceeds the configured review threshold.",
             )
 
     extreme_order_threshold = float(
@@ -417,12 +441,11 @@ def build_reorder_recommendations(artifacts: RunArtifacts, settings: Settings) -
         )
     )
     if settings.business.flag_extreme_order_quantity and extreme_order_threshold > 0:
-        extreme_order_mask = (
-            recommendations["order_quantity"] >= extreme_order_threshold
-        ) & recommendations["risk_flag"].isna()
-        recommendations.loc[extreme_order_mask, "risk_flag"] = "extreme_order_quantity"
-        recommendations.loc[extreme_order_mask, "notes"] = (
-            "Order quantity exceeds the configured review threshold."
+        _apply_flag(
+            recommendations,
+            recommendations["order_quantity"] >= extreme_order_threshold,
+            "extreme_order_quantity",
+            "Order quantity exceeds the configured review threshold.",
         )
 
     preferred_columns = [
@@ -634,20 +657,20 @@ def update_champion_registry(
             promoted_row = promoted_rows.sort_values("total_cost").iloc[0]
             reason = promotion_decision.decision_reason
 
-    _backend = str(promoted_row["backend_name"])
-    _model_file = settings.reporting.output_dir / "models" / f"{_backend}.pkl"
+    backend = str(promoted_row["backend_name"])
+    model_file = settings.reporting.output_dir / "models" / f"{backend}.pkl"
     return ChampionRegistry(
         updated_at=utc_timestamp(),
         current_champion=ChampionRecord(
             data_strategy=_optional_string(promoted_row.get("data_strategy")),
             model_name=str(promoted_row["model_name"]),
-            backend_name=_backend,
+            backend_name=backend,
             promoted_at=utc_timestamp(),
             run_name=settings.reporting.run_name,
             git_commit=get_git_commit(),
             config_hash=build_config_hash(settings),
             reason=reason,
-            model_path=str(_model_file) if _model_file.exists() else None,
+            model_path=str(model_file) if model_file.exists() else None,
         ),
     )
 
