@@ -15,15 +15,18 @@ class DriftResult:
 
 @dataclass(slots=True)
 class PageHinkleyDetector:
-    """Implementation of the Page-Hinkley test for concept drift detection.
+    """Simplified, one-sided Page-Hinkley test for concept drift detection.
 
-    The Page-Hinkley (PH) test is a sequential analysis technique used for
-    monitoring change point detection. It is designed to detect a change in
-    the mean of a Gaussian signal.
+    The classic Page-Hinkley (PH) test is a sequential change-point technique
+    for detecting a shift in the mean of a signal. This is an adapted,
+    one-sided variant: it tracks the cumulative deviation of the error above
+    its running mean (with a slack term ``delta``) and flags drift when that
+    statistic exceeds ``threshold``. It only watches for the error *increasing*
+    (model degradation), not for symmetric changes as the full PH test does.
 
-    In the context of forecasting, we use it to monitor the model error.
-    An increase in the cumulative deviation of the error suggests that
-    the model's performance is degrading (Concept Drift).
+    In the context of forecasting, it monitors the model error: a growing
+    cumulative deviation suggests the model's performance is degrading
+    (concept drift).
     """
 
     threshold: float = 30.0

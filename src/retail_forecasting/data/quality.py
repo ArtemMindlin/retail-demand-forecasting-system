@@ -50,11 +50,8 @@ def validate_prepared_panel(panel: pd.DataFrame, settings: Settings) -> DataQual
             )
         )
 
-    null_key_counts = {
-        column: int(panel[column].isna().sum())
-        for column in KEY_COLUMNS
-        if int(panel[column].isna().sum()) > 0
-    }
+    null_counts_by_key = {column: int(panel[column].isna().sum()) for column in KEY_COLUMNS}
+    null_key_counts = {column: count for column, count in null_counts_by_key.items() if count > 0}
     if null_key_counts:
         blocking_errors.append(
             DataQualityIssue(

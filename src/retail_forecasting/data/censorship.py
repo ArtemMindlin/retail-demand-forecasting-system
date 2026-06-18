@@ -6,6 +6,10 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
+# The dataset records stock availability over the 6:00–22:00 operative window (16 hours).
+# stockout_hours is counted within that window, so this is its normalizing denominator.
+OPERATIVE_WINDOW_HOURS = 16.0
+
 
 class LatentDemandImputer:
     """Imputes latent demand for periods with stockouts using various strategies.
@@ -39,19 +43,14 @@ class LatentDemandImputer:
             A panel with 'latent_demand_est', 'is_imputed' and updated 'observed_demand'.
         """
         if self.strategy == "none":
-            df = panel.copy()
-            df["latent_demand_est"] = df[self.target_col]
-            df["is_imputed"] = False
-            return df
+            return self._passthrough(panel)
 
         df = panel.copy()
         is_clean = df[self.stockout_col] == 0
         is_censored = ~is_clean
 
         if not is_censored.any():
-            df["latent_demand_est"] = df[self.target_col]
-            df["is_imputed"] = False
-            return df
+            return self._passthrough(panel)
 
         if self.strategy == "supervised":
             df = self._impute_supervised(df, is_clean, is_censored)
@@ -59,6 +58,8 @@ class LatentDemandImputer:
             df = self._impute_historical_mean(df, is_clean, is_censored)
         elif self.strategy == "clipped_scaling":
             df = self._impute_clipped_scaling(df, is_clean, is_censored)
+        else:
+            raise ValueError(f"Unknown imputation strategy: {self.strategy!r}")
 
         # Ensure we don't have NaNs in the estimate
         df["latent_demand_est"] = df["latent_demand_est"].fillna(df[self.target_col])
@@ -68,6 +69,16 @@ class LatentDemandImputer:
         df["original_observed_demand"] = df[self.target_col]
         df[self.target_col] = df["latent_demand_est"]
 
+        return df
+
+    def _passthrough(self, panel: pd.DataFrame) -> pd.DataFrame:
+        """Return the panel unchanged, marking demand as not imputed.
+
+        Used when no correction applies (strategy ``none`` or no censored rows).
+        """
+        df = panel.copy()
+        df["latent_demand_est"] = df[self.target_col]
+        df["is_imputed"] = False
         return df
 
     def _impute_supervised(
@@ -81,7 +92,7 @@ class LatentDemandImputer:
         df_feat["series_cat"] = df_feat["series_id"].astype("category")
 
         # Stockout severity: fraction of operative window without stock
-        df_feat["stockout_ratio"] = df_feat[self.stockout_col] / 16.0
+        df_feat["stockout_ratio"] = df_feat[self.stockout_col] / OPERATIVE_WINDOW_HOURS
 
         # Series-level clean-day mean as a prior (mirrors historical_mean but as a feature)
         series_means = df_feat[is_clean].groupby("series_id")[self.target_col].mean()
