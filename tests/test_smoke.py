@@ -22,6 +22,8 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
             min_history_days=70,
             horizon=7,
         ),
+        # Keep the smoke run fast and deterministic: no Optuna tuning.
+        models=ModelConfig(use_tuning=False),
         reporting=ReportingConfig(
             output_dir=tmp_path,
             run_name="smoke_test",

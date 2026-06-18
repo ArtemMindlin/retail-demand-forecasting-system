@@ -158,21 +158,25 @@ def test_api_drift_serves_real_report(tmp_path: pytest.TempPath) -> None:
 
 
 def test_api_alerts() -> None:
+    # Alerts are derived only from a real run's exceptions.csv; no synthetic
+    # fallbacks. The list may be empty, but when populated it must follow the
+    # documented shape.
     response = client.get("/api/alerts")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
-    assert len(data) > 0
-    assert "title" in data[0]
-    assert "sev" in data[0]
+    for alert in data:
+        assert "title" in alert
+        assert "sev" in alert
 
 
 def test_api_retrain() -> None:
+    # Retraining runs offline via run.py; the endpoint is an honest no-op stub.
     response = client.post("/api/retrain")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "success"
-    assert "triggered" in data["message"].lower()
+    assert data["status"] == "not_implemented"
+    assert "run.py" in data["message"]
 
 
 def test_load_latest_predictions_fallback() -> None:

@@ -16,7 +16,6 @@ from retail_forecasting.config import (
     PreprocessingConfig,
     ReportingConfig,
     Settings,
-    SyntheticCostConfig,
     ValidationConfig,
     load_config,
 )
@@ -60,19 +59,10 @@ def test_default_model_quantiles_are_valid_and_orderable() -> None:
 
 def test_default_inventory_costs_are_positive() -> None:
     settings = load_config(CONFIG_PATH)
-    synthetic_cost_config = settings.inventory.synthetic_cost_config
 
     assert settings.inventory.overstock_cost > 0
     assert settings.inventory.stockout_cost > 0
     assert isinstance(settings.inventory.use_series_costs, bool)
-    assert settings.inventory.pareto_order_scales
-    assert all(scale >= 0.0 for scale in settings.inventory.pareto_order_scales)
-    assert sum(synthetic_cost_config.perishability_weights) == pytest.approx(1.0)
-    assert sum(synthetic_cost_config.slow_moving_weights) == pytest.approx(1.0)
-    assert sum(synthetic_cost_config.criticality_weights) == pytest.approx(1.0)
-    assert synthetic_cost_config.perishability_base > 0.0
-    assert synthetic_cost_config.slow_moving_base > 0.0
-    assert synthetic_cost_config.service_criticality_base > 0.0
 
 
 def test_default_reporting_does_not_write_into_data_cache() -> None:
@@ -120,31 +110,6 @@ def test_settings_instantiation_rejects_invalid_business_thresholds() -> None:
 
     with pytest.raises(ValidationError, match="max_missing_fraction_warning"):
         Settings(data_quality=DataQualityConfig(max_missing_fraction_warning=1.1))
-
-
-def test_settings_instantiation_rejects_invalid_synthetic_cost_weights() -> None:
-    with pytest.raises(ValidationError, match="Synthetic cost weights"):
-        Settings(
-            inventory=InventoryConfig(
-                synthetic_cost_config=SyntheticCostConfig(perishability_weights=[0.8, 0.3, -0.1])
-            )
-        )
-
-    with pytest.raises(ValidationError, match="Synthetic cost weights"):
-        Settings(
-            inventory=InventoryConfig(
-                synthetic_cost_config=SyntheticCostConfig(criticality_weights=[0.7, 0.4])
-            )
-        )
-
-
-def test_settings_instantiation_rejects_invalid_synthetic_cost_scaling() -> None:
-    with pytest.raises(ValidationError, match="perishability_base"):
-        Settings(
-            inventory=InventoryConfig(
-                synthetic_cost_config=SyntheticCostConfig(perishability_base=0.0)
-            )
-        )
 
 
 def test_settings_instantiation_rejects_data_cache_reporting_output() -> None:

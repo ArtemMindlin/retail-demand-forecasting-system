@@ -35,7 +35,7 @@ def test_pipeline_artifacts_follow_dataframe_contracts(tmp_path: Path) -> None:
     _assert_metrics_summary_contract(artifacts.metrics_summary)
     _assert_fold_metrics_contract(artifacts.fold_metrics)
     _assert_cost_summary_contract(artifacts.cost_summary)
-    _assert_pareto_frontier_contract(artifacts.pareto_frontier)
+    _assert_tuning_pareto_contract(artifacts.tuning_pareto)
 
 
 def _assert_prepared_panel_contract(frame) -> None:
@@ -150,31 +150,24 @@ def _assert_cost_summary_contract(cost_summary) -> None:
     assert cost_summary["fill_rate"].between(0.0, 1.0).all()
 
 
-def _assert_pareto_frontier_contract(pareto_frontier) -> None:
-    assert pareto_frontier is not None
+def _assert_tuning_pareto_contract(tuning_pareto) -> None:
+    # The Pareto artifact is now the Optuna tuning frontier (Pinball vs Winkler),
+    # populated when use_tuning is enabled (the default).
+    assert tuning_pareto is not None
     required_columns = {
-        "model_name",
-        "backend_name",
-        "policy_name",
-        "order_scale",
-        "observations",
-        "mean_order_quantity",
-        "total_overstock_units",
-        "total_stockout_units",
-        "total_overstock_cost",
-        "total_stockout_cost",
-        "total_cost",
-        "mean_cost",
-        "service_level",
-        "fill_rate",
-        "is_pareto_efficient",
+        "data_strategy",
+        "trial_number",
+        "pinball",
+        "winkler",
+        "is_on_front",
+        "is_selected",
     }
 
-    assert required_columns.issubset(pareto_frontier.columns)
-    assert (pareto_frontier["order_scale"] >= 0.0).all()
-    assert pareto_frontier["service_level"].between(0.0, 1.0).all()
-    assert pareto_frontier["fill_rate"].between(0.0, 1.0).all()
-    assert pareto_frontier["is_pareto_efficient"].any()
+    assert required_columns.issubset(tuning_pareto.columns)
+    assert (tuning_pareto["trial_number"] >= 0).all()
+    assert (tuning_pareto["pinball"] >= 0).all()
+    assert tuning_pareto["is_on_front"].any()
+    assert tuning_pareto["is_selected"].any()
 
 
 def _assert_quantile_columns_are_monotonic(predictions) -> None:
