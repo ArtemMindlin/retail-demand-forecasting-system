@@ -1,5 +1,5 @@
-# Generated model artifacts (written to models/ at runtime)
-models/
+# Generated model artifacts (written to ./models at runtime)
+/models/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
