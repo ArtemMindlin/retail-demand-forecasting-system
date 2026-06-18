@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -48,7 +49,73 @@ from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.optimization import HyperparameterTuner
-from retail_forecasting.utils.io import quantile_column_name
+from retail_forecasting.utils.io import quantile_column_name, quantile_level_from_column
+
+# Conventional fold id used for holdout predictions (distinct from real walk-forward folds).
+HOLDOUT_FOLD_ID = 999
+
+
+def _split_train_calibration(
+    frame: pd.DataFrame,
+    settings: Settings,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series | None]:
+    """Split a supervised frame into (sub_train, calibration, mondrian_group_ids).
+
+    The most recent ``validation.calibration_days`` are reserved for conformal
+    calibration. Falls back to training on the whole frame (empty calibration)
+    when the split would leave no training rows.
+    """
+    calib_cutoff = frame["date"].max() - pd.Timedelta(days=settings.validation.calibration_days)
+    sub_train = frame[frame["date"] <= calib_cutoff].copy()
+    calib = frame[frame["date"] > calib_cutoff].copy()
+    if sub_train.empty:
+        return frame, pd.DataFrame(), None
+
+    group_ids = None
+    if not calib.empty and "third_category_id" in calib.columns:
+        group_ids = calib["third_category_id"]
+    return sub_train, calib, group_ids
+
+
+def _instantiate_boosting_base(
+    model_cls: type[AutoBoostingModel] | type[CatBoostingModel],
+    settings: Settings,
+    params: BoostingParams,
+) -> AutoBoostingModel | CatBoostingModel:
+    """Build a boosting base model from tuned params and inventory costs."""
+    return model_cls(
+        quantiles=settings.models.quantiles,
+        random_seed=settings.project.random_seed,
+        n_estimators=params.n_estimators,
+        learning_rate=params.learning_rate,
+        max_depth=params.max_depth,
+        overstock_cost=settings.inventory.overstock_cost,
+        stockout_cost=settings.inventory.stockout_cost,
+    )
+
+
+def _train_conformal_model(
+    base_model: AutoBoostingModel | CatBoostingModel,
+    sub_train: pd.DataFrame,
+    calib: pd.DataFrame,
+    group_ids: pd.Series | None,
+    feature_columns: list[str],
+    settings: Settings,
+) -> ConformalForecaster:
+    """Fit a ConformalForecaster around a base model and calibrate it if possible."""
+    model = ConformalForecaster(base_model)
+    model.fit(
+        sub_train.loc[:, feature_columns],
+        sub_train["target_lead_time_demand"],
+    )
+    if not calib.empty:
+        model.calibrate(
+            calib.loc[:, feature_columns],
+            calib["target_lead_time_demand"],
+            alpha=settings.models.quantiles[0] * 2,
+            group_ids=group_ids,
+        )
+    return model
 
 
 def run_experiment(settings: Settings) -> RunArtifacts:
@@ -174,37 +241,44 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     return artifacts_with_files
 
 
-def run_experiment_from_frame(
-    panel: pd.DataFrame,
-    settings: Settings,
-    data_strategy: str = "Observed",
-    holdout_panel: pd.DataFrame | None = None,
-    save_artifacts: bool = True,
-) -> RunArtifacts:
-    """Run the full backtesting pipeline from an in-memory panel."""
-    quality_report = validate_prepared_panel(panel, settings)
-    raise_on_blocking_data_quality(quality_report)
+@dataclass
+class _FoldLoopResult:
+    """Outputs of the walk-forward fold loop needed by later phases."""
 
-    prepared_panel = label_all_regimes(panel)
-    series_cost_profile = None
-    if settings.inventory.use_series_costs:
-        series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)
+    fold_predictions: list[pd.DataFrame] = field(default_factory=list)
+    fold_run_metadata: list[FoldRunMetadata] = field(default_factory=list)
+    boosting_model: ConformalForecaster | None = None
+    cat_model: ConformalForecaster | None = None
+    detected_drifts: list[DriftEvent] = field(default_factory=list)
+    drift_observations: int = 0
+    max_drift_score: float = 0.0
+    last_drift_score: float = 0.0
+
+
+def _build_supervised_frames(
+    panel: pd.DataFrame,
+    prepared_panel: pd.DataFrame,
+    holdout_panel: pd.DataFrame | None,
+    settings: Settings,
+    data_strategy: str,
+) -> tuple[pd.DataFrame, Any, pd.DataFrame | None]:
+    """Build the supervised modeling frame and (optionally) the holdout frame.
+
+    The holdout frame is built from the panel+holdout concatenation so its rows
+    get correct lag history, but only holdout-date rows are kept — preventing
+    holdout demand from leaking into training targets via shift(-horizon).
+    """
     print(f"  🔧 [{data_strategy}] Building supervised frame (feature engineering)...")
     supervised_frame, feature_metadata = build_supervised_frame(
         panel=prepared_panel,
         feature_config=settings.features,
         horizon=settings.dataset.horizon,
     )
-    feature_columns = feature_metadata.feature_columns
-    print(f"  ✅ [{data_strategy}] {len(feature_columns)} features built")
+    print(f"  ✅ [{data_strategy}] {len(feature_metadata.feature_columns)} features built")
 
-    # Build holdout supervised frame separately. Concatenating panel+holdout gives the
-    # holdout rows correct lag history, but we only keep holdout-date rows in the result.
-    # This prevents holdout demand from entering training targets via shift(-horizon).
     holdout_supervised_frame: pd.DataFrame | None = None
     if holdout_panel is not None:
-        combined_panel = pd.concat([panel, holdout_panel], ignore_index=True)
-        combined_prepared = label_all_regimes(combined_panel)
+        combined_prepared = label_all_regimes(pd.concat([panel, holdout_panel], ignore_index=True))
         full_supervised, _ = build_supervised_frame(
             panel=combined_prepared,
             feature_config=settings.features,
@@ -215,64 +289,65 @@ def run_experiment_from_frame(
             full_supervised["date"].isin(holdout_dates)
         ].copy()
 
-    # Build walk-forward folds (only on the original panel dates)
-    folds = build_walk_forward_folds(
-        panel=panel,
-        validation_config=settings.validation,
-        horizon=settings.dataset.horizon,
-    )
+    return supervised_frame, feature_metadata, holdout_supervised_frame
 
-    # State for cross-fold model reuse
-    boosting_model: ConformalForecaster | None = None
-    cat_model: ConformalForecaster | None = None
 
-    # Optional: Hyperparameter Tuning Phase
-    best_boosting_params = BoostingParams(
+def _run_tuning_phase(
+    supervised_frame: pd.DataFrame,
+    feature_columns: list[str],
+    folds: list[Any],
+    settings: Settings,
+    data_strategy: str,
+) -> tuple[BoostingParams, Any, pd.DataFrame | None]:
+    """Run optional Optuna tuning; return (best_params, metadata, pareto_frame)."""
+    best_params = BoostingParams(
         n_estimators=settings.models.n_estimators,
         learning_rate=settings.models.learning_rate,
         max_depth=settings.models.max_depth,
     )
-    tuning_metadata = None
-    tuning_pareto = None
-    if settings.models.use_tuning:
-        print(f"🔍 Starting Optuna Tuning for {data_strategy} strategy...")
-        # Tuning only uses data available in the first fold's training set
-        tuning_train_frame = supervised_frame[supervised_frame["date"] <= folds[0].train_end_date]
-        tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
-        tuning_result = tuner.tune_boosting(tuning_train_frame, feature_columns)
-        best_boosting_params = tuning_result.best_params
-        tuning_metadata = tuning_result.metadata
-        if tuning_result.pareto_front:
-            tuning_pareto = pd.DataFrame(
-                [trial.model_dump() for trial in tuning_result.pareto_front]
-            )
-            tuning_pareto.insert(0, "data_strategy", data_strategy)
+    if not settings.models.use_tuning:
+        return best_params, None, None
 
-    # Drift detection state
+    print(f"🔍 Starting Optuna Tuning for {data_strategy} strategy...")
+    # Tuning only uses data available in the first fold's training set.
+    tuning_train_frame = supervised_frame[supervised_frame["date"] <= folds[0].train_end_date]
+    tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
+    tuning_result = tuner.tune_boosting(tuning_train_frame, feature_columns)
+
+    tuning_pareto = None
+    if tuning_result.pareto_front:
+        tuning_pareto = pd.DataFrame([trial.model_dump() for trial in tuning_result.pareto_front])
+        tuning_pareto.insert(0, "data_strategy", data_strategy)
+    return tuning_result.best_params, tuning_result.metadata, tuning_pareto
+
+
+def _run_fold_loop(
+    folds: list[Any],
+    supervised_frame: pd.DataFrame,
+    feature_columns: list[str],
+    baseline_model: SeasonalNaiveModel,
+    best_boosting_params: BoostingParams,
+    settings: Settings,
+    data_strategy: str,
+    series_cost_profile: pd.DataFrame | None,
+) -> _FoldLoopResult:
+    """Run the walk-forward loop: baseline + LightGBM + CatBoost per fold, with
+    cross-fold model reuse and Page-Hinkley drift detection."""
+    result = _FoldLoopResult()
     drift_detector = PageHinkleyDetector(
         threshold=settings.drift.threshold,
         delta=settings.drift.delta,
         min_instances=settings.drift.min_instances,
     )
     force_retrain = False
-    detected_drifts: list[DriftEvent] = []
-    max_drift_score = 0.0
-    last_drift_score = 0.0
-
-    fold_predictions = []
-    fold_run_metadata: list[FoldRunMetadata] = []
-
-    baseline_model = SeasonalNaiveModel(
-        seasonal_period=settings.models.seasonal_period,
-        horizon=settings.dataset.horizon,
-    ).fit(panel)
 
     print(f"  📅 [{data_strategy}] {len(folds)} walk-forward folds")
     for fold in folds:
         print(
-            f"  ▶ [{data_strategy}] Fold {fold.fold_id}/{len(folds)} — train up to {fold.train_end_date.date()}, val {fold.validation_start_date.date()}→{fold.validation_end_date.date()}"
+            f"  ▶ [{data_strategy}] Fold {fold.fold_id}/{len(folds)} — train up to "
+            f"{fold.train_end_date.date()}, val "
+            f"{fold.validation_start_date.date()}→{fold.validation_end_date.date()}"
         )
-        # Prepare training and validation frames
         train_mask = supervised_frame["date"] <= fold.train_end_date
         validation_mask = (supervised_frame["date"] >= fold.validation_start_date) & (
             supervised_frame["date"] <= fold.validation_end_date
@@ -281,7 +356,7 @@ def run_experiment_from_frame(
         validation_frame = supervised_frame.loc[validation_mask].copy()
         if train_frame.empty or validation_frame.empty:
             continue
-        fold_run_metadata.append(
+        result.fold_run_metadata.append(
             FoldRunMetadata(
                 fold_id=fold.fold_id,
                 horizon=fold.horizon,
@@ -295,25 +370,16 @@ def run_experiment_from_frame(
             )
         )
 
-        # Calibration split for conformal methods
-        max_train_date = train_frame["date"].max()
-        calib_cutoff = max_train_date - pd.Timedelta(days=settings.validation.calibration_days)
-        sub_train_frame = train_frame[train_frame["date"] <= calib_cutoff].copy()
-        calib_frame = train_frame[train_frame["date"] > calib_cutoff].copy()
-        if sub_train_frame.empty:
-            sub_train_frame = train_frame
-            calib_frame = pd.DataFrame()
+        # Calibration split for conformal methods (Mondrian grouping included)
+        sub_train_frame, calib_frame, calib_group_ids = _split_train_calibration(
+            train_frame, settings
+        )
 
-        # Mondrian grouping variable for calibration
-        calib_group_ids = None
-        if not calib_frame.empty and "third_category_id" in calib_frame.columns:
-            calib_group_ids = calib_frame["third_category_id"]
-
-        # Reset force_retrain if it was active
         current_fold_retrained = force_retrain
         force_retrain = False
+
         # 1. Seasonal Naive Baseline
-        fold_predictions.append(
+        result.fold_predictions.append(
             _build_baseline_predictions(
                 validation_frame=validation_frame,
                 baseline_model=baseline_model,
@@ -326,74 +392,52 @@ def run_experiment_from_frame(
 
         # 2. LightGBM (Boosting)
         if (
-            boosting_model is None
+            result.boosting_model is None
             or settings.validation.retrain_each_fold
             or current_fold_retrained
         ):
             print(f"    🌲 [{data_strategy}] Training LightGBM (fold {fold.fold_id})...")
-            base_lgb = AutoBoostingModel(
-                quantiles=settings.models.quantiles,
-                random_seed=settings.project.random_seed,
-                n_estimators=best_boosting_params.n_estimators,
-                learning_rate=best_boosting_params.learning_rate,
-                max_depth=best_boosting_params.max_depth,
-                overstock_cost=settings.inventory.overstock_cost,
-                stockout_cost=settings.inventory.stockout_cost,
+            result.boosting_model = _train_conformal_model(
+                _instantiate_boosting_base(AutoBoostingModel, settings, best_boosting_params),
+                sub_train_frame,
+                calib_frame,
+                calib_group_ids,
+                feature_columns,
+                settings,
             )
-            boosting_model = ConformalForecaster(base_lgb)
-            boosting_model.fit(
-                sub_train_frame.loc[:, feature_columns],
-                sub_train_frame["target_lead_time_demand"],
-            )
-            if not calib_frame.empty:
-                boosting_model.calibrate(
-                    calib_frame.loc[:, feature_columns],
-                    calib_frame["target_lead_time_demand"],
-                    alpha=settings.models.quantiles[0] * 2,
-                    group_ids=calib_group_ids,
-                )
 
         boosting_preds = _build_model_predictions(
             validation_frame=validation_frame,
             feature_columns=feature_columns,
-            model=boosting_model,
+            model=result.boosting_model,
             fold_id=fold.fold_id,
             settings=settings,
             data_strategy=data_strategy,
             series_cost_profile=series_cost_profile,
         )
-        fold_predictions.append(boosting_preds)
+        result.fold_predictions.append(boosting_preds)
 
         # 3. CatBoost (Boosting)
-        if cat_model is None or settings.validation.retrain_each_fold or current_fold_retrained:
+        if (
+            result.cat_model is None
+            or settings.validation.retrain_each_fold
+            or current_fold_retrained
+        ):
             print(f"    🐱 [{data_strategy}] Training CatBoost (fold {fold.fold_id})...")
-            base_cat = CatBoostingModel(
-                quantiles=settings.models.quantiles,
-                random_seed=settings.project.random_seed,
-                n_estimators=best_boosting_params.n_estimators,
-                learning_rate=best_boosting_params.learning_rate,
-                max_depth=best_boosting_params.max_depth,
-                overstock_cost=settings.inventory.overstock_cost,
-                stockout_cost=settings.inventory.stockout_cost,
+            result.cat_model = _train_conformal_model(
+                _instantiate_boosting_base(CatBoostingModel, settings, best_boosting_params),
+                sub_train_frame,
+                calib_frame,
+                calib_group_ids,
+                feature_columns,
+                settings,
             )
-            cat_model = ConformalForecaster(base_cat)
-            cat_model.fit(
-                sub_train_frame.loc[:, feature_columns],
-                sub_train_frame["target_lead_time_demand"],
-            )
-            if not calib_frame.empty:
-                cat_model.calibrate(
-                    calib_frame.loc[:, feature_columns],
-                    calib_frame["target_lead_time_demand"],
-                    alpha=settings.models.quantiles[0] * 2,
-                    group_ids=calib_group_ids,
-                )
 
-        fold_predictions.append(
+        result.fold_predictions.append(
             _build_model_predictions(
                 validation_frame=validation_frame,
                 feature_columns=feature_columns,
-                model=cat_model,
+                model=result.cat_model,
                 fold_id=fold.fold_id,
                 settings=settings,
                 data_strategy=data_strategy,
@@ -404,11 +448,11 @@ def run_experiment_from_frame(
         # Update drift detector with current fold MAE
         fold_mae = (boosting_preds["y_true"] - boosting_preds["y_pred"]).abs().mean()
         drift_status = drift_detector.update(fold_mae)
-        last_drift_score = drift_status.score
-        max_drift_score = max(max_drift_score, drift_status.score)
+        result.last_drift_score = drift_status.score
+        result.max_drift_score = max(result.max_drift_score, drift_status.score)
 
         if drift_status.is_drift:
-            detected_drifts.append(
+            result.detected_drifts.append(
                 DriftEvent(
                     date=str(fold.validation_start_date.date()),
                     score=drift_status.score,
@@ -420,145 +464,90 @@ def run_experiment_from_frame(
                 print(f"⚠️ DRIFT DETECTED in Fold {fold.fold_id}. Forcing retrain for next fold.")
                 force_retrain = True
 
-    # 4. Final Holdout Evaluation (Unseen data)
-    holdout_boosting_model: ConformalForecaster | None = None
-    holdout_cat_model: ConformalForecaster | None = None
-    if holdout_supervised_frame is not None and not holdout_supervised_frame.empty:
-        print(f"📊 Retraining on full train set before holdout evaluation ({data_strategy})...")
-        holdout_frame = holdout_supervised_frame
+    result.drift_observations = drift_detector.observations_seen
+    return result
 
-        # Retrain both models on the entire supervised_frame so the holdout is evaluated
-        # by a model that has seen all available training data, not just up to the last fold.
-        calib_cutoff = supervised_frame["date"].max() - pd.Timedelta(
-            days=settings.validation.calibration_days
-        )
-        full_sub_train = supervised_frame[supervised_frame["date"] <= calib_cutoff].copy()
-        full_calib = supervised_frame[supervised_frame["date"] > calib_cutoff].copy()
-        if full_sub_train.empty:
-            full_sub_train = supervised_frame
-            full_calib = pd.DataFrame()
 
-        full_calib_group_ids = None
-        if not full_calib.empty and "third_category_id" in full_calib.columns:
-            full_calib_group_ids = full_calib["third_category_id"]
+def _evaluate_on_holdout(
+    holdout_supervised_frame: pd.DataFrame | None,
+    supervised_frame: pd.DataFrame,
+    feature_columns: list[str],
+    baseline_model: SeasonalNaiveModel,
+    best_boosting_params: BoostingParams,
+    settings: Settings,
+    data_strategy: str,
+    series_cost_profile: pd.DataFrame | None,
+) -> tuple[list[pd.DataFrame], ConformalForecaster | None, ConformalForecaster | None]:
+    """Retrain both models on all training data and evaluate on the holdout split.
 
-        base_lgb_final = AutoBoostingModel(
-            quantiles=settings.models.quantiles,
-            random_seed=settings.project.random_seed,
-            n_estimators=best_boosting_params.n_estimators,
-            learning_rate=best_boosting_params.learning_rate,
-            max_depth=best_boosting_params.max_depth,
-            overstock_cost=settings.inventory.overstock_cost,
-            stockout_cost=settings.inventory.stockout_cost,
-        )
-        holdout_boosting_model = ConformalForecaster(base_lgb_final)
-        holdout_boosting_model.fit(
-            full_sub_train.loc[:, feature_columns],
-            full_sub_train["target_lead_time_demand"],
-        )
-        if not full_calib.empty:
-            holdout_boosting_model.calibrate(
-                full_calib.loc[:, feature_columns],
-                full_calib["target_lead_time_demand"],
-                alpha=settings.models.quantiles[0] * 2,
-                group_ids=full_calib_group_ids,
-            )
+    Returns ``(holdout_predictions, holdout_boosting_model, holdout_cat_model)``.
+    """
+    if holdout_supervised_frame is None or holdout_supervised_frame.empty:
+        return [], None, None
 
-        base_cat_final = CatBoostingModel(
-            quantiles=settings.models.quantiles,
-            random_seed=settings.project.random_seed,
-            n_estimators=best_boosting_params.n_estimators,
-            learning_rate=best_boosting_params.learning_rate,
-            max_depth=best_boosting_params.max_depth,
-            overstock_cost=settings.inventory.overstock_cost,
-            stockout_cost=settings.inventory.stockout_cost,
-        )
-        holdout_cat_model = ConformalForecaster(base_cat_final)
-        holdout_cat_model.fit(
-            full_sub_train.loc[:, feature_columns],
-            full_sub_train["target_lead_time_demand"],
-        )
-        if not full_calib.empty:
-            holdout_cat_model.calibrate(
-                full_calib.loc[:, feature_columns],
-                full_calib["target_lead_time_demand"],
-                alpha=settings.models.quantiles[0] * 2,
-                group_ids=full_calib_group_ids,
-            )
-
-        if not holdout_frame.empty:
-            # Baseline on holdout
-            fold_predictions.append(
-                _build_baseline_predictions(
-                    validation_frame=holdout_frame,
-                    baseline_model=baseline_model,
-                    fold_id=999,  # Conventional ID for holdout
-                    settings=settings,
-                    data_strategy=data_strategy,
-                    series_cost_profile=series_cost_profile,
-                )
-            )
-            fold_predictions.append(
-                _build_model_predictions(
-                    validation_frame=holdout_frame,
-                    feature_columns=feature_columns,
-                    model=holdout_boosting_model,
-                    fold_id=999,
-                    settings=settings,
-                    data_strategy=data_strategy,
-                    series_cost_profile=series_cost_profile,
-                )
-            )
-            fold_predictions.append(
-                _build_model_predictions(
-                    validation_frame=holdout_frame,
-                    feature_columns=feature_columns,
-                    model=holdout_cat_model,
-                    fold_id=999,
-                    settings=settings,
-                    data_strategy=data_strategy,
-                    series_cost_profile=series_cost_profile,
-                )
-            )
-
-    # Persist final models to the stable models directory for operational serving
-    _lgb_to_save = holdout_boosting_model if holdout_boosting_model is not None else boosting_model
-    _cat_to_save = holdout_cat_model if holdout_cat_model is not None else cat_model
-    _models_dir = settings.models.models_dir
-    _models_dir.mkdir(parents=True, exist_ok=True)
-    for _m in [_lgb_to_save, _cat_to_save]:
-        if _m is not None:
-            _m.save(_models_dir / f"{_m.backend_name}.pkl")
-
-    if not fold_predictions:
-        raise ValueError("Backtest did not produce any validation predictions.")
-
-    predictions = pd.concat(fold_predictions, ignore_index=True)
-    # Run dynamic inventory simulation
-    predictions = simulate_inventory_policy(
-        predictions,
-        inventory_config=settings.inventory,
-        series_cost_profile=series_cost_profile,
+    print(f"📊 Retraining on full train set before holdout evaluation ({data_strategy})...")
+    full_sub_train, full_calib, full_calib_group_ids = _split_train_calibration(
+        supervised_frame, settings
+    )
+    holdout_boosting_model = _train_conformal_model(
+        _instantiate_boosting_base(AutoBoostingModel, settings, best_boosting_params),
+        full_sub_train,
+        full_calib,
+        full_calib_group_ids,
+        feature_columns,
+        settings,
+    )
+    holdout_cat_model = _train_conformal_model(
+        _instantiate_boosting_base(CatBoostingModel, settings, best_boosting_params),
+        full_sub_train,
+        full_calib,
+        full_calib_group_ids,
+        feature_columns,
+        settings,
     )
 
-    metrics_summary, fold_metrics = summarize_predictions(predictions)
-    cost_summary = summarize_costs(predictions)
-    sensitivity_summary = run_sensitivity_analysis(
-        predictions=predictions,
-        base_inventory_config=settings.inventory,
-        series_cost_profile=series_cost_profile,
-    )
+    predictions = [
+        _build_baseline_predictions(
+            validation_frame=holdout_supervised_frame,
+            baseline_model=baseline_model,
+            fold_id=HOLDOUT_FOLD_ID,
+            settings=settings,
+            data_strategy=data_strategy,
+            series_cost_profile=series_cost_profile,
+        ),
+        _build_model_predictions(
+            validation_frame=holdout_supervised_frame,
+            feature_columns=feature_columns,
+            model=holdout_boosting_model,
+            fold_id=HOLDOUT_FOLD_ID,
+            settings=settings,
+            data_strategy=data_strategy,
+            series_cost_profile=series_cost_profile,
+        ),
+        _build_model_predictions(
+            validation_frame=holdout_supervised_frame,
+            feature_columns=feature_columns,
+            model=holdout_cat_model,
+            fold_id=HOLDOUT_FOLD_ID,
+            settings=settings,
+            data_strategy=data_strategy,
+            series_cost_profile=series_cost_profile,
+        ),
+    ]
+    return predictions, holdout_boosting_model, holdout_cat_model
 
-    report_extra = ""
-    if detected_drifts:
-        drift_str = ", ".join(
-            [f"Fold {event.fold_id} (score={event.score:.2f})" for event in detected_drifts]
-        )
-        report_extra = (
-            f"**ALERT**: Concept drift detected and triggered adaptive retrains at: {drift_str}"
-        )
 
-    backtest_metadata = BacktestMetadata(
+def _assemble_backtest_metadata(
+    prepared_panel: pd.DataFrame,
+    feature_metadata: Any,
+    loop: _FoldLoopResult,
+    predictions: pd.DataFrame,
+    tuning_metadata: Any,
+    settings: Settings,
+    data_strategy: str,
+) -> BacktestMetadata:
+    """Assemble the structured backtest metadata from all run phases."""
+    return BacktestMetadata(
         run_name=settings.reporting.run_name,
         data_strategy=data_strategy,
         created_at=utc_timestamp(),
@@ -585,8 +574,8 @@ def run_experiment_from_frame(
             initial_train_days=settings.validation.initial_train_days,
             n_folds_requested=settings.validation.n_folds,
             fold_size_days=settings.validation.fold_size_days,
-            folds_created=len(fold_run_metadata),
-            folds=fold_run_metadata,
+            folds_created=len(loop.fold_run_metadata),
+            folds=loop.fold_run_metadata,
         ),
         models=ModelRunMetadata(
             models_run=sorted(predictions["model_name"].dropna().unique().tolist()),
@@ -601,19 +590,127 @@ def run_experiment_from_frame(
             delta=settings.drift.delta,
             min_instances=settings.drift.min_instances,
             monitored_metric="boosting_fold_mae",
-            observations_seen=drift_detector.observations_seen,
-            alerts_detected=len(detected_drifts),
-            max_score=max_drift_score,
-            last_score=last_drift_score,
+            observations_seen=loop.drift_observations,
+            alerts_detected=len(loop.detected_drifts),
+            max_score=loop.max_drift_score,
+            last_score=loop.last_drift_score,
         ),
     )
 
-    # 6. Optional: Explainability (SHAP)
+
+def run_experiment_from_frame(
+    panel: pd.DataFrame,
+    settings: Settings,
+    data_strategy: str = "Observed",
+    holdout_panel: pd.DataFrame | None = None,
+    save_artifacts: bool = True,
+) -> RunArtifacts:
+    """Run the full backtesting pipeline from an in-memory panel."""
+    quality_report = validate_prepared_panel(panel, settings)
+    raise_on_blocking_data_quality(quality_report)
+
+    prepared_panel = label_all_regimes(panel)
+    series_cost_profile = None
+    if settings.inventory.use_series_costs:
+        series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)
+
+    supervised_frame, feature_metadata, holdout_supervised_frame = _build_supervised_frames(
+        panel, prepared_panel, holdout_panel, settings, data_strategy
+    )
+    feature_columns = feature_metadata.feature_columns
+
+    # Walk-forward folds are built only on the original panel dates.
+    folds = build_walk_forward_folds(
+        panel=panel,
+        validation_config=settings.validation,
+        horizon=settings.dataset.horizon,
+    )
+
+    best_boosting_params, tuning_metadata, tuning_pareto = _run_tuning_phase(
+        supervised_frame, feature_columns, folds, settings, data_strategy
+    )
+
+    baseline_model = SeasonalNaiveModel(
+        seasonal_period=settings.models.seasonal_period,
+        horizon=settings.dataset.horizon,
+    ).fit(panel)
+
+    loop = _run_fold_loop(
+        folds,
+        supervised_frame,
+        feature_columns,
+        baseline_model,
+        best_boosting_params,
+        settings,
+        data_strategy,
+        series_cost_profile,
+    )
+
+    holdout_preds, holdout_boosting_model, holdout_cat_model = _evaluate_on_holdout(
+        holdout_supervised_frame,
+        supervised_frame,
+        feature_columns,
+        baseline_model,
+        best_boosting_params,
+        settings,
+        data_strategy,
+        series_cost_profile,
+    )
+    fold_predictions = loop.fold_predictions + holdout_preds
+
+    # Persist final models to the stable models directory for operational serving
+    lgb_to_save = (
+        holdout_boosting_model if holdout_boosting_model is not None else loop.boosting_model
+    )
+    cat_to_save = holdout_cat_model if holdout_cat_model is not None else loop.cat_model
+    models_dir = settings.models.models_dir
+    models_dir.mkdir(parents=True, exist_ok=True)
+    for model_to_save in [lgb_to_save, cat_to_save]:
+        if model_to_save is not None:
+            model_to_save.save(models_dir / f"{model_to_save.backend_name}.pkl")
+
+    if not fold_predictions:
+        raise ValueError("Backtest did not produce any validation predictions.")
+
+    predictions = pd.concat(fold_predictions, ignore_index=True)
+    # Run dynamic inventory simulation
+    predictions = simulate_inventory_policy(
+        predictions,
+        inventory_config=settings.inventory,
+        series_cost_profile=series_cost_profile,
+    )
+
+    metrics_summary, fold_metrics = summarize_predictions(predictions)
+    cost_summary = summarize_costs(predictions)
+    sensitivity_summary = run_sensitivity_analysis(
+        predictions=predictions,
+        base_inventory_config=settings.inventory,
+        series_cost_profile=series_cost_profile,
+    )
+
+    report_extra = ""
+    if loop.detected_drifts:
+        drift_str = ", ".join(
+            [f"Fold {event.fold_id} (score={event.score:.2f})" for event in loop.detected_drifts]
+        )
+        report_extra = (
+            f"**ALERT**: Concept drift detected and triggered adaptive retrains at: {drift_str}"
+        )
+
+    backtest_metadata = _assemble_backtest_metadata(
+        prepared_panel,
+        feature_metadata,
+        loop,
+        predictions,
+        tuning_metadata,
+        settings,
+        data_strategy,
+    )
+
+    # Optional: Explainability (SHAP) on the last fold-trained model (seen the most data).
     shap_values = None
     if settings.reporting.make_plots:
-        # We explain the last trained model (trained on the most data)
-        # using a sample from the supervised frame
-        model_to_explain = cat_model if cat_model is not None else boosting_model
+        model_to_explain = loop.cat_model if loop.cat_model is not None else loop.boosting_model
         if model_to_explain is not None:
             print(f"--- Calculating SHAP values for {model_to_explain.model_name} ---")
             shap_values = calculate_shap_values(
@@ -631,7 +728,7 @@ def run_experiment_from_frame(
         sensitivity_summary=sensitivity_summary,
         tuning_pareto=tuning_pareto,
         data_quality_report=quality_report,
-        drifts=detected_drifts,
+        drifts=loop.detected_drifts,
         report_extra=report_extra,
         backtest_metadata=backtest_metadata,
         shap_values=shap_values,
@@ -641,15 +738,13 @@ def run_experiment_from_frame(
     return write_run_artifacts(artifacts, settings)
 
 
-def _build_baseline_predictions(
-    validation_frame: pd.DataFrame,
-    baseline_model: SeasonalNaiveModel,
-    fold_id: int,
-    settings: Settings,
-    data_strategy: str = "Observed",
-    series_cost_profile: pd.DataFrame | None = None,
-) -> pd.DataFrame:
-    """Build baseline forecasts for one fold."""
+def _init_prediction_frame(validation_frame: pd.DataFrame) -> pd.DataFrame:
+    """Seed a prediction frame from a validation frame.
+
+    Keeps the id/regime/target columns (plus latent-demand columns when present)
+    and initializes ``y_true`` from the target. Callers then attach ``y_pred``,
+    model metadata, quantiles, order quantity and costs.
+    """
     cols_to_keep = [
         "date",
         "series_id",
@@ -665,6 +760,19 @@ def _build_baseline_predictions(
 
     prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
     prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
+    return prediction_frame
+
+
+def _build_baseline_predictions(
+    validation_frame: pd.DataFrame,
+    baseline_model: SeasonalNaiveModel,
+    fold_id: int,
+    settings: Settings,
+    data_strategy: str = "Observed",
+    series_cost_profile: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Build baseline forecasts for one fold."""
+    prediction_frame = _init_prediction_frame(validation_frame)
     prediction_frame["y_pred"] = baseline_model.predict(validation_frame)
     prediction_frame["model_name"] = baseline_model.model_name
     prediction_frame["backend_name"] = "heuristic"
@@ -694,22 +802,7 @@ def _build_model_predictions(
     series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build model forecasts and attach costs."""
-    cols_to_keep = [
-        "date",
-        "series_id",
-        "target_lead_time_demand",
-        "stockout_hours",
-        "stockout_regime",
-        "velocity_regime",
-        "promo_regime",
-        "seasonal_regime",
-    ]
-    if "latent_demand_est" in validation_frame.columns:
-        cols_to_keep.extend(["latent_demand_est", "is_imputed", "original_observed_demand"])
-
-    prediction_frame = validation_frame.loc[:, cols_to_keep].copy()
-    prediction_frame["y_true"] = prediction_frame["target_lead_time_demand"]
-
+    prediction_frame = _init_prediction_frame(validation_frame)
     prediction_frame["y_pred"] = model.predict(validation_frame.loc[:, feature_columns])
 
     prediction_frame["model_name"] = model.model_name
@@ -738,7 +831,7 @@ def _build_model_predictions(
         predictions=prediction_frame,
         inventory_config=settings.inventory,
         quantile_columns=quantile_columns,
-        quantile_levels=[float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns],
+        quantile_levels=[quantile_level_from_column(c) for c in quantile_columns],
         series_cost_profile=series_cost_profile,
     )
     return attach_inventory_costs(
@@ -786,31 +879,16 @@ def train_and_save_champion(
     )
     feature_columns = feature_metadata.feature_columns
 
-    calib_cutoff = supervised_frame["date"].max() - pd.Timedelta(
-        days=settings.validation.calibration_days
-    )
-    train_frame = supervised_frame[supervised_frame["date"] <= calib_cutoff].copy()
-    calib_frame = supervised_frame[supervised_frame["date"] > calib_cutoff].copy()
-    if train_frame.empty:
-        train_frame = supervised_frame
-        calib_frame = pd.DataFrame()
+    train_frame, calib_frame, calib_group_ids = _split_train_calibration(supervised_frame, settings)
 
-    base_model = _instantiate_champion_base_model(settings)
-    conformal = ConformalForecaster(base_model)
-    conformal.fit(
-        train_frame.loc[:, feature_columns],
-        train_frame["target_lead_time_demand"],
+    conformal = _train_conformal_model(
+        _instantiate_champion_base_model(settings),
+        train_frame,
+        calib_frame,
+        calib_group_ids,
+        feature_columns,
+        settings,
     )
-    if not calib_frame.empty:
-        calib_group_ids = None
-        if "third_category_id" in calib_frame.columns:
-            calib_group_ids = calib_frame["third_category_id"]
-        conformal.calibrate(
-            calib_frame.loc[:, feature_columns],
-            calib_frame["target_lead_time_demand"],
-            alpha=settings.models.quantiles[0] * 2,
-            group_ids=calib_group_ids,
-        )
 
     resolved_dir = models_dir if models_dir is not None else settings.models.models_dir
     resolved_dir.mkdir(parents=True, exist_ok=True)
@@ -947,7 +1025,7 @@ def _build_scoring_predictions(
         predictions=frame,
         inventory_config=settings.inventory,
         quantile_columns=quantile_columns,
-        quantile_levels=[float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns],
+        quantile_levels=[quantile_level_from_column(c) for c in quantile_columns],
         series_cost_profile=series_cost_profile,
     )
     return attach_inventory_costs(
