@@ -4,7 +4,7 @@
 PYTHON = uv run python
 PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
-.PHONY: help install run retrain score simulate eda api mlflow up test test-harness lint format clean
+.PHONY: help install run retrain score simulate eda api mlflow up test test-harness lint format clean pdf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -47,6 +47,9 @@ lint: ## Run the linter (ruff)
 
 format: ## Format the code (ruff)
 	uv run ruff format .
+
+pdf: ## Compile memoria/main.tex with tectonic
+	cd memoria && tectonic main.tex
 
 clean: ## Clean temporary files and Python caches
 	find . -type d -name "__pycache__" -exec rm -rf {} +
