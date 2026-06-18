@@ -5,6 +5,19 @@ import pandas as pd
 
 from retail_forecasting.config import InventoryConfig
 
+# Heuristic weights and scaling for the synthetic per-series cost model. These
+# are fixed constants (not exposed as config) because they are not varied across
+# experiments; the dimensional scores they weight are described in build_series_cost_profile.
+PERISHABILITY_WEIGHTS = (0.5, 0.3, 0.2)
+SLOW_MOVING_WEIGHTS = (0.6, 0.4)
+CRITICALITY_WEIGHTS = (0.7, 0.3)
+PERISHABILITY_BASE = 0.8
+PERISHABILITY_MULTIPLIER = 0.8
+SLOW_MOVING_BASE = 0.9
+SLOW_MOVING_MULTIPLIER = 0.5
+SERVICE_CRITICALITY_BASE = 0.9
+SERVICE_CRITICALITY_MULTIPLIER = 0.5
+
 
 def build_series_cost_profile(
     panel: pd.DataFrame,
@@ -28,8 +41,6 @@ def build_series_cost_profile(
             "Cannot build series cost profile without required columns: "
             f"{', '.join(sorted(missing_columns))}"
         )
-
-    conf = inventory_config.synthetic_cost_config
 
     series_summary = (
         panel.groupby("series_id")
@@ -79,48 +90,8 @@ def build_series_cost_profile(
         how="left",
     )
 
-    profile["demand_rank"] = _percentile_rank(profile["mean_observed_demand"])
-    profile["intermittency_rank"] = _percentile_rank(profile["zero_demand_rate"])
-    profile["stockout_rank"] = _percentile_rank(profile["stockout_day_rate"])
-
-    # Dimensional Scoring using parameterized weights
-    pw = conf.perishability_weights
-    profile["synthetic_perishability_score"] = (
-        pw[0] * profile["category_zero_rank"]
-        + pw[1] * profile["category_cv_rank"]
-        + pw[2] * profile["intermittency_rank"]
-    )
-
-    sw = conf.slow_moving_weights
-    profile["slow_moving_score"] = sw[0] * profile["intermittency_rank"] + sw[1] * (
-        1.0 - profile["demand_rank"]
-    )
-
-    cw = conf.criticality_weights
-    profile["service_criticality_score"] = (
-        cw[0] * profile["demand_rank"] + cw[1] * profile["stockout_rank"]
-    )
-
-    # Rescaling using parameterized base and multipliers
-    profile["perishability_factor"] = (
-        conf.perishability_base
-        + conf.perishability_multiplier * profile["synthetic_perishability_score"]
-    )
-    profile["slow_moving_factor"] = (
-        conf.slow_moving_base + conf.slow_moving_multiplier * profile["slow_moving_score"]
-    )
-    profile["service_criticality_factor"] = (
-        conf.service_criticality_base
-        + conf.service_criticality_multiplier * profile["service_criticality_score"]
-    )
-
-    profile["c_over"] = (
-        inventory_config.overstock_cost
-        * profile["perishability_factor"]
-        * profile["slow_moving_factor"]
-    )
-    profile["c_under"] = inventory_config.stockout_cost * profile["service_criticality_factor"]
-    profile["critical_fractile"] = profile["c_under"] / (profile["c_under"] + profile["c_over"])
+    profile = _score_dimensions(profile)
+    profile = _apply_cost_factors(profile, inventory_config)
 
     return profile[
         [
@@ -132,6 +103,54 @@ def build_series_cost_profile(
             "service_criticality_score",
         ]
     ].copy()
+
+
+def _score_dimensions(profile: pd.DataFrame) -> pd.DataFrame:
+    """Combine the percentile ranks into perishability/slow-moving/criticality scores."""
+    profile["demand_rank"] = _percentile_rank(profile["mean_observed_demand"])
+    profile["intermittency_rank"] = _percentile_rank(profile["zero_demand_rate"])
+    profile["stockout_rank"] = _percentile_rank(profile["stockout_day_rate"])
+
+    pw = PERISHABILITY_WEIGHTS
+    profile["synthetic_perishability_score"] = (
+        pw[0] * profile["category_zero_rank"]
+        + pw[1] * profile["category_cv_rank"]
+        + pw[2] * profile["intermittency_rank"]
+    )
+
+    sw = SLOW_MOVING_WEIGHTS
+    profile["slow_moving_score"] = sw[0] * profile["intermittency_rank"] + sw[1] * (
+        1.0 - profile["demand_rank"]
+    )
+
+    cw = CRITICALITY_WEIGHTS
+    profile["service_criticality_score"] = (
+        cw[0] * profile["demand_rank"] + cw[1] * profile["stockout_rank"]
+    )
+    return profile
+
+
+def _apply_cost_factors(profile: pd.DataFrame, inventory_config: InventoryConfig) -> pd.DataFrame:
+    """Turn dimensional scores into per-series c_over / c_under / critical_fractile."""
+    profile["perishability_factor"] = (
+        PERISHABILITY_BASE + PERISHABILITY_MULTIPLIER * profile["synthetic_perishability_score"]
+    )
+    profile["slow_moving_factor"] = (
+        SLOW_MOVING_BASE + SLOW_MOVING_MULTIPLIER * profile["slow_moving_score"]
+    )
+    profile["service_criticality_factor"] = (
+        SERVICE_CRITICALITY_BASE
+        + SERVICE_CRITICALITY_MULTIPLIER * profile["service_criticality_score"]
+    )
+
+    profile["c_over"] = (
+        inventory_config.overstock_cost
+        * profile["perishability_factor"]
+        * profile["slow_moving_factor"]
+    )
+    profile["c_under"] = inventory_config.stockout_cost * profile["service_criticality_factor"]
+    profile["critical_fractile"] = profile["c_under"] / (profile["c_under"] + profile["c_over"])
+    return profile
 
 
 def attach_series_costs(

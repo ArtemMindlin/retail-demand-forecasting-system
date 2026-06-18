@@ -61,13 +61,6 @@ class FeatureConfig(BaseModel):
     include_discount_lags: bool = True
     include_stockout_lags: bool = True
 
-    @field_validator("lags", "rolling_windows")
-    @classmethod
-    def validate_positive_values(cls, v: list[int]) -> list[int]:
-        if any(x <= 0 for x in v):
-            raise ValueError("All values must be strictly positive.")
-        return v
-
 
 class ValidationConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -115,41 +108,12 @@ class ModelConfig(BaseModel):
         return v
 
 
-class SyntheticCostConfig(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    perishability_weights: list[float] = Field(
-        default_factory=lambda: [0.5, 0.3, 0.2], min_length=3, max_length=3
-    )
-    slow_moving_weights: list[float] = Field(
-        default_factory=lambda: [0.6, 0.4], min_length=2, max_length=2
-    )
-    criticality_weights: list[float] = Field(
-        default_factory=lambda: [0.7, 0.3], min_length=2, max_length=2
-    )
-    perishability_base: float = Field(default=0.8, gt=0)
-    perishability_multiplier: float = Field(default=0.8, ge=0)
-    slow_moving_base: float = Field(default=0.9, gt=0)
-    slow_moving_multiplier: float = Field(default=0.5, ge=0)
-    service_criticality_base: float = Field(default=0.9, gt=0)
-    service_criticality_multiplier: float = Field(default=0.5, ge=0)
-
-    @field_validator("perishability_weights", "slow_moving_weights", "criticality_weights")
-    @classmethod
-    def validate_weights_sum(cls, v: list[float]) -> list[float]:
-        if any(weight < 0.0 for weight in v):
-            raise ValueError("Synthetic cost weights must be non-negative.")
-        if not (0.99 <= sum(v) <= 1.01):
-            raise ValueError("Synthetic cost weights must sum to approximately 1.0.")
-        return v
-
-
 class InventoryConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     overstock_cost: float = Field(default=1.0, gt=0)
     stockout_cost: float = Field(default=4.0, gt=0)
     use_series_costs: bool = False
     clip_negative_orders: bool = True
-    synthetic_cost_config: SyntheticCostConfig = Field(default_factory=SyntheticCostConfig)
     global_capacity_units: int | None = Field(default=None, gt=0)
 
 

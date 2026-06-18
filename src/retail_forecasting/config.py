@@ -17,7 +17,6 @@ from retail_forecasting.contracts.contracts_config import (
     ReportingConfig,
     Settings,
     SimulationConfig,
-    SyntheticCostConfig,
     ValidationConfig,
 )
 
@@ -34,7 +33,6 @@ __all__ = [
     "ReportingConfig",
     "Settings",
     "SimulationConfig",
-    "SyntheticCostConfig",
     "ValidationConfig",
     "load_config",
 ]
