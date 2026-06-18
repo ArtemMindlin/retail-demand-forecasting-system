@@ -290,6 +290,7 @@ covariables disponible en $t$.
 Al entrenar con RMSE o MAE se minimiza el error estadístico pero no el coste logístico, lo que es inconsistente con el objetivo operativo del sistema. Por eso el entrenamiento orientado a costes es el único modo disponible.
 
 \subsection{Arquitectura Multi-Modelo y Corrección del Quantile Crossing}
+\label{sec:crossing}
 Dado que los frameworks estándar de Gradient Boosting están diseñados para optimizar un único objetivo escalar por modelo, el sistema implementa un \textbf{Wrapper Cuantílico Multi-Modelo}. Este componente instancia y entrena de forma independiente $M$ estimadores, cada uno sintonizado para un cuantil específico del conjunto $\mathcal{Q} = \{q_1, q_2, \dots, q_M\}$, donde $q_1 < q_2 < \dots < q_M$.
 
 Sin embargo, esta aproximación introduce el \textbf{cruzamiento de cuantiles} (\textit{quantile crossing}) \cite{koenker2005quantile}: al entrenarse cada modelo sin información sobre las predicciones de los demás, nada impide que el modelo del cuantil 0{,}7 prediga un valor mayor que el del cuantil 0{,}9 en alguna observación concreta. Para corregirlo, se aplica el \textbf{\textit{rearrangement}} de Chernozhukov \cite{chernozhukov2010quantile}: dado el vector de predicciones crudas $\tilde{\mathbf{y}}_{s,t} = (\tilde{y}_{s,t}^{(1)}, \dots, \tilde{y}_{s,t}^{(M)})$, simplemente se reordenan en orden ascendente. Este procedimiento, equivalente a aplicar \texttt{np.sort} sobre el eje de cuantiles, tiene complejidad $\mathcal{O}(M \log M)$ y posee una propiedad teórica relevante \cite{chernozhukov2010quantile}: el \textit{rearrangement} reduce la pérdida cuantílica \textbf{integrada sobre todos los niveles de cuantil} respecto a las estimaciones originales, mientras que la regresión isotónica, al minimizar la proyección L2, no ofrece garantías equivalentes sobre la pérdida \textit{Pinball}. La alternativa isotónica se resolvería mediante el algoritmo \textbf{PAVA} (\textit{Pool Adjacent Violators Algorithm}) \cite{barlow1972isotonic}, que recorre el vector y, cada vez que detecta dos valores adyacentes que violan la monotonía, los promedia (\textit{pool}) hasta obtener la secuencia no decreciente más cercana al original en norma L2. Frente al \textit{rearrangement}, que únicamente reordena los valores conservándolos, PAVA los \textit{modifica} al promediarlos, lo que justifica su descarte en este contexto. Formalmente:
@@ -305,20 +306,54 @@ Esta operación garantiza:
 \end{equation}
 
 \subsection{Optimización Multi-Objetivo y Frente de Pareto}
+\label{sec:pareto}
 Históricamente, los modelos de \textit{demand forecasting} minimizaban una única métrica de error promedio, como el MAE o el RMSE. Sin embargo, en un problema de optimización de inventarios donde la gestión de la incertidumbre es vital, buscar únicamente reducir la media del error puede resultar en modelos con varianza infraestimada o sobreajustada.
 
 Para abordar este problema, el sistema implementa una \textbf{Búsqueda de Hiperparámetros Multi-Objetivo}
 utilizando \textit{Optuna} \cite{akiba2019optuna}. Durante la fase de sintonización, el algoritmo
-evolutivo (basado en NSGA-II \cite{deb2002nsga2}) optimiza simultáneamente dos funciones de pérdida en conflicto:
+evolutivo (basado en NSGA-II \cite{deb2002nsga2}) optimiza simultáneamente dos funciones de pérdida en conflicto: la Pinball Loss en el fractil crítico (ya definida en la Sección~\ref{sec:pinball}) y el \textbf{Winkler Score}, que se define a continuación.
+
+\subsubsection{Winkler Score: Métrica de Calidad de Intervalos}
+\label{sec:winkler}
+El \textbf{Winkler Score} \cite{winkler1972scoring} evalúa simultáneamente la \emph{nitidez} (intervalos estrechos) y la \emph{cobertura} (el valor real cae dentro del intervalo) en una sola cifra. En el contexto del tuning, se aplica sobre los cuantiles extremos $P10$ y $P90$ que produce el modelo --- ya rearreglados para garantizar monotonicidad (Sección~\ref{sec:crossing}) --- con el único fin de discriminar entre configuraciones de hiperparámetros. En la evaluación final, la misma fórmula se aplica sobre las columnas de cuantiles del DataFrame de predicciones, que en ese punto ya contienen los valores ajustados por la capa de calibración (Sección~\ref{sec:conformal}).
+
+Para un intervalo $[L_{s,t},\, U_{s,t}]$ con nivel de significancia $\alpha$ ($\alpha = 0{,}2$ para el intervalo P10--P90, que deja fuera el $10\%$ inferior y el $10\%$ superior de la distribución):
+
+\begin{equation}
+    W(L, U, y) = \begin{cases}
+        (U_{s,t} - L_{s,t}) & \text{si } L_{s,t} \le y_{s,t} \le U_{s,t} \\[4pt]
+        (U_{s,t} - L_{s,t}) + \dfrac{2}{\alpha}(L_{s,t} - y_{s,t})
+        & \text{si } y_{s,t} < L_{s,t} \\[4pt]
+        (U_{s,t} - L_{s,t}) + \dfrac{2}{\alpha}(y_{s,t} - U_{s,t})
+        & \text{si } y_{s,t} > U_{s,t}
+    \end{cases}
+\end{equation}
+
+El primer caso es el \emph{pago base}: siempre se paga la amplitud del intervalo $(U - L)$, incentivando intervalos ajustados. Si el valor real cae \emph{fuera} del intervalo se añade una penalización proporcional a la distancia al borde, amplificada por el factor $2/\alpha$ (en nuestro caso $\times 10$). La métrica se promedia sobre todas las series y horizontes; \textbf{valores más bajos son mejores}.
+
+\medskip
+\noindent\textbf{Ejemplo numérico.} Supóngase que el modelo predice el intervalo $[10, 20]$ kg para la demanda de mañana (amplitud $= 10$ kg, $\alpha = 0{,}2$):
+
+\begin{itemize}
+    \item \textbf{Caso 1 --- acierto:} la demanda real es $y = 15$ kg (dentro del intervalo). $W = 20 - 10 = \mathbf{10}$. Solo se paga la amplitud.
+    \item \textbf{Caso 2 --- fallo por abajo:} la demanda real es $y = 5$ kg (por debajo de $L = 10$). $W = 10 + \frac{2}{0{,}2}(10 - 5) = 10 + 50 = \mathbf{60}$. El fallo de cobertura multiplica por seis el coste del intervalo válido.
+    \item \textbf{Caso 3 --- fallo por arriba:} la demanda real es $y = 25$ kg (por encima de $U = 20$). $W = 10 + \frac{2}{0{,}2}(25 - 20) = 10 + 50 = \mathbf{60}$. Mismo coste que el caso anterior.
+\end{itemize}
+
+Si en cambio el modelo hubiera predicho el intervalo vago $[0, 100]$ kg (amplitud $= 100$ kg), habría acertado siempre pero pagando $W = 100$ en cada predicción, mucho peor que el acierto del intervalo ajustado ($W = 10$). La métrica desincentiva así tanto los intervalos vagos como los que fallan.
+
+\bigskip
+Los dos objetivos que minimiza el algoritmo son por tanto:
 
 \begin{enumerate}
     \item \textbf{Coste de Predicción Puntual (Pinball Loss en $q^*$)}: Evalúa el error del modelo en el fractil crítico, es decir, con la misma función de pérdida con la que fue entrenado. Esta coherencia garantiza que los hiperparámetros se seleccionen en función del coste logístico real, no de una métrica estadística genérica como el MAE.
-    \item \textbf{Nitidez Probabilística (Winkler Score)}: Penaliza simultáneamente la amplitud de los intervalos de confianza predichos (penalizando intervalos vagos o excesivamente anchos) y la cobertura empírica si el valor real cae fuera del intervalo.
+    \item \textbf{Nitidez Probabilística (Winkler Score)}: Penaliza simultáneamente la amplitud de los intervalos predichos y los fallos de cobertura, tal como se define en la sección anterior.
 \end{enumerate}
 
 El resultado no es una única configuración de hiperparámetros ``óptima'', sino un \textbf{Frente de Pareto} donde cada punto representa un compromiso inmejorable entre el coste logístico de la predicción central y la fiabilidad de las cotas de incertidumbre. El orquestador selecciona el punto del frente que minimiza la suma $\text{Pinball}(q^*) + \text{Winkler}$ (ambos objetivos con igual peso) antes de iniciar el \textit{backtesting} global.
 
 \subsection{Calibración: Mondrian Conformal Prediction}
+\label{sec:conformal}
 El modelo entrenado con \textit{Pinball Loss} en $q = 0{,}9$ debería, en teoría, producir
 predicciones que la demanda real supere solo el 10\% de las veces. En la práctica esto no
 está garantizado: el modelo puede estar sistemáticamente sesgado, haber sobreajustado, o
@@ -408,36 +443,9 @@ trabajo futuro.
 
 \subsubsection{Métricas de Evaluación de Intervalos de Confianza}
 Para evaluar la calidad de los intervalos de confianza generados por la capa conformal,
-se formulan tres métricas probabilísticas fundamentales:
+se emplean dos métricas complementarias al Winkler Score (definido en la Sección~\ref{sec:winkler}):
 
 \begin{itemize}
-    \item \textbf{Winkler Score}: Es la métrica principal para evaluar intervalos de predicción.
-    Su idea es sencilla: un intervalo bueno es aquel que es \emph{estrecho} (no dice
-    \textit{``la demanda estará entre 0 y 1000 kg''}) pero a la vez \emph{cubre} el valor real la mayoría
-    de las veces. El Winkler Score penaliza ambos fallos en una sola cifra.
-
-    Para un intervalo $[L_{s,t},\, U_{s,t}]$ predicho con nivel de significancia $\alpha$
-    (en nuestro caso $\alpha = 0{,}2$ para el intervalo P10--P90):
-
-    \begin{equation}
-        W(L, U, y) = \begin{cases}
-            (U_{s,t} - L_{s,t}) & \text{si } L_{s,t} \le y_{s,t} \le U_{s,t} \\[4pt]
-            (U_{s,t} - L_{s,t}) + \dfrac{2}{\alpha}(L_{s,t} - y_{s,t})
-            & \text{si } y_{s,t} < L_{s,t} \\[4pt]
-            (U_{s,t} - L_{s,t}) + \dfrac{2}{\alpha}(y_{s,t} - U_{s,t})
-            & \text{si } y_{s,t} > U_{s,t}
-        \end{cases}
-    \end{equation}
-
-    El primer caso es el \emph{pago base}: siempre se paga la amplitud del intervalo
-    $(U - L)$, incentivando intervalos ajustados. Si el valor real cae \emph{fuera}
-    del intervalo se añade una penalización extra proporcional a lo lejos que quedó,
-    amplificada por el factor $2/\alpha$ (en nuestro caso $\times 10$). Esto hace
-    que un solo fallo de cobertura cueste mucho más que tener un intervalo
-    ligeramente más ancho, alineando la métrica con el criterio logístico real.
-    La métrica se promedia sobre todas las predicciones para obtener el Winkler Score final;
-    \textbf{valores más bajos son mejores}.
-
     \item \textbf{PICP (Prediction Interval Coverage Probability)}: Mide simplemente
     qué fracción de las observaciones reales cayó dentro del intervalo predicho:
     \begin{equation}

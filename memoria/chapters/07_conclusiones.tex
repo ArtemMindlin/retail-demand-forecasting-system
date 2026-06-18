@@ -10,13 +10,13 @@ El desarrollo de este sistema ha ido más allá de un ejercicio de \textit{Machi
 Las conclusiones principales se resumen en los siguientes puntos:
 
 \begin{itemize}
-    \item \textbf{Censura y Demanda Latente}: La imputación de la demanda censurada por \textit{stockouts} es el factor técnico más determinante para la rentabilidad de la cadena de suministro. Los modelos entrenados con la estrategia de Demanda Latente reducen el coste total operativo en un \textbf{32,3\%} frente a los mismos modelos entrenados con ventas observadas sin corrección (CatBoost: 34.558 frente a 51.022 unidades monetarias). Este resultado es consistente en todos los modelos evaluados, incluido el Seasonal Naïve, lo que descarta que la mejora sea un artefacto del algoritmo y la atribuye directamente al módulo de imputación.
+    \item \textbf{Censura y Demanda Latente}: La imputación de la demanda censurada por \textit{stockouts} es el factor técnico más determinante para la rentabilidad de la cadena de suministro. Los modelos entrenados con la estrategia de Demanda Latente reducen el coste total operativo en un \textbf{32,3\%} frente a los mismos modelos entrenados con ventas observadas sin corrección (CatBoost: 34.558 frente a 51.021 unidades monetarias). Este resultado es consistente en todos los modelos evaluados, incluido el Seasonal Naïve, lo que descarta que la mejora sea un artefacto del algoritmo y la atribuye directamente al módulo de imputación.
 
     \item \textbf{La trampa del MAE y el valor del modelo probabilístico}: El Seasonal Naïve obtiene el mejor MAE del backtesting (2,74 bajo estrategia Latent) al tiempo que incurre en el mayor coste logístico (38.197 frente a 34.558 de CatBoost, una diferencia del \textbf{9,5\%}). Este resultado reproduce el fenómeno teórico advertido en el Capítulo~\ref{chap:estado_del_arte} y constituye la justificación empírica más sólida del diseño probabilístico: optimizar el MAE no equivale a optimizar la política de inventario.
 
     \item \textbf{Calibración Conformal: garantías teóricas y limitaciones prácticas}: La implementación de \textit{Mondrian Conformal Prediction} proporciona las herramientas correctas para la calibración condicional por categoría. En el subset de evaluación base (50 series), la cobertura promedio fue del 38\% para CatBoost con varianza extrema entre folds (14\%--86\%). La validación a escala con 500 series confirmó el diagnóstico parcialmente: la cobertura sube al 63{,}5\% y la inestabilidad entre folds desaparece, pero persiste una infracobertura residual atribuible a la no-intercambiabilidad temporal entre la ventana de calibración y el periodo de test en un panel de solo 90 días. Esta evidencia delimita con precisión el supuesto que falla (intercambiabilidad, no tamaño muestral) y motiva la adopción de Conformal Prediction adaptativa como evolución natural del sistema.
 
-    \item \textbf{El Gemelo Digital Logístico}: La evaluación estática (aislada por día) oculta el impacto acumulativo de los errores de inventario. La integración de la \textbf{Simulación Dinámica Order-Up-To} permite medir el verdadero coste logístico con estado de inventario persistente, exponiendo el \textit{efecto látigo} que los modelos evaluados en aislamiento no pueden detectar.
+    \item \textbf{El Gemelo Digital Logístico}: La evaluación estática (aislada por día) oculta el impacto acumulativo de los errores de inventario. La integración de la \textbf{Simulación Dinámica Order-Up-To} permite medir el verdadero coste logístico con estado de inventario persistente, exponiendo el \textit{efecto látigo} que los modelos evaluados en aislamiento no pueden detectar. La validación a 500 series reveló además que el beneficio de la corrección de censura sobre el coste dinámico es sensible a la composición del catálogo: se concentra en series de stockout severo y se diluye cuando el catálogo es más heterogéneo, matiz que el coste estático no captura.
 
     \item \textbf{Resolución de Conflictos de Capacidad}: Los modelos aislados generan recomendaciones óptimas individuales pero ciegamente agresivas. La integración de una capa de \textbf{Programación Lineal} garantiza que las decisiones respetan las restricciones globales de almacén, priorizando la inversión en los SKUs con mayor penalización de rotura frente a los de lenta rotación y alta caducidad.
 
@@ -62,20 +62,21 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     90\% sobre el dataset completo (50.000 series) con historia más larga.
 
     \item \textbf{Costes Reales e Integración ERP}: Los perfiles de coste sintéticos ($c_u$, $c_o$)
-    utilizados en este trabajo son una aproximación necesaria dado que los datos del dataset no
-    incluyen márgenes reales. Sustituirlos por costes empíricos de merma, rotura y liquidación
-    extraídos directamente del ERP eliminaría la principal asunción no verificada del sistema y
-    haría el Newsvendor completamente operativo.
+    utilizados en este trabajo son una aproximación necesaria dado que el dataset no incluye
+    márgenes reales. La integración con el ERP permitiría sustituirlos por costes empíricos de
+    merma, rotura y liquidación, haciendo el Newsvendor completamente operativo tanto en su
+    formulación estática (Sección~\ref{sec:resultados_lp}) como en la simulación dinámica
+    (Sección~\ref{sec:cost_profiles}).
 
-    \item \textbf{Simulación de Inventario con Parámetros Reales}: El simulador dinámico
-    implementado en la Sección~\ref{sec:cost_profiles} opera con costes sintéticos y asume
-    un \textit{lead time} determinista fijo. Las extensiones naturales son tres: (1) sustituir
-    los coeficientes $c_u$ y $c_o$ por datos empíricos de merma y venta perdida extraídos del
-    ERP, eliminando la principal asunción no verificada; (2) modelar el \textit{lead time}
-    como variable aleatoria (distribución empírica sobre histórico de entregas) para capturar
-    la variabilidad real del proveedor; y (3) incorporar restricciones de capacidad por almacén
-    en la política Order-Up-To, actualmente ignoradas al calcular $Q = \max(0, S - IP)$ sin
-    techo de inventario.
+    \item \textbf{Extensiones del Simulador Dinámico}: El simulador Order-Up-To de la
+    Sección~\ref{sec:cost_profiles} asume un \textit{lead time} determinista fijo y no tiene
+    techo de capacidad en la propia política de reposición. Las extensiones naturales son dos:
+    (1) modelar el \textit{lead time} como variable aleatoria (distribución empírica sobre
+    histórico de entregas) para capturar la variabilidad real del proveedor; y (2) incorporar
+    un techo de inventario por almacén directamente en la política Order-Up-To ---distinto de
+    la capa LP estática de la Sección~\ref{sec:resultados_lp}, que opera sobre cantidades
+    Newsvendor de un único periodo sin estado acumulado--- permitiendo que el simulador rechace
+    pedidos que superen la capacidad física disponible.
 
     \item \textbf{Modelos de Deep Learning para Series Temporales}: Explorar arquitecturas como el
     Temporal Fusion Transformer para sustituir el motor de \textit{Gradient Boosting}, capturando

@@ -44,16 +44,16 @@ La evaluación del componente probabilístico exige dos métricas específicas q
 \begin{table}[htbp]
     \centering
     \small
-    \begin{tabular}{llcccc}
+    \begin{tabular}{llccc}
         \toprule
         \textbf{Modelo} & \textbf{Estrategia} & \textbf{Winkler Score} & \textbf{Cobertura} & \textbf{Ancho medio} \\
         \midrule
         CatBoost & Latent Supervised & 31,57 & 38,0\% & 6,90 \\
         LightGBM & Latent Supervised & 25,74 & 57,3\% & 10,88 \\
-        \textit{Seasonal Naïve} & \textit{Latent Supervised} & \textit{---} & \textit{---} & \textit{---} \\
+        \textit{Seasonal Naïve} & \textit{Latent Supervised} & \multicolumn{3}{c}{\textit{n/a --- no genera intervalos de predicción}} \\
         \bottomrule
     \end{tabular}
-    \caption{Métricas de calibración conformal. Cobertura objetivo: $\geq 90\%$ al nivel $\alpha = 0{,}10$.}
+    \caption{Métricas de calibración conformal. Cobertura objetivo: $\geq 90\%$ al nivel $\alpha = 0{,}10$. El Seasonal Naïve es un modelo puntual y no produce intervalos cuantílicos.}
     \label{tab:conformal_metrics}
 \end{table}
 
@@ -78,7 +78,14 @@ La Tabla~\ref{tab:fold_coverage} desagrega la cobertura por fold temporal, revel
     \label{tab:fold_coverage}
 \end{table}
 
-Los folds 0 y 1 presentan cobertura crítica (14\%--46\%), mientras que el fold 2 alcanza 86--88\%, próximo al objetivo teórico. Este patrón es consistente con el tamaño del conjunto de calibración: con 50 observaciones por fold distribuidas entre los estratos de la \textit{Mondrian Conformal Prediction} (estratificada por \texttt{third\_category\_id}), cada estrato recibe aproximadamente 4--7 observaciones de calibración. A esta escala, el estimador empírico del cuantil es inestable y la garantía de cobertura de la CP split, que requiere que el conjunto de calibración sea intercambiable y suficientemente grande, no puede materializarse.
+Los folds 0 y 1 presentan cobertura crítica (14\%--46\%), mientras que el fold 2 alcanza 86--88\%, próximo al objetivo teórico. Este patrón es consistente con el tamaño del conjunto de calibración: con 50 observaciones por fold distribuidas entre los estratos de la \textit{Mondrian Conformal Prediction} (estratificada por \texttt{third\_category\_id}), cada estrato recibe aproximadamente 4--7 observaciones de calibración.
+
+A esta escala, la varianza extrema no es una anomalía empírica sino el comportamiento predicho por la teoría. Angelopoulos y Bates \cite{angelopoulos2021gentle} demuestran que la cobertura empírica de un Split CP con $n_\text{cal}$ puntos de calibración sigue una distribución
+\begin{equation}
+    \widehat{\text{cov}} \;\sim\; \mathrm{Beta}(l,\; n_\text{cal}+1-l), \qquad l = \left\lceil (n_\text{cal}+1)(1-\alpha) \right\rceil.
+    \label{eq:beta_coverage}
+\end{equation}
+Para garantizar que el nivel $l$ sea alcanzable (es decir, $l \leq n_\text{cal}$), se requiere $n_\text{cal} \geq 9$ puntos de calibración por estrato al nivel $\alpha = 0{,}10$. Con $n_\text{cal} \in [4,7]$ observaciones por categoría, $l = \lceil 0{,}9(n_\text{cal}+1) \rceil$ supera $n_\text{cal}$ en todos los estratos: la implementación recurre al máximo de los residuos de calibración como único valor posible del cuantil conformal, lo que desemboca en intervalos mal calibrados cuando la cola de la distribución de test no está representada en calibración. La varianza entre folds del 14\%--86\% (rango de 72 puntos porcentuales) no es por tanto inestabilidad del método, sino la consecuencia directa de operar por debajo del tamaño mínimo de calibración que el marco teórico exige.
 
 Esta limitación es inherente al tamaño del subset de evaluación utilizado en este trabajo ($n=50$ series activas) y no al diseño del método: la garantía teórica del Split Conformal Prediction es de muestra finita, pero la garantía \textit{condicional por estrato} de Mondrian se degrada con estratos pequeños: el factor corrector $\hat{q}_g$ se vuelve inestable con apenas 4--7 observaciones de calibración por categoría, produciendo intervalos excesivamente anchos o mal calibrados. El fold 2, con un conjunto de calibración más representativo, apunta en esta dirección. Para verificar empíricamente esta hipótesis, se repitió el protocolo completo a mayor escala, como se describe a continuación.
 
@@ -107,7 +114,7 @@ Los resultados confirman parcialmente el diagnóstico y lo matizan:
 \begin{itemize}
     \item \textbf{La inestabilidad desaparece}: la cobertura media sube del 38\% al 63{,}5\% (CatBoost) y la varianza extrema entre folds se colapsa (el rango pasa de 14--86\% a 52--75\%). Esto confirma que los valores críticos del experimento base eran un artefacto del tamaño del conjunto de calibración por estrato, tal y como se hipotetizaba.
     \item \textbf{Persiste una infracobertura residual} de unos 25 puntos respecto al objetivo teórico. Con estratos de calibración ya razonables, esta brecha no es atribuible al tamaño muestral sino a la \textbf{no-intercambiabilidad temporal} de los datos: el Split CP asume que calibración y test son intercambiables, pero la ventana de calibración (últimos días del train) y la semana de test pertenecen a regímenes de demanda distintos en un panel con estacionalidad fuerte y solo 90 días de historia. Esta es precisamente la motivación de los métodos de CP adaptativa como EnbPI \cite{xu2021conformal} discutidos en el Capítulo~\ref{chap:estado_del_arte}, cuya integración se propone como trabajo futuro.
-    \item \textbf{Las conclusiones logísticas se mantienen}: en la simulación dinámica Order-Up-To a 500 series, CatBoost Latent reduce el coste simulado un 3{,}7\% frente al Seasonal Naïve Latent (427.210 frente a 443.449 u.m.) y eleva el nivel de servicio del 79{,}3\% al 94{,}3\%. La corrección de censura mantiene su efecto positivo sobre el coste estático en todos los modelos (CatBoost: $+$3{,}3\%; Seasonal Naïve: $+$15{,}4\%), aunque con una magnitud menor que en el subset base, lo que sugiere que el efecto de la imputación es más pronunciado en las series de mayor severidad de stockout sobrerrepresentadas en el subset pequeño.
+    \item \textbf{Las conclusiones logísticas se mantienen parcialmente}: en la simulación dinámica Order-Up-To a 500 series, CatBoost Latent reduce el coste simulado un 3{,}7\% frente al Seasonal Naïve Latent (427.210 frente a 443.449 u.m.) y eleva el nivel de servicio del 79{,}3\% al 94{,}3\%. La corrección de censura mantiene su efecto positivo sobre el \textbf{coste estático} en todos los modelos (CatBoost: $+$3{,}3\%; Seasonal Naïve: $+$15{,}4\%). Sin embargo, en el \textbf{coste dinámico simulado}, CatBoost Observed (424.577 u.m.) supera marginalmente a CatBoost Latent (427.210 u.m., diferencia del 0{,}6\%): el beneficio de la corrección de censura sobre la política dinámica queda acotado a las series de mayor severidad de stockout, sobrerrepresentadas en el subset base de 50 series pero diluidas a mayor escala. Esta inversión puntual no invalida la corrección de censura como práctica ---el efecto sobre el coste estático es consistente y positivo en todos los modelos--- sino que delimita en qué escenarios (catálogos dominados por stockouts severos) el impacto dinámico es más pronunciado.
 \end{itemize}
 
 El \textbf{Winkler Score} de LightGBM (25,74) es inferior al de CatBoost (31,57), lo que indica intervalos más eficientes (más estrechos con mayor cobertura). Sin embargo, como se discute en la sección siguiente, el criterio de selección del modelo campeón es el coste logístico simulado, no el Winkler Score, lo que explica la elección de CatBoost.
@@ -132,9 +139,18 @@ La comparación Latent vs.\ Observed es la contribución empírica más sólida 
 \section{Optimización Global bajo Restricciones de Capacidad}
 \label{sec:resultados_lp}
 
-La robustez del sistema fue evaluada introduciendo una restricción dura de capacidad de almacén (\texttt{global\_capacity\_units}). Cuando la suma de las cantidades óptimas individuales del Newsvendor supera la capacidad disponible, el solver de Programación Lineal redistribuye el presupuesto de unidades priorizando los SKUs con mayor ratio rentabilidad/coste de rotura.
+La robustez del sistema fue evaluada introduciendo una restricción dura de capacidad de almacén (\texttt{global\_capacity\_units}). Cuando la suma de las cantidades óptimas individuales del Newsvendor supera la capacidad disponible, el módulo \texttt{optimize\_orders\_lp} formula un problema de \textit{knapsack} continuo que maximiza la utilidad marginal total dentro del presupuesto de unidades:
 
-El resultado operativo relevante es que el coste total bajo restricción es estrictamente inferior al coste de un recorte proporcional ciego: al sacrificar inventario en los SKUs de lenta rotación y alta caducidad (coste de sobrestock elevado), el sistema libera capacidad para los productos de alta rotación y alta penalización de rotura, maximizando el nivel de servicio global dentro del presupuesto. Esta priorización inteligente constituye el puente entre el modelo probabilístico y la operativa logística real con recursos finitos.
+\begin{equation}
+    \max_{\mathbf{q}} \;\sum_{i} u_i\, q_i
+    \quad \text{s.a.} \quad
+    \sum_{i} q_i \leq C, \qquad 0 \leq q_i \leq d_i \;\; \forall i
+    \label{eq:lp_capacity}
+\end{equation}
+
+donde $q_i$ es la cantidad a pedir del SKU $i$, $d_i$ la cantidad óptima sin restricción (Newsvendor individual, que actúa como cota superior), $u_i$ la utilidad marginal de cada unidad ---el coste de rotura evitado $c_{u,i}$--- y $C$ la capacidad global del almacén. Como cada unidad consume exactamente un hueco de capacidad, la solución óptima asigna el presupuesto de forma voraz a los SKUs con mayor utilidad marginal $u_i$ hasta agotar su cota $d_i$: los productos con alta penalización de rotura absorben capacidad a costa de los de baja utilidad marginal. El solver empleado es \texttt{scipy.optimize.linprog} con el método \texttt{highs}.
+
+El resultado operativo relevante es que el coste total bajo restricción es estrictamente inferior al de un recorte proporcional ciego (reducir todos los $q_i$ en el mismo porcentaje, que es precisamente el mecanismo de \textit{fallback} si el solver falla): al sacrificar inventario en los SKUs de menor utilidad marginal, el sistema preserva el suministro de los productos donde la rotura es más cara, maximizando el nivel de servicio global dentro del presupuesto. Esta priorización inteligente constituye el puente entre el modelo probabilístico y la operativa logística real con recursos finitos.
 
 \section{Explicabilidad y Diagnóstico Automático}
 \label{sec:resultados_xai}
@@ -166,16 +182,16 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definid
         \toprule
         \textbf{Objetivo} & \textbf{Target} & \textbf{Resultado} & \textbf{Estado} \\
         \midrule
-        Corrección de censura mejora el coste vs.\ estrategia Observed & $> 0\%$ & $-32{,}3\%$ (CatBoost Latent vs.\ Observed) & \checkmark \\
+        Corrección de censura mejora el coste vs.\ estrategia Observed & $> 0\%$ & $-32{,}3\%$ (CatBoost Latent vs.\ Observed, coste estático) & \checkmark \\
         \midrule
-        CatBoost supera al Seasonal Naïve en coste logístico & $> 0\%$ & $-9{,}5\%$ (Latent) & \checkmark \\
+        CatBoost supera al Seasonal Naïve en coste logístico & $> 0\%$ & $-9{,}5\%$ (Latent, coste estático) & \checkmark \\
         \midrule
-        Winkler Score del campeón frente a las alternativas probabilísticas & Menor & LightGBM: 25,74; CatBoost (campeón): 31,57 & Parcial \\
+        Winkler Score del campeón$^{\dagger}$ frente a las alternativas probabilísticas & Menor & LightGBM: 25,74; CatBoost (campeón): 31,57 & Parcial \\
         \midrule
         Cobertura empírica al nivel $\alpha = 0{,}10$ & $\geq 90\%$ & 38\% (subset base); 63{,}5\% (500 series) & Limitado \\
         \bottomrule
     \end{tabular}
-    \caption{Verificación de los KPIs definidos en el Capítulo~\ref{chap:introduccion}. \checkmark = cumplido; Parcial = cumplido con matices; Limitado = no alcanzado en el subset de evaluación.}
+    \caption{Verificación de los KPIs definidos en el Capítulo~\ref{chap:introduccion}. \checkmark = cumplido; Parcial = cumplido con matices; Limitado = no alcanzado en el subset de evaluación. $^{\dagger}$El campeón se selecciona por coste logístico simulado, no por Winkler Score; entre los modelos probabilísticos, LightGBM obtiene el mejor Winkler (25,74) pero CatBoost domina en coste dinámico.}
     \label{tab:kpi_verification}
 \end{table}
 
@@ -184,7 +200,7 @@ Los dos primeros objetivos ---el impacto de la corrección de censura y la super
 \section{Caso de Uso Ilustrativo: Mecánica de la Política Order-Up-To paso a paso}
 \label{sec:caso_uso_sS}
 
-Para consolidar la comprensión del gemelo digital, esta sección desarrolla un ejemplo numérico completo sobre un SKU ficticio que reproduce fielmente la lógica implementada en \texttt{simulate\_inventory\_policy}. El objetivo es hacer explícita la diferencia entre la política probabilística ---que conoce la distribución de la demanda--- y la política puntual ---que solo utiliza la media predicha.
+Para consolidar la comprensión del gemelo digital, esta sección desarrolla un ejemplo numérico sobre un SKU ficticio que reproduce la mecánica de costes implementada en \texttt{simulate\_inventory\_policy} ---esto es, el ciclo de cada periodo: recepción de pedidos, saldo del \textit{backlog}, atención de la demanda y cómputo del coste $\text{coste} = OH_{\text{fin}}\cdot c_o + BL_{\text{fin}}\cdot c_u$. Las cantidades de pedido se presentan de forma idealizada (la posición de inventario se evalúa tras resolver la demanda de cada periodo) para mantener la claridad expositiva. El objetivo es hacer explícita la diferencia entre la política probabilística ---que conoce la distribución de la demanda--- y la política puntual ---que solo utiliza la media predicha.
 
 \subsection*{Parámetros del ejemplo}
 
@@ -237,8 +253,10 @@ El backlog de 55 unidades se arrastra al siguiente periodo. Ambas políticas (pr
 
 \subsection*{Periodo 2 --- llegada del pedido}
 
-Llegan las 72 unidades pedidas en el periodo 1. La demanda real es $y_2 = 60$ unidades:
+Llegan las 72 unidades pedidas en el periodo 1 (política probabilística) y las 50 de la política puntual. La demanda real es $y_2 = 60$ unidades:
 
+\medskip
+\noindent\textbf{Política probabilística:}
 \begin{align*}
     OH_2 &= 0 + 72 = 72 \\
     \text{backlog saldado} &= \min(72,\; 55) = 55 \Rightarrow OH_2 = 17,\; BL_2 = 0 \\
@@ -247,16 +265,28 @@ Llegan las 72 unidades pedidas en el periodo 1. La demanda real es $y_2 = 60$ un
     \text{coste}_2 &= 0 \times 1 + 43 \times 4 = 172\,\text{u.m.}
 \end{align*}
 
-La nueva posición de inventario es $IP_2 = OH_2 - BL_2 = 0 - 43 = -43$. El modelo predice $S_2 = 70$ para el siguiente periodo:
-\begin{equation*}
-    Q_2 = S_2 - IP_2 = 70 - (-43) = 113 \text{ unidades}
-\end{equation*}
-El backlog pendiente ``infla'' el pedido, mecanismo que el gemelo digital captura automáticamente y que la evaluación estática (Newsvendor de un solo periodo) ignoraría por completo.
+$IP_2 = 0 - 43 = -43$; el modelo predice $S_2 = 70$, por lo que $Q_2 = 70 - (-43) = 113$ unidades.
+
+\medskip
+\noindent\textbf{Política puntual:}
+\begin{align*}
+    OH_2 &= 0 + 50 = 50 \\
+    \text{backlog saldado} &= \min(50,\; 55) = 50 \Rightarrow OH_2 = 0,\; BL_{\text{restante}} = 5 \\
+    \text{servido}_2 &= \min(0,\; 60) = 0 \\
+    BL_2 &= 5 + 60 = 65 \text{ unidades} \\
+    \text{coste}_2 &= 0 \times 1 + 65 \times 4 = 260\,\text{u.m.}
+\end{align*}
+
+$IP_2 = 0 - 65 = -65$; la política puntual predice $\hat{y}_2 = 50$, por lo que $Q_2 = 50 - (-65) = 115$ unidades.
+
+El backlog pendiente ``infla'' el pedido en ambas políticas, mecanismo que el gemelo digital captura automáticamente y que la evaluación estática (Newsvendor de un solo periodo) ignoraría por completo.
 
 \subsection*{Periodo 3 --- estabilización}
 
-Llegan las 113 unidades. La demanda real es $y_3 = 50$ unidades:
+Llegan las 113 unidades (política probabilística) y las 115 (política puntual). La demanda real es $y_3 = 50$ unidades:
 
+\medskip
+\noindent\textbf{Política probabilística:}
 \begin{align*}
     OH_3 &= 0 + 113 = 113 \\
     \text{backlog saldado} &= \min(113,\; 43) = 43 \Rightarrow OH_3 = 70,\; BL_3 = 0 \\
@@ -265,26 +295,35 @@ Llegan las 113 unidades. La demanda real es $y_3 = 50$ unidades:
     \text{coste}_3 &= 20 \times 1 + 0 \times 4 = 20\,\text{u.m.}
 \end{align*}
 
-El sistema se ha estabilizado: el backlog está saldado y el sobrestock residual de 20 unidades genera un coste mínimo.
+\noindent\textbf{Política puntual:}
+\begin{align*}
+    OH_3 &= 0 + 115 = 115 \\
+    \text{backlog saldado} &= \min(115,\; 65) = 65 \Rightarrow OH_3 = 50,\; BL_3 = 0 \\
+    \text{servido}_3 &= \min(50,\; 50) = 50 \\
+    OH_3 &= 0,\; BL_3 = 0 \\
+    \text{coste}_3 &= 0 \times 1 + 0 \times 4 = 0\,\text{u.m.}
+\end{align*}
+
+Ambos sistemas han saldado el backlog. La política probabilística presenta sobrestock residual (20 u.m.) porque sus pedidos iniciales más generosos llegaron con anticipación; la puntual cierra en cero porque tardó más en recuperar el déficit acumulado.
 
 \subsection*{Comparación acumulada de costes}
 
 \begin{table}[htbp]
     \centering
     \small
-    \begin{tabular}{lccc}
+    \begin{tabular}{lcc}
         \toprule
         \textbf{Periodo} & \textbf{Política probabilística} ($S = q_{0{,}80}$) & \textbf{Política puntual} ($S = \hat{y}$) \\
         \midrule
         1 & 220\,u.m. & 220\,u.m. \\
-        2 & 172\,u.m. & 212\,u.m. \\
-        3 &  20\,u.m. &  60\,u.m. \\
+        2 & 172\,u.m. & 260\,u.m. \\
+        3 &  20\,u.m. &   0\,u.m. \\
         \midrule
-        \textbf{Total} & \textbf{412\,u.m.} & \textbf{492\,u.m.} \\
+        \textbf{Total} & \textbf{412\,u.m.} & \textbf{480\,u.m.} \\
         \bottomrule
     \end{tabular}
-    \caption{Coste de inventario acumulado en el ejemplo ilustrativo. La política probabilística reduce el coste total en un 16\% al recuperar antes el backlog gracias a pedidos iniciales más generosos.}
+    \caption{Coste de inventario acumulado en el ejemplo ilustrativo. La política probabilística reduce el coste total en un 14\% al recuperar antes el backlog gracias a pedidos iniciales más generosos.}
     \label{tab:caso_uso_sS}
 \end{table}
 
-La diferencia acumulada (412\,u.m.{} frente a 492\,u.m.{}, una reducción del \textbf{16\%}) ilustra el mecanismo subyacente a la mejora del 9,5\% observada en el backtesting real. La política puntual infraestima sistemáticamente la demanda en escenarios de alta asimetría de costes porque no incorpora el fractil crítico $q^*$ en la selección del nivel objetivo $S$: utiliza la mediana cuando debería utilizar el percentil 80. Este sesgo se acumula periodo a periodo a través del backlog, amplificando el coste total de forma no lineal, exactamente el ``efecto látigo'' que la simulación dinámica está diseñada para capturar.
+La diferencia acumulada (412\,u.m.{} frente a 480\,u.m.{}, una reducción del \textbf{14\%}) ilustra el mecanismo subyacente a la mejora del 9,5\% observada en el backtesting real. La política puntual infraestima sistemáticamente la demanda en escenarios de alta asimetría de costes porque no incorpora el fractil crítico $q^*$ en la selección del nivel objetivo $S$: utiliza la mediana cuando debería utilizar el percentil 80. Este sesgo se acumula periodo a periodo a través del backlog, amplificando el coste total de forma no lineal, exactamente el ``efecto látigo'' que la simulación dinámica está diseñada para capturar.
