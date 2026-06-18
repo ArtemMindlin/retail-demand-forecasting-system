@@ -13,7 +13,7 @@ import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -196,13 +196,17 @@ def _execute_pipeline_in_background(config_path: Path) -> None:
         _RUN_LOCK.release()
 
 
-# Deterministic helper mapping SKU to category
-CATEGORIES = ["Bebidas", "Lácteos", "Snacks", "Limpieza", "Frescos", "Congelados", "Higiene"]
+def get_category(sku_df: pd.DataFrame) -> str:
+    """Return the SKU's real category if it is present in the predictions frame.
 
-
-def get_category(series_id: str) -> str:
-    val = sum(ord(c) for c in series_id)
-    return CATEGORIES[val % len(CATEGORIES)]
+    The dataset categories (``third_category_id``) are used internally for the
+    Mondrian conformal grouping but are not currently persisted into the
+    predictions artifact the API reads. Until they are, we return "N/D" instead
+    of fabricating a category, so the dashboard never shows invented data.
+    """
+    if "third_category_id" in sku_df.columns and not sku_df.empty:
+        return str(sku_df["third_category_id"].iloc[-1])
+    return "N/D"
 
 
 def _get_latest_run_path() -> Path:
@@ -334,60 +338,49 @@ def reset_pipeline_lock() -> dict[str, str]:
     return {"status": "reset", "message": "Pipeline lock released."}
 
 
-@app.get("/api/download/predictions")
-def download_predictions() -> FileResponse:
-    """Download the predictions.csv file from the latest run."""
+def _download_latest_csv(
+    candidates: list[str],
+    download_name: str,
+    missing_detail: str,
+    error_label: str,
+) -> FileResponse:
+    """Serve the first existing CSV among ``candidates`` from the latest run dir."""
     try:
         latest_run = _get_latest_run_path()
-        file_path = latest_run / "predictions.csv"
-        if not file_path.exists():
-            raise HTTPException(
-                status_code=404,
-                detail="predictions.csv not found in the latest run.",
-            )
-        return FileResponse(
-            path=file_path,
-            filename="predictions.csv",
-            media_type="text/csv",
+        file_path = next(
+            (latest_run / name for name in candidates if (latest_run / name).exists()), None
         )
+        if file_path is None:
+            raise HTTPException(status_code=404, detail=missing_detail)
+        return FileResponse(path=file_path, filename=download_name, media_type="text/csv")
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to download predictions: {e}",
-        ) from e
+        raise HTTPException(status_code=500, detail=f"{error_label}: {e}") from e
+
+
+@app.get("/api/download/predictions")
+def download_predictions() -> FileResponse:
+    """Download the predictions.csv file from the latest run."""
+    return _download_latest_csv(
+        ["predictions.csv"],
+        "predictions.csv",
+        "predictions.csv not found in the latest run.",
+        "Failed to download predictions",
+    )
 
 
 @app.get("/api/download/costs")
 def download_costs() -> FileResponse:
-    """Download the cost_summary.csv file from the latest run."""
-    try:
-        latest_run = _get_latest_run_path()
-        file_path = latest_run / "cost_summary.csv"
-        if not file_path.exists():
-            file_path = latest_run / "costs.csv"
-        if not file_path.exists():
-            raise HTTPException(
-                status_code=404,
-                detail="Cost summary CSV file not found in the latest run.",
-            )
-        return FileResponse(
-            path=file_path,
-            filename="costs.csv",
-            media_type="text/csv",
-        )
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to download costs: {e}",
-        ) from e
+    """Download the cost summary CSV from the latest run."""
+    return _download_latest_csv(
+        ["cost_summary.csv", "costs.csv"],
+        "costs.csv",
+        "Cost summary CSV file not found in the latest run.",
+        "Failed to download costs",
+    )
 
 
 _EDA_FIGURES: list[dict[str, Any]] = [
@@ -653,6 +646,86 @@ def get_dashboard() -> str:
     return static_path.read_text(encoding="utf-8")
 
 
+def _ensure_grouped_cache(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Return the {series_id: frame} grouping for ``df``, repopulating the cache
+    only when the underlying predictions frame has changed."""
+    if "df" not in _PREDICTIONS_CACHE or _PREDICTIONS_CACHE["df"] is not df:
+        _PREDICTIONS_CACHE["df"] = df
+        _PREDICTIONS_CACHE["grouped"] = {sku: group for sku, group in df.groupby("series_id")}
+    return cast("dict[str, pd.DataFrame]", _PREDICTIONS_CACHE.get("grouped", {}))
+
+
+def _empirical_conformal(
+    sku_df: pd.DataFrame, alpha: float
+) -> tuple[pd.Series, pd.Series, float, float]:
+    """Empirical conformal stats for one SKU.
+
+    Returns ``(residuals, abs_residuals, conformal_width, empirical_coverage_pct)``
+    where the interval half-width is the ``(1 - alpha)`` quantile of |residuals|.
+    """
+    residuals = sku_df["y_true"] - sku_df["y_pred"]
+    abs_residuals = residuals.abs()
+    conformal_width = float(np.quantile(abs_residuals, 1.0 - alpha))
+    emp_coverage = float((abs_residuals <= conformal_width).mean()) * 100.0
+    return residuals, abs_residuals, conformal_width, emp_coverage
+
+
+def _per_sku_psi(demand: np.ndarray) -> float:
+    """PSI of a SKU's own demand, older half vs recent half (0.0 if too short)."""
+    half = len(demand) // 2
+    if half < 1:
+        return 0.0
+    return round(compute_psi(demand[:half], demand[half:])[0], 3)
+
+
+def _build_forecast_chart(sku_df: pd.DataFrame, conformal_width: float) -> list[dict[str, Any]]:
+    """Per-day actual/predicted values with a symmetric conformal band."""
+    forecast = []
+    for idx, row in enumerate(sku_df.itertuples()):
+        pred = float(row.y_pred)
+        forecast.append(
+            {
+                "day": idx + 1,
+                "label": f"D{idx + 1:02d}",
+                "actual": round(float(row.y_true)),
+                "predicted": round(pred),
+                "lower": round(max(0.0, pred - conformal_width)),
+                "upper": round(pred + conformal_width),
+            }
+        )
+    return forecast
+
+
+def _aggregate_inventory_cost(
+    sku_df: pd.DataFrame,
+    cr_quantile: float,
+    shortage_cost: float,
+    holding_cost: float,
+    capacity: float,
+) -> tuple[float, float]:
+    """Aggregate Newsvendor vs naïve point-forecast inventory cost over the SKU's history.
+
+    Returns ``(newsvendor_cost, delta_vs_naive)``; a negative delta means the
+    Newsvendor policy is cheaper than naïve point-forecast ordering.
+    """
+    tot_cost = 0.0
+    naive_cost = 0.0
+    for row in sku_df.itertuples():
+        q_day = min(max(0.0, float(row.y_pred) + cr_quantile), capacity)
+        q_naive = min(float(row.y_pred), capacity)
+        d_day = float(row.y_true)
+        tot_cost += (
+            (d_day - q_day) * shortage_cost if d_day > q_day else (q_day - d_day) * holding_cost
+        )
+        naive_cost += (
+            (d_day - q_naive) * shortage_cost
+            if d_day > q_naive
+            else (q_naive - d_day) * holding_cost
+        )
+    inv_cost = round(tot_cost, 2)
+    return inv_cost, round(inv_cost - naive_cost, 2)
+
+
 @app.post("/api/forecast")
 def post_forecast(request: ForecastRequest) -> dict[str, Any]:
     """Calculate live empirical conformal quantiles and Newsvendor quantities."""
@@ -663,41 +736,19 @@ def post_forecast(request: ForecastRequest) -> dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load predictions: {e}") from e
 
-    if "df" not in _PREDICTIONS_CACHE or _PREDICTIONS_CACHE["df"] is not df:
-        _PREDICTIONS_CACHE["df"] = df
-        _PREDICTIONS_CACHE["grouped"] = {sku: group for sku, group in df.groupby("series_id")}
-
-    grouped = _PREDICTIONS_CACHE.get("grouped", {})
+    grouped = _ensure_grouped_cache(df)
 
     sku = request.selectedSkuId
     if not sku or sku not in grouped:
         sku = next(iter(grouped.keys()))
 
     sku_df = grouped[sku].copy().sort_values("date")
-    residuals = sku_df["y_true"] - sku_df["y_pred"]
-    abs_residuals = residuals.abs()
 
     sl = request.serviceLevel
     alpha = 1.0 - (sl / 100.0)
-    conformal_width = float(np.quantile(abs_residuals, 1.0 - alpha))
+    residuals, abs_residuals, conformal_width, emp_coverage = _empirical_conformal(sku_df, alpha)
 
-    # Build forecast daily chart values
-    forecast = []
-    for idx, row in enumerate(sku_df.itertuples()):
-        pred = float(row.y_pred)
-        actual = float(row.y_true)
-        lower = max(0.0, pred - conformal_width)
-        upper = pred + conformal_width
-        forecast.append(
-            {
-                "day": idx + 1,
-                "label": f"D{idx + 1:02d}",
-                "actual": round(actual),
-                "predicted": round(pred),
-                "lower": round(lower),
-                "upper": round(upper),
-            }
-        )
+    forecast = _build_forecast_chart(sku_df, conformal_width)
 
     # Newsvendor order quantity calculations
     cs = request.shortageCost
@@ -713,9 +764,6 @@ def post_forecast(request: ForecastRequest) -> dict[str, Any]:
     target_cr = sl / 100.0
     ratio_delta = (target_cr - cr) * 100.0
 
-    # Calculate actual empirical coverage
-    covered = abs_residuals <= conformal_width
-    emp_coverage = float(covered.mean()) * 100.0
     cov_delta = emp_coverage - sl
 
     # MAE of the selected SKU; delta = second-half MAE − first-half MAE (negative = improving)
@@ -728,24 +776,10 @@ def post_forecast(request: ForecastRequest) -> dict[str, Any]:
     else:
         mae_delta = 0.0
 
-    # Calculate aggregate inventory cost over all dates for this SKU
-    tot_cost = 0.0
-    naive_cost = 0.0
-    for row in sku_df.itertuples():
-        q_day = min(max(0.0, float(row.y_pred) + cr_quantile), request.capacity)
-        q_naive = min(float(row.y_pred), request.capacity)
-        d_day = float(row.y_true)
-        tot_cost += (d_day - q_day) * cs if d_day > q_day else (q_day - d_day) * ch
-        naive_cost += (d_day - q_naive) * cs if d_day > q_naive else (q_naive - d_day) * ch
-
-    inv_cost = round(tot_cost, 2)
-    # Negative delta means Newsvendor policy costs less than naïve point-forecast ordering
-    inv_delta = round(inv_cost - naive_cost, 2)
+    inv_cost, inv_delta = _aggregate_inventory_cost(sku_df, cr_quantile, cs, ch, request.capacity)
 
     # Real per-SKU drift: PSI of the SKU's own demand, older half vs recent.
-    demand = sku_df["y_true"].to_numpy(dtype=float)
-    half = len(demand) // 2
-    psi = round(compute_psi(demand[:half], demand[half:])[0], 3) if half >= 1 else 0.0
+    psi = _per_sku_psi(sku_df["y_true"].to_numpy(dtype=float))
     psi_delta = (psi - 0.20) * 100.0
 
     util = min(100.0, round((q_star / request.capacity) * 100.0, 1))
@@ -782,11 +816,7 @@ def get_skus(
     except Exception:
         return []
 
-    if "df" not in _PREDICTIONS_CACHE or _PREDICTIONS_CACHE["df"] is not df:
-        _PREDICTIONS_CACHE["df"] = df
-        _PREDICTIONS_CACHE["grouped"] = {sku: group for sku, group in df.groupby("series_id")}
-
-    grouped = _PREDICTIONS_CACHE.get("grouped", {})
+    grouped = _ensure_grouped_cache(df)
     if not grouped:
         return []
 
@@ -800,14 +830,8 @@ def get_skus(
         if sku_df.empty:
             continue
 
-        residuals = sku_df["y_true"] - sku_df["y_pred"]
-        abs_residuals = residuals.abs()
-
-        conformal_width = float(np.quantile(abs_residuals, 1.0 - alpha))
+        residuals, _, _, emp_coverage = _empirical_conformal(sku_df, alpha)
         cr_quantile = float(np.quantile(residuals, cr))
-
-        covered = abs_residuals <= conformal_width
-        emp_coverage = float(covered.mean()) * 100.0
 
         last_row = sku_df.iloc[-1]
         last_actual = float(last_row["y_true"])
@@ -817,13 +841,7 @@ def get_skus(
         q_star = min(q_star, capacity)
 
         # Real per-SKU drift: PSI of the SKU's own demand, older half vs recent.
-        demand = sku_df["y_true"].to_numpy(dtype=float)
-        half = len(demand) // 2
-        if half >= 1:
-            drift_psi, _, _ = compute_psi(demand[:half], demand[half:])
-            drift_psi = round(drift_psi, 3)
-        else:
-            drift_psi = 0.0
+        drift_psi = _per_sku_psi(sku_df["y_true"].to_numpy(dtype=float))
 
         status = "ok"
         if drift_psi > 0.2:
@@ -844,7 +862,7 @@ def get_skus(
         skus_list.append(
             {
                 "id": sku,
-                "cat": get_category(sku),
+                "cat": get_category(sku_df),
                 "series": trend,
                 "lastActual": round(last_actual),
                 "lastPred": round(last_pred),
@@ -888,7 +906,12 @@ def get_drift(service_level: float = 95.0) -> list[dict[str, Any]]:
 
 @app.get("/api/alerts")
 def get_alerts() -> list[dict[str, Any]]:
-    """Return operational alerts from execution context or baseline presets."""
+    """Return operational alerts derived from the latest run's exceptions.csv.
+
+    Returns an empty list when no run or no exceptions are available; the
+    dashboard renders an empty state in that case. No synthetic alerts are
+    fabricated.
+    """
     try:
         load_latest_predictions()
     except Exception:
@@ -920,71 +943,11 @@ def get_alerts() -> list[dict[str, Any]]:
                         ],
                         "endpoint": "POST /api/optimize",
                         "actionLabel": "Reoptimizar política",
-                        "time": f"hace {idx * 7 + 4} min",
-                        "ts": idx * 7 + 4,
-                        "bundle": "RT-029-A",
                     }
                 )
         except Exception:
             pass
 
-    if not alerts:
-        alerts = [
-            {
-                "id": "a-001",
-                "sev": "critical",
-                "title": "Drift detectado · temperature_7d",
-                "desc": (
-                    "PSI = 0.27 supera el umbral de 0.20. La distribución "
-                    "de la feature ha cambiado significativamente."
-                ),
-                "meta": [
-                    {"k": "PSI", "v": "0.27"},
-                    {"k": "feature", "v": "temperature_7d"},
-                    {"k": "umbral", "v": "0.20"},
-                ],
-                "endpoint": "POST /api/retrain",
-                "actionLabel": "Recalibrar modelo",
-                "time": "hace 4 min",
-                "ts": 4,
-                "bundle": "RT-029-A",
-            },
-            {
-                "id": "a-002",
-                "sev": "critical",
-                "title": "Riesgo de rotura · SKU-1187",
-                "desc": (
-                    "Demanda observada supera el límite superior conformal "
-                    "en 2 de los últimos 3 días."
-                ),
-                "meta": [
-                    {"k": "SKU", "v": "1187"},
-                    {"k": "cobertura", "v": "91.2%"},
-                    {"k": "target", "v": "95.0%"},
-                ],
-                "endpoint": "POST /api/optimize",
-                "actionLabel": "Reoptimizar política",
-                "time": "hace 12 min",
-                "ts": 12,
-                "bundle": "RT-029-A",
-            },
-            {
-                "id": "a-003",
-                "sev": "warning",
-                "title": "Capacidad de almacén al 94%",
-                "desc": "La política óptima propuesta consume 11 248 u de 12 000 u disponibles.",
-                "meta": [
-                    {"k": "utilización", "v": "94%"},
-                    {"k": "λ (sombra)", "v": "$0.42/u"},
-                    {"k": "horizon", "v": "8d"},
-                ],
-                "endpoint": "POST /api/optimize",
-                "actionLabel": "Simular ampliación",
-                "time": "hace 38 min",
-                "ts": 38,
-                "bundle": "global",
-            },
-        ]
     return alerts
 
 
@@ -1262,8 +1225,19 @@ def run_whatif(run_name: str, body: WhatIfRequest) -> dict[str, Any]:
 
 @app.post("/api/retrain")
 def retrain_model() -> dict[str, str]:
-    """Trigger background model retraining simulation."""
-    return {"status": "success", "message": "Model recalibration triggered successfully."}
+    """Stub endpoint: real retraining runs offline via ``run.py --mode retrain``.
+
+    This endpoint does not trigger any training; it exists only so the UI can
+    surface the action. It reports its no-op status honestly rather than
+    claiming a success that did not happen.
+    """
+    return {
+        "status": "not_implemented",
+        "message": (
+            "El reentrenamiento se ejecuta fuera de línea con "
+            "'run.py --mode retrain'. Este endpoint no lanza entrenamiento."
+        ),
+    }
 
 
 _CONFIG_PATH = Path("configs/experiment.yaml")
