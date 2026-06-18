@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 import pandas as pd
-
-
-def _to_timestamp(value: Any) -> pd.Timestamp:
-    return pd.Timestamp(value)
 
 
 @dataclass
@@ -17,6 +13,7 @@ class SeasonalNaiveModel:
     seasonal_period: int
     horizon: int
     model_name: str = "seasonal_naive"
+    history_: Any = field(init=False, default=None)
 
     def fit(self, panel: pd.DataFrame) -> SeasonalNaiveModel:
         self.history_ = (
@@ -29,8 +26,10 @@ class SeasonalNaiveModel:
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
         predictions = []
         for row in frame.itertuples(index=False):
-            # The seasonal naive prediction is computed by summing the observed demand from the most recent seasonal periods, which are determined by the seasonal period and the forecast horizon. If there is insufficient historical data for a series, the prediction defaults to zero.
-            row_date = _to_timestamp(row.date)
+            # Seasonal naive: sum the observed demand at the most recent seasonal
+            # lags covering the forecast horizon. Falls back to zero (via NaN) when
+            # a series lacks enough history for a given lag.
+            row_date = pd.Timestamp(row.date)
             series_history = self.history_.get_group(row.series_id)
             history = series_history.loc[series_history["date"] < row_date]
             history_by_date = history.set_index("date")["observed_demand"]

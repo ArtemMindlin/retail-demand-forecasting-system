@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -32,6 +33,14 @@ def quantile_column_name(quantile: float) -> str:
     """Build the canonical column name for a quantile prediction."""
     normalized = str(quantile).replace(".", "_")
     return f"q_{normalized}"
+
+
+def quantile_level_from_column(column: str) -> float:
+    """Recover the quantile level from a canonical quantile column name.
+
+    Inverse of :func:`quantile_column_name` (e.g. ``"q_0_9" -> 0.9``).
+    """
+    return float(column.replace("q_", "").replace("_", "."))
 
 
 def dataframe_to_markdown(frame: pd.DataFrame, columns: Iterable[str] | None = None) -> str:
@@ -66,6 +75,21 @@ def dataframe_to_markdown(frame: pd.DataFrame, columns: Iterable[str] | None = N
     return "\n".join([f"| {headers} |", f"| {separator} |", *[f"| {row} |" for row in rows]])
 
 
+def winkler_score(actual: Any, lower: Any, upper: Any, alpha: float) -> float:
+    """Winkler interval score for a central ``(1 - alpha)`` prediction interval.
+
+    A proper scoring rule that penalizes both wide intervals and observations
+    falling outside them (asymmetric ``2/alpha`` penalty). Lower is better.
+    Accepts pandas Series or numpy arrays. Lives in ``utils`` so both the
+    ``models`` and ``evaluation`` layers can reuse it without crossing layer
+    boundaries.
+    """
+    width = upper - lower
+    under_penalty = (2.0 / alpha) * (lower - actual) * (actual < lower)
+    over_penalty = (2.0 / alpha) * (actual - upper) * (actual > upper)
+    return float(np.mean(width + under_penalty + over_penalty))
+
+
 def rearrange_quantiles(raw_predictions: list[np.ndarray]) -> np.ndarray:
     """Apply Chernozhukov rearrangement to enforce quantile monotonicity.
 
@@ -79,8 +103,6 @@ def rearrange_quantiles(raw_predictions: list[np.ndarray]) -> np.ndarray:
     Returns:
         2-D array of shape (n_samples, n_quantiles) with monotone rows.
     """
-    import numpy as np
-
     matrix = np.column_stack(raw_predictions)
     return np.sort(matrix, axis=1)
 

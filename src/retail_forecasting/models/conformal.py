@@ -8,7 +8,11 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from retail_forecasting.utils.io import quantile_column_name
+from retail_forecasting.utils.io import quantile_column_name, quantile_level_from_column
+
+# Default miscoverage level (alpha=0.2 -> 80% nominal interval) used when the
+# detector has not been calibrated with an explicit alpha.
+DEFAULT_ALPHA = 0.2
 
 
 @runtime_checkable
@@ -46,7 +50,7 @@ class ConformalForecaster:
         self,
         features: Any,
         target: pd.Series,
-        alpha: float = 0.2,
+        alpha: float = DEFAULT_ALPHA,
         group_ids: pd.Series | None = None,
     ) -> ConformalForecaster:
         """Calculate the conformal correction factor (q_hat) using a calibration set."""
@@ -70,7 +74,7 @@ class ConformalForecaster:
 
     def _calculate_conformity_scores(self, features: Any, y_true: np.ndarray) -> np.ndarray:
         if hasattr(self.base_model, "predict_quantiles"):
-            alpha = self.alpha if self.alpha is not None else 0.2
+            alpha = self.alpha if self.alpha is not None else DEFAULT_ALPHA
             q_low_level = alpha / 2
             q_high_level = 1 - (alpha / 2)
 
@@ -103,51 +107,62 @@ class ConformalForecaster:
     ) -> dict[str, np.ndarray]:
         """Predict adjusted (conformalized) quantiles."""
         y_pred = np.asarray(self.base_model.predict(features))
+        has_base_quantiles = hasattr(self.base_model, "predict_quantiles")
 
-        alpha = self.alpha if self.alpha is not None else 0.2
-        q_low_level = alpha / 2
-        q_high_level = 1 - (alpha / 2)
-
-        mid_col = quantile_column_name(0.5)
-
+        # Not yet calibrated: pass through the base quantiles (or just the point forecast).
         if self.q_hat is None:
-            if hasattr(self.base_model, "predict_quantiles"):
+            if has_base_quantiles:
                 return {
                     str(k): np.asarray(v)
                     for k, v in self.base_model.predict_quantiles(features).items()
                 }
-            return {mid_col: y_pred}
+            return {quantile_column_name(0.5): y_pred}
 
-        # Select q_hat values
+        q_hat_vec = self._resolve_q_hat_vector(y_pred, group_ids)
+
+        if has_base_quantiles:
+            return self._adjust_existing_quantiles(
+                self.base_model.predict_quantiles(features), q_hat_vec
+            )
+        return self._synthesize_quantiles(y_pred, q_hat_vec)
+
+    def _resolve_q_hat_vector(self, y_pred: np.ndarray, group_ids: pd.Series | None) -> np.ndarray:
+        """Per-row conformal radius: Mondrian group value when available, else the global q_hat."""
         if group_ids is not None and self.mondrian_q_hat:
-            q_hat_vec = cast(
+            return cast(
                 np.ndarray,
                 group_ids.map(self.mondrian_q_hat).fillna(self.q_hat).to_numpy(),
             )
-        else:
-            q_hat_vec = np.full(len(y_pred), self.q_hat)
+        return np.full(len(y_pred), self.q_hat)
 
-        if hasattr(self.base_model, "predict_quantiles"):
-            raw_preds = self.base_model.predict_quantiles(features)
-            adjusted_preds: dict[str, np.ndarray] = {}
-            for col, values in raw_preds.items():
-                quantile_val = float(col.replace("q_", "").replace("_", "."))
-                vals = np.asarray(values)
-                if quantile_val < 0.5:
-                    adjusted_preds[col] = np.maximum(vals - q_hat_vec, 0.0)
-                elif quantile_val > 0.5:
-                    adjusted_preds[col] = np.maximum(vals + q_hat_vec, 0.0)
-                else:
-                    adjusted_preds[col] = vals
-            return adjusted_preds
-        else:
-            low_col = quantile_column_name(q_low_level)
-            high_col = quantile_column_name(q_high_level)
-            return {
-                low_col: cast(np.ndarray, np.maximum(y_pred - q_hat_vec, 0.0)),
-                mid_col: y_pred,
-                high_col: cast(np.ndarray, np.maximum(y_pred + q_hat_vec, 0.0)),
-            }
+    def _adjust_existing_quantiles(
+        self, raw_preds: dict[str, np.ndarray], q_hat_vec: np.ndarray
+    ) -> dict[str, np.ndarray]:
+        """Shift each base quantile by ±q_hat (lower down, upper up; median unchanged)."""
+        adjusted: dict[str, np.ndarray] = {}
+        for col, values in raw_preds.items():
+            quantile_val = quantile_level_from_column(col)
+            vals = np.asarray(values)
+            if quantile_val < 0.5:
+                adjusted[col] = np.maximum(vals - q_hat_vec, 0.0)
+            elif quantile_val > 0.5:
+                adjusted[col] = np.maximum(vals + q_hat_vec, 0.0)
+            else:
+                adjusted[col] = vals
+        return adjusted
+
+    def _synthesize_quantiles(
+        self, y_pred: np.ndarray, q_hat_vec: np.ndarray
+    ) -> dict[str, np.ndarray]:
+        """Build a symmetric [low, mid, high] interval from the point forecast ± q_hat."""
+        alpha = self.alpha if self.alpha is not None else DEFAULT_ALPHA
+        return {
+            quantile_column_name(alpha / 2): cast(np.ndarray, np.maximum(y_pred - q_hat_vec, 0.0)),
+            quantile_column_name(0.5): y_pred,
+            quantile_column_name(1 - (alpha / 2)): cast(
+                np.ndarray, np.maximum(y_pred + q_hat_vec, 0.0)
+            ),
+        }
 
     def save(self, path: Path) -> None:
         """Persist the full forecaster state (base model + conformal calibration) to disk."""

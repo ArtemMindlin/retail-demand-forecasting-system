@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
-from typing import cast
 
-import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor
 
-from retail_forecasting.utils.io import quantile_column_name, rearrange_quantiles
+from retail_forecasting.models._quantile_forecaster import QuantileForecasterMixin
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CatBoostingModel:
+class CatBoostingModel(QuantileForecasterMixin):
     """A wrapper for CatBoost that supports point and quantile forecasts.
 
     CatBoost is known for its excellent handling of categorical features
@@ -28,13 +29,11 @@ class CatBoostingModel:
     stockout_cost: float = 4.0  # must be > 0; drives the critical fractile q* = cu/(cu+co)
     model_name: str = "catboost"
     backend_name: str = field(init=False, default="catboost_official")
+    point_model_: CatBoostRegressor | None = field(init=False, default=None)
+    quantile_models_: dict[float, CatBoostRegressor] = field(init=False, default_factory=dict)
 
     def fit(self, features: pd.DataFrame, target: pd.Series) -> CatBoostingModel:
-        if self.stockout_cost <= 0:
-            raise ValueError(
-                "stockout_cost must be > 0. Provide valid inventory costs in the configuration."
-            )
-        critical_fractile = self.stockout_cost / (self.stockout_cost + self.overstock_cost)
+        critical_fractile = self._critical_fractile()
         cat_features = features.select_dtypes(include=["category", "object"]).columns.tolist()
 
         # 1. Fit Point Model at critical fractile q* (cost-aware, pinball loss)
@@ -51,13 +50,13 @@ class CatBoostingModel:
             allow_writing_files=False,
             thread_count=-1,
         )
-        print(
-            f"🎯 Cost-Aware Training: Optimizing point model for critical fractil τ = {critical_fractile:.4f}"  # noqa: E501
+        logger.info(
+            "Cost-aware training: optimizing point model for critical fractile tau = %.4f",
+            critical_fractile,
         )
         self.point_model_.fit(features, target, cat_features=cat_features)
 
         # 2. Fit Quantile Models (One per quantile for consistency)
-        self.quantile_models_: dict[float, CatBoostRegressor] = {}
         for q in sorted(set(self.quantiles)):
             q_model = CatBoostRegressor(
                 iterations=self.n_estimators,
@@ -76,26 +75,3 @@ class CatBoostingModel:
             self.quantile_models_[q] = q_model
 
         return self
-
-    def predict(self, features: pd.DataFrame) -> np.ndarray:
-        predictions = self.point_model_.predict(features)
-        return cast(np.ndarray, np.maximum(np.asarray(predictions, dtype=float), 0.0))
-
-    def predict_quantiles(self, features: pd.DataFrame) -> dict[str, np.ndarray]:
-        quantile_predictions: dict[str, np.ndarray] = {}
-        ordered_quantiles = sorted(self.quantile_models_.keys())
-
-        raw_predictions = [
-            np.maximum(
-                np.asarray(self.quantile_models_[q].predict(features), dtype=float),
-                0.0,
-            )
-            for q in ordered_quantiles
-        ]
-
-        # Ensure monotonicity via Chernozhukov rearrangement (Econometrica, 2010)
-        monotonic = rearrange_quantiles(raw_predictions)
-        for index, q in enumerate(ordered_quantiles):
-            quantile_predictions[quantile_column_name(q)] = monotonic[:, index]
-
-        return quantile_predictions
