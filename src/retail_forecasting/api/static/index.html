@@ -4161,12 +4161,15 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const innerH = H - pad.top - pad.bottom;
       const xlo = Math.min(...pinballs), xhi = Math.max(...pinballs);
       const ylo = Math.min(...winklers), yhi = Math.max(...winklers);
-      const xSpan = xhi - xlo || 1, ySpan = yhi - ylo || 1;
-      const px = v => pad.left + ((v - xlo) / xSpan) * innerW;
-      const py = v => pad.top + ((v - ylo) / ySpan) * innerH;  // lower Winkler = better = top
 
       const xTicks = niceTicks(xlo, xhi, 5);
       const yTicks = niceTicks(ylo, yhi, 5);
+      // Use tick-rounded domain so all tick labels render inside SVG bounds
+      const xDlo = xTicks[0], xDhi = xTicks[xTicks.length - 1];
+      const yDlo = yTicks[0], yDhi = yTicks[yTicks.length - 1];
+      const xSpan = xDhi - xDlo || 1, ySpan = yDhi - yDlo || 1;
+      const px = v => pad.left + ((v - xDlo) / xSpan) * innerW;
+      const py = v => pad.top + ((v - yDlo) / ySpan) * innerH;
 
       // Color by data_strategy
       const COLORS = ["var(--c-inv)", "var(--c-ai)", "var(--c-conf)", "var(--c-drift)", "#f472b6", "#06b6d4"];
@@ -4329,9 +4332,12 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
     function ExpSensChart({ sensData }) {
       const wrapRef = useRef(null);
+      const svgRef = useRef(null);
       const [W, setW] = useState(700);
+      const [hoveredRatio, setHoveredRatio] = useState(null);
+      const [hoveredGroup, setHoveredGroup] = useState(null);
       const H = 300;
-      const pad = { top: 20, right: 20, bottom: 40, left: 60 };
+      const pad = { top: 20, right: 140, bottom: 40, left: 60 };
 
       useEffect(() => {
         if (!wrapRef.current) return;
@@ -4354,18 +4360,20 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
       const innerW = W - pad.left - pad.right;
       const innerH = H - pad.top - pad.bottom;
-      const xlo = Math.min(...ratios), xhi = Math.max(...ratios);
-      const ylo = Math.min(...costs), yhi = Math.max(...costs);
-      const xSpan = xhi - xlo || 1, ySpan = yhi - ylo || 1;
-      const px = v => pad.left + ((v - xlo) / xSpan) * innerW;
-      const py = v => pad.top + (1 - (v - ylo) / ySpan) * innerH;
 
-      const xTicks = niceTicks(xlo, xhi, 5);
-      const yTicks = niceTicks(ylo, yhi, 5);
+      const xTicks = niceTicks(Math.min(...ratios), Math.max(...ratios), 5);
+      const yTicks = niceTicks(Math.min(...costs), Math.max(...costs), 5);
+      const xDlo = xTicks[0], xDhi = xTicks[xTicks.length - 1];
+      const yDlo = yTicks[0], yDhi = yTicks[yTicks.length - 1];
+      const xSpan = xDhi - xDlo || 1, ySpan = yDhi - yDlo || 1;
+      const px = v => pad.left + ((v - xDlo) / xSpan) * innerW;
+      const py = v => pad.top + (1 - (v - yDlo) / ySpan) * innerH;
 
       const COLORS = ["var(--c-inv)", "var(--c-ai)", "var(--c-conf)", "var(--c-drift)", "#f472b6", "#06b6d4"];
+      // Observed = solid, Latent_supervised = dashed
+      const dashOf = key => key.startsWith("Latent") ? "6 4" : "none";
+      const widthOf = key => key === hoveredGroup ? 2.5 : 1.5;
 
-      // Group by data_strategy + model_name
       const groupMap = {};
       sensData.forEach(r => {
         const key = `${r.data_strategy || ""}|${r.model_name || ""}`;
@@ -4374,9 +4382,32 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       });
       const groups = Object.entries(groupMap);
 
+      // All unique ratio values sorted
+      const allRatios = [...new Set(ratios)].sort((a, b) => a - b);
+
+      const handleMouseMove = e => {
+        if (!svgRef.current) return;
+        const rect = svgRef.current.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const ratio = xDlo + ((mouseX - pad.left) / innerW) * xSpan;
+        if (mouseX < pad.left || mouseX > pad.left + innerW) { setHoveredRatio(null); return; }
+        const nearest = allRatios.reduce((a, b) => Math.abs(b - ratio) < Math.abs(a - ratio) ? b : a);
+        setHoveredRatio(nearest);
+      };
+
+      const crossX = hoveredRatio != null ? px(hoveredRatio) : null;
+      const hoveredPoints = hoveredRatio != null ? groups.map(([key, rows], gi) => {
+        const row = rows.find(r => Math.abs(r.ratio - hoveredRatio) < 1e-9);
+        return row ? { key, gi, cost: row.total_cost } : null;
+      }).filter(Boolean) : [];
+
       return (
-        <div ref={wrapRef} style={{ height: H }}>
-          <svg width={W} height={H} style={{ display: "block", overflow: "visible" }}>
+        <div ref={wrapRef} style={{ position: "relative" }}>
+          <svg ref={svgRef} width={W} height={H} style={{ display: "block", overflow: "hidden" }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => { setHoveredRatio(null); setHoveredGroup(null); }}>
+
+            {/* Grid */}
             {xTicks.map((t, i) => (
               <g key={i}>
                 <line x1={px(t)} x2={px(t)} y1={pad.top} y2={pad.top + innerH}
@@ -4398,20 +4429,51 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               </g>
             ))}
 
+            {/* Lines */}
             {groups.map(([key, rows], gi) => {
               const sorted = [...rows].sort((a, b) => a.ratio - b.ratio);
               const pts = sorted.map(r => [px(r.ratio), py(r.total_cost)]);
+              const color = COLORS[gi % COLORS.length];
+              const isHov = key === hoveredGroup;
+              const isDim = hoveredGroup && !isHov;
               return (
-                <g key={key}>
-                  <path d={smoothPath(pts)} fill="none"
-                    stroke={COLORS[gi % COLORS.length]} strokeWidth={2} strokeLinecap="round" />
-                  {pts.map(([x, y], i) => (
-                    <circle key={i} cx={x} cy={y} r={3} fill={COLORS[gi % COLORS.length]} />
-                  ))}
+                <g key={key} style={{ cursor: "crosshair" }}
+                  onMouseEnter={() => setHoveredGroup(key)}
+                  onMouseLeave={() => setHoveredGroup(null)}>
+                  <path d={smoothPath(pts)} fill="none" stroke={color}
+                    strokeWidth={widthOf(key)}
+                    strokeDasharray={dashOf(key.split("|")[0])}
+                    strokeLinecap="round"
+                    opacity={isDim ? 0.25 : 1} />
+                  {/* Inline label at end of line */}
+                  {pts.length > 0 && (() => {
+                    const [lx, ly] = pts[pts.length - 1];
+                    const label = key.replace("|", " / ").replace("Latent_supervised", "Latent").replace("auto_boosting", "auto_boost");
+                    return (
+                      <text x={lx + 6} y={ly + 3.5} fill={color}
+                        fontFamily="var(--font-mono)" fontSize={9}
+                        opacity={isDim ? 0.25 : 1}>
+                        {label}
+                      </text>
+                    );
+                  })()}
                 </g>
               );
             })}
 
+            {/* Crosshair */}
+            {crossX != null && (
+              <g pointerEvents="none">
+                <line x1={crossX} x2={crossX} y1={pad.top} y2={pad.top + innerH}
+                  stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="3 3" />
+                {hoveredPoints.map(({ key, gi, cost }) => (
+                  <circle key={key} cx={crossX} cy={py(cost)} r={3.5}
+                    fill={COLORS[gi % COLORS.length]} stroke="var(--bg-2)" strokeWidth={1.5} />
+                ))}
+              </g>
+            )}
+
+            {/* Axis labels */}
             <text x={pad.left + innerW / 2} y={H - 4} textAnchor="middle"
               fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10.5}>
               Ratio Cs/Co
@@ -4423,15 +4485,38 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             </text>
           </svg>
 
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 6, paddingLeft: pad.left }}>
-            {groups.map(([key], i) => (
-              <div key={key} style={{ display: "flex", alignItems: "center", gap: 5,
-                fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
-                <span style={{ display: "inline-block", width: 14, height: 2, background: COLORS[i % COLORS.length] }} />
-                {key.replace("|", " / ")}
+          {/* Hover tooltip */}
+          {crossX != null && hoveredPoints.length > 0 && (
+            <div style={{
+              position: "absolute",
+              left: crossX > W / 2 ? crossX - 10 - 160 : crossX + 14,
+              top: pad.top,
+              background: "rgba(10,15,28,0.95)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              padding: "7px 10px",
+              pointerEvents: "none",
+              zIndex: 50,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10.5,
+              minWidth: 150,
+            }}>
+              <div style={{ color: "var(--text-3)", fontSize: 9, marginBottom: 5 }}>
+                Ratio Cs/Co = {hoveredRatio.toFixed(1)}
               </div>
-            ))}
-          </div>
+              {hoveredPoints.map(({ key, gi, cost }) => (
+                <div key={key} style={{ display: "flex", justifyContent: "space-between", gap: 10,
+                  color: COLORS[gi % COLORS.length], marginBottom: 2 }}>
+                  <span style={{ opacity: 0.85, fontSize: 9.5 }}>
+                    {key.replace("|", " / ").replace("Latent_supervised", "Latent").replace("auto_boosting", "auto_boost")}
+                  </span>
+                  <span className="tnum" style={{ fontWeight: 600 }}>
+                    {cost >= 1000 ? `${(cost/1000).toFixed(1)}k` : Math.round(cost)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }
