@@ -4935,8 +4935,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                       <div className="shimmer" style={{ height: 300, borderRadius: 8 }} />
                     ) : (
                       <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
-                        {/* Chart */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        {/* Chart — capped width so table stays close */}
+                        <div style={{ flex: "0 0 58%", maxWidth: 620, minWidth: 0 }}>
                           <ExpParetoChart paretoData={paretoData || []} />
                         </div>
 
