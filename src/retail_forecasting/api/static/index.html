@@ -4303,21 +4303,21 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           )}
 
           {/* Legend */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "nowrap", marginTop: 4, paddingLeft: pad.left }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4, paddingLeft: pad.left }}>
             {strategies.map((s, i) => (
-              <div key={s} style={{ display: "flex", alignItems: "center", gap: 5,
+              <div key={s} style={{ display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
                 fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
                 <span style={{ width: 10, height: 10, borderRadius: "50%", background: COLORS[i % COLORS.length] }} />
                 {s || "default"}
               </div>
             ))}
-            <div style={{ display: "flex", alignItems: "center", gap: 5,
+            <div style={{ display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
               fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
               <span style={{ display: "inline-block", width: 14, height: 2,
                 background: "transparent", borderTop: "2px dashed var(--c-conf)" }} />
               Frente Pareto
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5,
+            <div style={{ display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
               fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
               <span style={{ width: 10, height: 10, borderRadius: "50%",
                 background: "var(--c-inv)", border: "2px solid #fff",
@@ -4924,7 +4924,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               {/* ── Sub-tab: Pareto Tuning ── */}
               {subTab === "pareto" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div className="glass" style={{ padding: "18px 18px 14px" }}>
+                  <div className="glass" style={{ padding: "18px 18px 14px", alignSelf: "flex-start" }}>
                     <div style={{ marginBottom: 12 }}>
                       <div className="h-display" style={{ fontSize: 16 }}>Frente de Pareto — Tuning Multiobjeto</div>
                       <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
@@ -4934,9 +4934,9 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     {paretoLoading ? (
                       <div className="shimmer" style={{ height: 300, borderRadius: 8 }} />
                     ) : (
-                      <div style={{ display: "flex", gap: 0, alignItems: "flex-start", maxWidth: 800 }}>
-                        {/* Chart */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
+                        {/* Chart — fixed width so the card shrinks to content (no dead space) */}
+                        <div style={{ width: 520, flexShrink: 0 }}>
                           <ExpParetoChart paretoData={paretoData || []} />
                         </div>
 
