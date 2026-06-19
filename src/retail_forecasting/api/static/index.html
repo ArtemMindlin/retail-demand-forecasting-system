@@ -2448,6 +2448,28 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
       const [sortDir, setSortDir] = useState("desc");
       const [skus, setSkus] = useState([]);
 
+      const [overrides, setOverrides] = useState(() => {
+        try {
+          const saved = localStorage.getItem("order_overrides");
+          return saved ? JSON.parse(saved) : {};
+        } catch {
+          return {};
+        }
+      });
+
+      const updateOverride = (skuId, val) => {
+        setOverrides(prev => {
+          const next = { ...prev };
+          if (val === "" || val === null || val === undefined) {
+            delete next[skuId];
+          } else {
+            next[skuId] = parseInt(val, 10) || 0;
+          }
+          localStorage.setItem("order_overrides", JSON.stringify(next));
+          return next;
+        });
+      };
+
       useEffect(() => {
         let active = true;
         const load = async () => {
@@ -2457,6 +2479,7 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
         load();
         return () => { active = false; };
       }, [params]);
+
       const filtered = useMemo(() => {
         let r = skus;
         if (filter !== "all") r = r.filter(s => s.status === filter);
@@ -2487,19 +2510,40 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
 
       const selected = filtered.find(s => s.id === selectedSkuId);
 
+      const summaryMetrics = useMemo(() => {
+        let totalItems = 0;
+        let totalVolume = 0;
+        let overrideCount = 0;
+        skus.forEach(s => {
+          const qty = overrides[s.id] !== undefined ? overrides[s.id] : s.q_star;
+          if (qty > 0) {
+            totalItems += 1;
+            totalVolume += qty;
+          }
+          if (overrides[s.id] !== undefined) {
+            overrideCount += 1;
+          }
+        });
+        return { totalItems, totalVolume, overrideCount };
+      }, [skus, overrides]);
+
       const handleDownloadCSV = () => {
         if (!skus.length) return;
         const headers = [
           "SKU", "Categoria", "Ultimo_Actual", "Ultimo_Predicho",
           "Cobertura_Empirica", "Objetivo_Cobertura", "Drift_PSI",
-          "Margen", "Cantidad_Recomendada_qStar", "Estado"
+          "Margen", "Cantidad_Recomendada_qStar", "Cantidad_Final_Pedido", "Ajustado_Manualmente", "Estado"
         ];
-        const rows = skus.map(s => [
-          s.id, s.cat, s.lastActual, s.lastPred,
-          s.empCoverage.toFixed(2), s.coverageTarget,
-          s.driftPsi.toFixed(3), (s.margin * 100).toFixed(0) + "%",
-          s.q_star, s.status
-        ]);
+        const rows = skus.map(s => {
+          const finalQty = overrides[s.id] !== undefined ? overrides[s.id] : s.q_star;
+          const isOverridden = overrides[s.id] !== undefined ? "SI" : "NO";
+          return [
+            s.id, s.cat, s.lastActual, s.lastPred,
+            s.empCoverage.toFixed(2), s.coverageTarget,
+            s.driftPsi.toFixed(3), (s.margin * 100).toFixed(0) + "%",
+            s.q_star, finalQty, isOverridden, s.status
+          ];
+        });
         const csvContent = "data:text/csv;charset=utf-8,"
           + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
         const encodedUri = encodeURI(csvContent);
@@ -2517,10 +2561,10 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
             <div>
               <div className="label-mono">VIEW · SKU-LEVEL</div>
               <div className="h-display" style={{ fontSize: 22, color: "var(--text-1)", marginTop: 4 }}>
-                Inventario por SKU
+                Control de Pedidos e Inventario
               </div>
               <div style={{ fontSize: 13, color: "var(--text-3)", marginTop: 2 }}>
-                {skus.length} SKUs activos · cobertura empírica calculada por <i>holdout</i> conformal
+                {skus.length} SKUs activos · Gestiona propuestas algorítmicas con ajustes manuales en tiempo real.
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -2543,7 +2587,7 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
                 }}
               >
                 <Icon name="arrowDown" size={14} stroke="var(--c-conf)" strokeWidth={2} />
-                Descargar CSV
+                Exportar Propuesta (CSV)
               </button>
               <div style={{
                 display: "inline-flex",
@@ -2561,6 +2605,50 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
                     fontSize: 12, padding: "6px 10px", width: 220
                   }}
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Operational Order Summary Card */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 12,
+            marginBottom: 18,
+            padding: 14,
+            borderRadius: 12,
+            background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
+            border: "1px solid var(--border)"
+          }}>
+            <div>
+              <div className="label-mono" style={{ fontSize: 10, color: "var(--text-3)" }}>Líneas de Pedido (SKUs)</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-1)", fontFamily: "var(--font-display)", marginTop: 4 }}>
+                {summaryMetrics.totalItems} <span style={{ fontSize: 12, color: "var(--text-3)", fontWeight: 500 }}>/ {skus.length}</span>
+              </div>
+            </div>
+            <div>
+              <div className="label-mono" style={{ fontSize: 10, color: "var(--text-3)" }}>Volumen Total de Pedidos</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--c-ai)", fontFamily: "var(--font-display)", marginTop: 4 }} className="tnum">
+                {summaryMetrics.totalVolume.toLocaleString()} <span style={{ fontSize: 12, color: "var(--text-3)", fontWeight: 500 }}>u</span>
+              </div>
+            </div>
+            <div>
+              <div className="label-mono" style={{ fontSize: 10, color: "var(--text-3)" }}>Ajustes Manuales</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: summaryMetrics.overrideCount > 0 ? "#fbbf24" : "var(--text-2)", fontFamily: "var(--font-display)", marginTop: 4 }}>
+                {summaryMetrics.overrideCount} <span style={{ fontSize: 12, color: "var(--text-3)", fontWeight: 500 }}>SKUs</span>
+              </div>
+            </div>
+            <div>
+              <div className="label-mono" style={{ fontSize: 10, color: "var(--text-3)" }}>Utilización de Capacidad</div>
+              <div style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: (summaryMetrics.totalVolume > params.capacity) ? "var(--c-drift)" : "var(--c-conf)",
+                fontFamily: "var(--font-display)",
+                marginTop: 4
+              }} className="tnum">
+                {((summaryMetrics.totalVolume / (params.capacity || 1)) * 100).toFixed(1)}%
+                {(summaryMetrics.totalVolume > params.capacity) && <span style={{ fontSize: 10, marginLeft: 6, color: "var(--c-drift)", fontWeight: 600 }}>¡SOBREPASADA!</span>}
               </div>
             </div>
           </div>
@@ -2597,7 +2685,7 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
                 ["empCoverage", "Cobertura"],
                 ["driftPsi", "PSI"],
                 ["margin", "Margen"],
-                ["q_star", "q*"],
+                ["q_star", "Pedido Final"],
                 ["status", "Estado"],
               ].map(([k, label, noSort]) => (
                 <div
@@ -2623,6 +2711,9 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
                   cov < s.coverageTarget - 3 ? "var(--c-drift)" :
                   cov > s.coverageTarget + 2 ? "var(--c-inv)" :
                   "var(--c-conf)";
+                const isOverridden = overrides[s.id] !== undefined;
+                const finalOrderVal = isOverridden ? overrides[s.id] : s.q_star;
+
                 return (
                   <div
                     key={s.id}
@@ -2653,7 +2744,17 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
                       color: s.driftPsi > 0.2 ? "var(--c-drift)" : "var(--text-2)"
                     }}>{s.driftPsi.toFixed(3)}</div>
                     <div className="sku-cell tnum" style={{ fontFamily: "var(--font-mono)", color: "var(--text-2)" }}>{(s.margin * 100).toFixed(0)}%</div>
-                    <div className="sku-cell tnum" style={{ fontFamily: "var(--font-mono)", color: "var(--c-ai)", fontWeight: 600 }}>{s.q_star}</div>
+                    <div className="sku-cell tnum" style={{
+                      fontFamily: "var(--font-mono)",
+                      color: isOverridden ? "#fbbf24" : "var(--c-ai)",
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4
+                    }}>
+                      {finalOrderVal}
+                      {isOverridden && <span style={{ fontSize: 10, background: "rgba(251, 191, 36, 0.15)", padding: "1px 4px", borderRadius: 4, border: "1px solid rgba(251, 191, 36, 0.3)" }}>M</span>}
+                    </div>
                     <div className="sku-cell">
                       <span className="alert-sev" style={{
                         "--alert-color": sc.color,
@@ -2696,13 +2797,63 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
                   <Icon name="x" size={11} /> Cerrar
                 </button>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 14 }}>
                 <Stat2 label="last actual" value={selected.lastActual} unit="u" color="var(--c-inv)" />
                 <Stat2 label="last predicted" value={selected.lastPred} unit="u" color="var(--c-ai)" />
                 <Stat2 label="cobertura" value={selected.empCoverage.toFixed(1)} unit="%" color="var(--c-conf)" />
                 <Stat2 label="psi drift" value={selected.driftPsi.toFixed(3)} color={selected.driftPsi > 0.2 ? "var(--c-drift)" : "var(--text-2)"} />
                 <Stat2 label="margen" value={(selected.margin * 100).toFixed(0)} unit="%" color="var(--c-drift)" />
-                <Stat2 label="recomendación q*" value={selected.q_star} unit="u" color="var(--c-ai)" big />
+                <Stat2 label="Propuesta Algorítmica q*" value={selected.q_star} unit="u" color="var(--c-ai)" />
+
+                {/* Manual Override Input Block */}
+                <div style={{
+                  padding: "12px 14px",
+                  borderRadius: 8,
+                  background: "rgba(251, 191, 36, 0.08)",
+                  border: "1px solid rgba(251, 191, 36, 0.25)",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between"
+                }}>
+                  <div className="label-mono" style={{ color: "#fbbf24", marginBottom: 6 }}>AJUSTE MANUAL</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="number"
+                      min="0"
+                      value={overrides[selected.id] !== undefined ? overrides[selected.id] : ""}
+                      placeholder={selected.q_star}
+                      onChange={(e) => updateOverride(selected.id, e.target.value)}
+                      style={{
+                        background: "rgba(0,0,0,0.3)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 6,
+                        color: "var(--text-1)",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 16,
+                        padding: "4px 8px",
+                        width: "80px",
+                        outline: "none"
+                      }}
+                    />
+                    {overrides[selected.id] !== undefined && (
+                      <button
+                        onClick={() => updateOverride(selected.id, "")}
+                        style={{
+                          background: "rgba(255,255,255,0.05)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 4,
+                          color: "var(--text-2)",
+                          cursor: "pointer",
+                          fontSize: 10,
+                          fontFamily: "var(--font-mono)",
+                          padding: "2px 6px"
+                        }}
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -3983,6 +4134,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     function ExpParetoChart({ paretoData }) {
       const wrapRef = useRef(null);
       const [W, setW] = useState(700);
+      const [hovered, setHovered] = useState(null);
       const H = 300;
       const pad = { top: 20, right: 20, bottom: 44, left: 64 };
 
@@ -4028,7 +4180,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const frontierPts = onFront.map(r => [px(r.pinball), py(r.winkler)]);
 
       return (
-        <div ref={wrapRef} style={{ height: H + 30 }}>
+        <div ref={wrapRef} style={{ height: H + 30, position: "relative" }}>
           <svg width={W} height={H} style={{ display: "block", overflow: "visible" }}>
             {/* Grid */}
             {xTicks.map((t, i) => (
@@ -4067,7 +4219,12 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               const color = colorOf(r.data_strategy || "");
               if (isSelected) {
                 return (
-                  <g key={i}>
+                  <g
+                    key={i}
+                    onMouseEnter={() => setHovered(r)}
+                    onMouseLeave={() => setHovered(null)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <circle cx={cx} cy={cy} r={9} fill={color} opacity={1}
                       stroke="#fff" strokeWidth={2} />
                     <text x={cx} y={cy + 4} textAnchor="middle"
@@ -4076,9 +4233,19 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 );
               }
               return (
-                <circle key={i} cx={cx} cy={cy} r={isOnFront ? 5 : 3}
-                  fill={color} opacity={isOnFront ? 0.9 : 0.35}
-                  stroke={isOnFront ? "#fff" : "none"} strokeWidth={1} />
+                <circle
+                  key={i}
+                  cx={cx}
+                  cy={cy}
+                  r={isOnFront ? 5 : 3}
+                  fill={color}
+                  opacity={isOnFront ? 0.9 : 0.35}
+                  stroke={isOnFront ? "#fff" : "none"}
+                  strokeWidth={1}
+                  onMouseEnter={() => setHovered(r)}
+                  onMouseLeave={() => setHovered(null)}
+                  style={{ cursor: "pointer" }}
+                />
               );
             })}
 
@@ -4093,6 +4260,44 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               Winkler Score
             </text>
           </svg>
+
+          {/* Hover Tooltip */}
+          {hovered && (
+            <div style={{
+              position: "absolute",
+              left: px(hovered.pinball) > innerW / 2 ? px(hovered.pinball) - 180 : px(hovered.pinball) + 12,
+              top: py(hovered.winkler) - 75,
+              background: "rgba(15, 23, 42, 0.95)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              padding: "8px 10px",
+              pointerEvents: "none",
+              zIndex: 100,
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--text-1)",
+              boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 2
+            }}>
+              <div style={{ fontWeight: "bold", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: 4, marginBottom: 4, color: colorOf(hovered.data_strategy) }}>
+                Trial #{hovered.trial_number} ({hovered.data_strategy})
+              </div>
+              <div>Pinball: <span className="tnum" style={{ color: "var(--text-2)" }}>{hovered.pinball.toFixed(4)}</span></div>
+              <div>Winkler: <span className="tnum" style={{ color: "var(--text-2)" }}>{hovered.winkler.toFixed(3)}</span></div>
+              {hovered.n_estimators !== undefined && hovered.n_estimators !== null && (
+                <>
+                  <div style={{ marginTop: 2, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 4 }}>n_estimators: <span className="tnum" style={{ color: "var(--c-ai)" }}>{hovered.n_estimators}</span></div>
+                  <div>learning_rate: <span className="tnum" style={{ color: "var(--c-ai)" }}>{hovered.learning_rate.toFixed(4)}</span></div>
+                  <div>max_depth: <span className="tnum" style={{ color: "var(--c-ai)" }}>{hovered.max_depth}</span></div>
+                </>
+              )}
+              <div style={{ fontSize: 9, color: "var(--text-3)", marginTop: 2 }}>
+                {hovered.is_selected ? "★ Seleccionado (Compromiso)" : hovered.is_on_front ? "● En Frontera de Pareto" : ""}
+              </div>
+            </div>
+          )}
 
           {/* Legend */}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4, paddingLeft: pad.left }}>
@@ -4644,7 +4849,114 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     {paretoLoading ? (
                       <div className="shimmer" style={{ height: 300, borderRadius: 8 }} />
                     ) : (
-                      <ExpParetoChart paretoData={paretoData || []} />
+                      <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
+                        {/* Chart */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <ExpParetoChart paretoData={paretoData || []} />
+                        </div>
+
+                        {/* Transposed params table — parameters as rows, models as columns */}
+                        {paretoData && paretoData.length > 0 && (() => {
+                          const frontier = paretoData
+                            .filter(r => String(r.is_on_front).toLowerCase() === "true")
+                            .sort((a, b) => a.pinball - b.pinball);
+                          const rows = [
+                            { label: "Trial",       render: r => `#${r.trial_number}` },
+                            { label: "Estrategia",  render: r => r.data_strategy || "—" },
+                            { label: "Pinball",     render: r => r.pinball.toFixed(4) },
+                            { label: "Winkler",     render: r => r.winkler.toFixed(3) },
+                            { label: "n_est.",      render: r => r.n_estimators ?? "—" },
+                            { label: "lr",          render: r => r.learning_rate != null ? r.learning_rate.toFixed(4) : "—" },
+                            { label: "max_depth",   render: r => r.max_depth ?? "—" },
+                          ];
+                          return (
+                            <div style={{
+                              width: 260,
+                              flexShrink: 0,
+                              borderLeft: "1px solid var(--border)",
+                              marginLeft: 16,
+                              paddingLeft: 16,
+                              alignSelf: "stretch",
+                              display: "flex",
+                              flexDirection: "column",
+                              justifyContent: "center",
+                            }}>
+                              <div className="label-mono" style={{ marginBottom: 10, fontSize: 9.5, color: "var(--c-conf)", fontWeight: 600, letterSpacing: "0.06em" }}>
+                                FRONTERA DE PARETO
+                              </div>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 10.5 }}>
+                                <thead>
+                                  <tr>
+                                    <th style={{ padding: "4px 6px 4px 0", textAlign: "left", color: "var(--text-3)", fontWeight: 400, fontSize: 9.5, width: 68 }}></th>
+                                    {frontier.map((r, ci) => {
+                                      const isSel = String(r.is_selected).toLowerCase() === "true";
+                                      return (
+                                        <th key={ci} style={{
+                                          padding: "4px 6px",
+                                          textAlign: "center",
+                                          color: isSel ? "var(--c-conf)" : "var(--text-3)",
+                                          fontWeight: isSel ? 700 : 400,
+                                          fontSize: 9.5,
+                                          borderBottom: isSel ? "2px solid var(--c-conf)" : "1px solid var(--border)",
+                                        }}>
+                                          #{r.trial_number}
+                                        </th>
+                                      );
+                                    })}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {rows.map((row, ri) => (
+                                    <tr key={ri} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                                      <td style={{ padding: "5px 6px 5px 0", color: "var(--text-3)", fontSize: 9.5, fontWeight: 500, whiteSpace: "nowrap" }}>
+                                        {row.label}
+                                      </td>
+                                      {frontier.map((r, ci) => {
+                                        const isSel = String(r.is_selected).toLowerCase() === "true";
+                                        return (
+                                          <td key={ci} style={{
+                                            padding: "5px 6px",
+                                            textAlign: "center",
+                                            color: isSel ? "var(--c-conf)" : "var(--text-2)",
+                                            fontWeight: isSel ? 600 : 400,
+                                          }} className="tnum">
+                                            {row.render(r)}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  ))}
+                                  {/* Estado row */}
+                                  <tr>
+                                    <td style={{ padding: "6px 6px 2px 0", color: "var(--text-3)", fontSize: 9.5, fontWeight: 500 }}>Estado</td>
+                                    {frontier.map((r, ci) => {
+                                      const isSel = String(r.is_selected).toLowerCase() === "true";
+                                      return (
+                                        <td key={ci} style={{ padding: "6px 6px 2px", textAlign: "center" }}>
+                                          {isSel ? (
+                                            <span style={{
+                                              background: "rgba(16, 185, 129, 0.15)",
+                                              color: "var(--c-conf)",
+                                              padding: "2px 5px",
+                                              borderRadius: 3,
+                                              fontSize: 8.5,
+                                              fontWeight: "bold",
+                                              border: "1px solid rgba(16, 185, 129, 0.3)",
+                                              whiteSpace: "nowrap",
+                                            }}>★ SEL.</span>
+                                          ) : (
+                                            <span style={{ color: "var(--text-3)", fontSize: 9 }}>Frontera</span>
+                                          )}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        })()}
+                      </div>
                     )}
                   </div>
 
