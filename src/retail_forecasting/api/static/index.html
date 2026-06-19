@@ -4934,9 +4934,9 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     {paretoLoading ? (
                       <div className="shimmer" style={{ height: 300, borderRadius: 8 }} />
                     ) : (
-                      <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
-                        {/* Chart — capped width so table stays close */}
-                        <div style={{ flex: "0 0 58%", maxWidth: 620, minWidth: 0 }}>
+                      <div style={{ display: "flex", gap: 0, alignItems: "flex-start", maxWidth: 760 }}>
+                        {/* Chart */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <ExpParetoChart paretoData={paretoData || []} />
                         </div>
 
