@@ -4336,8 +4336,9 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const [W, setW] = useState(700);
       const [hoveredRatio, setHoveredRatio] = useState(null);
       const [hoveredGroup, setHoveredGroup] = useState(null);
-      const H = 300;
-      const pad = { top: 20, right: 140, bottom: 40, left: 60 };
+      const H = 380;
+      const pad = { top: 20, right: 150, bottom: 40, left: 60 };
+      const DW = Math.min(W, 1180);  // cap draw width so lines aren't flattened on wide screens
 
       useEffect(() => {
         if (!wrapRef.current) return;
@@ -4358,7 +4359,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const costs = sensData.map(r => r.total_cost).filter(v => v != null);
       if (ratios.length === 0) return null;
 
-      const innerW = W - pad.left - pad.right;
+      const innerW = DW - pad.left - pad.right;
       const innerH = H - pad.top - pad.bottom;
 
       const xTicks = niceTicks(Math.min(...ratios), Math.max(...ratios), 5);
@@ -4401,9 +4402,34 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         return row ? { key, gi, cost: row.total_cost } : null;
       }).filter(Boolean) : [];
 
+      // Precompute per-line geometry + end-label positions with anti-overlap
+      const fmtLabel = key => key.replace("|", " / ")
+        .replace("Latent_supervised", "Latent").replace("auto_boosting", "auto_boost");
+      const lines = groups.map(([key, rows], gi) => {
+        const sorted = [...rows].sort((a, b) => a.ratio - b.ratio);
+        const pts = sorted.map(r => [px(r.ratio), py(r.total_cost)]);
+        const [endX, endY] = pts.length ? pts[pts.length - 1] : [0, 0];
+        return { key, gi, color: COLORS[gi % COLORS.length], pts, endX, endY, label: fmtLabel(key) };
+      });
+      // Resolve label collisions: sort by y, enforce a minimum vertical gap
+      const LBL_GAP = 12;
+      const labelLayout = lines
+        .map(l => ({ gi: l.gi, color: l.color, label: l.label, lineX: l.endX, lineY: l.endY, y: l.endY }))
+        .sort((a, b) => a.lineY - b.lineY);
+      for (let i = 1; i < labelLayout.length; i++) {
+        if (labelLayout[i].y - labelLayout[i - 1].y < LBL_GAP) {
+          labelLayout[i].y = labelLayout[i - 1].y + LBL_GAP;
+        }
+      }
+      // If pushed past the bottom, shift the whole stack up
+      const bottomY = pad.top + innerH;
+      const overflow = labelLayout.length ? labelLayout[labelLayout.length - 1].y - bottomY : 0;
+      if (overflow > 0) labelLayout.forEach(l => { l.y -= overflow; });
+      const labelX = pad.left + innerW + 8;
+
       return (
         <div ref={wrapRef} style={{ position: "relative" }}>
-          <svg ref={svgRef} width={W} height={H} style={{ display: "block", overflow: "hidden" }}
+          <svg ref={svgRef} width={DW} height={H} style={{ display: "block", margin: "0 auto", overflow: "hidden" }}
             onMouseMove={handleMouseMove}
             onMouseLeave={() => { setHoveredRatio(null); setHoveredGroup(null); }}>
 
@@ -4430,10 +4456,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             ))}
 
             {/* Lines */}
-            {groups.map(([key, rows], gi) => {
-              const sorted = [...rows].sort((a, b) => a.ratio - b.ratio);
-              const pts = sorted.map(r => [px(r.ratio), py(r.total_cost)]);
-              const color = COLORS[gi % COLORS.length];
+            {lines.map(({ key, color, pts }) => {
               const isHov = key === hoveredGroup;
               const isDim = hoveredGroup && !isHov;
               return (
@@ -4445,18 +4468,25 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     strokeDasharray={dashOf(key.split("|")[0])}
                     strokeLinecap="round"
                     opacity={isDim ? 0.25 : 1} />
-                  {/* Inline label at end of line */}
-                  {pts.length > 0 && (() => {
-                    const [lx, ly] = pts[pts.length - 1];
-                    const label = key.replace("|", " / ").replace("Latent_supervised", "Latent").replace("auto_boosting", "auto_boost");
-                    return (
-                      <text x={lx + 6} y={ly + 3.5} fill={color}
-                        fontFamily="var(--font-mono)" fontSize={9}
-                        opacity={isDim ? 0.25 : 1}>
-                        {label}
-                      </text>
-                    );
-                  })()}
+                </g>
+              );
+            })}
+
+            {/* End labels with anti-overlap + connector */}
+            {labelLayout.map(({ gi, color, label, lineX, lineY, y }) => {
+              const lkey = lines[gi] ? lines[gi].key : label;
+              const isHov = lkey === hoveredGroup;
+              const isDim = hoveredGroup && !isHov;
+              return (
+                <g key={label + gi} opacity={isDim ? 0.25 : 1} pointerEvents="none">
+                  <path
+                    d={`M ${lineX} ${lineY} L ${labelX - 4} ${y}`}
+                    fill="none" stroke={color} strokeWidth={1} opacity={0.45} />
+                  <text x={labelX} y={y + 3} fill={color}
+                    fontFamily="var(--font-mono)" fontSize={9.5}
+                    fontWeight={isHov ? 700 : 400}>
+                    {label}
+                  </text>
                 </g>
               );
             })}
@@ -4489,7 +4519,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           {crossX != null && hoveredPoints.length > 0 && (
             <div style={{
               position: "absolute",
-              left: crossX > W / 2 ? crossX - 10 - 160 : crossX + 14,
+              left: (W - DW) / 2 + (crossX > DW / 2 ? crossX - 10 - 160 : crossX + 14),
               top: pad.top,
               background: "rgba(10,15,28,0.95)",
               border: "1px solid var(--border)",
