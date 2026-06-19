@@ -4029,7 +4029,9 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
     function ExpLatentChart({ latentData }) {
       const wrapRef = useRef(null);
+      const svgRef = useRef(null);
       const [W, setW] = useState(800);
+      const [hoverIdx, setHoverIdx] = useState(null);
       const H = 300;
       const pad = { top: 18, right: 60, bottom: 34, left: 52 };
 
@@ -4076,9 +4078,28 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         </div>
       );
 
+      const handleMove = e => {
+        if (!svgRef.current || !geom.xs.length) return;
+        const rect = svgRef.current.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        if (mx < pad.left || mx > W - pad.right) { setHoverIdx(null); return; }
+        let best = 0, bestD = Infinity;
+        geom.xs.forEach((x, i) => { const d = Math.abs(x - mx); if (d < bestD) { bestD = d; best = i; } });
+        setHoverIdx(best);
+      };
+
+      const hv = hoverIdx != null ? {
+        x: geom.xs[hoverIdx],
+        date: latentData.dates[hoverIdx],
+        observed: (latentData.observed || [])[hoverIdx],
+        latent: (latentData.latent || [])[hoverIdx],
+        stockout: (latentData.stockout_hours || [])[hoverIdx],
+      } : null;
+
       return (
-        <div ref={wrapRef} style={{ height: H }}>
-          <svg width={W} height={H} style={{ display: "block", overflow: "hidden" }}>
+        <div ref={wrapRef} style={{ height: H, position: "relative" }}>
+          <svg ref={svgRef} width={W} height={H} style={{ display: "block", overflow: "hidden" }}
+            onMouseMove={handleMove} onMouseLeave={() => setHoverIdx(null)}>
             {/* Y grid */}
             {geom.dTicks.map((t, i) => (
               <g key={i}>
@@ -4128,7 +4149,62 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
             {/* Latent line (green) */}
             <path d={smoothPath(geom.latPts)} fill="none" stroke="var(--c-conf)" strokeWidth={2} strokeLinecap="round" />
+
+            {/* Data point markers */}
+            {(latentData.observed || []).map((v, i) => v != null
+              ? <circle key={`o${i}`} cx={geom.xs[i]} cy={geom.y(v)} r={hoverIdx === i ? 4 : 2.5}
+                  fill="#ef4444" stroke="var(--bg-2)" strokeWidth={1} /> : null)}
+            {(latentData.latent || []).map((v, i) => v != null
+              ? <circle key={`l${i}`} cx={geom.xs[i]} cy={geom.y(v)} r={hoverIdx === i ? 4 : 2.5}
+                  fill="var(--c-conf)" stroke="var(--bg-2)" strokeWidth={1} /> : null)}
+
+            {/* Crosshair */}
+            {hv && (
+              <line x1={hv.x} x2={hv.x} y1={pad.top} y2={pad.top + geom.innerH}
+                stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="3 3" pointerEvents="none" />
+            )}
           </svg>
+
+          {/* Hover tooltip */}
+          {hv && (
+            <div style={{
+              position: "absolute",
+              left: hv.x > W / 2 ? hv.x - 14 - 178 : hv.x + 14,
+              top: pad.top,
+              background: "rgba(10,15,28,0.95)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              padding: "8px 11px",
+              pointerEvents: "none",
+              zIndex: 50,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10.5,
+              minWidth: 164,
+            }}>
+              <div style={{ color: "var(--text-3)", fontSize: 9, marginBottom: 6 }}>{hv.date}</div>
+              {hv.latent != null && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "var(--c-conf)", marginBottom: 2 }}>
+                  <span>Demanda latente</span><span className="tnum" style={{ fontWeight: 600 }}>{hv.latent.toFixed(1)}</span>
+                </div>
+              )}
+              {hv.observed != null && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "#ef4444", marginBottom: 2 }}>
+                  <span>Venta real</span><span className="tnum" style={{ fontWeight: 600 }}>{hv.observed.toFixed(1)}</span>
+                </div>
+              )}
+              {hv.observed != null && hv.latent != null && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "var(--text-3)", marginBottom: 2 }}>
+                  <span>Censura</span><span className="tnum">{(hv.latent - hv.observed).toFixed(1)}</span>
+                </div>
+              )}
+              {hv.stockout != null && hv.stockout > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "#f59e0b",
+                  borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 4, marginTop: 2 }}>
+                  <span>Horas rotura</span><span className="tnum" style={{ fontWeight: 600 }}>{hv.stockout}h</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       );
     }
