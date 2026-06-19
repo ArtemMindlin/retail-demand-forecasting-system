@@ -4678,48 +4678,56 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
               {filters && (
                 <>
-                  <div>
-                    <div style={labelStyle}>Estrategia</div>
-                    <select style={selectStyle} value={selectedStrategy}
-                      onChange={e => setSelectedStrategy(e.target.value)}>
-                      {(filters.strategies || []).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
+                  {subTab === "forecast" && (
+                    <div>
+                      <div style={labelStyle}>Estrategia</div>
+                      <select style={selectStyle} value={selectedStrategy}
+                        onChange={e => setSelectedStrategy(e.target.value)}>
+                        {(filters.strategies || []).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
 
-                  <div>
-                    <div style={labelStyle}>Serie / SKU</div>
-                    <select style={selectStyle} value={selectedSeries}
-                      onChange={e => setSelectedSeries(e.target.value)}>
-                      {(filters.series_ids || []).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
+                  {subTab !== "pareto" && (
+                    <div>
+                      <div style={labelStyle}>Serie / SKU</div>
+                      <select style={selectStyle} value={selectedSeries}
+                        onChange={e => setSelectedSeries(e.target.value)}>
+                        {(filters.series_ids || []).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
 
-                  <div>
-                    <div style={labelStyle}>Modelo</div>
-                    <select style={selectStyle} value={selectedModel}
-                      onChange={e => setSelectedModel(e.target.value)}>
-                      {(filters.models || []).map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                  </div>
+                  {subTab !== "pareto" && (
+                    <div>
+                      <div style={labelStyle}>Modelo</div>
+                      <select style={selectStyle} value={selectedModel}
+                        onChange={e => setSelectedModel(e.target.value)}>
+                        {(filters.models || []).map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                  )}
 
                   {/* What-If toggle */}
-                  <button
-                    className={`filter-tab ${wiOpen ? "active" : ""}`}
-                    onClick={() => setWiOpen(o => !o)}
-                    style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "8px 14px",
-                      alignSelf: "flex-end", borderRadius: 8,
-                      background: wiOpen ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.02)",
-                      color: wiOpen ? "#fff" : "var(--text-2)",
-                      borderColor: wiOpen ? "rgba(139,92,246,0.45)" : "var(--border)" }}>
-                    <Icon name="zap" size={13} />
-                    What-If
-                  </button>
+                  {subTab === "forecast" && (
+                    <button
+                      className={`filter-tab ${wiOpen ? "active" : ""}`}
+                      onClick={() => setWiOpen(o => !o)}
+                      style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "8px 14px",
+                        alignSelf: "flex-end", borderRadius: 8,
+                        background: wiOpen ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.02)",
+                        color: wiOpen ? "#fff" : "var(--text-2)",
+                        borderColor: wiOpen ? "rgba(139,92,246,0.45)" : "var(--border)" }}>
+                      <Icon name="zap" size={13} />
+                      What-If
+                    </button>
+                  )}
                 </>
               )}
             </div>
 
             {/* What-if panel */}
-            {wiOpen && filters && (
+            {wiOpen && subTab === "forecast" && filters && (
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px dashed var(--border)",
                 display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
                 <div style={{ minWidth: 180 }}>

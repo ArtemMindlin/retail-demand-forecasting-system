@@ -242,11 +242,24 @@ def load_latest_predictions() -> pd.DataFrame:
 
     latest_run = _get_latest_run_path()
 
-    usecols = ["date", "series_id", "y_true", "y_pred", "data_strategy"]
+    usecols = ["date", "series_id", "y_true", "y_pred", "data_strategy", "model_name"]
     try:
         df = pd.read_csv(latest_run / "predictions.csv", usecols=usecols)
     except Exception:
         df = pd.read_csv(latest_run / "predictions.csv")
+
+    try:
+        settings = load_config("configs/experiment.yaml")
+        champion_strategy = settings.business.champion_data_strategy
+        champion_model = settings.business.champion_model_name
+    except Exception:
+        champion_strategy = "Observed"
+        champion_model = "catboost"
+
+    if "data_strategy" in df.columns:
+        df = df[df["data_strategy"] == champion_strategy]
+    if "model_name" in df.columns:
+        df = df[df["model_name"] == champion_model]
 
     _PREDICTIONS_CACHE["df"] = df
     _PREDICTIONS_CACHE["grouped"] = {sku: group for sku, group in df.groupby("series_id")}
