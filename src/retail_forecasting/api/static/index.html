@@ -4338,7 +4338,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const [hoveredGroup, setHoveredGroup] = useState(null);
       const H = 380;
       const pad = { top: 20, right: 150, bottom: 40, left: 60 };
-      const DW = Math.min(W, 1180);  // cap draw width so lines aren't flattened on wide screens
+      const DW = Math.min(W, 1500);  // cap draw width so lines aren't flattened on wide screens
 
       useEffect(() => {
         if (!wrapRef.current) return;
