@@ -47,6 +47,9 @@ class ParetoTrial(BaseModel):
     winkler: float
     is_on_front: bool
     is_selected: bool
+    n_estimators: int | None = Field(default=None, ge=0)
+    learning_rate: float | None = Field(default=None, ge=0)
+    max_depth: int | None = Field(default=None, ge=0)
 
 
 class TuningResult(BaseModel):

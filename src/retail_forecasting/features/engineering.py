@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+import numpy as np
 import pandas as pd
 from pandas.core.groupby.generic import DataFrameGroupBy, SeriesGroupBy
 
@@ -377,35 +378,20 @@ def _resolve_cold_start_fallbacks(
     third_category_means = panel.groupby("third_category_id")["observed_demand"].mean()
     global_mean = panel["observed_demand"].mean()
 
-    fallback_levels: list[str] = []
-    fallback_values: list[float] = []
+    if pd.isna(global_mean):
+        raise ValueError(
+            "Cannot resolve cold-start fallback because observed_demand has no non-null history."
+        )
 
-    for row in cold_rows.itertuples(index=False):
-        series_mean = series_means.get(row.series_id)
-        if pd.notna(series_mean):
-            fallback_levels.append("series")
-            fallback_values.append(float(series_mean) * horizon)
-            continue
+    val_series = cold_rows["series_id"].map(series_means)
+    val_product = cold_rows["product_id"].map(product_means)
+    val_third = cold_rows["third_category_id"].map(third_category_means)
 
-        product_mean = product_means.get(row.product_id)
-        if pd.notna(product_mean):
-            fallback_levels.append("product")
-            fallback_values.append(float(product_mean) * horizon)
-            continue
+    fallback_values = val_series.fillna(val_product).fillna(val_third).fillna(global_mean) * horizon
 
-        third_category_mean = third_category_means.get(row.third_category_id)
-        if pd.notna(third_category_mean):
-            fallback_levels.append("third_category")
-            fallback_values.append(float(third_category_mean) * horizon)
-            continue
-
-        if pd.isna(global_mean):
-            raise ValueError(
-                "Cannot resolve cold-start fallback because observed_demand has no non-null history."
-            )
-
-        fallback_levels.append("global")
-        fallback_values.append(float(global_mean) * horizon)
+    conditions = [val_series.notna(), val_product.notna(), val_third.notna()]
+    choices = ["series", "product", "third_category"]
+    fallback_levels = np.select(conditions, choices, default="global")
 
     return pd.DataFrame(
         {

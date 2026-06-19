@@ -121,6 +121,9 @@ def _train_conformal_model(
 def run_experiment(settings: Settings) -> RunArtifacts:
     """Run the end-to-end experiment comparing Observed vs Latent demand."""
     # 1. Load Original Panel
+    print("\n" + "=" * 50)
+    print("🚀 STARTING RETAIL DEMAND FORECASTING EXPERIMENT")
+    print("=" * 50 + "\n")
     print("📂 Loading train panel...")
     raw_panel = load_prepared_panel(
         dataset_config=settings.dataset,
@@ -134,7 +137,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     print("✅ Data quality checks passed")
 
     # Load external holdout (eval) split
-    print("📥 Loading external holdout (eval) split...")
+    print("\n📥 Loading external holdout (eval) split...")
     holdout_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
@@ -142,7 +145,9 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     )
 
     # 2. Run Strategy A: Observed Demand (Baseline)
-    print("--- Running Strategy A: Observed Demand ---")
+    print("\n" + "-" * 40)
+    print("📊 Strategy A: Observed Demand")
+    print("-" * 40)
     artifacts_obs = run_experiment_from_frame(
         raw_panel,
         settings,
@@ -153,7 +158,9 @@ def run_experiment(settings: Settings) -> RunArtifacts:
 
     # 3. Run Strategy B: Latent Demand (Imputed)
     strategy_name = settings.preprocessing.imputation_strategy
-    print(f"--- Running Strategy B: Latent Demand (Strategy: {strategy_name}) ---")
+    print("\n" + "-" * 40)
+    print(f"📊 Strategy B: Latent Demand (Imputation: {strategy_name})")
+    print("-" * 40)
     imputer = LatentDemandImputer(strategy=strategy_name)
     imputed_panel = imputer.impute(raw_panel)
 
@@ -180,7 +187,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     if settings.inventory.use_series_costs:
         sample_series_cost_profile = build_series_cost_profile(raw_panel, settings.inventory)
 
-    print("📦 Running inventory simulation...")
+    print("\n📦 Running inventory simulation on merged predictions...")
     # Run dynamic inventory simulation on merged results
     merged_predictions = simulate_inventory_policy(
         merged_predictions,
@@ -227,9 +234,9 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         backtest_metadata=combined_metadata,
     )
 
-    print("💾 Writing run artifacts...")
+    print("\n💾 Writing run artifacts...")
     artifacts_with_files = write_run_artifacts(final_artifacts, settings)
-    print(f"✅ Artifacts saved to: {artifacts_with_files.run_directory}")
+    print(f"✅ Artifacts saved to: {artifacts_with_files.run_directory}\n")
 
     try:
         from retail_forecasting.evaluation.mlflow_logger import log_experiment_to_mlflow
@@ -308,7 +315,7 @@ def _run_tuning_phase(
     if not settings.models.use_tuning:
         return best_params, None, None
 
-    print(f"🔍 Starting Optuna Tuning for {data_strategy} strategy...")
+    print(f"\n🔍 Starting Optuna Tuning for [{data_strategy}] strategy...")
     # Tuning only uses data available in the first fold's training set.
     tuning_train_frame = supervised_frame[supervised_frame["date"] <= folds[0].train_end_date]
     tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
@@ -341,12 +348,11 @@ def _run_fold_loop(
     )
     force_retrain = False
 
-    print(f"  📅 [{data_strategy}] {len(folds)} walk-forward folds")
+    print(f"\n  📅 [{data_strategy}] Starting {len(folds)} walk-forward folds...")
     for fold in folds:
+        print(f"\n  ▶ [{data_strategy}] Fold {fold.fold_id}/{len(folds)}")
         print(
-            f"  ▶ [{data_strategy}] Fold {fold.fold_id}/{len(folds)} — train up to "
-            f"{fold.train_end_date.date()}, val "
-            f"{fold.validation_start_date.date()}→{fold.validation_end_date.date()}"
+            f"    Train: up to {fold.train_end_date.date()} | Val: {fold.validation_start_date.date()} → {fold.validation_end_date.date()}"
         )
         train_mask = supervised_frame["date"] <= fold.train_end_date
         validation_mask = (supervised_frame["date"] >= fold.validation_start_date) & (

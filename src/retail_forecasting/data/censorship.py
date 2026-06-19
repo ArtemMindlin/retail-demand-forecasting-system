@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import Literal
 
 import lightgbm as lgb
 import numpy as np
@@ -143,20 +143,14 @@ class LatentDemandImputer:
         self, df: pd.DataFrame, is_clean: pd.Series, is_censored: pd.Series
     ) -> pd.DataFrame:
         """Baseline: Impute using the historical mean of clean days for each series."""
-        means = cast(
-            dict[object, float],
-            df[is_clean].groupby("series_id")[self.target_col].mean().to_dict(),
-        )
-
-        # Default to global mean if a series has NO clean days
+        series_means = df[is_clean].groupby("series_id")[self.target_col].mean()
         global_mean = float(df[is_clean][self.target_col].mean())
 
-        def get_mean(series_id: object) -> float:
-            return means.get(series_id, global_mean)
+        fallback_means = df.loc[is_censored, "series_id"].map(series_means).fillna(global_mean)
 
         df.loc[is_censored, "latent_demand_est"] = np.maximum(
             df.loc[is_censored, self.target_col],
-            df.loc[is_censored, "series_id"].map(get_mean),
+            fallback_means,
         )
         df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, self.target_col]
         return df

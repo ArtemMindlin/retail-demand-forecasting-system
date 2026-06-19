@@ -171,7 +171,7 @@ class HyperparameterTuner:
             preds = model.predict(t_val.loc[:, feature_columns])
             q_preds = model.predict_quantiles(t_val.loc[:, feature_columns])
 
-            y_true = t_val[target_col].values
+            y_true = t_val[target_col].to_numpy()
 
             # Objective 1: Pinball Loss at critical fractile q* (consistent with training)
             critical_fractile = self.settings.inventory.stockout_cost / (
@@ -215,6 +215,13 @@ class HyperparameterTuner:
                 winkler=float(trial.values[1]),
                 is_on_front=trial.number in front_numbers,
                 is_selected=trial.number == best_trial.number,
+                n_estimators=int(trial.params["n_estimators"])
+                if "n_estimators" in trial.params
+                else None,
+                learning_rate=float(trial.params["learning_rate"])
+                if "learning_rate" in trial.params
+                else None,
+                max_depth=int(trial.params["max_depth"]) if "max_depth" in trial.params else None,
             )
             for trial in study.trials
             if trial.values is not None
