@@ -4924,7 +4924,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               {/* ── Sub-tab: Pareto Tuning ── */}
               {subTab === "pareto" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div className="glass" style={{ padding: "18px 18px 14px", alignSelf: "flex-start" }}>
+                  <div className="glass" style={{ padding: "18px 18px 14px" }}>
                     <div style={{ marginBottom: 12 }}>
                       <div className="h-display" style={{ fontSize: 16 }}>Frente de Pareto — Tuning Multiobjeto</div>
                       <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
@@ -4935,8 +4935,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                       <div className="shimmer" style={{ height: 300, borderRadius: 8 }} />
                     ) : (
                       <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
-                        {/* Chart — fixed width so the card shrinks to content (no dead space) */}
-                        <div style={{ width: 520, flexShrink: 0 }}>
+                        {/* Chart expands to fill the card; table is fixed and pinned right */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <ExpParetoChart paretoData={paretoData || []} />
                         </div>
 
@@ -4956,7 +4956,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                           ];
                           return (
                             <div style={{
-                              width: 260,
+                              width: 330,
                               flexShrink: 0,
                               borderLeft: "1px solid var(--border)",
                               marginLeft: 16,
