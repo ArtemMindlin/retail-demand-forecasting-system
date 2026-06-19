@@ -4078,7 +4078,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
       return (
         <div ref={wrapRef} style={{ height: H }}>
-          <svg width={W} height={H} style={{ display: "block", overflow: "visible" }}>
+          <svg width={W} height={H} style={{ display: "block", overflow: "hidden" }}>
             {/* Y grid */}
             {geom.dTicks.map((t, i) => (
               <g key={i}>
@@ -4112,11 +4112,13 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             {/* Stockout hours bars (amber, secondary axis) */}
             {(latentData.stockout_hours || []).map((v, i) => {
               if (v == null || v <= 0) return null;
-              const barH = geom.yStockout(0) - geom.yStockout(v);
-              const barW = Math.max(2, geom.innerW / geom.n * 0.7);
+              const vc = Math.min(v, 24);
+              const topY = geom.yStockout(vc);
+              const baseY = geom.yStockout(0);
+              const barW = Math.min(28, Math.max(2, geom.innerW / geom.n * 0.7));
               return (
-                <rect key={i} x={geom.xs[i] - barW / 2} y={geom.yStockout(v)}
-                  width={barW} height={barH}
+                <rect key={i} x={geom.xs[i] - barW / 2} y={topY}
+                  width={barW} height={Math.max(0, baseY - topY)} rx={1.5}
                   fill="rgba(245,158,11,0.22)" stroke="rgba(245,158,11,0.5)" strokeWidth={0.5} />
               );
             })}
