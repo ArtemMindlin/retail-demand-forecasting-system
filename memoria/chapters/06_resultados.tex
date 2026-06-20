@@ -36,6 +36,30 @@ Media Histórica Local & 6{,}92 & 46{,}04 & $+$84{,}2\% \\
 
 La estrategia \textbf{Supervisada} obtiene el mejor Winkler Score (39{,}54), superando a la Media Histórica Local en un 14\% y al \textit{Clipped Scaling} en un 88\%. Destaca que el \textit{Clipped Scaling} empeora respecto a no hacer ninguna corrección: al escalar uniformemente un 20\% la demanda observada, introduce ruido en días con stockouts cortos (1--2 horas) donde la corrección necesaria es mínima, degradando la señal de entrenamiento. La estrategia Supervisada evita este problema al estimar la corrección de forma condicional a las covariables del día (ratio de stockout, media histórica de la serie, calendario y variables meteorológicas), lo que le permite hacer una imputación proporcionada a la severidad real de cada rotura de stock.
 
+\subsubsection{Evaluación directa de la reconstrucción mediante censura sintética}
+\label{sec:imputacion_censura_sintetica}
+
+La comparativa anterior es una evaluación \textit{indirecta}: mide la calidad de cada estrategia a través del rendimiento del modelo de forecasting entrenado sobre los datos corregidos. Tiene una limitación conceptual de fondo: la demanda latente en un día con rotura real es un \textbf{contrafactual no observable} ---nunca se conoce cuánto se habría vendido con disponibilidad plena---, por lo que no existe una verdad-terreno contra la que medir directamente el error de reconstrucción sobre esos días.
+
+Para sortear esta imposibilidad se diseña un protocolo de \textbf{censura sintética} sobre los días limpios, donde la demanda real sí es conocida. El procedimiento es: (i) se reserva un subconjunto aleatorio del 30\% de los días sin rotura (\texttt{stockout\_hours}~$=0$); (ii) a cada día reservado se le asigna un ratio de rotura muestreado de la \textbf{distribución empírica de los stockouts reales} del panel, y se reduce su venta de forma proporcional ($\text{venta}_{\text{censurada}} = \text{demanda}_{\text{real}}\cdot(1-r)$), simulando así una rotura realista; (iii) cada estrategia reconstruye esos días censurados artificialmente; y (iv) se compara la estimación contra la demanda real conocida. La Tabla~\ref{tab:imputation_reconstruction} recoge el error de reconstrucción sobre $n=5\,009$ días censurados sintéticamente en el panel de 500 series.
+
+\begin{table}[h]
+\centering
+\caption{Error directo de reconstrucción por censura sintética sobre días limpios ($n=5\,009$, panel de 500 series). MAE/RMSE menores y sesgo próximo a cero indican mejor reconstrucción.}
+\label{tab:imputation_reconstruction}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Estrategia} & \textbf{MAE} & \textbf{RMSE} & \textbf{Sesgo} & \textbf{MAPE} \\
+\midrule
+\textbf{Supervisada (LightGBM)} & \textbf{1{,}11} & \textbf{1{,}55} & \textbf{$+$0{,}03} & \textbf{16{,}5\%} \\
+Media Histórica Local & 1{,}62 & 2{,}18 & $+$0{,}11 & 26{,}7\% \\
+Clipped Scaling ($\gamma=1{,}2$) & 2{,}95 & 4{,}85 & $-$2{,}68 & 31{,}3\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La evaluación directa confirma y refuerza la conclusión de la comparativa downstream: la estrategia \textbf{Supervisada} reconstruye con el menor error (MAE~$=1{,}11$) y, de forma notable, con un \textbf{sesgo prácticamente nulo} ($+0{,}03$), lo que indica que no infra- ni sobre-estima sistemáticamente la demanda recuperada. El \textit{Clipped Scaling} exhibe un sesgo fuertemente negativo ($-2{,}68$): al limitarse a escalar la venta observada un 20\%, \textbf{infra-imputa} de forma estructural cuando la rotura es severa, dejando sin recuperar la mayor parte de la demanda perdida. Que dos métricas \textbf{metodológicamente independientes} ---la fidelidad directa de reconstrucción y la utilidad downstream para el forecasting--- coincidan en señalar a la estrategia Supervisada como la óptima constituye una evidencia robusta para su elección. El único supuesto del protocolo directo es que el mecanismo de censura sintética ---construido muestreando de la distribución real de roturas--- es representativo de las roturas reales del catálogo.
+
 \section{Calibración Conformal: Cobertura y Winkler Score}
 \label{sec:resultados_conformal}
 
