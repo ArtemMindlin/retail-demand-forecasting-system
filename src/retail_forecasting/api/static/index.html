@@ -4052,12 +4052,13 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         const xs = latentData.dates.map((_, i) => pad.left + (i / Math.max(n - 1, 1)) * innerW);
 
         const demandVals = [...(latentData.observed || []), ...(latentData.latent || [])].filter(v => v != null);
-        let dlo = Math.min(...demandVals, 0);
         let dhi = Math.max(...demandVals, 1);
-        const dSpan = dhi - dlo || 1;
-        dlo -= dSpan * 0.08; dhi += dSpan * 0.12;
+        const dSpan = dhi || 1;
+        dhi += dSpan * 0.12;
+        // Demand can't be negative: floor the axis at 0.
+        let dlo = 0;
         const dTicks = niceTicks(dlo, dhi, 5);
-        dlo = Math.min(dlo, dTicks[0]); dhi = Math.max(dhi, dTicks[dTicks.length - 1]);
+        dhi = Math.max(dhi, dTicks[dTicks.length - 1]);
         const y = v => pad.top + (1 - (v - dlo) / (dhi - dlo)) * innerH;
 
         // Secondary Y for stockout hours (0–24)
