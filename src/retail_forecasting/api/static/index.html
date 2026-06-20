@@ -2123,7 +2123,7 @@
               <pre className="code-block" dangerouslySetInnerHTML={{ __html: item.code }} />
 
               {/* Defense tips */}
-              <div className="modal-section-title">Defensa ante tribunal</div>
+              <div className="modal-section-title">Análisis crítico</div>
               <ul style={{ margin: "4px 0 0 0", padding: 0, listStyle: "none" }}>
                 {item.defense.map((d, i) => (
                   <li key={i} style={{
@@ -2411,10 +2411,10 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
     // Latent-demand imputation strategies — academic explainer grid (mirrors
     // AcademicGrid styling). Card shows the strategy's live reconstruction MAE.
     // ═══════════════════════════════════════════════════════════════════════
-    function LatentMethodCard({ item, q, isBest, onOpen }) {
+    function LatentMethodCard({ item, q, isBest, onOpen, style }) {
       const { icon, color, kicker, title, formula, short } = item;
       return (
-        <div className="glass academic" onClick={onOpen}>
+        <div className="glass academic" onClick={onOpen} style={style}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8,
@@ -2470,9 +2470,10 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
       }, [onClose]);
 
       const cssVars = {
-        "--modal-glow": item.color.startsWith("var(--c-conf") ? "rgba(16,185,129,0.22)"
+        "--modal-glow": item.glow
+                       || (item.color.startsWith("var(--c-conf") ? "rgba(16,185,129,0.22)"
                        : item.color === "#60a5fa" ? "rgba(96,165,250,0.22)"
-                       : "rgba(167,139,250,0.22)",
+                       : "rgba(167,139,250,0.22)"),
         "--modal-accent": item.color,
       };
 
@@ -2499,7 +2500,7 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
                 <Icon name={item.icon} size={20} stroke={item.color} strokeWidth={2} />
               </div>
               <div style={{ flex: 1 }}>
-                <div className="label-mono" style={{ color: item.color, marginBottom: 2 }}>{item.kicker} · IMPUTACIÓN DE DEMANDA LATENTE</div>
+                <div className="label-mono" style={{ color: item.color, marginBottom: 2 }}>{item.kicker} · {item.kickerScope || "IMPUTACIÓN DE DEMANDA LATENTE"}</div>
                 <div className="h-display" style={{ fontSize: 20, color: "var(--text-1)" }}>{item.title}</div>
               </div>
               <button className="modal-close" onClick={onClose} aria-label="Cerrar">
@@ -2530,10 +2531,10 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
               <div className="modal-section-title">Derivación &amp; supuestos</div>
               <div className="modal-text">{item.derivation}</div>
 
-              <div className="modal-section-title">Implementación · censorship.py</div>
+              <div className="modal-section-title">Implementación · {item.codeFile || "censorship.py"}</div>
               <pre className="code-block" dangerouslySetInnerHTML={{ __html: item.code }} />
 
-              <div className="modal-section-title">Defensa ante tribunal</div>
+              <div className="modal-section-title">Análisis crítico</div>
               <ul style={{ margin: "4px 0 0 0", padding: 0, listStyle: "none" }}>
                 {item.defense.map((d, i) => (
                   <li key={i} style={{
@@ -2711,6 +2712,71 @@ df.loc[is_clean, <span class="s">"latent_demand_est"</span>] = df.loc[is_clean, 
     }
 
     window.LatentMethodGrid = LatentMethodGrid;
+
+    // Methodology explainer for the verdict — how reconstruction quality is scored
+    // (faithful to _evaluate_imputation_quality in pipeline.py).
+    const VERDICT_METHOD = {
+      id: "methodology",
+      icon: "function",
+      color: "#22d3ee",
+      glow: "rgba(34,211,238,0.22)",
+      kicker: "Metodología",
+      kickerScope: "EVALUACIÓN DEL VEREDICTO",
+      tag: "censura sintética",
+      title: "¿Cómo se calcula?",
+      formula: "e = \\hat{D}_t - D_t^{\\text{real}}",
+      short: (<>La demanda perdida en una rotura real es un <b>contrafactual no observable</b>. La medimos sobre <b>días limpios censurados artificialmente</b>, donde la demanda real sí se conoce.</>),
+      bigFormula: "\\begin{aligned} &\\text{1. Días limpios } \\mathcal{L}:\\ \\text{horas\\_rotura}=0 \\;\\Rightarrow\\; d_t = D_t^{\\text{real}} \\\\ &\\text{2. Muestrea } n = 0.30\\,|\\mathcal{L}| \\text{ días; } \\; r \\sim \\text{ratios de rotura reales} \\\\ &\\text{3. Censura: } d_t \\leftarrow D_t^{\\text{real}}(1-r), \\quad \\text{horas} \\leftarrow r \\cdot H \\\\ &\\text{4. Reconstruye } \\hat{D}_t; \\quad e = \\hat{D}_t - D_t^{\\text{real}} \\\\[2pt] &\\text{MAE}=\\overline{|e|}, \\;\\; \\text{RMSE}=\\sqrt{\\overline{e^2}}, \\;\\; \\text{sesgo}=\\bar{e} \\end{aligned}",
+      intuition: (<>
+        No podemos medir el error en roturas reales: no conocemos la demanda verdadera de ese día. El truco es coger
+        días <b>sin</b> rotura (donde venta = demanda real), <b>«romperlos» artificialmente</b> reduciendo la venta según
+        un ratio de rotura tomado de la distribución real, dejar que cada estrategia los reconstruya, y comparar contra
+        la demanda real que <i>sí</i> conocíamos. Así el error es <b>honesto y comparable</b> entre estrategias.
+      </>),
+      derivation: (<>
+        Se muestrea el <b>30%</b> de los días limpios sin reemplazo (<code>n_eval</code>, global del run). El ratio
+        <code> r</code> se muestrea <i>con</i> reemplazo de la distribución empírica de roturas reales
+        (<code>horas_rotura / ventana</code>, recortado a <code>[0,1]</code>), así la severidad sintética imita la real.
+        Semilla fija → reproducible. Métricas: <code>MAE/RMSE</code> (menor = mejor), <code>sesgo</code> (≈0 insesgado;
+        &lt;0 infra-imputa; &gt;0 sobre-imputa) y <code>MAPE</code> sobre días con demanda &gt; 0.
+      </>),
+      codeFile: "pipeline.py · _evaluate_imputation_quality",
+      code:
+`clean   = panel[panel.stockout_hours == <span class="n">0</span>]      <span class="c"># venta = demanda real</span>
+n_eval  = <span class="f">int</span>(<span class="f">len</span>(clean) * <span class="n">0.30</span>)               <span class="c"># 30% holdout</span>
+eval_idx = rng.<span class="f">choice</span>(clean.index, n_eval, replace=<span class="k">False</span>)
+r        = rng.<span class="f">choice</span>(real_stockout_ratios, n_eval)  <span class="c"># severidad real</span>
+
+<span class="c"># censura sintética sobre los días limpios elegidos</span>
+censored.loc[eval_idx, <span class="s">"observed_demand"</span>] = true * (<span class="n">1</span> - r)
+
+pred = <span class="f">LatentDemandImputer</span>(strategy).<span class="f">impute</span>(censored).loc[eval_idx]
+err  = pred - true                            <span class="c"># error honesto vs demanda real</span>
+mae, rmse, bias = np.<span class="f">abs</span>(err).<span class="f">mean</span>(), np.<span class="f">sqrt</span>((err**<span class="n">2</span>).<span class="f">mean</span>()), err.<span class="f">mean</span>()`,
+      defense: [
+        "El reto: la demanda perdida en una rotura real es un contrafactual — nunca se observa. No hay «verdad» contra la que medir directamente.",
+        "Solución: censura sintética sobre días limpios, donde sí conocemos la demanda real; así el error es medible y honesto.",
+        "La severidad sintética se muestrea de la distribución real de roturas (no uniforme) → el test imita las condiciones reales.",
+        "Es global del run y con semilla fija: comparación reproducible y justa entre las tres estrategias.",
+      ],
+      refs: [
+        "Nahmias (1994) — Demand estimation in lost-sales inventory systems.",
+        "Hold-out con censura sintética: práctica estándar para validar imputación de demanda censurada.",
+      ],
+    };
+
+    function VerdictMethodCard({ nEval }) {
+      const [open, setOpen] = useState(false);
+      const item = { ...VERDICT_METHOD, tag: nEval ? `n = ${nEval.toLocaleString()} días eval.` : VERDICT_METHOD.tag };
+      return (
+        <>
+          <LatentMethodCard item={item} onOpen={() => setOpen(true)} style={{ height: "100%" }} />
+          {open && <LatentMethodModal item={item} onClose={() => setOpen(false)} />}
+        </>
+      );
+    }
+
+    window.VerdictMethodCard = VerdictMethodCard;
   </script>
 
   <!-- =================== EXTENDED VIEWS, ALERT DETAIL, DYNAMIC ALERTS =================== -->
@@ -4542,7 +4608,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       );
 
       return (
-        <div className="glass" style={{ padding: "16px 20px", marginBottom: 18 }}>
+        <div className="glass" style={{ padding: "16px 20px", height: "100%", boxSizing: "border-box" }}>
           {/* header: scope label + winner headline (left) · run-level KPIs (right) */}
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 14 }}>
             <div>
@@ -5501,9 +5567,16 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               {/* ── Sub-tab: Demanda Latente ── */}
               {subTab === "latent" && (
                 <>
-                  {/* Run-level verdict — stable across SKU changes (snapshot keyed on the run) */}
+                  {/* Run-level verdict + how-it's-computed card, side by side */}
                   {runVerdict?.quality?.length > 0 && (
-                    <LatentVerdictBanner impData={runVerdict} />
+                    <div style={{ display: "flex", gap: 16, alignItems: "stretch", flexWrap: "wrap", marginBottom: 18 }}>
+                      <div style={{ flex: "1 1 620px", minWidth: 0 }}>
+                        <LatentVerdictBanner impData={runVerdict} />
+                      </div>
+                      <div style={{ flex: "0 1 320px", minWidth: 260 }}>
+                        <VerdictMethodCard nEval={runVerdict.quality[0]?.n_eval} />
+                      </div>
+                    </div>
                   )}
 
                   {/* SKU-level: chart + values, with the SKU selector grouped in its header */}
