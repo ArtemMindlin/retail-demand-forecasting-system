@@ -1023,6 +1023,71 @@ def list_runs() -> list[str]:
     return runs
 
 
+@app.get("/api/imputation-runs")
+def list_imputation_runs() -> list[str]:
+    """Return names of imputation-comparison run dirs (those with latent_strategies.csv)."""
+    if not _REPORTS_DIR.exists():
+        return []
+    return [
+        d.name
+        for d in sorted(_REPORTS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)
+        if d.is_dir() and (d / "latent_strategies.csv").exists()
+    ]
+
+
+def _resolve_imputation_run_path(run_name: str) -> Path:
+    """Validate run_name and return its path, requiring latent_strategies.csv."""
+    safe_name = Path(run_name).name
+    if not safe_name or safe_name != run_name or run_name.startswith("."):
+        raise HTTPException(status_code=404, detail="Run not found.")
+    run_path = _REPORTS_DIR / run_name
+    if not run_path.is_dir() or not (run_path / "latent_strategies.csv").exists():
+        raise HTTPException(status_code=404, detail="Imputation comparison run not found.")
+    return run_path
+
+
+@app.get("/api/imputation-runs/{run_name}/strategies")
+def get_imputation_strategies(run_name: str, series_id: str | None = None) -> dict[str, Any]:
+    """Return the per-strategy latent demand reconstruction for one series.
+
+    Response: dates, observed (censored sale), stockout_hours, and a `strategies` map of
+    {strategy_name: [latent values aligned to dates]}, plus the list of available series.
+    """
+    run_path = _resolve_imputation_run_path(run_name)
+    df = pd.read_csv(run_path / "latent_strategies.csv")
+    if df.empty:
+        return {"dates": [], "observed": [], "stockout_hours": [], "strategies": {}, "series": []}
+
+    series = sorted(df["series_id"].astype(str).unique().tolist())
+    chosen = series_id if series_id in series else series[0]
+    sub = df[df["series_id"].astype(str) == chosen].sort_values("date")
+
+    dates = sorted(sub["date"].unique().tolist())
+    # observed + stockout are strategy-invariant; take them from the first strategy slice.
+    base = sub.drop_duplicates(subset=["date"]).set_index("date")
+    strategies: dict[str, list[float | None]] = {}
+    for name in sorted(sub["strategy"].unique().tolist()):
+        s = sub[sub["strategy"] == name].set_index("date")["latent_demand_est"]
+        strategies[name] = [float(s[d]) if d in s.index and pd.notna(s[d]) else None for d in dates]
+
+    return {
+        "series": series,
+        "series_id": chosen,
+        "dates": dates,
+        "observed": [
+            float(base.loc[d, "observed"]) if pd.notna(base.loc[d, "observed"]) else None
+            for d in dates
+        ],
+        "stockout_hours": [
+            float(base.loc[d, "stockout_hours"])
+            if pd.notna(base.loc[d, "stockout_hours"])
+            else None
+            for d in dates
+        ],
+        "strategies": strategies,
+    }
+
+
 @app.get("/api/runs/{run_name}/filters")
 def get_run_filters(run_name: str) -> dict[str, Any]:
     """Return available filter options for a given historical run."""

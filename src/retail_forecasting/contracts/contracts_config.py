@@ -50,6 +50,10 @@ class PreprocessingConfig(BaseModel):
     imputation_strategy: Literal["supervised", "historical_mean", "clipped_scaling", "none"] = (
         "supervised"
     )
+    # When True, the experiment run_mode skips forecasting and runs only the latent-demand
+    # imputation strategies side by side, writing a lightweight comparison artifact for the
+    # dashboard (no models, no folds).
+    compare_imputation: bool = False
 
 
 class FeatureConfig(BaseModel):

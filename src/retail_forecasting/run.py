@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from retail_forecasting.config import load_config
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
+    run_imputation_comparison,
     run_retrain,
     run_scoring,
 )
@@ -83,6 +84,10 @@ def main() -> None:
         settings = settings.model_copy(update={"project": new_project})
 
     mode = settings.project.run_mode
+    if mode == "experiment" and settings.preprocessing.compare_imputation:
+        run_dir = run_imputation_comparison(settings)
+        print(f"Imputation comparison written to: {run_dir / 'latent_strategies.csv'}")
+        return
     if mode == "retrain":
         run_retrain(settings)
         return

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 
@@ -49,7 +50,11 @@ from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.optimization import HyperparameterTuner
-from retail_forecasting.utils.io import quantile_column_name, quantile_level_from_column
+from retail_forecasting.utils.io import (
+    make_run_directory,
+    quantile_column_name,
+    quantile_level_from_column,
+)
 
 # Conventional fold id used for holdout predictions (distinct from real walk-forward folds).
 HOLDOUT_FOLD_ID = 999
@@ -116,6 +121,76 @@ def _train_conformal_model(
             group_ids=group_ids,
         )
     return model
+
+
+IMPUTATION_COMPARISON_STRATEGIES: tuple[
+    Literal["supervised", "historical_mean", "clipped_scaling"], ...
+] = ("supervised", "historical_mean", "clipped_scaling")
+
+
+def run_imputation_comparison(settings: Settings) -> Path:
+    """Run only the latent-demand imputation strategies side by side (no forecasting).
+
+    This is a lightweight pre-model pass: it loads the daily panel and applies each
+    imputation strategy to reconstruct latent demand, then writes a long-format
+    ``latent_strategies.csv`` plus an ``imputation_metadata.json`` marker. The dashboard
+    uses this to compare strategies in the Demanda Latente tab. No models are trained
+    and no walk-forward folds are run.
+
+    Returns:
+        The created run directory path.
+    """
+    print("\n" + "=" * 50)
+    print("🧪 LATENT-DEMAND IMPUTATION COMPARISON (no forecasting)")
+    print("=" * 50 + "\n")
+    print("📂 Loading train panel...")
+    panel = load_prepared_panel(
+        dataset_config=settings.dataset,
+        preprocessing_config=settings.preprocessing,
+        split="train",
+    )
+    n_series = panel["series_id"].nunique() if "series_id" in panel.columns else 0
+    print(f"✅ Train panel loaded: {len(panel):,} rows, {n_series} series")
+
+    frames: list[pd.DataFrame] = []
+    for strategy in IMPUTATION_COMPARISON_STRATEGIES:
+        print(f"  🧮 Imputing latent demand with strategy: {strategy}...")
+        imputed = LatentDemandImputer(strategy=strategy).impute(panel)
+        frame = pd.DataFrame(
+            {
+                "series_id": imputed["series_id"].astype(str),
+                "date": pd.to_datetime(imputed["date"]).dt.strftime("%Y-%m-%d"),
+                "strategy": strategy,
+                "observed": imputed["original_observed_demand"].astype(float),
+                "latent_demand_est": imputed["latent_demand_est"].astype(float),
+                "stockout_hours": imputed["stockout_hours"].astype(float),
+                "is_imputed": imputed["is_imputed"].astype(bool),
+            }
+        )
+        frames.append(frame)
+
+    long_df = pd.concat(frames, ignore_index=True).sort_values(["series_id", "date", "strategy"])
+
+    run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    long_df.to_csv(run_dir / "latent_strategies.csv", index=False)
+
+    metadata = {
+        "kind": "impute_compare",
+        "run_name": settings.reporting.run_name,
+        "created_at": utc_timestamp(),
+        "git_commit": get_git_commit(),
+        "config_hash": build_config_hash(settings),
+        "strategies": list(IMPUTATION_COMPARISON_STRATEGIES),
+        "series": int(n_series),
+        "rows": int(len(panel)),
+    }
+    (run_dir / "imputation_metadata.json").write_text(
+        json.dumps(metadata, indent=2), encoding="utf-8"
+    )
+
+    print(f"\n✅ Imputation comparison written to: {run_dir}\n")
+    return run_dir
 
 
 def run_experiment(settings: Settings) -> RunArtifacts:

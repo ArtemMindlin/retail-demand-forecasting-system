@@ -4027,12 +4027,15 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       );
     }
 
-    function ExpLatentChart({ latentData }) {
+
+    // Compares censored sales vs latent-demand reconstruction across imputation strategies.
+    function ExpLatentCompareChart({ impData }) {
       const wrapRef = useRef(null);
       const svgRef = useRef(null);
       const [W, setW] = useState(800);
       const [hoverIdx, setHoverIdx] = useState(null);
-      const H = 300;
+      const [hoverStrat, setHoverStrat] = useState(null);
+      const H = 380;
       const pad = { top: 18, right: 60, bottom: 34, left: 52 };
 
       useEffect(() => {
@@ -4044,38 +4047,42 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         return () => ro.disconnect();
       }, []);
 
+      const STRAT_META = {
+        supervised:      { color: "var(--c-conf)", label: "Supervised (LGBM)" },
+        historical_mean: { color: "#60a5fa",       label: "Historical mean" },
+        clipped_scaling: { color: "#a78bfa",       label: "Clipped scaling" },
+      };
+
+      const dates = impData?.dates || [];
+      const observed = impData?.observed || [];
+      const stockout = impData?.stockout_hours || [];
+      const strategies = impData?.strategies || {};
+      const stratNames = Object.keys(strategies);
+
       const geom = useMemo(() => {
-        if (!latentData || !latentData.dates || latentData.dates.length === 0) return null;
-        const n = latentData.dates.length;
+        if (!dates.length) return null;
+        const n = dates.length;
         const innerW = W - pad.left - pad.right;
         const innerH = H - pad.top - pad.bottom;
-        const xs = latentData.dates.map((_, i) => pad.left + (i / Math.max(n - 1, 1)) * innerW);
+        const xs = dates.map((_, i) => pad.left + (i / Math.max(n - 1, 1)) * innerW);
 
-        const demandVals = [...(latentData.observed || []), ...(latentData.latent || [])].filter(v => v != null);
-        let dhi = Math.max(...demandVals, 1);
-        const dSpan = dhi || 1;
-        dhi += dSpan * 0.12;
-        // Demand can't be negative: floor the axis at 0.
-        let dlo = 0;
+        const allVals = [...observed, ...stratNames.flatMap(k => strategies[k])].filter(v => v != null);
+        let dhi = Math.max(...allVals, 1);
+        dhi += (dhi || 1) * 0.12;
+        const dlo = 0;  // demand can't be negative
         const dTicks = niceTicks(dlo, dhi, 5);
         dhi = Math.max(dhi, dTicks[dTicks.length - 1]);
         const y = v => pad.top + (1 - (v - dlo) / (dhi - dlo)) * innerH;
-
-        // Secondary Y for stockout hours (0–24)
-        const yStockout = v => pad.top + (1 - v / 24) * innerH;
+        const yStockout = v => pad.top + (1 - Math.min(v, 24) / 24) * innerH;
 
         const step = Math.max(1, Math.floor(n / 8));
-        const xTickIdx = latentData.dates.map((_, i) => i).filter(i => i % step === 0 || i === n - 1);
-
-        const obsPts = (latentData.observed || []).map((v, i) => v != null ? [xs[i], y(v)] : null).filter(Boolean);
-        const latPts = (latentData.latent || []).map((v, i) => v != null ? [xs[i], y(v)] : null).filter(Boolean);
-
-        return { innerW, innerH, xs, y, yStockout, dTicks, xTickIdx, n, obsPts, latPts };
-      }, [latentData, W]);
+        const xTickIdx = dates.map((_, i) => i).filter(i => i % step === 0 || i === n - 1);
+        return { innerW, innerH, xs, y, yStockout, dTicks, xTickIdx, n };
+      }, [impData, W]);
 
       if (!geom) return (
         <div style={{ height: H, display: "grid", placeItems: "center", color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
-          Sin datos de demanda latente
+          Sin datos de comparación de imputación
         </div>
       );
 
@@ -4089,119 +4096,101 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         setHoverIdx(best);
       };
 
-      const hv = hoverIdx != null ? {
-        x: geom.xs[hoverIdx],
-        date: latentData.dates[hoverIdx],
-        observed: (latentData.observed || [])[hoverIdx],
-        latent: (latentData.latent || [])[hoverIdx],
-        stockout: (latentData.stockout_hours || [])[hoverIdx],
-      } : null;
+      const linePath = vals => smoothPath(vals.map((v, i) => v != null ? [geom.xs[i], geom.y(v)] : null).filter(Boolean));
+      const crossX = hoverIdx != null ? geom.xs[hoverIdx] : null;
 
       return (
-        <div ref={wrapRef} style={{ height: H, position: "relative" }}>
+        <div ref={wrapRef} style={{ position: "relative" }}>
+          {/* Legend */}
+          <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 5,
+              fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: "rgba(245,158,11,0.4)" }} /> Horas de rotura (eje der.)
+            </div>
+            <Legend2 color="#ef4444" label="Venta real (censurada)" />
+            {stratNames.map(k => (
+              <Legend2 key={k} color={(STRAT_META[k] || {}).color || "var(--text-2)"} label={(STRAT_META[k] || {}).label || k} />
+            ))}
+          </div>
+
           <svg ref={svgRef} width={W} height={H} style={{ display: "block", overflow: "hidden" }}
-            onMouseMove={handleMove} onMouseLeave={() => setHoverIdx(null)}>
+            onMouseMove={handleMove} onMouseLeave={() => { setHoverIdx(null); setHoverStrat(null); }}>
             {/* Y grid */}
             {geom.dTicks.map((t, i) => (
               <g key={i}>
                 <line x1={pad.left} x2={W - pad.right} y1={geom.y(t)} y2={geom.y(t)}
                   stroke="rgba(148,163,184,0.06)" strokeWidth={1} />
                 <text x={pad.left - 6} y={geom.y(t) + 3.5} textAnchor="end"
-                  fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10.5}>
-                  {Math.round(t)}
-                </text>
+                  fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10.5}>{Math.round(t)}</text>
               </g>
             ))}
-
-            {/* Secondary Y axis ticks (stockout hours) */}
+            {/* Secondary axis (stockout hours) */}
             {[0, 6, 12, 18, 24].map((t, i) => (
-              <g key={`sh${i}`}>
-                <text x={W - pad.right + 6} y={geom.yStockout(t) + 3.5} textAnchor="start"
-                  fill="var(--c-drift)" fontFamily="var(--font-mono)" fontSize={10} opacity={0.7}>
-                  {t}h
-                </text>
-              </g>
+              <text key={`sh${i}`} x={W - pad.right + 6} y={geom.yStockout(t) + 3.5} textAnchor="start"
+                fill="var(--c-drift)" fontFamily="var(--font-mono)" fontSize={10} opacity={0.7}>{t}h</text>
             ))}
-
             {/* X labels */}
             {geom.xTickIdx.map((i, ki) => (
               <text key={ki} x={geom.xs[i]} y={H - pad.bottom + 16} textAnchor="middle"
-                fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10}>
-                {(latentData.dates[i] || "").slice(5)}
-              </text>
+                fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10}>{(dates[i] || "").slice(5)}</text>
             ))}
-
-            {/* Stockout hours bars (amber, secondary axis) */}
-            {(latentData.stockout_hours || []).map((v, i) => {
+            {/* Stockout bars */}
+            {stockout.map((v, i) => {
               if (v == null || v <= 0) return null;
-              const vc = Math.min(v, 24);
-              const topY = geom.yStockout(vc);
-              const baseY = geom.yStockout(0);
-              const barW = Math.min(28, Math.max(2, geom.innerW / geom.n * 0.7));
+              const topY = geom.yStockout(v), baseY = geom.yStockout(0);
+              const barW = Math.min(20, Math.max(2, geom.innerW / geom.n * 0.6));
+              return <rect key={i} x={geom.xs[i] - barW / 2} y={topY} width={barW} height={Math.max(0, baseY - topY)} rx={1.5}
+                fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.4)" strokeWidth={0.5} />;
+            })}
+            {/* Strategy lines */}
+            {stratNames.map(k => {
+              const dim = hoverStrat && hoverStrat !== k;
               return (
-                <rect key={i} x={geom.xs[i] - barW / 2} y={topY}
-                  width={barW} height={Math.max(0, baseY - topY)} rx={1.5}
-                  fill="rgba(245,158,11,0.22)" stroke="rgba(245,158,11,0.5)" strokeWidth={0.5} />
+                <g key={k} style={{ cursor: "pointer" }}
+                  onMouseEnter={() => setHoverStrat(k)} onMouseLeave={() => setHoverStrat(null)}>
+                  <path d={linePath(strategies[k])} fill="none" stroke={(STRAT_META[k] || {}).color || "#888"}
+                    strokeWidth={hoverStrat === k ? 2.5 : 2} strokeLinecap="round" opacity={dim ? 0.25 : 1} />
+                </g>
               );
             })}
-
-            {/* Observed line (red) */}
-            <path d={smoothPath(geom.obsPts)} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinecap="round" />
-
-            {/* Latent line (green) */}
-            <path d={smoothPath(geom.latPts)} fill="none" stroke="var(--c-conf)" strokeWidth={2} strokeLinecap="round" />
-
-            {/* Data point markers */}
-            {(latentData.observed || []).map((v, i) => v != null
-              ? <circle key={`o${i}`} cx={geom.xs[i]} cy={geom.y(v)} r={hoverIdx === i ? 4 : 2.5}
-                  fill="#ef4444" stroke="var(--bg-2)" strokeWidth={1} /> : null)}
-            {(latentData.latent || []).map((v, i) => v != null
-              ? <circle key={`l${i}`} cx={geom.xs[i]} cy={geom.y(v)} r={hoverIdx === i ? 4 : 2.5}
-                  fill="var(--c-conf)" stroke="var(--bg-2)" strokeWidth={1} /> : null)}
+            {/* Observed line (censored) — dashed red so it reads as the floor */}
+            <path d={linePath(observed)} fill="none" stroke="#ef4444" strokeWidth={2}
+              strokeDasharray="5 4" strokeLinecap="round" opacity={hoverStrat ? 0.4 : 1} />
 
             {/* Crosshair */}
-            {hv && (
-              <line x1={hv.x} x2={hv.x} y1={pad.top} y2={pad.top + geom.innerH}
+            {crossX != null && (
+              <line x1={crossX} x2={crossX} y1={pad.top} y2={pad.top + geom.innerH}
                 stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="3 3" pointerEvents="none" />
             )}
           </svg>
 
-          {/* Hover tooltip */}
-          {hv && (
+          {/* Tooltip */}
+          {hoverIdx != null && (
             <div style={{
               position: "absolute",
-              left: hv.x > W / 2 ? hv.x - 14 - 178 : hv.x + 14,
+              left: crossX > W / 2 ? crossX - 14 - 190 : crossX + 14,
               top: pad.top,
-              background: "rgba(10,15,28,0.95)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              padding: "8px 11px",
-              pointerEvents: "none",
-              zIndex: 50,
-              fontFamily: "var(--font-mono)",
-              fontSize: 10.5,
-              minWidth: 164,
+              background: "rgba(10,15,28,0.95)", border: "1px solid var(--border)", borderRadius: 6,
+              padding: "8px 11px", pointerEvents: "none", zIndex: 50,
+              fontFamily: "var(--font-mono)", fontSize: 10.5, minWidth: 176,
             }}>
-              <div style={{ color: "var(--text-3)", fontSize: 9, marginBottom: 6 }}>{hv.date}</div>
-              {hv.latent != null && (
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "var(--c-conf)", marginBottom: 2 }}>
-                  <span>Demanda latente</span><span className="tnum" style={{ fontWeight: 600 }}>{hv.latent.toFixed(1)}</span>
-                </div>
-              )}
-              {hv.observed != null && (
+              <div style={{ color: "var(--text-3)", fontSize: 9, marginBottom: 6 }}>{dates[hoverIdx]}</div>
+              {observed[hoverIdx] != null && (
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "#ef4444", marginBottom: 2 }}>
-                  <span>Venta real</span><span className="tnum" style={{ fontWeight: 600 }}>{hv.observed.toFixed(1)}</span>
+                  <span>Venta real</span><span className="tnum" style={{ fontWeight: 600 }}>{observed[hoverIdx].toFixed(1)}</span>
                 </div>
               )}
-              {hv.observed != null && hv.latent != null && (
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "var(--text-3)", marginBottom: 2 }}>
-                  <span>Censura</span><span className="tnum">{(hv.latent - hv.observed).toFixed(1)}</span>
+              {stratNames.map(k => strategies[k][hoverIdx] != null && (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12,
+                  color: (STRAT_META[k] || {}).color || "var(--text-2)", marginBottom: 2 }}>
+                  <span style={{ fontSize: 9.5 }}>{(STRAT_META[k] || {}).label || k}</span>
+                  <span className="tnum" style={{ fontWeight: 600 }}>{strategies[k][hoverIdx].toFixed(1)}</span>
                 </div>
-              )}
-              {hv.stockout != null && hv.stockout > 0 && (
+              ))}
+              {stockout[hoverIdx] != null && stockout[hoverIdx] > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, color: "#f59e0b",
                   borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 4, marginTop: 2 }}>
-                  <span>Horas rotura</span><span className="tnum" style={{ fontWeight: 600 }}>{hv.stockout}h</span>
+                  <span>Horas rotura</span><span className="tnum" style={{ fontWeight: 600 }}>{stockout[hoverIdx]}h</span>
                 </div>
               )}
             </div>
@@ -4638,6 +4627,10 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const [selectedModel, setSelectedModel] = useState("");
       const [subTab, setSubTab] = useState("forecast");
 
+      // Latent-demand imputation comparison (its own run + series, segregated from forecasting runs)
+      const [impRun, setImpRun] = useState("");
+      const [impSeries, setImpSeries] = useState("");
+
       // What-if panel state
       const [wiOpen, setWiOpen] = useState(false);
       const [cOver, setCOver] = useState(1.0);
@@ -4668,15 +4661,17 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
       const { data: chartData, loading: chartLoading } = useApi(chartUrl, [chartUrl]);
 
-      const latentUrl = useMemo(() => {
-        if (!selectedRun || !filters?.has_latent) return null;
-        const p = new URLSearchParams();
-        if (selectedSeries) p.set("series_id", selectedSeries);
-        if (selectedModel) p.set("model", selectedModel);
-        return `/api/runs/${encodeURIComponent(selectedRun)}/latent?${p}`;
-      }, [selectedRun, filters, selectedSeries, selectedModel]);
+      // Imputation-comparison runs (only those appear in the Demanda Latente tab)
+      const { data: impRuns, loading: impRunsLoading } = useApi("/api/imputation-runs", []);
 
-      const { data: latentData, loading: latentLoading } = useApi(latentUrl, [latentUrl]);
+      const impUrl = useMemo(() => {
+        if (!impRun || subTab !== "latent") return null;
+        const p = new URLSearchParams();
+        if (impSeries) p.set("series_id", impSeries);
+        return `/api/imputation-runs/${encodeURIComponent(impRun)}/strategies?${p}`;
+      }, [impRun, impSeries, subTab]);
+
+      const { data: impData, loading: impLoading } = useApi(impUrl, [impUrl]);
 
       const { data: paretoData, loading: paretoLoading } = useApi(
         selectedRun && subTab === "pareto" ? `/api/runs/${encodeURIComponent(selectedRun)}/pareto` : null,
@@ -4694,6 +4689,14 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         if (filters.series_ids?.length) setSelectedSeries(filters.series_ids[0]);
         if (filters.models?.length) setSelectedModel(filters.models[0]);
       }, [filters]);
+
+      // Auto-select first imputation run; sync the series to whatever the run returns
+      useEffect(() => {
+        if (!impRun && impRuns?.length) setImpRun(impRuns[0]);
+      }, [impRuns]);
+      useEffect(() => {
+        if (impData?.series_id && impData.series_id !== impSeries) setImpSeries(impData.series_id);
+      }, [impData]);
 
       // Compute KPIs from summary
       const kpis = useMemo(() => {
@@ -4761,7 +4764,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       };
 
       // ── render ──
-      if (!selectedRun && !runsLoading && (!runs || runs.length === 0)) return (
+      if (!selectedRun && !runsLoading && (!runs || runs.length === 0)
+          && (!impRuns || impRuns.length === 0)) return (
         <div style={{ padding: 48, textAlign: "center", color: "var(--text-3)" }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>📂</div>
           <div style={{ fontFamily: "var(--font-mono)", fontSize: 14 }}>
@@ -4775,17 +4779,39 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           {/* ── Filter bar ── */}
           <div className="glass" style={{ padding: "14px 18px", marginBottom: 18 }}>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
-              {/* Run selector */}
-              <div>
-                <div style={labelStyle}>Ejecución (Run)</div>
-                <select style={selectStyle} value={selectedRun}
-                  onChange={e => { setSelectedRun(e.target.value); setWiResult(null); }}>
-                  <option value="">— seleccionar —</option>
-                  {(runs || []).map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
+              {/* Run selector — latent tab lists imputation-comparison runs; others list forecasting runs */}
+              {subTab === "latent" ? (
+                <div>
+                  <div style={labelStyle}>Ejecución (Comparación imputación)</div>
+                  <select style={selectStyle} value={impRun}
+                    onChange={e => { setImpRun(e.target.value); setImpSeries(""); }}>
+                    <option value="">— seleccionar —</option>
+                    {(impRuns || []).map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <div style={labelStyle}>Ejecución (Run)</div>
+                  <select style={selectStyle} value={selectedRun}
+                    onChange={e => { setSelectedRun(e.target.value); setWiResult(null); }}>
+                    <option value="">— seleccionar —</option>
+                    {(runs || []).map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              )}
 
-              {filters && (
+              {/* Latent tab: series selector sourced from the imputation run */}
+              {subTab === "latent" && impData?.series?.length > 0 && (
+                <div>
+                  <div style={labelStyle}>Serie / SKU</div>
+                  <select style={selectStyle} value={impSeries}
+                    onChange={e => setImpSeries(e.target.value)}>
+                    {impData.series.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {filters && subTab !== "latent" && (
                 <>
                   {subTab === "forecast" && (
                     <div>
@@ -4797,7 +4823,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     </div>
                   )}
 
-                  {subTab !== "pareto" && (
+                  {subTab === "forecast" && (
                     <div>
                       <div style={labelStyle}>Serie / SKU</div>
                       <select style={selectStyle} value={selectedSeries}
@@ -4807,7 +4833,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     </div>
                   )}
 
-                  {subTab !== "pareto" && (
+                  {subTab === "forecast" && (
                     <div>
                       <div style={labelStyle}>Modelo</div>
                       <select style={selectStyle} value={selectedModel}
@@ -4882,34 +4908,36 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             )}
           </div>
 
-          {!selectedRun ? (
+          {/* ── Sub-tab bar (always visible so tabs can switch independently of run) ── */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            {[
+              { id: "forecast", label: "Pronósticos", icon: "activity" },
+              { id: "latent",   label: "Demanda Latente", icon: "eye" },
+              { id: "pareto",   label: "Pareto Tuning", icon: "target" },
+            ].map(t => (
+              <button key={t.id}
+                className={`filter-tab ${subTab === t.id ? "active" : ""}`}
+                onClick={() => setSubTab(t.id)}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12,
+                  padding: "8px 14px", borderRadius: 8,
+                  background: subTab === t.id ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.02)",
+                  color: subTab === t.id ? "#fff" : "var(--text-2)",
+                  borderColor: subTab === t.id ? "rgba(139,92,246,0.45)" : "var(--border)" }}>
+                <Icon name={t.icon} size={13} />
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {(subTab === "latent" ? !impRun : !selectedRun) ? (
             <div style={{ padding: 48, textAlign: "center", color: "var(--text-3)",
               fontFamily: "var(--font-mono)", fontSize: 13 }}>
-              Selecciona un experimento para explorar los resultados.
+              {subTab === "latent"
+                ? "Selecciona una ejecución de comparación de imputación (run_mode con compare_imputation)."
+                : "Selecciona un experimento para explorar los resultados."}
             </div>
           ) : (
             <>
-              {/* ── Sub-tab bar ── */}
-              <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-                {[
-                  { id: "forecast", label: "Pronósticos", icon: "activity" },
-                  { id: "latent",   label: "Demanda Latente", icon: "eye" },
-                  { id: "pareto",   label: "Pareto Tuning", icon: "target" },
-                ].map(t => (
-                  <button key={t.id}
-                    className={`filter-tab ${subTab === t.id ? "active" : ""}`}
-                    onClick={() => setSubTab(t.id)}
-                    style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12,
-                      padding: "8px 14px", borderRadius: 8,
-                      background: subTab === t.id ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.02)",
-                      color: subTab === t.id ? "#fff" : "var(--text-2)",
-                      borderColor: subTab === t.id ? "rgba(139,92,246,0.45)" : "var(--border)" }}>
-                    <Icon name={t.icon} size={13} />
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
               {/* ── Sub-tab: Pronósticos ── */}
               {subTab === "forecast" && (
                 <div>
@@ -5008,32 +5036,20 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               {subTab === "latent" && (
                 <div className="glass" style={{ padding: "18px 18px 14px" }}>
                   <div style={{ marginBottom: 12 }}>
-                    <div className="h-display" style={{ fontSize: 16 }}>Imputación de Demanda Latente</div>
+                    <div className="h-display" style={{ fontSize: 16 }}>Comparación de Imputación de Demanda Latente</div>
                     <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
-                      Horas de rotura de stock · venta registrada (censurada) · demanda latente imputada
+                      Venta registrada (censurada) vs reconstrucción de demanda latente por estrategia · horas de rotura
                     </div>
                   </div>
 
-                  {!filters?.has_latent ? (
+                  {impLoading ? (
+                    <div className="shimmer" style={{ height: 380, borderRadius: 8 }} />
+                  ) : !impData || !impData.dates?.length ? (
                     <div style={{ padding: 32, color: "var(--text-3)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
-                      Esta ejecución no contiene datos de imputación de demanda latente.
-                      Selecciona una ejecución que incluya estrategia Latent_.
+                      Sin datos de comparación de imputación para esta ejecución.
                     </div>
-                  ) : latentLoading ? (
-                    <div className="shimmer" style={{ height: 300, borderRadius: 8 }} />
                   ) : (
-                    <>
-                      <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 5,
-                          fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
-                          <span style={{ width: 10, height: 10, borderRadius: 2,
-                            background: "rgba(245,158,11,0.4)" }} /> Horas de rotura (eje der.)
-                        </div>
-                        <Legend2 color="#ef4444" label="Venta real (censurada)" />
-                        <Legend2 color="var(--c-conf)" label="Demanda latente imputada" />
-                      </div>
-                      <ExpLatentChart latentData={latentData || { dates: [], stockout_hours: [], observed: [], latent: [] }} />
-                    </>
+                    <ExpLatentCompareChart impData={impData} />
                   )}
                 </div>
               )}
