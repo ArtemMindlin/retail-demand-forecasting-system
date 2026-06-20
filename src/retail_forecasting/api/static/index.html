@@ -4868,6 +4868,17 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         if (impData?.series_id && impData.series_id !== impSeries) setImpSeries(impData.series_id);
       }, [impData]);
 
+      // Run-level verdict snapshot. Reconstruction quality is identical for every
+      // SKU of a run, so capture it once per run and keep the reference stable —
+      // this keeps the verdict banner from re-rendering/flashing on each SKU change.
+      const [runVerdict, setRunVerdict] = useState(null);
+      useEffect(() => { setRunVerdict(null); }, [impRun]);
+      useEffect(() => {
+        if (subTab === "latent" && !runVerdict && impData?.quality?.length) {
+          setRunVerdict({ quality: impData.quality, series: impData.series });
+        }
+      }, [impData, subTab, runVerdict]);
+
       // Compute KPIs from summary
       const kpis = useMemo(() => {
         if (!summary || !selectedModel) return null;
@@ -5185,9 +5196,9 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               {/* ── Sub-tab: Demanda Latente ── */}
               {subTab === "latent" && (
                 <>
-                  {/* Run-level verdict — sits up top, right under the Ejecución selector */}
-                  {!impLoading && impData?.dates?.length > 0 && (
-                    <LatentVerdictBanner impData={impData} />
+                  {/* Run-level verdict — stable across SKU changes (snapshot keyed on the run) */}
+                  {runVerdict?.quality?.length > 0 && (
+                    <LatentVerdictBanner impData={runVerdict} />
                   )}
 
                   {/* SKU-level: chart + values, with the SKU selector grouped in its header */}
