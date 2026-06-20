@@ -377,6 +377,15 @@
   }
   @keyframes blink { 50% { opacity: 0; } }
 
+  /* Hierarchical cascade nav — each revealed level slides in from the left */
+  .nav-cascade { animation: nav-cascade 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  @keyframes nav-cascade {
+    from { opacity: 0; transform: translateX(-10px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .nav-sep { animation: nav-sep 0.3s ease both; }
+  @keyframes nav-sep { from { opacity: 0; } to { opacity: 0.45; } }
+
   /* Soft glow halo on chart container */
   .chart-card {
     position: relative;
@@ -4829,12 +4838,11 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     }
 
     // ── ExperimentsView main component ────────────────────────────────────────
-    function ExperimentsView() {
+    function ExperimentsView({ subTab, setSubTab }) {
       const [selectedRun, setSelectedRun] = useState("");
       const [selectedStrategy, setSelectedStrategy] = useState("");
       const [selectedSeries, setSelectedSeries] = useState("");
       const [selectedModel, setSelectedModel] = useState("");
-      const [subTab, setSubTab] = useState("forecast");
 
       // Latent-demand imputation comparison (its own run + series, segregated from forecasting runs)
       const [impRun, setImpRun] = useState("");
@@ -5137,27 +5145,6 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 )}
               </div>
             )}
-          </div>
-
-          {/* ── Sub-tab bar (always visible so tabs can switch independently of run) ── */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-            {[
-              { id: "forecast", label: "Pronósticos", icon: "activity" },
-              { id: "latent",   label: "Demanda Latente", icon: "eye" },
-              { id: "pareto",   label: "Pareto Tuning", icon: "target" },
-            ].map(t => (
-              <button key={t.id}
-                className={`filter-tab ${subTab === t.id ? "active" : ""}`}
-                onClick={() => setSubTab(t.id)}
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12,
-                  padding: "8px 14px", borderRadius: 8,
-                  background: subTab === t.id ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.02)",
-                  color: subTab === t.id ? "#fff" : "var(--text-2)",
-                  borderColor: subTab === t.id ? "rgba(139,92,246,0.45)" : "var(--border)" }}>
-                <Icon name={t.icon} size={13} />
-                {t.label}
-              </button>
-            ))}
           </div>
 
           {(subTab === "latent" ? !impRun : !selectedRun) ? (
@@ -6216,11 +6203,18 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           { id: "experiments", label: "Experimentos", icon: "sparkles" },
         ]},
       ];
+      // Third nav level — only revealed when the Experimentos tab is active.
+      const EXP_SUBTABS = [
+        { id: "forecast", label: "Pronósticos", icon: "activity" },
+        { id: "latent",   label: "Demanda Latente", icon: "eye" },
+        { id: "pareto",   label: "Pareto Tuning", icon: "target" },
+      ];
       // Tabs that show the what-if Sidebar (the rest get the full-width canvas).
       const SIDEBAR_TABS = ["dashboard", "skus", "drift"];
 
       const [activeMode, setActiveMode] = useState("operacion");
       const [activeTab, setActiveTab] = useState("dashboard");
+      const [expSubTab, setExpSubTab] = useState("forecast");
       const [selectedSkuId, setSelectedSkuId] = useState(null);
       const [tabTransitioning, setTabTransitioning] = useState(false);
       const debounceRef = useRef(null);
@@ -6520,10 +6514,15 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               />
             ) : (
               <>
-                {/* Two-level navigation: mode toggle + sub-tabs */}
-                <div style={{ marginBottom: 18 }}>
-                  {/* Mode toggle */}
-                  <div style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", marginBottom: 14 }}>
+                {/* Hierarchical cascade nav: Modo › Sección › Vista (revealed left→right) */}
+                <div style={{
+                  marginBottom: 18, paddingBottom: 16,
+                  borderBottom: "1px solid var(--border)",
+                  display: "flex", alignItems: "center", gap: 10,
+                  flexWrap: "wrap", rowGap: 10,
+                }}>
+                  {/* Level 1 — modes (root) */}
+                  <div style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}>
                     {MODES.map(m => (
                       <button
                         key={m.id}
@@ -6545,11 +6544,11 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     ))}
                   </div>
 
-                  {/* Sub-tabs for the active mode */}
-                  <div style={{
-                    display: "flex", gap: 8, flexWrap: "wrap",
-                    borderBottom: "1px solid var(--border)", paddingBottom: 16,
-                  }}>
+                  {/* › separator before level 2 */}
+                  <Icon name="chevronRight" size={15} stroke="var(--text-3)" style={{ opacity: 0.45, flexShrink: 0 }} />
+
+                  {/* Level 2 — sections of the active mode (re-cascades when the mode changes) */}
+                  <div key={activeMode} className="nav-cascade" style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
                     {(MODES.find(m => m.id === activeMode)?.tabs || []).map(t => (
                       <button
                         key={t.id}
@@ -6557,7 +6556,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                         onClick={() => changeTab(t.id)}
                         style={{
                           display: "flex", alignItems: "center", gap: 8,
-                          fontSize: 12.5, padding: "10px 16px", borderRadius: "8px",
+                          fontSize: 12.5, padding: "9px 15px", borderRadius: "8px",
                           background: activeTab === t.id ? "rgba(139, 92, 246, 0.12)" : "rgba(255,255,255,0.02)",
                           color: activeTab === t.id ? "#fff" : "var(--text-2)",
                           borderColor: activeTab === t.id ? "rgba(139, 92, 246, 0.45)" : "var(--border)"
@@ -6568,6 +6567,32 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                       </button>
                     ))}
                   </div>
+
+                  {/* Level 3 — experiment views, only when Experimentos is active */}
+                  {activeTab === "experiments" && (
+                    <React.Fragment>
+                      <Icon name="chevronRight" size={14} stroke="var(--text-3)" className="nav-sep" style={{ flexShrink: 0 }} />
+                      <div key="exp-sub" className="nav-cascade" style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                        {EXP_SUBTABS.map(t => (
+                          <button
+                            key={t.id}
+                            className={`filter-tab ${expSubTab === t.id ? "active" : ""}`}
+                            onClick={() => setExpSubTab(t.id)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 6,
+                              fontSize: 12, padding: "8px 13px", borderRadius: "8px",
+                              background: expSubTab === t.id ? "rgba(139, 92, 246, 0.12)" : "rgba(255,255,255,0.02)",
+                              color: expSubTab === t.id ? "#fff" : "var(--text-2)",
+                              borderColor: expSubTab === t.id ? "rgba(139, 92, 246, 0.45)" : "var(--border)"
+                            }}
+                          >
+                            <Icon name={t.icon} size={13} />
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </React.Fragment>
+                  )}
                 </div>
 
                 {activeTab === "dashboard" && (
@@ -6621,7 +6646,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 )}
 
                 {activeTab === "experiments" && (
-                  <ExperimentsView />
+                  <ExperimentsView subTab={expSubTab} setSubTab={setExpSubTab} />
                 )}
 
                 {activeTab === "eda" && (
