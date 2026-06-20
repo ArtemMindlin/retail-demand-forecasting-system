@@ -893,8 +893,11 @@
   /* Transition effect for tabs / SKU changes */
   .canvas-content {
     opacity: 1;
-    filter: blur(0);
-    transform: translateY(0);
+    /* `none` (not blur(0)/translateY(0)) so this element does NOT become the
+       containing block for position:fixed children — otherwise modals anchor to
+       this tall panel instead of the viewport and render off-centre (Safari). */
+    filter: none;
+    transform: none;
     transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
                 filter 0.25s cubic-bezier(0.4, 0, 0.2, 1),
                 transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -4458,7 +4461,13 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         const yStockout = v => pad.top + (1 - Math.min(v, 24) / 24) * innerH;
 
         const step = Math.max(1, Math.floor(n / 8));
-        const xTickIdx = dates.map((_, i) => i).filter(i => i % step === 0 || i === n - 1);
+        const lastIdx = n - 1;
+        // Always show the last date, but drop any regular tick that would collide
+        // with it (e.g. 88 vs 89), then append the forced last label exactly once.
+        const xTickIdx = dates
+          .map((_, i) => i)
+          .filter(i => i % step === 0 && lastIdx - i >= step * 0.6);
+        xTickIdx.push(lastIdx);
         return { innerW, innerH, xs, y, yStockout, dTicks, xTickIdx, n };
       }, [impData, W]);
 
@@ -4487,7 +4496,9 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 5,
               fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-2)" }}>
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: "rgba(245,158,11,0.4)" }} /> Horas de rotura (eje der.)
+              <span style={{ width: 10, height: 10, borderRadius: 2,
+                background: "linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.4))",
+                borderTop: "1px solid rgba(245,158,11,0.6)" }} /> Horas de rotura (eje der.)
             </div>
             <Legend2 color="#ef4444" label="Venta real (censurada)" />
             {stratNames.map(k => (
@@ -4497,6 +4508,13 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
           <svg ref={svgRef} width={W} height={H} style={{ display: "block", overflow: "hidden" }}
             onMouseMove={handleMove} onMouseLeave={() => { setHoverIdx(null); setHoverStrat(null); }}>
+            <defs>
+              {/* Stockout bars: amber wash, opaque at the axis fading to transparent on top */}
+              <linearGradient id="stockoutGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor="#f59e0b" stopOpacity="0.05" />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.34" />
+              </linearGradient>
+            </defs>
             {/* Y grid */}
             {geom.dTicks.map((t, i) => (
               <g key={i}>
@@ -4511,18 +4529,29 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               <text key={`sh${i}`} x={W - pad.right + 6} y={geom.yStockout(t) + 3.5} textAnchor="start"
                 fill="var(--c-drift)" fontFamily="var(--font-mono)" fontSize={10} opacity={0.7}>{t}h</text>
             ))}
-            {/* X labels */}
-            {geom.xTickIdx.map((i, ki) => (
-              <text key={ki} x={geom.xs[i]} y={H - pad.bottom + 16} textAnchor="middle"
-                fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10}>{(dates[i] || "").slice(5)}</text>
-            ))}
-            {/* Stockout bars */}
+            {/* X labels — first/last anchored inward so they never clip the edge */}
+            {geom.xTickIdx.map((i, ki) => {
+              const anchor = i === 0 ? "start" : i === geom.n - 1 ? "end" : "middle";
+              return (
+                <text key={ki} x={geom.xs[i]} y={H - pad.bottom + 16} textAnchor={anchor}
+                  fill="var(--text-3)" fontFamily="var(--font-mono)" fontSize={10}>{(dates[i] || "").slice(5)}</text>
+              );
+            })}
+            {/* Stockout bars — quiet amber gradient + crisp top edge so they read
+                as a deliberate backdrop, not muddy olive */}
             {stockout.map((v, i) => {
               if (v == null || v <= 0) return null;
               const topY = geom.yStockout(v), baseY = geom.yStockout(0);
               const barW = Math.min(20, Math.max(2, geom.innerW / geom.n * 0.6));
-              return <rect key={i} x={geom.xs[i] - barW / 2} y={topY} width={barW} height={Math.max(0, baseY - topY)} rx={1.5}
-                fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.4)" strokeWidth={0.5} />;
+              const x = geom.xs[i] - barW / 2;
+              const h = Math.max(0, baseY - topY);
+              return (
+                <g key={i}>
+                  <rect x={x} y={topY} width={barW} height={h} rx={1.5} fill="url(#stockoutGrad)" />
+                  <line x1={x} x2={x + barW} y1={topY + 0.5} y2={topY + 0.5}
+                    stroke="rgba(245,158,11,0.55)" strokeWidth={1} strokeLinecap="round" />
+                </g>
+              );
             })}
             {/* Strategy lines */}
             {stratNames.map(k => {
