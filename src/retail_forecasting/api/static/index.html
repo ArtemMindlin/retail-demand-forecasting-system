@@ -4199,13 +4199,148 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       );
     }
 
-    // Per-strategy numeric summary for the selected SKU (recovered demand vs censored sales).
-    function LatentStrategyStats({ impData }) {
-      const STRAT_META = {
-        supervised:      { color: "var(--c-conf)", label: "Supervised (LGBM)" },
-        historical_mean: { color: "#60a5fa",       label: "Historical mean" },
-        clipped_scaling: { color: "#a78bfa",       label: "Clipped scaling" },
-      };
+    const LATENT_STRAT_META = {
+      supervised:      { color: "var(--c-conf)", label: "Supervised (LGBM)", short: "Supervised" },
+      historical_mean: { color: "#60a5fa",       label: "Historical mean",   short: "Hist. mean" },
+      clipped_scaling: { color: "#a78bfa",       label: "Clipped scaling",   short: "Clipped scal." },
+    };
+
+    // Verdict rail — sits beside the chart and answers "which imputation wins".
+    // Ranks strategies by reconstruction MAE (synthetic-censoring eval); falls back
+    // to a recovered-demand summary when the run carries no quality metrics.
+    function LatentVerdictRail({ impData }) {
+      const STRAT_META = LATENT_STRAT_META;
+      const observed = (impData?.observed || []).filter(v => v != null);
+      const stockout = impData?.stockout_hours || [];
+      const strategies = impData?.strategies || {};
+      const stratNames = Object.keys(strategies);
+      const quality = impData?.quality || [];
+      if (!observed.length) return null;
+
+      const sum = arr => arr.reduce((a, b) => a + (b || 0), 0);
+      const n = observed.length;
+      const obsTotal = sum(observed);
+      const censoredDays = stockout.filter(v => v != null && v > 0).length;
+
+      const railLabel = { fontSize: 9.5, letterSpacing: "0.08em", fontWeight: 600 };
+      const kpi = (label, value, color) => (
+        <div>
+          <div className="tnum" style={{ fontFamily: "var(--font-mono)", fontSize: 17, fontWeight: 700, color: color || "var(--text-1)", lineHeight: 1.1 }}>{value}</div>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)", letterSpacing: "0.03em", marginTop: 2 }}>{label}</div>
+        </div>
+      );
+
+      // ── Verdict from reconstruction quality (the real answer) ──
+      if (quality.length > 0) {
+        const ranked = [...quality].sort((a, b) => a.mae - b.mae);
+        const best = ranked[0];
+        const worstMae = Math.max(...ranked.map(q => q.mae), 1e-9);
+        const nEval = quality[0].n_eval || 0;
+        const bMeta = STRAT_META[best.strategy] || {};
+        return (
+          <div>
+            <div className="label-mono" style={{ ...railLabel, color: "var(--c-conf)", marginBottom: 10 }}>
+              ★ VEREDICTO · MENOR ERROR
+            </div>
+            <div style={{ color: bMeta.color || "var(--text-1)", fontSize: 17, fontWeight: 700, lineHeight: 1.15 }}>
+              {bMeta.label || best.strategy}
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginTop: 4, marginBottom: 16 }}>
+              <span className="tnum" style={{ fontFamily: "var(--font-mono)", fontSize: 30, fontWeight: 700, color: "var(--text-1)", lineHeight: 1 }}>
+                {best.mae.toFixed(3)}
+              </span>
+              <span style={{ fontSize: 10, color: "var(--text-3)" }}>MAE de reconstrucción</span>
+            </div>
+
+            {/* Ranked bars — longer bar = worse MAE */}
+            <div className="label-mono" style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.06em", marginBottom: 9 }}>
+              RANKING POR ERROR (MENOR = MEJOR)
+            </div>
+            {ranked.map((q, i) => {
+              const m = STRAT_META[q.strategy] || {};
+              const isBest = i === 0;
+              const w = (q.mae / worstMae) * 100;
+              return (
+                <div key={q.strategy} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "var(--font-mono)", fontSize: 11, marginBottom: 4 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 7, color: isBest ? "var(--text-1)" : "var(--text-2)", fontWeight: isBest ? 600 : 400 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.color || "#888", flexShrink: 0 }} />
+                      {m.short || q.strategy}
+                    </span>
+                    <span className="tnum" style={{ color: isBest ? "var(--c-conf)" : "var(--text-2)", fontWeight: isBest ? 700 : 400 }}>
+                      {q.mae.toFixed(3)}
+                    </span>
+                  </div>
+                  <div style={{ height: 5, borderRadius: 3, background: "rgba(255,255,255,0.04)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${w}%`, background: m.color || "#888", opacity: isBest ? 0.95 : 0.4, borderRadius: 3, transition: "width .4s ease" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 9 }}>
+                    <span style={{ color: "var(--text-3)" }}>
+                      RMSE {q.rmse.toFixed(2)} · sesgo{" "}
+                      <span style={{ color: Math.abs(q.bias) < 0.2 ? "var(--c-conf)" : (q.bias < 0 ? "#ef4444" : "#f59e0b") }}>
+                        {q.bias >= 0 ? "+" : ""}{q.bias.toFixed(2)}
+                      </span>
+                    </span>
+                    {isBest
+                      ? <span style={{ color: "var(--c-conf)", fontWeight: 700 }}>★ MEJOR</span>
+                      : <span style={{ color: "var(--text-3)" }}>{q.bias < -0.5 ? "infra-imputa" : q.bias > 0.5 ? "sobre-imputa" : ""}</span>}
+                  </div>
+                </div>
+              );
+            })}
+
+            <div style={{ borderTop: "1px solid var(--border)", marginTop: 14, paddingTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {kpi("días evaluados", nEval.toLocaleString())}
+              {kpi("días con rotura", censoredDays, censoredDays > 0 ? "#f59e0b" : "var(--text-1)")}
+            </div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 8.5, color: "var(--text-3)", marginTop: 12, lineHeight: 1.5, letterSpacing: "0.02em" }}>
+              Días limpios censurados artificialmente y reconstruidos; error medido contra la demanda real conocida.
+            </div>
+          </div>
+        );
+      }
+
+      // ── Fallback: no quality metrics → recovered-demand summary ──
+      const rows = stratNames.map(k => {
+        const vals = (strategies[k] || []).filter(v => v != null);
+        const total = sum(vals);
+        const uplift = total - obsTotal;
+        return { k, uplift, upliftPct: obsTotal > 0 ? (uplift / obsTotal) * 100 : 0 };
+      }).sort((a, b) => b.uplift - a.uplift);
+      const maxUp = Math.max(...rows.map(r => r.uplift), 1e-9);
+      return (
+        <div>
+          <div className="label-mono" style={{ ...railLabel, color: "var(--text-3)", marginBottom: 12 }}>
+            DEMANDA RECUPERADA POR ESTRATEGIA
+          </div>
+          {rows.map(r => {
+            const m = STRAT_META[r.k] || {};
+            return (
+              <div key={r.k} style={{ marginBottom: 13 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "var(--font-mono)", fontSize: 11, marginBottom: 4 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--text-2)" }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.color || "#888" }} />
+                    {m.short || r.k}
+                  </span>
+                  <span className="tnum" style={{ color: "var(--c-conf)", fontWeight: 600 }}>+{r.upliftPct.toFixed(1)}%</span>
+                </div>
+                <div style={{ height: 5, borderRadius: 3, background: "rgba(255,255,255,0.04)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(r.uplift / maxUp) * 100}%`, background: m.color || "#888", opacity: 0.7, borderRadius: 3 }} />
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {kpi("días", n)}
+            {kpi("días con rotura", censoredDays, censoredDays > 0 ? "#f59e0b" : "var(--text-1)")}
+          </div>
+        </div>
+      );
+    }
+
+    // Full-width descriptive summary for the selected SKU (recovered demand vs censored sales).
+    function LatentDescriptiveTable({ impData }) {
+      const STRAT_META = LATENT_STRAT_META;
       const observed = (impData?.observed || []).filter(v => v != null);
       const stockout = impData?.stockout_hours || [];
       const strategies = impData?.strategies || {};
@@ -4216,11 +4351,6 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const obsTotal = sum(observed);
       const n = observed.length;
       const censoredDays = stockout.filter(v => v != null && v > 0).length;
-
-      // Quality table (run-level): direct reconstruction error via synthetic censoring.
-      const quality = impData?.quality || [];
-      const bestMae = quality.length ? Math.min(...quality.map(q => q.mae)) : null;
-      const nEval = quality.length ? quality[0].n_eval : 0;
 
       const rows = stratNames.map(k => {
         const vals = (strategies[k] || []).filter(v => v != null);
@@ -4235,59 +4365,6 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
       return (
         <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
-          {/* Quality table — the actual "which is better" answer */}
-          {quality.length > 0 && (
-            <div style={{ marginBottom: 22 }}>
-              <div className="label-mono" style={{ marginBottom: 4, fontSize: 10, color: "var(--c-conf)", letterSpacing: "0.06em", fontWeight: 600 }}>
-                CALIDAD DE RECONSTRUCCIÓN · CENSURA SINTÉTICA SOBRE DÍAS LIMPIOS
-              </div>
-              <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 10 }}>
-                Días limpios censurados artificialmente y reconstruidos · error vs demanda real conocida ·
-                {" "}{nEval.toLocaleString()} días evaluados (global) · menor MAE = mejor
-              </div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                      <th style={{ ...head, textAlign: "left" }}>Estrategia</th>
-                      <th style={head}>MAE</th>
-                      <th style={head}>RMSE</th>
-                      <th style={head}>Sesgo</th>
-                      <th style={head}>MAPE</th>
-                      <th style={head}>Veredicto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...quality].sort((a, b) => a.mae - b.mae).map(q => {
-                      const isBest = q.mae === bestMae;
-                      return (
-                        <tr key={q.strategy} style={{
-                          borderBottom: "1px solid rgba(255,255,255,0.04)",
-                          background: isBest ? "rgba(16,185,129,0.06)" : "transparent",
-                        }}>
-                          <td style={{ ...cell, textAlign: "left", color: (STRAT_META[q.strategy] || {}).color || "var(--text-1)", fontWeight: isBest ? 700 : 400 }}>
-                            {(STRAT_META[q.strategy] || {}).label || q.strategy}
-                          </td>
-                          <td style={{ ...cell, color: isBest ? "var(--c-conf)" : "var(--text-1)", fontWeight: isBest ? 700 : 400 }} className="tnum">{q.mae.toFixed(3)}</td>
-                          <td style={{ ...cell, color: "var(--text-2)" }} className="tnum">{q.rmse.toFixed(3)}</td>
-                          <td style={{ ...cell, color: Math.abs(q.bias) < 0.2 ? "var(--c-conf)" : (q.bias < 0 ? "#ef4444" : "#f59e0b") }} className="tnum">
-                            {q.bias >= 0 ? "+" : ""}{q.bias.toFixed(3)}
-                          </td>
-                          <td style={{ ...cell, color: "var(--text-2)" }} className="tnum">{q.mape != null ? q.mape.toFixed(1) + "%" : "—"}</td>
-                          <td style={{ ...cell, textAlign: "center" }}>
-                            {isBest
-                              ? <span style={{ background: "rgba(16,185,129,0.15)", color: "var(--c-conf)", padding: "2px 6px", borderRadius: 4, fontSize: 9.5, fontWeight: "bold", border: "1px solid rgba(16,185,129,0.3)" }}>★ MEJOR</span>
-                              : <span style={{ color: "var(--text-3)", fontSize: 9.5 }}>{q.bias < -0.5 ? "infra-imputa" : q.bias > 0.5 ? "sobre-imputa" : "—"}</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
           <div className="label-mono" style={{ marginBottom: 10, fontSize: 10, color: "var(--text-3)", letterSpacing: "0.06em" }}>
             RESUMEN DESCRIPTIVO · SKU {impData.series_id} · {n} días ({censoredDays} con rotura)
           </div>
@@ -4943,6 +5020,28 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 </div>
               )}
 
+              {/* Latent tab: scope KPIs pushed right to use the empty bar space */}
+              {subTab === "latent" && impData?.dates?.length > 0 && (() => {
+                const chip = (label, value, color) => (
+                  <div style={{ textAlign: "right" }}>
+                    <div className="tnum" style={{ fontFamily: "var(--font-mono)", fontSize: 17, fontWeight: 700, color: color || "var(--text-1)", lineHeight: 1 }}>{value}</div>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)", letterSpacing: "0.04em", textTransform: "uppercase", marginTop: 3 }}>{label}</div>
+                  </div>
+                );
+                const nSeries = impData.series?.length || 0;
+                const nDays = impData.dates.length;
+                const censored = (impData.stockout_hours || []).filter(v => v != null && v > 0).length;
+                const nEval = impData.quality?.length ? (impData.quality[0].n_eval || 0).toLocaleString() : "—";
+                return (
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 26, alignItems: "flex-end", paddingBottom: 2 }}>
+                    {chip("series", nSeries)}
+                    {chip("días (SKU)", nDays)}
+                    {chip("c/ rotura", censored, censored > 0 ? "#f59e0b" : "var(--text-1)")}
+                    {chip("días eval.", nEval, "var(--c-conf)")}
+                  </div>
+                );
+              })()}
+
               {filters && subTab !== "latent" && (
                 <>
                   {subTab === "forecast" && (
@@ -5182,8 +5281,23 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     </div>
                   ) : (
                     <>
-                      <ExpLatentCompareChart impData={impData} />
-                      <LatentStrategyStats impData={impData} />
+                      {/* Chart fills the card; verdict rail is pinned right (mirrors Pareto tab) */}
+                      <div style={{ display: "flex", gap: 0, alignItems: "flex-start", flexWrap: "wrap" }}>
+                        <div style={{ flex: "1 1 460px", minWidth: 0 }}>
+                          <ExpLatentCompareChart impData={impData} />
+                        </div>
+                        <div style={{
+                          width: 320,
+                          flexShrink: 0,
+                          borderLeft: "1px solid var(--border)",
+                          marginLeft: 18,
+                          paddingLeft: 18,
+                          alignSelf: "stretch",
+                        }}>
+                          <LatentVerdictRail impData={impData} />
+                        </div>
+                      </div>
+                      <LatentDescriptiveTable impData={impData} />
                     </>
                   )}
                 </div>
