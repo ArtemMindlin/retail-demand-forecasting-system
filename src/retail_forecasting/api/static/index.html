@@ -4791,7 +4791,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     }
 
     // ── ExperimentsView main component ────────────────────────────────────────
-    function ExperimentsView({ subTab, setSubTab }) {
+    function ExperimentsView({ subTab, setSubTab, runSlot }) {
       const [selectedRun, setSelectedRun] = useState("");
       const [selectedStrategy, setSelectedStrategy] = useState("");
       const [selectedSeries, setSelectedSeries] = useState("");
@@ -4946,32 +4946,42 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
       return (
         <div>
-          {/* ── Filter bar ── */}
+          {/* Run (Ejecución) selector — portaled into the nav row, right of the sub-tabs.
+              Latent lists imputation-comparison runs; forecast/pareto list forecasting runs. */}
+          {runSlot && ReactDOM.createPortal(
+            (() => {
+              const isLatent = subTab === "latent";
+              const runList = isLatent ? (impRuns || []) : (runs || []);
+              const runVal = (isLatent ? impRun : selectedRun) || "";
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, color: "var(--text-3)", letterSpacing: "0.07em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                    Ejecución
+                  </span>
+                  <select
+                    value={runVal}
+                    title={runVal}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (isLatent) { setImpRun(v); setImpSeries(""); }
+                      else { setSelectedRun(v); setWiResult(null); }
+                    }}
+                    style={{ ...selectStyle, minWidth: 0, maxWidth: 300, fontSize: 11.5, padding: "6px 9px", textOverflow: "ellipsis" }}
+                  >
+                    <option value="">— seleccionar —</option>
+                    {runList.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              );
+            })(),
+            runSlot
+          )}
+
+          {/* ── Filter bar — only Pronósticos carries extra filters ── */}
+          {subTab === "forecast" && filters && (
           <div className="glass" style={{ padding: "14px 18px", marginBottom: 18 }}>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
-              {/* Run selector — latent tab lists imputation-comparison runs; others list forecasting runs */}
-              {subTab === "latent" ? (
-                <div>
-                  <div style={labelStyle}>Ejecución (Comparación imputación)</div>
-                  <select style={selectStyle} value={impRun}
-                    onChange={e => { setImpRun(e.target.value); setImpSeries(""); }}>
-                    <option value="">— seleccionar —</option>
-                    {(impRuns || []).map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
-              ) : (
-                <div>
-                  <div style={labelStyle}>Ejecución (Run)</div>
-                  <select style={selectStyle} value={selectedRun}
-                    onChange={e => { setSelectedRun(e.target.value); setWiResult(null); }}>
-                    <option value="">— seleccionar —</option>
-                    {(runs || []).map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
-              )}
-
-
-              {filters && subTab !== "latent" && (
+              {filters && (
                 <>
                   {subTab === "forecast" && (
                     <div>
@@ -5067,6 +5077,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               </div>
             )}
           </div>
+          )}
 
           {(subTab === "latent" ? !impRun : !selectedRun) ? (
             <div style={{ padding: 48, textAlign: "center", color: "var(--text-3)",
@@ -6158,6 +6169,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const [activeMode, setActiveMode] = useState("operacion");
       const [activeTab, setActiveTab] = useState("dashboard");
       const [expSubTab, setExpSubTab] = useState("forecast");
+      // DOM node in the nav row where ExperimentsView portals its run selector
+      const [runSlotEl, setRunSlotEl] = useState(null);
       const [selectedSkuId, setSelectedSkuId] = useState(null);
       const [tabTransitioning, setTabTransitioning] = useState(false);
       const debounceRef = useRef(null);
@@ -6534,6 +6547,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                           </button>
                         ))}
                       </div>
+                      {/* Run selector slot — ExperimentsView portals the Ejecución dropdown here */}
+                      <div ref={setRunSlotEl} className="nav-cascade" style={{ marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "flex-end", minWidth: 0 }} />
                     </React.Fragment>
                   )}
                 </div>
@@ -6589,7 +6604,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 )}
 
                 {activeTab === "experiments" && (
-                  <ExperimentsView subTab={expSubTab} setSubTab={setExpSubTab} />
+                  <ExperimentsView subTab={expSubTab} setSubTab={setExpSubTab} runSlot={runSlotEl} />
                 )}
 
                 {activeTab === "eda" && (
