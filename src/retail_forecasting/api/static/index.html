@@ -4217,6 +4217,11 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const n = observed.length;
       const censoredDays = stockout.filter(v => v != null && v > 0).length;
 
+      // Quality table (run-level): direct reconstruction error via synthetic censoring.
+      const quality = impData?.quality || [];
+      const bestMae = quality.length ? Math.min(...quality.map(q => q.mae)) : null;
+      const nEval = quality.length ? quality[0].n_eval : 0;
+
       const rows = stratNames.map(k => {
         const vals = (strategies[k] || []).filter(v => v != null);
         const total = sum(vals);
@@ -4230,8 +4235,61 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
       return (
         <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+          {/* Quality table — the actual "which is better" answer */}
+          {quality.length > 0 && (
+            <div style={{ marginBottom: 22 }}>
+              <div className="label-mono" style={{ marginBottom: 4, fontSize: 10, color: "var(--c-conf)", letterSpacing: "0.06em", fontWeight: 600 }}>
+                CALIDAD DE RECONSTRUCCIÓN · CENSURA SINTÉTICA SOBRE DÍAS LIMPIOS
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 10 }}>
+                Días limpios censurados artificialmente y reconstruidos · error vs demanda real conocida ·
+                {" "}{nEval.toLocaleString()} días evaluados (global) · menor MAE = mejor
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                      <th style={{ ...head, textAlign: "left" }}>Estrategia</th>
+                      <th style={head}>MAE</th>
+                      <th style={head}>RMSE</th>
+                      <th style={head}>Sesgo</th>
+                      <th style={head}>MAPE</th>
+                      <th style={head}>Veredicto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...quality].sort((a, b) => a.mae - b.mae).map(q => {
+                      const isBest = q.mae === bestMae;
+                      return (
+                        <tr key={q.strategy} style={{
+                          borderBottom: "1px solid rgba(255,255,255,0.04)",
+                          background: isBest ? "rgba(16,185,129,0.06)" : "transparent",
+                        }}>
+                          <td style={{ ...cell, textAlign: "left", color: (STRAT_META[q.strategy] || {}).color || "var(--text-1)", fontWeight: isBest ? 700 : 400 }}>
+                            {(STRAT_META[q.strategy] || {}).label || q.strategy}
+                          </td>
+                          <td style={{ ...cell, color: isBest ? "var(--c-conf)" : "var(--text-1)", fontWeight: isBest ? 700 : 400 }} className="tnum">{q.mae.toFixed(3)}</td>
+                          <td style={{ ...cell, color: "var(--text-2)" }} className="tnum">{q.rmse.toFixed(3)}</td>
+                          <td style={{ ...cell, color: Math.abs(q.bias) < 0.2 ? "var(--c-conf)" : (q.bias < 0 ? "#ef4444" : "#f59e0b") }} className="tnum">
+                            {q.bias >= 0 ? "+" : ""}{q.bias.toFixed(3)}
+                          </td>
+                          <td style={{ ...cell, color: "var(--text-2)" }} className="tnum">{q.mape != null ? q.mape.toFixed(1) + "%" : "—"}</td>
+                          <td style={{ ...cell, textAlign: "center" }}>
+                            {isBest
+                              ? <span style={{ background: "rgba(16,185,129,0.15)", color: "var(--c-conf)", padding: "2px 6px", borderRadius: 4, fontSize: 9.5, fontWeight: "bold", border: "1px solid rgba(16,185,129,0.3)" }}>★ MEJOR</span>
+                              : <span style={{ color: "var(--text-3)", fontSize: 9.5 }}>{q.bias < -0.5 ? "infra-imputa" : q.bias > 0.5 ? "sobre-imputa" : "—"}</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div className="label-mono" style={{ marginBottom: 10, fontSize: 10, color: "var(--text-3)", letterSpacing: "0.06em" }}>
-            RESUMEN POR ESTRATEGIA · SKU {impData.series_id} · {n} días ({censoredDays} con rotura)
+            RESUMEN DESCRIPTIVO · SKU {impData.series_id} · {n} días ({censoredDays} con rotura)
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>

@@ -1070,6 +1070,15 @@ def get_imputation_strategies(run_name: str, series_id: str | None = None) -> di
         s = sub[sub["strategy"] == name].set_index("date")["latent_demand_est"]
         strategies[name] = [float(s[d]) if d in s.index and pd.notna(s[d]) else None for d in dates]
 
+    quality: list[dict[str, Any]] = []
+    quality_path = run_path / "imputation_quality.csv"
+    if quality_path.exists():
+        qdf = pd.read_csv(quality_path)
+        quality = [
+            {k: (None if pd.isna(v) else v) for k, v in row.items()}
+            for row in qdf.to_dict(orient="records")
+        ]
+
     return {
         "series": series,
         "series_id": chosen,
@@ -1085,6 +1094,7 @@ def get_imputation_strategies(run_name: str, series_id: str | None = None) -> di
             for d in dates
         ],
         "strategies": strategies,
+        "quality": quality,
     }
 
 

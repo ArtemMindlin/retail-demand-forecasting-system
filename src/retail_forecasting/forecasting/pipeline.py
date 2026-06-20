@@ -5,13 +5,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+import numpy as np
 import pandas as pd
 
 from retail_forecasting.config import InventoryConfig, Settings
 from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_tuning import BoostingParams
-from retail_forecasting.data.censorship import LatentDemandImputer
+from retail_forecasting.data.censorship import OPERATIVE_WINDOW_HOURS, LatentDemandImputer
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.data.quality import (
     raise_on_blocking_data_quality,
@@ -127,6 +128,66 @@ IMPUTATION_COMPARISON_STRATEGIES: tuple[
     Literal["supervised", "historical_mean", "clipped_scaling"], ...
 ] = ("supervised", "historical_mean", "clipped_scaling")
 
+# Fraction of clean (uncensored) days held out and synthetically censored for evaluation.
+SYNTHETIC_CENSORING_EVAL_FRACTION = 0.30
+
+
+def _evaluate_imputation_quality(panel: pd.DataFrame, seed: int) -> pd.DataFrame:
+    """Score each imputation strategy by direct reconstruction error.
+
+    Latent demand on real stockouts is an unobserved counterfactual, so we evaluate on
+    a held-out set of CLEAN days (true demand known) that we synthetically censor:
+    each held-out day is assigned a stockout ratio sampled from the empirical distribution
+    of real stockouts, and its sale is reduced proportionally. Each strategy then
+    reconstructs those days; we compare the estimate against the known true demand.
+
+    Returns a DataFrame: strategy, mae, rmse, bias, mape, n_eval (lower MAE/RMSE = better,
+    bias near 0 = unbiased).
+    """
+    rng = np.random.default_rng(seed)
+    clean_mask = panel["stockout_hours"] == 0
+    real_ratios = (
+        (panel.loc[panel["stockout_hours"] > 0, "stockout_hours"] / OPERATIVE_WINDOW_HOURS)
+        .clip(0, 1)
+        .to_numpy()
+    )
+    clean_idx = panel.index[clean_mask].to_numpy()
+    if len(clean_idx) == 0 or len(real_ratios) == 0:
+        return pd.DataFrame(columns=["strategy", "mae", "rmse", "bias", "mape", "n_eval"])
+
+    n_eval = max(1, int(len(clean_idx) * SYNTHETIC_CENSORING_EVAL_FRACTION))
+    eval_idx = rng.choice(clean_idx, size=n_eval, replace=False)
+    sampled_ratios = rng.choice(real_ratios, size=n_eval, replace=True)
+
+    true_demand = panel.loc[eval_idx, "observed_demand"].astype(float).to_numpy()
+
+    censored = panel.copy()
+    censored.loc[eval_idx, "stockout_hours"] = sampled_ratios * OPERATIVE_WINDOW_HOURS
+    censored.loc[eval_idx, "observed_demand"] = true_demand * (1.0 - sampled_ratios)
+
+    records: list[dict[str, Any]] = []
+    for strategy in IMPUTATION_COMPARISON_STRATEGIES:
+        imputed = LatentDemandImputer(strategy=strategy).impute(censored)
+        pred = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
+        err = pred - true_demand
+        nonzero = true_demand > 0
+        mape = (
+            float(np.mean(np.abs(err[nonzero]) / true_demand[nonzero]) * 100)
+            if nonzero.any()
+            else float("nan")
+        )
+        records.append(
+            {
+                "strategy": strategy,
+                "mae": float(np.mean(np.abs(err))),
+                "rmse": float(np.sqrt(np.mean(err**2))),
+                "bias": float(np.mean(err)),
+                "mape": mape,
+                "n_eval": int(n_eval),
+            }
+        )
+    return pd.DataFrame(records)
+
 
 def run_imputation_comparison(settings: Settings) -> Path:
     """Run only the latent-demand imputation strategies side by side (no forecasting).
@@ -171,9 +232,13 @@ def run_imputation_comparison(settings: Settings) -> Path:
 
     long_df = pd.concat(frames, ignore_index=True).sort_values(["series_id", "date", "strategy"])
 
+    print("  📐 Evaluating reconstruction quality via synthetic censoring of clean days...")
+    quality_df = _evaluate_imputation_quality(panel, seed=settings.project.random_seed)
+
     run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
     run_dir.mkdir(parents=True, exist_ok=True)
     long_df.to_csv(run_dir / "latent_strategies.csv", index=False)
+    quality_df.to_csv(run_dir / "imputation_quality.csv", index=False)
 
     metadata = {
         "kind": "impute_compare",
