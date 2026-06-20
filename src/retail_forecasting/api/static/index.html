@@ -4199,6 +4199,80 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       );
     }
 
+    // Per-strategy numeric summary for the selected SKU (recovered demand vs censored sales).
+    function LatentStrategyStats({ impData }) {
+      const STRAT_META = {
+        supervised:      { color: "var(--c-conf)", label: "Supervised (LGBM)" },
+        historical_mean: { color: "#60a5fa",       label: "Historical mean" },
+        clipped_scaling: { color: "#a78bfa",       label: "Clipped scaling" },
+      };
+      const observed = (impData?.observed || []).filter(v => v != null);
+      const stockout = impData?.stockout_hours || [];
+      const strategies = impData?.strategies || {};
+      const stratNames = Object.keys(strategies);
+      if (!observed.length) return null;
+
+      const sum = arr => arr.reduce((a, b) => a + (b || 0), 0);
+      const obsTotal = sum(observed);
+      const n = observed.length;
+      const censoredDays = stockout.filter(v => v != null && v > 0).length;
+
+      const rows = stratNames.map(k => {
+        const vals = (strategies[k] || []).filter(v => v != null);
+        const total = sum(vals);
+        const uplift = total - obsTotal;
+        const upliftPct = obsTotal > 0 ? (uplift / obsTotal) * 100 : 0;
+        return { k, total, mean: total / n, uplift, upliftPct, max: Math.max(...vals) };
+      });
+
+      const cell = { padding: "7px 10px", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11.5 };
+      const head = { ...cell, color: "var(--text-3)", fontWeight: 400, fontSize: 10 };
+
+      return (
+        <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+          <div className="label-mono" style={{ marginBottom: 10, fontSize: 10, color: "var(--text-3)", letterSpacing: "0.06em" }}>
+            RESUMEN POR ESTRATEGIA · SKU {impData.series_id} · {n} días ({censoredDays} con rotura)
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  <th style={{ ...head, textAlign: "left" }}>Estrategia</th>
+                  <th style={head}>Demanda total</th>
+                  <th style={head}>Media diaria</th>
+                  <th style={head}>Demanda recuperada</th>
+                  <th style={head}>% uplift</th>
+                  <th style={head}>Pico</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <td style={{ ...cell, textAlign: "left", color: "#ef4444" }}>Venta real (censurada)</td>
+                  <td style={{ ...cell, color: "var(--text-1)" }} className="tnum">{obsTotal.toFixed(0)}</td>
+                  <td style={{ ...cell, color: "var(--text-2)" }} className="tnum">{(obsTotal / n).toFixed(2)}</td>
+                  <td style={{ ...cell, color: "var(--text-3)" }}>—</td>
+                  <td style={{ ...cell, color: "var(--text-3)" }}>—</td>
+                  <td style={{ ...cell, color: "var(--text-2)" }} className="tnum">{Math.max(...observed).toFixed(1)}</td>
+                </tr>
+                {rows.map(r => (
+                  <tr key={r.k} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <td style={{ ...cell, textAlign: "left", color: (STRAT_META[r.k] || {}).color || "var(--text-1)" }}>
+                      {(STRAT_META[r.k] || {}).label || r.k}
+                    </td>
+                    <td style={{ ...cell, color: "var(--text-1)" }} className="tnum">{r.total.toFixed(0)}</td>
+                    <td style={{ ...cell, color: "var(--text-2)" }} className="tnum">{r.mean.toFixed(2)}</td>
+                    <td style={{ ...cell, color: "var(--c-conf)" }} className="tnum">+{r.uplift.toFixed(0)}</td>
+                    <td style={{ ...cell, color: "var(--c-conf)" }} className="tnum">+{r.upliftPct.toFixed(1)}%</td>
+                    <td style={{ ...cell, color: "var(--text-2)" }} className="tnum">{r.max.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
     function ExpParetoChart({ paretoData }) {
       const wrapRef = useRef(null);
       const [W, setW] = useState(700);
@@ -5049,7 +5123,10 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                       Sin datos de comparación de imputación para esta ejecución.
                     </div>
                   ) : (
-                    <ExpLatentCompareChart impData={impData} />
+                    <>
+                      <ExpLatentCompareChart impData={impData} />
+                      <LatentStrategyStats impData={impData} />
+                    </>
                   )}
                 </div>
               )}
