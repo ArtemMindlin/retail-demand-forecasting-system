@@ -4,7 +4,7 @@
 PYTHON = uv run python
 PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
-.PHONY: help install run retrain score simulate eda api mlflow up test test-harness lint format clean pdf
+.PHONY: help install run retrain score simulate eda api dev mlflow up test test-harness lint format clean pdf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -29,6 +29,9 @@ eda: ## Run the reproducible EDA module on the prepared panel
 
 api: ## Start the FastAPI microservice
 	uv run uvicorn retail_forecasting.api.main:app --reload
+
+dev: ## Run the local dev server (API + dashboard) with autoreload at http://localhost:8000
+	uv run --env-file .env uvicorn retail_forecasting.api.main:app --reload --host 127.0.0.1 --port 8000
 
 mlflow: ## Start the MLflow UI
 	uv run mlflow ui

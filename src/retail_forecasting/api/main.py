@@ -44,6 +44,14 @@ _AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "")
 _SESSION_COOKIE = "rf_session"
 _SESSION_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 _SESSIONS: set[str] = set()
+# Secure cookies require HTTPS. Safari drops Secure cookies over http://localhost
+# (Chrome/Firefox allow them), so for local dev set COOKIE_SECURE=false. Prod keeps
+# the default (True) — the cookie is only sent over HTTPS.
+_COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").strip().lower() not in {
+    "false",
+    "0",
+    "no",
+}
 
 _PUBLIC_PATHS = {"/", "/health", "/api/login", "/api/auth/check"}
 
@@ -103,7 +111,7 @@ def login(body: LoginRequest, response: Response) -> dict[str, str]:
         _SESSION_COOKIE,
         token,
         httponly=True,
-        secure=True,
+        secure=_COOKIE_SECURE,
         samesite="lax",
         max_age=_SESSION_MAX_AGE,
     )
