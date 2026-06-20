@@ -2406,6 +2406,311 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
     }
 
     window.AcademicGrid = AcademicGrid;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Latent-demand imputation strategies — academic explainer grid (mirrors
+    // AcademicGrid styling). Card shows the strategy's live reconstruction MAE.
+    // ═══════════════════════════════════════════════════════════════════════
+    function LatentMethodCard({ item, q, isBest, onOpen }) {
+      const { icon, color, kicker, title, formula, short } = item;
+      return (
+        <div className="glass academic" onClick={onOpen}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: `linear-gradient(135deg, ${color}, transparent 140%)`,
+              border: `1px solid ${color}55`,
+              display: "grid", placeItems: "center", color
+            }}>
+              <Icon name={icon} size={16} stroke={color} strokeWidth={2} />
+            </div>
+            <div className="chip" style={{ borderColor: `${color}30` }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: color }} />
+              {kicker}
+            </div>
+          </div>
+
+          <div className="h-display" style={{ fontSize: 16, marginBottom: 4, color: "var(--text-1)" }}>{title}</div>
+
+          <div style={{
+            padding: "10px 12px", background: "rgba(0,0,0,0.25)",
+            border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-2)",
+            margin: "10px 0 12px", overflowX: "auto", display: "flex", justifyContent: "center"
+          }}>
+            <Latex formula={formula} block={true} />
+          </div>
+
+          <div style={{ fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.55 }}>{short}</div>
+
+          <div style={{
+            marginTop: 14, paddingTop: 12, borderTop: "1px dashed var(--border)",
+            display: "flex", justifyContent: "space-between", alignItems: "center"
+          }}>
+            <div className="tnum" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color }}>
+              {q ? <>MAE = {q.mae.toFixed(3)}{isBest && <span style={{ color: "var(--c-conf)", marginLeft: 6 }}>★ mejor</span>}</> : item.tag}
+            </div>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--text-3)", letterSpacing: "0.06em"
+            }}>
+              VER DETALLE <Icon name="chevronRight" size={11} stroke="var(--text-3)" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function LatentMethodModal({ item, q, onClose }) {
+      useEffect(() => {
+        const onKey = (e) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+      }, [onClose]);
+
+      const cssVars = {
+        "--modal-glow": item.color.startsWith("var(--c-conf") ? "rgba(16,185,129,0.22)"
+                       : item.color === "#60a5fa" ? "rgba(96,165,250,0.22)"
+                       : "rgba(167,139,250,0.22)",
+        "--modal-accent": item.color,
+      };
+
+      const pills = q
+        ? [
+            { label: "MAE", value: q.mae.toFixed(3), accent: true },
+            { label: "RMSE", value: q.rmse.toFixed(3) },
+            { label: "sesgo", value: `${q.bias >= 0 ? "+" : ""}${q.bias.toFixed(3)}` },
+            { label: "MAPE", value: q.mape != null ? `${q.mape.toFixed(1)}%` : "—" },
+          ]
+        : [{ label: "tipo", value: item.tag }];
+
+      return (
+        <div className="modal-backdrop" onClick={onClose}>
+          <div className="modal-window" style={cssVars} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-glow" />
+            <div style={{ position: "relative", padding: "20px 26px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{
+                width: 42, height: 42, borderRadius: 10,
+                background: `linear-gradient(135deg, ${item.color}, transparent 140%)`,
+                border: `1px solid ${item.color}66`, display: "grid", placeItems: "center",
+                boxShadow: `0 0 24px ${item.color}33`
+              }}>
+                <Icon name={item.icon} size={20} stroke={item.color} strokeWidth={2} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="label-mono" style={{ color: item.color, marginBottom: 2 }}>{item.kicker} · IMPUTACIÓN DE DEMANDA LATENTE</div>
+                <div className="h-display" style={{ fontSize: 20, color: "var(--text-1)" }}>{item.title}</div>
+              </div>
+              <button className="modal-close" onClick={onClose} aria-label="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="pill-row">
+                {pills.map((p, i) => (
+                  <div key={i} className="pill">
+                    <span style={{ color: "var(--text-3)" }}>{p.label}</span>
+                    <span className={p.accent ? "v accent" : "v"}>{p.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="modal-section-title">Intuición</div>
+              <div className="modal-text">{item.intuition}</div>
+
+              <div className="modal-section-title">Formulación</div>
+              <div className="formula-big" style={{ display: "flex", justifyContent: "center", whiteSpace: "normal" }}>
+                <Latex formula={item.bigFormula} block={true} />
+              </div>
+
+              <div className="modal-section-title">Derivación &amp; supuestos</div>
+              <div className="modal-text">{item.derivation}</div>
+
+              <div className="modal-section-title">Implementación · censorship.py</div>
+              <pre className="code-block" dangerouslySetInnerHTML={{ __html: item.code }} />
+
+              <div className="modal-section-title">Defensa ante tribunal</div>
+              <ul style={{ margin: "4px 0 0 0", padding: 0, listStyle: "none" }}>
+                {item.defense.map((d, i) => (
+                  <li key={i} style={{
+                    display: "flex", gap: 10, alignItems: "flex-start", padding: "8px 0",
+                    borderBottom: i < item.defense.length - 1 ? "1px dashed var(--border)" : "none"
+                  }}>
+                    <span style={{
+                      flexShrink: 0, marginTop: 2, width: 18, height: 18, borderRadius: 4,
+                      background: `${item.color}18`, color: item.color, display: "grid", placeItems: "center",
+                      fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600
+                    }}>{String(i + 1).padStart(2, "0")}</span>
+                    <span className="modal-text" style={{ fontSize: 12.5 }}>{d}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="modal-section-title">Referencias</div>
+              <div className="modal-text" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, lineHeight: 1.9 }}>
+                {item.refs.map((r, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10 }}>
+                    <span style={{ color: "var(--text-mute)", width: 20 }}>[{i + 1}]</span>
+                    <span style={{ color: "var(--text-2)" }}>{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const LATENT_METHODS = [
+      {
+        id: "supervised",
+        icon: "cpu",
+        color: "var(--c-conf)",
+        kicker: "Teacher · LGBM",
+        tag: "modelo supervisado",
+        title: "Supervised (LGBM)",
+        formula: "\\hat{D}_t = \\max\\!\\big(d_t,\\; \\hat{f}_\\theta(\\mathbf{x}_t)\\big)",
+        short: (<>Un <b>LGBM «teacher»</b> aprende la demanda en los días limpios y reconstruye los de rotura condicionando en calendario, SKU, <b>severidad</b> y clima.</>),
+        bigFormula: "\\begin{aligned} \\hat{f}_\\theta &= \\arg\\min_\\theta \\sum_{t \\in \\mathcal{L}} \\big(d_t - f_\\theta(\\mathbf{x}_t)\\big)^2 \\quad (\\text{entrena en días limpios } \\mathcal{L}) \\\\ \\mathbf{x}_t &= [\\text{mes},\\, \\text{dow},\\, \\text{dom},\\, \\text{SKU},\\, \\text{stockout\\_ratio},\\, \\bar{d}_s,\\, \\text{promo},\\, \\text{clima}] \\\\ \\hat{D}_t &= \\max\\!\\big(d_t,\\; \\hat{f}_\\theta(\\mathbf{x}_t)\\big) \\quad (t \\in \\mathcal{C},\\ \\text{rotura}) \\end{aligned}",
+        intuition: (<>
+          En lugar de un prior fijo, modela <code>E[D | x]</code>. Entrena <b>solo en días limpios</b> —donde
+          venta = demanda real— y extrapola a los censurados. Incluye <code>stockout_ratio = horas_rotura / ventana</code>
+          como feature, así que «sabe» <i>cuánta</i> demanda pudo perderse. Captura estacionalidad, efectos por SKU,
+          promociones y clima → menor MAE y sesgo casi nulo. Es el <b>ganador</b> del run.
+        </>),
+        derivation: (<>
+          Features: <code>month, day_of_week, day_of_month</code>, <code>series</code> (categórica),
+          <code> stockout_ratio</code>, <code>series_mean_demand</code> (el prior de <i>historical mean</i> incorporado
+          como una feature más), y opcionales <code>discount, holiday_flag, temperatura, precipitación, humedad, viento</code>.
+          Hiperparámetros: <code>n_estimators=200, learning_rate=0.05, max_depth=6, seed=42</code>. La cota inferior
+          <code> max(d_t, ·)</code> impide imputar por debajo de lo realmente vendido.
+        </>),
+        code:
+`model = lgb.<span class="f">LGBMRegressor</span>(n_estimators=<span class="n">200</span>, learning_rate=<span class="n">0.05</span>,
+                          max_depth=<span class="n">6</span>, random_state=<span class="n">42</span>)
+model.<span class="f">fit</span>(X_clean[features], y_clean)      <span class="c"># entrena en días limpios</span>
+pred = model.<span class="f">predict</span>(X_censored[features]) <span class="c"># reconstruye roturas</span>
+
+df.loc[is_censored, <span class="s">"latent_demand_est"</span>] = np.<span class="f">maximum</span>(
+    df.loc[is_censored, target], pred)         <span class="c"># nunca por debajo de la venta</span>`,
+        defense: [
+          "Entrena donde venta = demanda (días limpios) y extrapola a los censurados: no inventa etiquetas que no existen.",
+          "stockout_ratio como feature aporta la severidad de la rotura — la información que a los baselines les falta.",
+          "Se valida por censura sintética (censuramos días limpios y medimos el error de reconstrucción): gana en MAE y sesgo.",
+          "series_mean_demand mete el prior de historical_mean como una feature más, así que domina al baseline por construcción.",
+        ],
+        refs: [
+          "Ke et al. (2017) — LightGBM: A Highly Efficient Gradient Boosting Decision Tree. NeurIPS.",
+          "Nahmias (1994) — Demand estimation in lost-sales inventory systems.",
+        ],
+      },
+      {
+        id: "historical_mean",
+        icon: "sigma",
+        color: "#60a5fa",
+        kicker: "Baseline",
+        tag: "prior estadístico",
+        title: "Historical mean",
+        formula: "\\hat{D}_t = \\max\\!\\big(d_t,\\; \\bar{d}_{s}\\big)",
+        short: (<>Sustituye los días de rotura por la <b>demanda media de los días limpios</b> de ese SKU (prior plano por serie, con fallback a la media global).</>),
+        bigFormula: "\\begin{aligned} \\bar{d}_s &= \\frac{1}{|\\mathcal{L}_s|} \\sum_{t \\in \\mathcal{L}_s} d_t \\quad (\\text{media de días limpios de la serie } s) \\\\ \\hat{D}_t &= \\max\\!\\big(d_t,\\; \\bar{d}_{s(t)}\\big) \\quad (t \\in \\mathcal{C}) \\end{aligned}",
+        intuition: (<>
+          Imputa la «demanda típica» del SKU. Mejor que <i>clipped scaling</i> porque no depende de lo poco que se
+          vendió ese día concreto, sino del <b>nivel histórico</b> de la serie. Pero es un <b>prior plano</b>: ignora
+          estacionalidad, día de semana, promociones y severidad de la rotura → sesga ligeramente (sobre-imputa roturas
+          en valle, infra-imputa en pico).
+        </>),
+        derivation: (<>
+          Media por serie sobre días limpios; <i>fallback</i> a la media global para SKUs sin historial limpio.
+          Cota inferior <code>max(d_t, ·)</code> para no contradecir lo observado.
+        </>),
+        code:
+`series_means = df[is_clean].<span class="f">groupby</span>(<span class="s">"series_id"</span>)[target].<span class="f">mean</span>()
+global_mean  = df[is_clean][target].<span class="f">mean</span>()
+fallback     = df.loc[is_censored, <span class="s">"series_id"</span>].<span class="f">map</span>(series_means).<span class="f">fillna</span>(global_mean)
+
+df.loc[is_censored, <span class="s">"latent_demand_est"</span>] = np.<span class="f">maximum</span>(
+    df.loc[is_censored, target], fallback)`,
+        defense: [
+          "Prior plano por SKU: robusto y sin riesgo de overfitting, buen baseline intermedio.",
+          "Ignora toda covariable temporal → sesgo sistemático en picos y valles estacionales.",
+          "El fallback a media global cubre SKUs sin días limpios suficientes.",
+        ],
+        refs: [
+          "Silver, Pyke & Peterson (1998) — Inventory Management and Production Planning and Scheduling.",
+          "Nahmias (1994) — Demand estimation in lost-sales inventory systems.",
+        ],
+      },
+      {
+        id: "clipped_scaling",
+        icon: "zap",
+        color: "#a78bfa",
+        kicker: "Baseline",
+        tag: "heurística fija",
+        title: "Clipped scaling",
+        formula: "\\hat{D}_t = \\max\\!\\big(d_t,\\; \\gamma\\, d_t\\big),\\quad \\gamma = 1.2",
+        short: (<>Escala la venta observada por un <b>factor fijo γ</b> durante las roturas. Cero contexto: si el SKU se agotó pronto y vendió poco, sigue infra-estimando.</>),
+        bigFormula: "\\hat{D}_t = \\begin{cases} d_t & t \\notin \\mathcal{C} \\;\\; (\\text{día limpio}) \\\\[4pt] \\max\\!\\big(d_t,\\; \\gamma\\, d_t\\big) & t \\in \\mathcal{C} \\;\\; (\\text{rotura}) \\end{cases}, \\qquad \\gamma = 1.2",
+        intuition: (<>
+          El más ingenuo: asume que durante una rotura la demanda real fue un <code>γ</code> superior a lo vendido.
+          Como <code>γ &gt; 1</code>, el <code>max</code> es trivial (= <code>γ·d_t</code>) y solo actúa de suelo si
+          <code> γ ≤ 1</code>. El problema es estructural: es <b>proporcional a d_t</b>, así que si la rotura fue temprana
+          (<code>d_t ≈ 0</code>) la estimación sigue ≈ 0 — <b>infra-imputa</b> justo cuando más demanda se perdió.
+        </>),
+        derivation: (<>
+          No hay ajuste a datos: <code>γ = scaling_factor = 1.2</code> es un hiperparámetro fijo. Sin dependencia de
+          calendario, severidad de la rotura ni SKU. Hereda el sesgo de censura en vez de corregirlo.
+        </>),
+        code:
+`df.loc[is_censored, <span class="s">"latent_demand_est"</span>] = np.<span class="f">maximum</span>(
+    df.loc[is_censored, target],
+    df.loc[is_censored, target] * self.scaling_factor,  <span class="c"># γ = 1.2</span>
+)
+df.loc[is_clean, <span class="s">"latent_demand_est"</span>] = df.loc[is_clean, target]`,
+        defense: [
+          "Es un baseline deliberadamente naïf: sirve de suelo de comparación, no de candidato real.",
+          "Su fallo es estructural: proporcional a la venta censurada, hereda el sesgo de censura en lugar de corregirlo.",
+          "γ = 1.2 es arbitrario; no se calibra contra datos — por eso es el peor en MAE y el más infra-imputador.",
+        ],
+        refs: [
+          "Nahmias (1994) — Demand estimation in lost-sales inventory systems.",
+          "Heurística habitual de «infla-ventas» en retail (uplift fijo sobre rotura).",
+        ],
+      },
+    ];
+
+    function LatentMethodGrid({ quality }) {
+      const [openId, setOpenId] = useState(null);
+      const byStrat = {};
+      (quality || []).forEach(q => { byStrat[q.strategy] = q; });
+      const bestStrat = (quality && quality.length)
+        ? [...quality].sort((a, b) => a.mae - b.mae)[0].strategy : null;
+      const openItem = LATENT_METHODS.find((it) => it.id === openId);
+      return (
+        <>
+          <div className="grid-academic">
+            {LATENT_METHODS.map((it) => (
+              <LatentMethodCard
+                key={it.id}
+                item={it}
+                q={byStrat[it.id]}
+                isBest={it.id === bestStrat}
+                onOpen={() => setOpenId(it.id)}
+              />
+            ))}
+          </div>
+          {openItem && (
+            <LatentMethodModal item={openItem} q={byStrat[openItem.id]} onClose={() => setOpenId(null)} />
+          )}
+        </>
+      );
+    }
+
+    window.LatentMethodGrid = LatentMethodGrid;
   </script>
 
   <!-- =================== EXTENDED VIEWS, ALERT DETAIL, DYNAMIC ALERTS =================== -->
@@ -5252,6 +5557,19 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                       </>
                     )}
                   </div>
+
+                  {/* Academic explainer — the three imputation strategies (run-level) */}
+                  {runVerdict?.quality?.length > 0 && (
+                    <div style={{ marginTop: 24 }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <div className="label-mono" style={{ marginBottom: 4 }}>módulos académicos · defensa TFG</div>
+                        <div className="h-display" style={{ fontSize: 18, color: "var(--text-1)" }}>
+                          Estrategias de imputación de demanda latente
+                        </div>
+                      </div>
+                      <LatentMethodGrid quality={runVerdict.quality} />
+                    </div>
+                  )}
                 </>
               )}
 
