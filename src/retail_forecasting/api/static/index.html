@@ -4970,23 +4970,6 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 </div>
               )}
 
-              {/* Latent tab: run-level scope KPIs (the SKU selector lives down in the chart card) */}
-              {subTab === "latent" && impData?.dates?.length > 0 && (() => {
-                const chip = (label, value, color) => (
-                  <div style={{ textAlign: "right" }}>
-                    <div className="tnum" style={{ fontFamily: "var(--font-mono)", fontSize: 17, fontWeight: 700, color: color || "var(--text-1)", lineHeight: 1 }}>{value}</div>
-                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)", letterSpacing: "0.04em", textTransform: "uppercase", marginTop: 3 }}>{label}</div>
-                  </div>
-                );
-                const nSeries = impData.series?.length || 0;
-                const nEval = impData.quality?.length ? (impData.quality[0].n_eval || 0).toLocaleString() : "—";
-                return (
-                  <div style={{ marginLeft: "auto", display: "flex", gap: 26, alignItems: "flex-end", paddingBottom: 2 }}>
-                    {chip("series", nSeries)}
-                    {chip("días eval.", nEval, "var(--c-conf)")}
-                  </div>
-                );
-              })()}
 
               {filters && subTab !== "latent" && (
                 <>
