@@ -211,7 +211,7 @@ Del análisis de esta figura se extraen las siguientes conclusiones, que validan
 
 \begin{itemize}
     \item \textbf{Dominancia de la inercia reciente:} Las medias móviles de demanda a corto y medio plazo (\texttt{demand\_roll\_mean\_7}, \texttt{demand\_roll\_sum\_28}) dominan la importancia predictiva de forma absoluta, seguidas de los rezagos o \textit{lags} directos (\texttt{demand\_lag\_7}, \texttt{demand\_lag\_1}). Esto refleja el comportamiento natural de autocorrelación en series temporales de retail.
-    \item \textbf{Uso inteligente de la información de rotura:} Las variables de \textit{stockout} (\texttt{stockout\_roll\_mean\_28}) aparecen de forma consistente en posiciones intermedias-altas de importancia. Esto evidencia que el modelo probabilístico ha aprendido a utilizar el historial de estanterías vacías como una señal \textit{proxy} estructural para ajustar al alza la demanda latente.
+    \item \textbf{Uso inteligente de la información de rotura:} Las variables que miden el historial de \textit{stockout}, como por ejemplo \texttt{stockout\_roll\_mean\_28}, aparecen de forma consistente en posiciones intermedias-altas de importancia. Esto evidencia que el modelo probabilístico ha aprendido a utilizar el historial de estanterías vacías como una señal \textit{proxy} estructural para ajustar al alza la demanda latente.
     \item \textbf{Modulación climática:} Las variables meteorológicas como la humedad media (\texttt{avg\_humidity\_lag\_14}) y el nivel de viento (\texttt{avg\_wind\_level\_lag\_14}) se sitúan en las últimas posiciones. En lugar de forzar una dependencia general irreal, el algoritmo las utiliza sutilmente para ajustar los cuantiles extremos únicamente en categorías específicas.
 \end{itemize}
 
