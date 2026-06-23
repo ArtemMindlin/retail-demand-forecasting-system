@@ -196,13 +196,9 @@ El resultado operativo relevante es que el coste total bajo restricción es estr
 \section{Explicabilidad y Diagnóstico Automático}
 \label{sec:resultados_xai}
 
-El sistema fue evaluado también por su capacidad de justificar sus decisiones, requisito indispensable para la adopción en entornos logísticos industriales donde los responsables de compra deben validar las recomendaciones.
+El sistema fue evaluado también por su capacidad de justificar sus decisiones, requisito indispensable para la adopción en entornos logísticos industriales donde los responsables de compra deben validar las recomendaciones. Para abrir la ``caja negra'' de los modelos basados en árboles, se emplearon los valores de Shapley (SHAP). Esta técnica permite cuantificar exactamente cuánto aporta cada variable al valor final predicho y confirmar que el algoritmo está aprendiendo relaciones lógicas y no artefactos espurios de los datos.
 
-\begin{itemize}
-    \item \textbf{Análisis SHAP}: Los valores de Shapley exportados automáticamente a MLflow confirman las hipótesis de diseño del módulo de \textit{feature engineering}. La Figura~\ref{fig:shap_summary} muestra el \textit{beeswarm plot} global del modelo CatBoost campeón: las medias móviles de demanda a 7 días (\texttt{demand\_roll\_mean\_7}, \texttt{demand\_roll\_sum\_28}) dominan la importancia predictiva, seguidas de los lags directos (\texttt{demand\_lag\_7}, \texttt{demand\_lag\_1}). Las variables de stockout (\texttt{stockout\_roll\_mean\_28}) aparecen en posición intermedia, evidenciando que el modelo ha aprendido a utilizar el historial de roturas como señal proxy de la demanda latente. Las variables climáticas (\texttt{avg\_humidity\_lag\_14}, \texttt{avg\_wind\_level\_lag\_14}) se sitúan en las últimas posiciones, modulando únicamente los cuantiles extremos en categorías de alta estacionalidad. Este resultado valida la selección de features del Capítulo~\ref{chap:metodologia} y confirma que el modelo no está aprendiendo artefactos espurios.
-
-    \item \textbf{Diagnóstico Post-Mortem}: El módulo automático de diagnóstico identificó los SKUs con mayor contribución al coste total. En los casos más problemáticos, el sistema atribuyó las pérdidas a alta intermitencia estructural (series con más del 40\% de días con venta cero, donde cualquier predicción positiva genera coste de sobrestock) o a derivas bruscas de tendencia detectadas con retraso por el detector Page-Hinkley. Esta trazabilidad convierte los fallos del modelo en información accionable para el responsable logístico.
-\end{itemize}
+La Figura~\ref{fig:shap_summary} muestra el \textit{beeswarm plot} global del modelo CatBoost campeón, donde se representan las 20 características más influyentes.
 
 \begin{figure}[htbp]
     \centering
@@ -210,6 +206,16 @@ El sistema fue evaluado también por su capacidad de justificar sus decisiones, 
     \caption{SHAP \textit{beeswarm plot} del modelo CatBoost campeón (top-20 features por importancia global). El eje horizontal mide el impacto en la predicción; el color indica el valor de la feature (rojo = alto, azul = bajo). Las medias móviles de demanda dominan la importancia, seguidas de los lags directos y los indicadores de stockout.}
     \label{fig:shap_summary}
 \end{figure}
+
+Del análisis de esta figura se extraen las siguientes conclusiones, que validan empíricamente las hipótesis de diseño del módulo de \textit{feature engineering}:
+
+\begin{itemize}
+    \item \textbf{Dominancia de la inercia reciente:} Las medias móviles de demanda a corto y medio plazo (\texttt{demand\_roll\_mean\_7}, \texttt{demand\_roll\_sum\_28}) dominan la importancia predictiva de forma absoluta, seguidas de los rezagos o \textit{lags} directos (\texttt{demand\_lag\_7}, \texttt{demand\_lag\_1}). Esto refleja el comportamiento natural de autocorrelación en series temporales de retail.
+    \item \textbf{Uso inteligente de la información de rotura:} Las variables de \textit{stockout} (\texttt{stockout\_roll\_mean\_28}) aparecen de forma consistente en posiciones intermedias-altas de importancia. Esto evidencia que el modelo probabilístico ha aprendido a utilizar el historial de estanterías vacías como una señal \textit{proxy} estructural para ajustar al alza la demanda latente.
+    \item \textbf{Modulación climática:} Las variables meteorológicas (\texttt{avg\_humidity\_lag\_14}, \texttt{avg\_wind\_level\_lag\_14}) se sitúan en las últimas posiciones. En lugar de forzar una dependencia general irreal, el algoritmo las utiliza sutilmente para ajustar los cuantiles extremos únicamente en categorías específicas.
+\end{itemize}
+
+Finalmente, más allá del impacto global de las variables, el sistema implementa un \textbf{Diagnóstico Post-Mortem} a nivel de ítem. El módulo identificó los SKUs con mayor contribución al coste total durante la simulación y, en los casos más problemáticos, atribuyó las pérdidas a una de dos causas: alta intermitencia estructural (series con más del 40\% de días con venta cero, donde cualquier predicción positiva genera sobrestock continuo) o derivas bruscas de tendencia detectadas tarde por el detector Page-Hinkley. Esta trazabilidad convierte los fallos estadísticos en información financiera accionable para el responsable logístico.
 
 \section{Verificación de Objetivos y KPIs}
 \label{sec:resultados_kpis}
