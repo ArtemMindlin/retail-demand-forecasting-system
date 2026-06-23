@@ -251,13 +251,24 @@ Los dos primeros objetivos (el impacto de la corrección de censura y la superio
 
 Para consolidar la comprensión del gemelo digital, esta sección desarrolla un ejemplo numérico sobre un SKU ficticio que reproduce la mecánica de costes implementada en \texttt{simulate\_inventory\_policy}. El bucle de simulación procesa cada periodo en dos fases: primero emite el pedido evaluando la Posición de Inventario ($IP$) con el estado inicial del día, y luego ejecuta el \texttt{step} físico (llegan los pedidos, se salda el backlog, se atiende la demanda y se computa el coste: $\text{coste} = OH_{\text{fin}}\cdot c_o + BL_{\text{fin}}\cdot c_u$). El objetivo es hacer explícita la diferencia entre la política probabilística (que conoce la distribución de la demanda) y la política puntual (que solo utiliza la media predicha).
 
-\subsection*{Parámetros del ejemplo}
+\subsection*{Parámetros y Nomenclatura del ejemplo}
 
+Para modelar el estado del inventario a lo largo del tiempo, empleamos la nomenclatura estándar de la literatura logística, que se corresponde directamente con los atributos de la clase \texttt{InventoryState} del simulador:
 \begin{itemize}
-    \item Coste de sobrestock: $c_o = 1$\,u.m./unidad
-    \item Coste de rotura: $c_u = 4$\,u.m./unidad
-    \item \textit{Lead time}: 7 días (el pedido llega en el siguiente periodo)
-    \item Stock inicial: $OH_0 = 0$, $BL_0 = 0$
+    \item $OH$ (\textit{On-Hand}): Stock físico disponible en el almacén al inicio o fin del periodo.
+    \item $OO$ (\textit{On-Order}): Unidades en tránsito que ya han sido pedidas pero aún no han llegado.
+    \item $BL$ (\textit{Backlog}): Demanda insatisfecha acumulada (pedidos pendientes de entrega).
+    \item $IP$ (\textit{Inventory Position}): Posición neta de inventario sobre la que se toman las decisiones ($IP = OH + OO - BL$).
+    \item $S$: Nivel objetivo de inventario (\textit{Order-Up-To level}).
+    \item $Q$: Cantidad a pedir emitida al proveedor en el periodo actual ($Q = S - IP$).
+\end{itemize}
+
+Los parámetros de simulación fijados para este SKU ficticio son:
+\begin{itemize}
+    \item Coste de sobrestock: $c_o = 1$\,u.m./unidad.
+    \item Coste de rotura: $c_u = 4$\,u.m./unidad.
+    \item \textit{Lead time}: 7 días (el pedido emitido hoy llega al inicio del siguiente periodo semanal).
+    \item Estado inicial (Periodo 0): $OH_0 = 0$, $BL_0 = 0$, $OO_1 = 0$.
 \end{itemize}
 
 El fractil crítico que minimiza el coste esperado del Newsvendor es:
