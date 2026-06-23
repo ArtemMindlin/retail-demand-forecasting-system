@@ -4,6 +4,8 @@
 
 Este capítulo presenta el análisis empírico de la ejecución del sistema sobre el dataset \textit{Fresh RetailNet}. Los resultados se organizan en cinco niveles de evaluación: métricas predictivas, calibración conformal, impacto logístico en el gemelo digital, optimización global bajo restricciones y explicabilidad. El capítulo cierra con una verificación explícita de los KPIs definidos en el Capítulo~\ref{chap:introduccion}.
 
+\textbf{Nota sobre el diseño experimental:} Es fundamental remarcar que la selección del modelo campeón y la evaluación del impacto de la corrección de censura se realizan deliberadamente sobre un \textbf{subset base de 50 series}. Este subset actúa como un entorno de laboratorio diseñado específicamente para aislar el problema central de esta tesis: los SKUs con \textit{stockouts} severos e intermitentes. La posterior validación a escala con 500 series se introduce únicamente para evaluar la estabilidad estadística de la \textit{Conformal Prediction} (Sección~\ref{sec:resultados_escala}). Evaluar el algoritmo de imputación promediando sobre las 500 series diluiría el impacto de la mejora bajo una gran mayoría de productos estables que rara vez sufren roturas, ocultando el valor real de la solución logística allí donde más se necesita.
+
 \section{Métricas Predictivas y la Trampa del MAE}
 \label{sec:resultados_predictivos}
 
