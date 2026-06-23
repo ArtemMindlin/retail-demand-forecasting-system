@@ -249,7 +249,7 @@ Los dos primeros objetivos (el impacto de la corrección de censura y la superio
 \section{Caso de Uso Ilustrativo: Mecánica de la Política Order-Up-To paso a paso}
 \label{sec:caso_uso_sS}
 
-Para consolidar la comprensión del gemelo digital, esta sección desarrolla un ejemplo numérico sobre un SKU ficticio que reproduce la mecánica de costes implementada en \texttt{simulate\_inventory\_policy} (esto es, el ciclo de cada periodo: recepción de pedidos, saldo del \textit{backlog}, atención de la demanda y cómputo del coste $\text{coste} = OH_{\text{fin}}\cdot c_o + BL_{\text{fin}}\cdot c_u$. Las cantidades de pedido se presentan de forma idealizada (la posición de inventario se evalúa tras resolver la demanda de cada periodo) para mantener la claridad expositiva. El objetivo es hacer explícita la diferencia entre la política probabilística (que conoce la distribución de la demanda) y la política puntual (que solo utiliza la media predicha).
+Para consolidar la comprensión del gemelo digital, esta sección desarrolla un ejemplo numérico sobre un SKU ficticio que reproduce la mecánica de costes implementada en \texttt{simulate\_inventory\_policy}. El bucle de simulación procesa cada periodo en dos fases: primero emite el pedido evaluando la Posición de Inventario ($IP$) con el estado inicial del día, y luego ejecuta el \texttt{step} físico (llegan los pedidos, se salda el backlog, se atiende la demanda y se computa el coste: $\text{coste} = OH_{\text{fin}}\cdot c_o + BL_{\text{fin}}\cdot c_u$). El objetivo es hacer explícita la diferencia entre la política probabilística (que conoce la distribución de la demanda) y la política puntual (que solo utiliza la media predicha).
 
 \subsection*{Parámetros del ejemplo}
 
@@ -257,103 +257,106 @@ Para consolidar la comprensión del gemelo digital, esta sección desarrolla un 
     \item Coste de sobrestock: $c_o = 1$\,u.m./unidad
     \item Coste de rotura: $c_u = 4$\,u.m./unidad
     \item \textit{Lead time}: 7 días (el pedido llega en el siguiente periodo)
-    \item Stock inicial: $OH_0 = 0$, $BL_0 = 0$, $OO_0 = 0$
+    \item Stock inicial: $OH_0 = 0$, $BL_0 = 0$
 \end{itemize}
 
 El fractil crítico que minimiza el coste esperado del Newsvendor es:
 \begin{equation}
     q^* = \frac{c_u}{c_u + c_o} = \frac{4}{4 + 1} = 0{,}80
 \end{equation}
-El sistema debe por tanto cubrir el percentil 80 de la distribución de demanda, reflejando que quedarse sin stock cuesta cuatro veces más que tener exceso.
+El sistema debe por tanto cubrir el percentil 80 de la distribución de demanda.
 
-\subsection*{Periodo 1 --- primer pedido}
+\subsection*{Periodo 1 --- primer pedido y demanda}
 
-El modelo probabilístico predice los siguientes cuantiles de demanda acumulada para los próximos 7 días:
+El modelo probabilístico predice una demanda para el Periodo 1 donde $q_{0{,}80} \approx 72$. La política puntual predice la mediana $\hat{y}_1 = 50$.
 
-\begin{center}
-\begin{tabular}{cccccc}
-\toprule
-$q_{0{,}1}$ & $q_{0{,}3}$ & $q_{0{,}5}$ & $q_{0{,}7}$ & $q_{0{,}9}$ \\
-\midrule
-20 & 35 & 50 & 65 & 80 \\
-\bottomrule
-\end{tabular}
-\end{center}
+\medskip
+\noindent\textbf{1. Emisión del pedido (Inicio del periodo):}
+La posición de inventario es $IP_1 = OH_0 - BL_0 + OO_1 = 0 - 0 + 0 = 0$.
+\begin{itemize}
+    \item Probabilística: Pide $Q_1 = 72 - 0 = 72$ unidades.
+    \item Puntual: Pide $Q_1 = 50 - 0 = 50$ unidades.
+\end{itemize}
+Estos pedidos llegarán al inicio del Periodo 2.
 
-Interpolando en $q^* = 0{,}80$ entre $q_{0{,}7} = 65$ y $q_{0{,}9} = 80$ se obtiene el nivel objetivo $S_1 \approx 72$ unidades. La posición de inventario actual es $IP_1 = OH_0 + OO_0 - BL_0 = 0$, por lo que la orden emitida es:
-\begin{equation*}
-    Q_1 = S_1 - IP_1 = 72 - 0 = 72 \text{ unidades}
-\end{equation*}
-
-La política puntual, en cambio, fija $S_1 = \hat{y}_1 = 50$ (la mediana predicha) y emite un pedido de solo 50 unidades. Esta diferencia de 22 unidades es la consecuencia directa de ignorar la asimetría de costes.
-
-\subsection*{Periodo 1 --- llegada de la demanda real}
-
-La demanda real es $y_1 = 55$ unidades. El pedido de 72 unidades todavía está en tránsito (\textit{on-order}), por lo que no hay stock disponible:
-
+\medskip
+\noindent\textbf{2. Resolución física (Fin del periodo):}
+Llegan 0 unidades. La demanda real es $y_1 = 55$.
 \begin{align*}
     OH_1 &= 0 + 0 \text{ (arrivals)} = 0 \\
     \text{servido} &= \min(0,\; 55) = 0 \\
     BL_1 &= 55 - 0 = 55 \text{ unidades (rotura total)} \\
-    \text{coste}_1 &= 0 \times 1 + 55 \times 4 = 220\,\text{u.m.}
+    \text{coste}_1 &= 0 \times 1 + 55 \times 4 = 220\,\text{u.m.} \quad \text{(para ambas políticas)}
 \end{align*}
-
-El backlog de 55 unidades se arrastra al siguiente periodo. Ambas políticas (probabilística y puntual) incurren en el mismo coste en este primer periodo, pues ninguna tiene stock disponible todavía.
 
 \subsection*{Periodo 2 --- llegada del pedido}
 
-Llegan las 72 unidades pedidas en el periodo 1 (política probabilística) y las 50 de la política puntual. La demanda real es $y_2 = 60$ unidades:
+El modelo predice para el Periodo 2 un $S_2 = 70$ (probabilística) y un $\hat{y}_2 = 50$ (puntual).
 
 \medskip
+\noindent\textbf{1. Emisión del pedido (Inicio del periodo):}
+El estado arrastrado es $OH = 0$, $BL = 55$. Los pedidos del Periodo 1 pasan a ser "llegadas" inminentes, por lo que ya no cuentan como \textit{On-Order} futuro ($OO_2 = 0$).
+$IP_2 = OH - BL + OO_2 = 0 - 55 + 0 = -55$.
+\begin{itemize}
+    \item Probabilística: $Q_2 = S_2 - IP_2 = 70 - (-55) = 125$ unidades.
+    \item Puntual: $Q_2 = 50 - (-55) = 105$ unidades.
+\end{itemize}
+El \textit{backlog} arrastrado infla automáticamente el nuevo pedido.
+
+\medskip
+\noindent\textbf{2. Resolución física (Fin del periodo):}
+Llegan los pedidos del Periodo 1 (72 y 50). La demanda real es $y_2 = 60$.
+
 \noindent\textbf{Política probabilística:}
 \begin{align*}
-    OH_2 &= 0 + 72 = 72 \\
+    OH_2 &= 0 + 72 \text{ (arrivals)} = 72 \\
     \text{backlog saldado} &= \min(72,\; 55) = 55 \Rightarrow OH_2 = 17,\; BL_2 = 0 \\
     \text{servido}_2 &= \min(17,\; 60) = 17 \\
     BL_2 &= 60 - 17 = 43 \text{ unidades} \\
     \text{coste}_2 &= 0 \times 1 + 43 \times 4 = 172\,\text{u.m.}
 \end{align*}
 
-$IP_2 = 0 - 43 = -43$; el modelo predice $S_2 = 70$, por lo que $Q_2 = 70 - (-43) = 113$ unidades.
-
-\medskip
 \noindent\textbf{Política puntual:}
 \begin{align*}
-    OH_2 &= 0 + 50 = 50 \\
-    \text{backlog saldado} &= \min(50,\; 55) = 50 \Rightarrow OH_2 = 0,\; BL_{\text{restante}} = 5 \\
+    OH_2 &= 0 + 50 \text{ (arrivals)} = 50 \\
+    \text{backlog saldado} &= \min(50,\; 55) = 50 \Rightarrow OH_2 = 0,\; \text{BL restante} = 5 \\
     \text{servido}_2 &= \min(0,\; 60) = 0 \\
     BL_2 &= 5 + 60 = 65 \text{ unidades} \\
     \text{coste}_2 &= 0 \times 1 + 65 \times 4 = 260\,\text{u.m.}
 \end{align*}
 
-$IP_2 = 0 - 65 = -65$; la política puntual predice $\hat{y}_2 = 50$, por lo que $Q_2 = 50 - (-65) = 115$ unidades.
-
-El backlog pendiente ``infla'' el pedido en ambas políticas, mecanismo que el gemelo digital captura automáticamente y que la evaluación estática (Newsvendor de un solo periodo) ignoraría por completo.
-
 \subsection*{Periodo 3 --- estabilización}
 
-Llegan las 113 unidades (política probabilística) y las 115 (política puntual). La demanda real es $y_3 = 50$ unidades:
+Asumimos una predicción idéntica ($S_3 = 70$, $\hat{y}_3 = 50$).
 
 \medskip
+\noindent\textbf{1. Emisión del pedido:}
+\begin{itemize}
+    \item Probabilística ($BL=43$): $IP_3 = 0 - 43 = -43 \Rightarrow Q_3 = 70 - (-43) = 113$ unidades.
+    \item Puntual ($BL=65$): $IP_3 = 0 - 65 = -65 \Rightarrow Q_3 = 50 - (-65) = 115$ unidades.
+\end{itemize}
+
+\medskip
+\noindent\textbf{2. Resolución física:}
+Llegan los pedidos del Periodo 2 (125 y 105). La demanda es $y_3 = 50$.
+
 \noindent\textbf{Política probabilística:}
 \begin{align*}
-    OH_3 &= 0 + 113 = 113 \\
-    \text{backlog saldado} &= \min(113,\; 43) = 43 \Rightarrow OH_3 = 70,\; BL_3 = 0 \\
-    \text{servido}_3 &= \min(70,\; 50) = 50 \\
-    OH_3 &= 20,\; BL_3 = 0 \\
-    \text{coste}_3 &= 20 \times 1 + 0 \times 4 = 20\,\text{u.m.}
+    OH_3 &= 0 + 125 = 125 \\
+    \text{backlog saldado} &= \min(125,\; 43) = 43 \Rightarrow OH_3 = 82,\; BL_3 = 0 \\
+    \text{servido}_3 &= \min(82,\; 50) = 50 \\
+    OH_3 &= 32,\; BL_3 = 0 \\
+    \text{coste}_3 &= 32 \times 1 + 0 \times 4 = 32\,\text{u.m.}
 \end{align*}
 
 \noindent\textbf{Política puntual:}
 \begin{align*}
-    OH_3 &= 0 + 115 = 115 \\
-    \text{backlog saldado} &= \min(115,\; 65) = 65 \Rightarrow OH_3 = 50,\; BL_3 = 0 \\
-    \text{servido}_3 &= \min(50,\; 50) = 50 \\
-    OH_3 &= 0,\; BL_3 = 0 \\
-    \text{coste}_3 &= 0 \times 1 + 0 \times 4 = 0\,\text{u.m.}
+    OH_3 &= 0 + 105 = 105 \\
+    \text{backlog saldado} &= \min(105,\; 65) = 65 \Rightarrow OH_3 = 40,\; BL_3 = 0 \\
+    \text{servido}_3 &= \min(40,\; 50) = 40 \\
+    OH_3 &= 0,\; BL_3 = 10 \\
+    \text{coste}_3 &= 0 \times 1 + 10 \times 4 = 40\,\text{u.m.}
 \end{align*}
-
-Ambos sistemas han saldado el backlog. La política probabilística presenta sobrestock residual (20 u.m.) porque sus pedidos iniciales más generosos llegaron con anticipación; la puntual cierra en cero porque tardó más en recuperar el déficit acumulado.
 
 \subsection*{Comparación acumulada de costes}
 
@@ -366,12 +369,12 @@ Ambos sistemas han saldado el backlog. La política probabilística presenta sob
         \midrule
         1 & 220\,u.m. & 220\,u.m. \\
         2 & 172\,u.m. & 260\,u.m. \\
-        3 &  20\,u.m. &   0\,u.m. \\
+        3 &  32\,u.m. &  40\,u.m. \\
         \midrule
-        \textbf{Total} & \textbf{412\,u.m.} & \textbf{480\,u.m.} \\
+        \textbf{Total} & \textbf{424\,u.m.} & \textbf{520\,u.m.} \\
         \bottomrule
     \end{tabular}
-    \caption{Coste de inventario acumulado en el ejemplo ilustrativo. La política probabilística reduce el coste total en un 14\% al recuperar antes el backlog gracias a pedidos iniciales más generosos.}
+    \caption{Coste de inventario acumulado en el ejemplo ilustrativo. La política probabilística reduce el coste total al recuperar antes el backlog gracias a la gestión temprana de la incertidumbre.}
     \label{tab:caso_uso_sS}
 \end{table}
 
