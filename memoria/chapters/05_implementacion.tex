@@ -337,53 +337,19 @@ La Tabla~\ref{tab:api_endpoints} describe los endpoints operacionales del servic
     \label{tab:api_endpoints}
 \end{table}
 
-\subsection{Dashboard Interactivo y de Gestión}
+\subsection{Dashboard Interactivo}
 
-El endpoint raíz \texttt{GET /} sirve un dashboard React de página única (\textit{Single Page Application}) embebido en el propio servidor FastAPI. Esta aplicación web no es un simple visor estático, sino una herramienta de gestión y análisis logístico bidireccional que permite la interacción en tiempo real. 
-
-Para ilustrar su funcionamiento, las Figuras~\ref{fig:dashboard_1} y \ref{fig:dashboard_2} recogen capturas de la interfaz desarrollada. El dashboard está organizado en cuatro paneles funcionales principales:
+El endpoint raíz \texttt{GET /} sirve un dashboard React de página única (\textit{Single Page Application}) embebido en el propio servidor FastAPI. El dashboard está organizado en cuatro paneles funcionales:
 
 \begin{itemize}
     \item \textbf{Panel de Pronóstico y Simulador \textit{What-If}}: Muestra la serie temporal de predicciones vs. demanda real del SKU seleccionado, con los intervalos conformes superpuestos. El usuario puede ajustar mediante \textit{sliders} el nivel de servicio objetivo, los costes de rotura y sobrestock, y la capacidad del almacén; el endpoint \texttt{POST /api/forecast} recalcula en tiempo real la cantidad óptima $q^*$ y los KPIs de inventario (coste total, cobertura empírica, MAE, PSI de drift).
-    
-    \item \textbf{Panel de Catálogo de SKUs}: Vista tabular de los SKUs más activos con su estado operacional codificado en color, la tendencia de demanda de los últimos 14 días y las métricas clave. Permite seleccionar un SKU para actualizar el panel de pronóstico.
-    
-    \item \textbf{Panel de Drift}: Gráfico con el PSI de cada feature de importancia, calculado por el módulo \texttt{drift/psi.py} y persistido como \texttt{drift\_report.json} al término de cada \texttt{experiment}. Se marca visualmente (en naranja para advertencias y rojo para alertas críticas) las features que han sufrido cambios distribucionales significativos desde el entrenamiento.
-    
+
+    \item \textbf{Panel de Catálogo de SKUs}: Vista tabular de los 50 SKUs más activos con su estado operacional codificado en color, la tendencia de demanda de los últimos 14 días y las métricas clave. Permite seleccionar un SKU para actualizar el panel de pronóstico.
+
+    \item \textbf{Panel de Drift}: Gráfico de barras con el PSI de cada feature de importancia, calculado por el módulo \texttt{drift/psi.py} y persistido como \texttt{drift\_report.json} al término de cada \texttt{experiment}. Se marca en naranja (PSI $> 0.10$) y rojo (PSI $> 0.20$) las features que han sufrido cambios distribucionales significativos desde el entrenamiento.
+
     \item \textbf{Panel de Alertas}: Lista priorizada de alertas operacionales con enlace directo al endpoint de acción sugerida (reoptimización, reentrenamiento o revisión manual), extraídas del fichero \texttt{exceptions.csv} del último run.
 \end{itemize}
-
-\begin{figure}[H]
-    \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/dashboard/dash1.png}
-        \caption{Vista general de pronóstico y catálogo de SKUs.}
-        \label{fig:dashboard_1}
-    \end{minipage}\hfill
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/dashboard/dash2.png}
-        \caption{Simulador What-If interactivo con recálculo en tiempo real.}
-        \label{fig:dashboard_2}
-    \end{minipage}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/dashboard/dash3.png}
-        \caption{Monitor de Drift (Population Stability Index).}
-        \label{fig:dashboard_3}
-    \end{minipage}\hfill
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/dashboard/dash4.png}
-        \caption{Panel de alertas y diagnóstico Post-Mortem.}
-        \label{fig:dashboard_4}
-    \end{minipage}
-\end{figure}
 
 \section{Calidad de Software e Infraestructura CI/CD}
 Para garantizar que la deuda técnica no limite el escalado del sistema, se han aplicado prácticas fundamentales de \textit{DevOps}:
