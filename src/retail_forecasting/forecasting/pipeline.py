@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -46,7 +47,7 @@ from retail_forecasting.inventory.newsvendor import (
     run_sensitivity_analysis,
 )
 from retail_forecasting.inventory.simulation import simulate_inventory_policy
-from retail_forecasting.models.boosting import AutoBoostingModel
+from retail_forecasting.models.boosting import LightGBMModel
 from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
@@ -84,10 +85,10 @@ def _split_train_calibration(
 
 
 def _instantiate_boosting_base(
-    model_cls: type[AutoBoostingModel] | type[CatBoostingModel],
+    model_cls: type[LightGBMModel] | type[CatBoostingModel],
     settings: Settings,
     params: BoostingParams,
-) -> AutoBoostingModel | CatBoostingModel:
+) -> LightGBMModel | CatBoostingModel:
     """Build a boosting base model from tuned params and inventory costs."""
     return model_cls(
         quantiles=settings.models.quantiles,
@@ -101,7 +102,7 @@ def _instantiate_boosting_base(
 
 
 def _train_conformal_model(
-    base_model: AutoBoostingModel | CatBoostingModel,
+    base_model: LightGBMModel | CatBoostingModel,
     sub_train: pd.DataFrame,
     calib: pd.DataFrame,
     group_ids: pd.Series | None,
@@ -255,6 +256,141 @@ def run_imputation_comparison(settings: Settings) -> Path:
     )
 
     print(f"\n✅ Imputation comparison written to: {run_dir}\n")
+    return run_dir
+
+
+def evaluate_fair_inventory_cost(
+    panel: pd.DataFrame,
+    inventory_config: InventoryConfig,
+    seed: int,
+    eval_fraction: float = SYNTHETIC_CENSORING_EVAL_FRACTION,
+) -> pd.DataFrame:
+    """Compare strategies on inventory cost against a COMMON ground truth.
+
+    The naive pipeline scores each strategy against its own target (censored sale for
+    Observed, reconstructed demand for Latent), which is apples-to-oranges and unfairly
+    favours Observed. Here we reuse the synthetic-censoring trick of
+    ``_evaluate_imputation_quality``: hold out clean days (true demand known), censor them
+    with empirically-sampled stockout ratios, let each strategy build a demand SIGNAL,
+    derive an order-up-to quantity, and charge the newsvendor cost against the SAME true
+    demand for every strategy.
+
+    The order policy is identical across strategies (normal-approx order-up-to with a
+    shared safety term); only the demand signal differs, so any cost gap is attributable
+    to the censoring effect alone.
+
+    Returns one row per strategy: signal_mae, total_cost, fill_rate, mean_order, n_eval.
+    """
+    rng = np.random.default_rng(seed)
+    clean_mask = panel["stockout_hours"] == 0
+    real_ratios = (
+        (panel.loc[panel["stockout_hours"] > 0, "stockout_hours"] / OPERATIVE_WINDOW_HOURS)
+        .clip(0, 1)
+        .to_numpy()
+    )
+    clean_idx = panel.index[clean_mask].to_numpy()
+    columns = ["strategy", "signal_mae", "total_cost", "fill_rate", "mean_order", "n_eval"]
+    if len(clean_idx) == 0 or len(real_ratios) == 0:
+        return pd.DataFrame(columns=columns)
+
+    n_eval = max(1, int(len(clean_idx) * eval_fraction))
+    eval_idx = rng.choice(clean_idx, size=n_eval, replace=False)
+    sampled_ratios = rng.choice(real_ratios, size=n_eval, replace=True)
+
+    true_demand = panel.loc[eval_idx, "observed_demand"].astype(float).to_numpy()
+
+    censored = panel.copy()
+    censored.loc[eval_idx, "stockout_hours"] = sampled_ratios * OPERATIVE_WINDOW_HOURS
+    censored.loc[eval_idx, "observed_demand"] = true_demand * (1.0 - sampled_ratios)
+
+    # Flat cost coefficients so every strategy is charged identically (isolates the signal).
+    flat_config = inventory_config.model_copy(update={"use_series_costs": False})
+    cr = flat_config.stockout_cost / (flat_config.stockout_cost + flat_config.overstock_cost)
+    z = statistics.NormalDist().inv_cdf(cr)
+    sigma = float(np.std(true_demand))  # shared safety-stock scale (same scalar for all)
+
+    if "series_id" in panel.columns:
+        series_ids = panel.loc[eval_idx, "series_id"].astype(str).to_numpy()
+    else:
+        series_ids = np.arange(n_eval)
+
+    total_demand = float(true_demand.sum())
+    records: list[dict[str, Any]] = []
+    # "none" leaves the censored sale untouched → it IS the Observed (deflated) signal.
+    for strategy, label in (
+        ("none", "Observed"),
+        ("supervised", "Latent_supervised"),
+        ("historical_mean", "Latent_historical_mean"),
+        ("clipped_scaling", "Latent_clipped_scaling"),
+    ):
+        imputed = LatentDemandImputer(strategy=strategy).impute(censored)
+        signal = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
+        q_star = np.maximum(signal + z * sigma, 0.0)
+
+        costed = attach_inventory_costs(
+            pd.DataFrame(
+                {"series_id": series_ids, "y_true": true_demand, "order_quantity": q_star}
+            ),
+            flat_config,
+        )
+        stockout_units = float(costed["stockout_units"].sum())
+        records.append(
+            {
+                "strategy": label,
+                "signal_mae": float(np.mean(np.abs(signal - true_demand))),
+                "total_cost": float(costed["total_cost"].sum()),
+                "fill_rate": (
+                    (1.0 - stockout_units / total_demand) * 100.0
+                    if total_demand > 0
+                    else float("nan")
+                ),
+                "mean_order": float(np.mean(q_star)),
+                "n_eval": int(n_eval),
+            }
+        )
+    return pd.DataFrame(records)
+
+
+def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
+    """Lightweight backtest (no training) validating the fair inventory-cost comparison.
+
+    Loads the train panel, subsamples ``n_series`` series for speed, scores every strategy's
+    inventory cost against a common synthetically-censored ground truth, and writes
+    ``fair_cost_backtest.csv``. Use this to sanity-check the methodology before integrating.
+
+    Returns:
+        The created run directory path.
+    """
+    print("\n" + "=" * 50)
+    print("🧪 FAIR INVENTORY-COST BACKTEST (common ground truth · no forecasting)")
+    print("=" * 50 + "\n")
+    print("📂 Loading train panel...")
+    panel = load_prepared_panel(
+        dataset_config=settings.dataset,
+        preprocessing_config=settings.preprocessing,
+        split="train",
+    )
+    if "series_id" in panel.columns and n_series:
+        unique_ids = panel["series_id"].drop_duplicates().to_numpy()
+        if len(unique_ids) > n_series:
+            rng = np.random.default_rng(settings.project.random_seed)
+            keep = rng.choice(unique_ids, size=n_series, replace=False)
+            panel = panel[panel["series_id"].isin(keep)].reset_index(drop=True)
+    n_kept = panel["series_id"].nunique() if "series_id" in panel.columns else 0
+    print(f"✅ Panel: {len(panel):,} rows · {n_kept} series (sample)")
+
+    result = evaluate_fair_inventory_cost(
+        panel, settings.inventory, seed=settings.project.random_seed
+    )
+
+    run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    out_path = run_dir / "fair_cost_backtest.csv"
+    result.to_csv(out_path, index=False)
+
+    print("\n── Inventory cost against a COMMON ground truth (lower = better) ──")
+    print(result.to_string(index=False))
+    print(f"\n✅ Fair-cost backtest written to: {out_path}\n")
     return run_dir
 
 
@@ -544,7 +680,7 @@ def _run_fold_loop(
         ):
             print(f"    🌲 [{data_strategy}] Training LightGBM (fold {fold.fold_id})...")
             result.boosting_model = _train_conformal_model(
-                _instantiate_boosting_base(AutoBoostingModel, settings, best_boosting_params),
+                _instantiate_boosting_base(LightGBMModel, settings, best_boosting_params),
                 sub_train_frame,
                 calib_frame,
                 calib_group_ids,
@@ -636,7 +772,7 @@ def _evaluate_on_holdout(
         supervised_frame, settings
     )
     holdout_boosting_model = _train_conformal_model(
-        _instantiate_boosting_base(AutoBoostingModel, settings, best_boosting_params),
+        _instantiate_boosting_base(LightGBMModel, settings, best_boosting_params),
         full_sub_train,
         full_calib,
         full_calib_group_ids,
@@ -987,7 +1123,7 @@ def _build_model_predictions(
     )
 
 
-def _instantiate_champion_base_model(settings: Settings) -> CatBoostingModel | AutoBoostingModel:
+def _instantiate_champion_base_model(settings: Settings) -> CatBoostingModel | LightGBMModel:
     backend = settings.business.champion_backend_name
     if backend == "conformal_catboost_official":
         return CatBoostingModel(
@@ -999,7 +1135,7 @@ def _instantiate_champion_base_model(settings: Settings) -> CatBoostingModel | A
             overstock_cost=settings.inventory.overstock_cost,
             stockout_cost=settings.inventory.stockout_cost,
         )
-    return AutoBoostingModel(
+    return LightGBMModel(
         quantiles=settings.models.quantiles,
         random_seed=settings.project.random_seed,
         n_estimators=settings.models.n_estimators,

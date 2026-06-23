@@ -15,7 +15,7 @@ from retail_forecasting.contracts.contracts_tuning import (
     TuningMetadata,
     TuningResult,
 )
-from retail_forecasting.models.boosting import AutoBoostingModel
+from retail_forecasting.models.boosting import LightGBMModel
 from retail_forecasting.utils.io import quantile_column_name, winkler_score
 
 logger = logging.getLogger(__name__)
@@ -155,7 +155,7 @@ class HyperparameterTuner:
                 max_depth=trial.suggest_int("max_depth", 3, 12),
             )
 
-            model = AutoBoostingModel(
+            model = LightGBMModel(
                 quantiles=self.settings.models.quantiles,
                 random_seed=self.settings.project.random_seed,
                 n_estimators=params.n_estimators,

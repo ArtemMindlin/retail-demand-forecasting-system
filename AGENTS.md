@@ -39,7 +39,7 @@ run.py
  -> label_stockout_regime()
  -> build_supervised_frame()
  -> build_walk_forward_folds()
- -> SeasonalNaiveModel / AutoBoostingModel
+ -> SeasonalNaiveModel / LightGBMModel
  -> choose_order_quantity()
  -> attach_inventory_costs()
  -> summarize_predictions() / summarize_costs()

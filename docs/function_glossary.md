@@ -23,9 +23,9 @@ main()
        -> build_walk_forward_folds()
        -> SeasonalNaiveModel.fit()
        -> SeasonalNaiveModel.predict()
-       -> AutoBoostingModel.fit()
-       -> AutoBoostingModel.predict()
-       -> AutoBoostingModel.predict_quantiles()
+       -> LightGBMModel.fit()
+       -> LightGBMModel.predict()
+       -> LightGBMModel.predict_quantiles()
        -> choose_order_quantity()
        -> attach_inventory_costs()
        -> summarize_predictions()
@@ -309,16 +309,16 @@ main()
 - Devuelve: `np.ndarray`.
 - Se usa en: `_build_baseline_predictions()`.
 
-### `AutoBoostingModel.fit`
+### `LightGBMModel.fit`
 - Archivo: `src/retail_forecasting/models/boosting.py`
 - Que hace: entrena un modelo puntual y un modelo por cada cuantil solicitado.
 - Recibe:
   - `features`;
   - `target`.
-- Devuelve: `AutoBoostingModel`.
+- Devuelve: `LightGBMModel`.
 - Se usa en: `run_experiment_from_frame()`.
 
-### `AutoBoostingModel.predict`
+### `LightGBMModel.predict`
 - Archivo: `src/retail_forecasting/models/boosting.py`
 - Que hace: genera la prediccion puntual y recorta valores negativos.
 - Recibe:
@@ -326,7 +326,7 @@ main()
 - Devuelve: `np.ndarray`.
 - Se usa en: `_build_boosting_predictions()`.
 
-### `AutoBoostingModel.predict_quantiles`
+### `LightGBMModel.predict_quantiles`
 - Archivo: `src/retail_forecasting/models/boosting.py`
 - Que hace: genera cuantiles y fuerza monotonia entre ellos.
 - Recibe:

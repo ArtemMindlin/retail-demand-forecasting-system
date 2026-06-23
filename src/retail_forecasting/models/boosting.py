@@ -5,23 +5,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor
+import lightgbm as lgb
 
 from retail_forecasting.models._quantile_forecaster import QuantileForecasterMixin
 
 logger = logging.getLogger(__name__)
 
 
-def _lightgbm_available() -> bool:
-    try:
-        import lightgbm  # noqa: F401
-    except ImportError:
-        return False
-    return True
-
-
 @dataclass
-class AutoBoostingModel(QuantileForecasterMixin):
+class LightGBMModel(QuantileForecasterMixin):
     quantiles: list[float]
     random_seed: int
     n_estimators: int
@@ -29,12 +21,12 @@ class AutoBoostingModel(QuantileForecasterMixin):
     max_depth: int
     overstock_cost: float = 1.0
     stockout_cost: float = 4.0  # must be > 0; drives the critical fractile q* = cu/(cu+co)
-    model_name: str = "auto_boosting"
-    backend_name: str = field(init=False, default="unknown")
+    model_name: str = "lightgbm"
+    backend_name: str = field(init=False, default="lightgbm")
     point_model_: Any = field(init=False, default=None)
     quantile_models_: dict[float, Any] = field(init=False, default_factory=dict)
 
-    def fit(self, features: pd.DataFrame, target: pd.Series) -> AutoBoostingModel:
+    def fit(self, features: pd.DataFrame, target: pd.Series) -> LightGBMModel:
         # Build the main point model.
         # If stockout_cost > 0, we use a cost-aware objective (pinball loss at critical fractil)
         self.point_model_ = self._build_point_model()
@@ -59,32 +51,19 @@ class AutoBoostingModel(QuantileForecasterMixin):
             "Cost-aware training: optimizing point model for critical fractile tau = %.4f",
             critical_fractile,
         )
-        self.backend_name = "lightgbm" if _lightgbm_available() else "sklearn_gradient_boosting"
         return self._build_quantile_model(critical_fractile)
 
     def _build_quantile_model(self, quantile: float) -> Any:
-        if _lightgbm_available():
-            import lightgbm as lgb
-
-            return lgb.LGBMRegressor(
-                objective="quantile",
-                alpha=quantile,
-                random_state=self.random_seed,
-                n_estimators=self.n_estimators,
-                learning_rate=self.learning_rate,
-                num_leaves=31,
-                max_depth=self.max_depth,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                n_jobs=-1,
-                verbosity=-1,
-            )
-
-        return GradientBoostingRegressor(
-            loss="quantile",
+        return lgb.LGBMRegressor(
+            objective="quantile",
             alpha=quantile,
-            n_estimators=min(self.n_estimators, 300),
-            learning_rate=self.learning_rate,
-            max_depth=self.max_depth,
             random_state=self.random_seed,
+            n_estimators=self.n_estimators,
+            learning_rate=self.learning_rate,
+            num_leaves=31,
+            max_depth=self.max_depth,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            n_jobs=-1,
+            verbosity=-1,
         )

@@ -510,7 +510,7 @@ Mas trials pueden encontrar mejores parametros, pero aumentan runtime.
 
 ### `optimize_for_cost`
 
-Si es `true`, `AutoBoostingModel` entrena su prediccion puntual como un cuantil
+Si es `true`, `LightGBMModel` entrena su prediccion puntual como un cuantil
 en la fractil critica newsvendor:
 
 ```text

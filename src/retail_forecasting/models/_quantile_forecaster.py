@@ -11,7 +11,7 @@ from retail_forecasting.utils.io import quantile_column_name, rearrange_quantile
 class QuantileForecasterMixin:
     """Shared point/quantile prediction logic for the boosting forecasters.
 
-    Concrete classes (``AutoBoostingModel``, ``CatBoostingModel``) provide the
+    Concrete classes (``LightGBMModel``, ``CatBoostingModel``) provide the
     attributes declared below; the mixin only depends on those, so the concrete
     classes keep full ownership of how the underlying models are built and fitted.
     """
