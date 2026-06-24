@@ -6,12 +6,13 @@ El sector retail se enfrenta al reto constante de equilibrar la disponibilidad d
 
 La metodología propuesta evoluciona el \textit{forecasting} clásico integrando modelos de Gradient Boosting con \textit{Mondrian Conformal Prediction} para garantizar la equidad estadística de la incertidumbre por categoría de producto. El sistema no se limita a predecir, sino que transforma estos pronósticos probabilísticos en decisiones de inventario mediante un Gemelo Digital logístico (simulación dinámica $s, S$) y resuelve las limitaciones de volumen y presupuesto global utilizando algoritmos de Programación Lineal (Continuous Knapsack). Finalmente, el modelo estadístico se ha operativizado bajo estándares MLOps, incluyendo explicabilidad automática (SHAP), despliegue como microservicio (FastAPI) y cuadros de mando interactivos.
 
-Los resultados empíricos demuestran que la corrección de la demanda censurada reduce el coste logístico de inventario en un \textbf{32,3\%} frente a entrenar sin corrección, y que el modelo probabilístico CatBoost supera al modelo estacional ingenuo en un \textbf{9,5\%} en coste simulado. Este enfoque integral contribuye directamente al \textbf{ODS 12 (Producción y Consumo Responsables)} al mitigar el desperdicio de productos perecederos mediante una cadena de suministro altamente eficiente, matemática e inteligible.
+Los resultados empíricos demuestran que la corrección de la demanda censurada bajo una evaluación justa reduce el coste logístico de inventario en un \textbf{4,81\%} (con un incremento en el fill rate del 91,22\% al 99,96\%), y que el modelo probabilístico CatBoost supera al modelo estacional ingenuo en un \textbf{3,7\%} en coste simulado a escala. Este enfoque integral contribuye directamente al \textbf{ODS 12 (Producción y Consumo Responsables)} al mitigar el desperdicio de productos perecederos mediante una cadena de suministro altamente eficiente, matemática e inteligible.
 
 \textbf{Palabras clave:} Retail, Machine Learning, Investigación de Operaciones, Mondrian Conformal Prediction, Programación Lineal, MLOps, ODS 12.
 
 \newpage
 
+\begin{otherlanguage}{catalan}
 \chapter*{Resum}
 \addcontentsline{toc}{chapter}{Resum}
 
@@ -19,12 +20,14 @@ El sector del retail s'enfronta al repte constant d'equilibrar la disponibilitat
 
 La metodologia proposada evoluciona el \textit{forecasting} clàssic integrant models de Gradient Boosting amb \textit{Mondrian Conformal Prediction} per a garantir l'equitat estadística de la incertesa per categoria de producte. El sistema no es limita a predir, sinó que transforma aquests pronòstics probabilístics en decisions d'inventari mitjançant un Bessó Digital logístic (simulació dinàmica $s, S$) i resol les limitacions de volum i pressupost global utilitzant algorismes de Programació Lineal (Continuous Knapsack). Finalment, el model estadístic s'ha operativitzat sota estàndards MLOps, incloent-hi explicabilitat automàtica (SHAP), desplegament com a microservei (FastAPI) i quadres de comandament interactius.
 
-Els resultats empírics demostren que la correcció de la demanda censurada redueix el cost logístic d'inventari en un \textbf{32,3\%} respecte a entrenar sense correcció, i que el model probabilístic CatBoost supera el model estacional ingenu en un \textbf{9,5\%} en cost simulat. Aquest enfocament integral contribueix directament a l'\textbf{ODS 12 (Producció i Consum Responsables)} en mitigar el malbaratament de productes peribles mitjançant una cadena de subministrament altament eficient, matemàtica i intel·ligible.
+Els resultats empírics demostren que la correcció de la demanda censurada sota una valuació justa redueix el cost logístic d'inventari en un \textbf{4,81\%} (amb un increment del fill rate del 91,22\% al 99,96\%), i que el model probabilístic CatBoost supera el model estacional ingenu en un \textbf{3,7\%} en cost simulat a escala. Aquest enfocament integral contribueix directament a l'\textbf{ODS 12 (Producció i Consum Responsables)} en mitigar el malbaratament de productes peribles mitjançant una cadena de subministrament altament eficient, matemàtica i intel·ligible.
 
 \textbf{Paraules clau:} Retail, Machine Learning, Investigació d'Operacions, Mondrian Conformal Prediction, Programació Lineal, MLOps, ODS 12.
+\end{otherlanguage}
 
 \newpage
 
+\begin{otherlanguage}{english}
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
 
@@ -32,6 +35,7 @@ The retail sector faces the constant challenge of balancing product availability
 
 The proposed methodology evolves classical forecasting by integrating Gradient Boosting models with Mondrian Conformal Prediction to ensure statistical fairness of uncertainty across product categories. The system goes beyond prediction by transforming probabilistic forecasts into inventory decisions via a logistical Digital Twin (dynamic $s, S$ simulation) and resolving global volume and budget limitations using Linear Programming (Continuous Knapsack). Finally, the statistical model has been operationalized under MLOps standards, including automated explainability (SHAP), microservice deployment (FastAPI), and interactive dashboards.
 
-Empirical results demonstrate that correcting censored demand reduces inventory logistics costs by \textbf{32.3\%} compared to training without correction, and that the probabilistic CatBoost model outperforms the seasonal naïve baseline by \textbf{9.5\%} in simulated cost. This comprehensive approach directly contributes to \textbf{SDG 12 (Responsible Consumption and Production)} by mitigating perishable product waste through a highly efficient, mathematical, and intelligible supply chain.
+Empirical results demonstrate that correcting censored demand under a fair evaluation reduces inventory logistics costs by \textbf{4.81\%} (improving the fill rate from 91.22\% to 99.96\%), and that the probabilistic CatBoost model outperforms the seasonal naïve baseline by \textbf{3.7\%} in simulated cost at scale. This comprehensive approach directly contributes to \textbf{SDG 12 (Responsible Consumption and Production)} by mitigating perishable product waste through a highly efficient, mathematical, and intelligible supply chain.
 
 \textbf{Keywords:} Retail, Machine Learning, Operations Research, Mondrian Conformal Prediction, Linear Programming, MLOps, SDG 12.
+\end{otherlanguage}

@@ -4,8 +4,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-import pandas as pd
 import lightgbm as lgb
+import pandas as pd
 
 from retail_forecasting.models._quantile_forecaster import QuantileForecasterMixin
 

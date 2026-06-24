@@ -13,7 +13,11 @@ from retail_forecasting.config import InventoryConfig, Settings
 from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_tuning import BoostingParams
-from retail_forecasting.data.censorship import OPERATIVE_WINDOW_HOURS, LatentDemandImputer
+from retail_forecasting.data.censorship import (
+    OPERATIVE_WINDOW_HOURS,
+    ImputationStrategy,
+    LatentDemandImputer,
+)
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.data.quality import (
     raise_on_blocking_data_quality,
@@ -53,13 +57,11 @@ from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.optimization import HyperparameterTuner
 from retail_forecasting.utils.io import (
+    HOLDOUT_FOLD_ID,
     make_run_directory,
     quantile_column_name,
     quantile_level_from_column,
 )
-
-# Conventional fold id used for holdout predictions (distinct from real walk-forward folds).
-HOLDOUT_FOLD_ID = 999
 
 
 def _split_train_calibration(
@@ -317,12 +319,13 @@ def evaluate_fair_inventory_cost(
     total_demand = float(true_demand.sum())
     records: list[dict[str, Any]] = []
     # "none" leaves the censored sale untouched → it IS the Observed (deflated) signal.
-    for strategy, label in (
+    strategies: tuple[tuple[ImputationStrategy, str], ...] = (
         ("none", "Observed"),
         ("supervised", "Latent_supervised"),
         ("historical_mean", "Latent_historical_mean"),
         ("clipped_scaling", "Latent_clipped_scaling"),
-    ):
+    )
+    for strategy, label in strategies:
         imputed = LatentDemandImputer(strategy=strategy).impute(censored)
         signal = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
         q_star = np.maximum(signal + z * sigma, 0.0)

@@ -2,7 +2,8 @@
 
 % --- Paquetes Básicos ---
 \usepackage[utf8]{inputenc}
-\usepackage[spanish,es-tabla]{babel}
+\usepackage[catalan,english,spanish,es-tabla]{babel}
+
 \usepackage[T1]{fontenc}
 \usepackage{graphicx}
 \usepackage{geometry}
@@ -31,8 +32,7 @@
 }
 
 % --- Datos del TFG ---
-\title{Sistema de Predicción de Demanda para Retail con Análisis de Incertidumbre\\[1ex]
-\large\textit{Entrega parcial --- Cap\'itulos 1 a 5}}
+\title{Sistema de Predicción de Demanda para Retail con Análisis de Incertidumbre}
 \author{Artem Mindlin}
 \date{\today}
 
@@ -51,11 +51,15 @@
 \mainmatter
 
 % --- Capítulos ---
+% Uso \input para que sea más fácil de organizar
 \input{chapters/01_introduccion}
 \input{chapters/02_estado_del_arte}
 \input{chapters/03_analisis_datos}
 \input{chapters/04_metodologia}
 \input{chapters/05_implementacion}
+\input{chapters/06_resultados}
+\input{chapters/07_conclusiones}
+% \input{chapters/08_presupuesto}
 
 % --- Apéndices ---
 \appendix

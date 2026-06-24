@@ -190,4 +190,6 @@ La conclusion experimental buscara identificar no solo que modelo predice mejor,
 - la demanda observada puede infraestimar demanda real en presencia de stockouts;
 - el dataset trabaja con demanda normalizada;
 - la v2 incorpora una estrategia heuristica de demanda latente, pero no estima demanda censurada con un modelo causal completo ni lead times variables;
-- la evaluacion economica es de una sola etapa, no una simulacion completa multi-periodo.
+- la evaluacion economica es de una sola etapa, no una simulacion completa multi-periodo;
+- la imputación `fillna` de variables climatológicas (`avg_temperature`, `avg_humidity`, `avg_wind_level`) utiliza la mediana calculada sobre el split completo (incluyendo fechas futuras), lo que constituye un data leakage temporal de baja severidad;
+- el cálculo de medias de soporte jerárquico para el fallback de arranque en frío (*cold-start*) se calcula sobre el panel completo disponible en el momento de generación del frame de inferencia, pudiendo filtrar información de demanda futura durante los experimentos de backtesting.

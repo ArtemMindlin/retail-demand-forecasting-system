@@ -206,4 +206,7 @@ def attach_series_costs(
 def _percentile_rank(values: pd.Series) -> pd.Series:
     if values.nunique(dropna=True) <= 1:
         return pd.Series(np.full(len(values), 0.5), index=values.index, dtype=float)
-    return values.rank(method="average", pct=True).astype(float)
+    # >1 distinct non-NA values guarantees count >= 2, so the rescale is safe.
+    # Rescale ranks to [0, 1] (min at 0, not 1/n) so the least-ranked SKU maps to 0.0.
+    ranked = values.rank(method="average")
+    return ((ranked - 1.0) / (values.count() - 1.0)).astype(float)

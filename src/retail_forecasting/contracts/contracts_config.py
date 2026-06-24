@@ -12,11 +12,15 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Single source of truth for the execution modes; reused by the CLI parser
+# (run.py) and the run metadata schema (evaluation.reporting).
+RunMode = Literal["experiment", "retrain", "score_daily", "simulate_ops", "fair_cost_backtest"]
+
 
 class ProjectConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     random_seed: int = 42
-    run_mode: Literal["experiment", "retrain", "score_daily", "simulate_ops"] = "experiment"
+    run_mode: RunMode = "experiment"
 
 
 class DatasetConfig(BaseModel):

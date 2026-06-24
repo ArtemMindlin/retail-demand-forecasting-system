@@ -10,9 +10,9 @@ El desarrollo de este sistema ha ido más allá de un ejercicio de \textit{Machi
 Las conclusiones principales se resumen en los siguientes puntos:
 
 \begin{itemize}
-    \item \textbf{Censura y Demanda Latente}: La imputación de la demanda censurada por \textit{stockouts} es el factor técnico más determinante para la rentabilidad de la cadena de suministro. Los modelos entrenados con la estrategia de Demanda Latente reducen el coste total operativo en un \textbf{32,3\%} frente a los mismos modelos entrenados con ventas observadas sin corrección (CatBoost: 34.558 frente a 51.021 unidades monetarias). Este resultado es consistente en todos los modelos evaluados, incluido el Seasonal Naïve, lo que descarta que la mejora sea un artefacto del algoritmo y la atribuye directamente al módulo de imputación.
+    \item \textbf{Censura y Demanda Latente}: La imputación de la demanda censurada por \textit{stockouts} es el factor técnico más determinante para la rentabilidad de la cadena de suministro. Bajo una evaluación justa con un target común de demanda real, los modelos entrenados con la estrategia de Demanda Latente Supervisada reducen el coste total de inventario en un \textbf{4,81\%} frente al baseline observado sin corregir (12.262,00 frente a 12.881,98 unidades monetarias), elevando el nivel de servicio (\textit{fill rate}) del \textbf{91,22\%} al \textbf{99,96\%}. Este resultado valida de forma cuantitativa y sin sesgo de evaluación el beneficio de recuperar la señal latente.
 
-    \item \textbf{La trampa del MAE y el valor del modelo probabilístico}: El Seasonal Naïve obtiene el mejor MAE del backtesting (2,74 bajo estrategia Latent) al tiempo que incurre en el mayor coste logístico (38.197 frente a 34.558 de CatBoost, una diferencia del \textbf{9,5\%}). Este resultado reproduce el fenómeno teórico advertido en el Capítulo~\ref{chap:estado_del_arte} y constituye la justificación empírica más sólida del diseño probabilístico: optimizar el MAE no equivale a optimizar la política de inventario.
+    \item \textbf{La trampa del MAE y el valor del modelo probabilístico}: El Seasonal Naïve obtiene el mejor MAE del backtesting predictivo (\textbf{4,47} bajo estrategia Latent) al tiempo que en la simulación dinámica a escala (500 series) incurre en un coste logístico significativamente superior al de un modelo probabilístico global como CatBoost (443.449 frente a 427.210 u.m., una diferencia del \textbf{3,7\%}). Este resultado reproduce el fenómeno teórico advertido en el Capítulo~\ref{chap:estado_del_arte} y constituye la justificación empírica más sólida del diseño probabilístico: optimizar el MAE no equivale a optimizar la política de inventario.
 
     \item \textbf{Calibración Conformal: garantías teóricas y limitaciones prácticas}: La implementación de \textit{Mondrian Conformal Prediction} proporciona las herramientas correctas para la calibración condicional por categoría. En el subset de evaluación base (50 series), la cobertura promedio fue del 38\% para CatBoost con varianza extrema entre folds (14\%--86\%). La validación a escala con 500 series confirmó el diagnóstico parcialmente: la cobertura sube al 63{,}5\% y la inestabilidad entre folds desaparece, pero persiste una infracobertura residual atribuible a la no-intercambiabilidad temporal entre la ventana de calibración y el periodo de test en un panel de solo 90 días. Esta evidencia delimita con precisión el supuesto que falla (intercambiabilidad, no tamaño muestral) y motiva la adopción de Conformal Prediction adaptativa como evolución natural del sistema.
 
@@ -25,7 +25,7 @@ Las conclusiones principales se resumen en los siguientes puntos:
 
 \section{Sostenibilidad e Impacto Ambiental}
 
-El trabajo presenta una relación directa con los \textbf{ODS 12} (Producción y Consumo Responsables) y \textbf{ODS 13} (Acción por el Clima) a través de la reducción del sobrestock de productos frescos perecederos. La reducción empírica del 9,5\% en coste de inventario frente al modelo estacional implica directamente menos producto caducado en estantería y menor demanda de producción agrícola en origen. El análisis detallado del grado de relación con los 17 ODS se recoge en el Anexo~\ref{anx:ods}, conforme a los requisitos de la ETSINF-UPV.
+El trabajo presenta una relación directa con los \textbf{ODS 12} (Producción y Consumo Responsables) y \textbf{ODS 13} (Acción por el Clima) a través de la reducción del sobrestock de productos frescos perecederos. La reducción empírica del 3,7\% en coste de inventario simulado frente al modelo estacional implica directamente menos producto caducado en estantería y menor demanda de producción agrícola en origen. El análisis detallado del grado de relación con los 17 ODS se recoge en el Anexo~\ref{anx:ods}, conforme a los requisitos de la ETSINF-UPV.
 
 \section{Análisis de Impacto Ético, Social y Privacidad}
 Más allá de los resultados logísticos, el sistema se ha estructurado atendiendo a criterios
@@ -40,8 +40,8 @@ de ética algorítmica, responsabilidad social corporativa y cumplimiento legal:
     y auditable.
     \item \textbf{Consumo Energético}: El entrenamiento de modelos globales de \textit{Gradient Boosting}
     sobre 4,5 millones de observaciones requiere recursos computacionales no despreciables. No
-    obstante, la arquitectura MLOps de dos niveles ---optimización mensual de hiperparámetros y
-    reentrenamiento diario ligero--- minimiza el ciclo de cómputo intensivo, y el coste energético
+    obstante, la arquitectura MLOps de dos niveles (optimización mensual de hiperparámetros y
+    reentrenamiento diario ligero) minimiza el ciclo de cómputo intensivo, y el coste energético
     acumulado es marginal frente a las emisiones que podría evitar una reducción del desperdicio
     alimentario en escala industrial.
     \item \textbf{Privacidad y Seguridad de Datos}: El dataset utilizado está debidamente
@@ -50,8 +50,20 @@ de ética algorítmica, responsabilidad social corporativa y cumplimiento legal:
     personal de consumidores.
 \end{itemize}
 
+\section{Limitaciones Metodológicas y del Sistema}
+\label{sec:limitaciones}
+
+El diseño e implementación del sistema presentan ciertas limitaciones y simplificaciones operativas, metodológicas y tecnológicas que es necesario advertir para contextualizar el alcance de los resultados:
+
+\begin{itemize}
+    \item \textbf{Simplificación de la Utilidad Marginal}: En la optimización agregada bajo restricciones de almacén (\texttt{optimize\_orders\_lp}), se asume que la utilidad marginal de cada unidad pedida de un SKU es constante e igual a su coste de rotura ($c_{u}$). En entornos reales, la utilidad marginal es estrictamente decreciente por SKU (ley de rendimientos decrecientes del stock). Esta linealización es una simplificación necesaria para formular el problema como programación lineal continua (Continuous Knapsack) resoluble de forma determinista y ultrarrápida a escala del catálogo.
+    \item \textbf{Penalización Acumulativa del Backlog}: La simulación dinámica asume que la demanda insatisfecha se acumula en el backlog de forma indefinida y se penaliza con el coste de rotura en cada período hasta que sea satisfecha. En la operativa real de gran consumo, un stockout prolongado suele derivar en una venta perdida (sustitución o abandono del cliente), lo que significa que el coste por rotura no escala linealmente de manera indefinida.
+    \item \textbf{Generalización y Diversidad de Paneles}: Todo el análisis se apoya en el dataset \textit{FreshRetailNet-50K} bajo un marco de censura sintética controlada. Validar la robustez del imputer y la cobertura conformal en paneles externos heterogéneos (como el dataset M5 de Walmart) constituye un paso metodológico necesario para demostrar la generalización del DSS ante patrones de demanda muy distintos.
+    \item \textbf{MLOps en Entorno Local}: La arquitectura FastAPI, MLflow y el dashboard React se han desarrollado como un prototipo funcional local. Un entorno productivo corporativo real exigiría una infraestructura distribuida en la nube, el despliegue mediante orquestadores (Kubernetes), el uso de bases de datos de características en tiempo real (Feature Stores) y flujos CI/CD para el reentrenamiento y promoción automática en caliente tras alertas de drift.
+\end{itemize}
+
 \section{Líneas de Trabajo Futuro}
-La arquitectura modular desarrollada deja el camino preparado para futuras expansiones. Las líneas propuestas fluyen directamente de las limitaciones identificadas en el capítulo de resultados:
+La arquitectura modular desarrollada deja el camino preparado para futuras expansiones. Las líneas propuestas fluyen directamente de las limitaciones identificadas en el capítulo de resultados y en la Sección~\ref{sec:limitaciones}:
 
 \begin{itemize}
     \item \textbf{Conformal Prediction Adaptativa (EnbPI)}: La validación a escala demostró que,
@@ -59,7 +71,7 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     no-intercambiabilidad temporal entre calibración y test. La línea prioritaria es sustituir el
     Split CP estático por métodos adaptativos como EnbPI \cite{xu2021conformal}, que reajustan el
     ancho del intervalo con los errores recientes observados, y verificar la convergencia hacia el
-    90\% sobre el dataset completo (50.000 series) con historia más larga.
+    80\% nominal sobre el dataset completo (50.000 series) con historia más larga.
 
     \item \textbf{Costes Reales e Integración ERP}: Los perfiles de coste sintéticos ($c_u$, $c_o$)
     utilizados en este trabajo son una aproximación necesaria dado que el dataset no incluye
@@ -73,9 +85,9 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     techo de capacidad en la propia política de reposición. Las extensiones naturales son dos:
     (1) modelar el \textit{lead time} como variable aleatoria (distribución empírica sobre
     histórico de entregas) para capturar la variabilidad real del proveedor; y (2) incorporar
-    un techo de inventario por almacén directamente en la política Order-Up-To ---distinto de
+    un techo de inventario por almacén directamente en la política Order-Up-To (distinto de
     la capa LP estática de la Sección~\ref{sec:resultados_lp}, que opera sobre cantidades
-    Newsvendor de un único periodo sin estado acumulado--- permitiendo que el simulador rechace
+    Newsvendor de un único periodo sin estado acumulado), permitiendo que el simulador rechace
     pedidos que superen la capacidad física disponible.
 
     \item \textbf{Modelos de Deep Learning para Series Temporales}: Explorar arquitecturas como el
@@ -105,7 +117,7 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     genuinamente nula (días sin ninguna venta, excluidos los ceros inducidos por stockout) no justifica
     un modelo de dos etapas para el catálogo general, pero sí para los SKUs de alta intermitencia
     donde la probabilidad de venta cero es estructuralmente distinta de la magnitud cuando sí se
-    vende. La arquitectura natural es un clasificador binario (¿hay venta?) seguido de un regresor
+    vende. La arquitectura natural es un clasificador binario (si hay o no venta) seguido de un regresor
     sobre el subconjunto positivo, análogo al modelo \textit{zero-inflated} clásico
     \cite{lambert1992zero}: la primera etapa filtra los días sin demanda y la segunda predice la
     cantidad condicionada a que haya venta. En el contexto de forecasting de series temporales,
@@ -118,4 +130,4 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     de forma explícita.
 \end{itemize}
 
-Como cierre, este TFG demuestra empíricamente que el valor de la inteligencia artificial aplicada a operaciones no está solo en los algoritmos, sino en integrarlos dentro de un diseño de software que cierra el bucle desde el dato bruto hasta la decisión logística operativa ---con sus garantías, sus limitaciones cuantificadas y su trazabilidad completa.
+Como cierre, este TFG demuestra empíricamente que el valor de la inteligencia artificial aplicada a operaciones no está solo en los algoritmos, sino en integrarlos dentro de un diseño de software que cierra el bucle desde el dato bruto hasta la decisión logística operativa, con sus garantías, sus limitaciones cuantificadas y su trazabilidad completa.

@@ -52,9 +52,9 @@ make install
 make run
 
 # 3. Lanzar servicios individualmente
-make api        # Levanta FastAPI
-make dashboard  # Levanta Streamlit
+make api        # Levanta FastAPI (API + dashboard integrado)
 make mlflow     # Levanta UI de MLflow
+
 ```
 
 ## Suite de Verificación

@@ -8,6 +8,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+# Sentinel fold id marking holdout (non walk-forward) predictions so global
+# summaries can exclude them. Written by the pipeline, read by evaluation.metrics.
+HOLDOUT_FOLD_ID = 999
+
 
 def make_run_directory(base_dir: str | Path, run_name: str) -> Path:
     """Create a timestamped run directory below a base output path.

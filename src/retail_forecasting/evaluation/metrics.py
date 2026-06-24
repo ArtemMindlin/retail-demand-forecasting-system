@@ -7,9 +7,20 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_pinball_loss
 
-from retail_forecasting.utils.io import quantile_level_from_column, winkler_score
+from retail_forecasting.utils.io import (
+    HOLDOUT_FOLD_ID,
+    quantile_level_from_column,
+    winkler_score,
+)
 
 __all__ = ["summarize_predictions", "summarize_costs", "pinball_loss", "winkler_score"]
+
+
+def _exclude_holdout(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop the holdout fold so global summaries don't mix it with walk-forward folds."""
+    if "fold_id" in df.columns:
+        return df[df["fold_id"] != HOLDOUT_FOLD_ID]
+    return df
 
 
 def _split_group_keys(keys: Any, group_cols: list[str]) -> dict[str, Any]:
@@ -28,7 +39,8 @@ def summarize_predictions(
     if "data_strategy" in predictions.columns:
         group_cols.insert(0, "data_strategy")
 
-    for keys, subset in predictions.groupby(group_cols, dropna=False):
+    # Global summary metrics exclude the holdout fold to avoid mixing it with walk-forward folds.
+    for keys, subset in _exclude_holdout(predictions).groupby(group_cols, dropna=False):
         key_map = _split_group_keys(keys, group_cols)
         record = _build_metric_record(subset, key_map["model_name"], key_map["backend_name"])
         if key_map.get("data_strategy"):
@@ -89,7 +101,10 @@ def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
             }
         )
 
-    summary = enriched.groupby(group_cols, dropna=False).agg(**agg_map).reset_index()
+    # Global summary costs exclude the holdout fold to avoid mixing it with walk-forward folds.
+    summary = (
+        _exclude_holdout(enriched).groupby(group_cols, dropna=False).agg(**agg_map).reset_index()
+    )
 
     summary["fill_rate"] = np.where(
         summary["total_demand"] > 0.0,

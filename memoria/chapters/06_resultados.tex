@@ -39,7 +39,7 @@ El módulo \texttt{LatentDemandImputer} implementa tres estrategias de imputaci�
 \toprule
 \textbf{Estrategia} & \textbf{MAE} & \textbf{Winkler Score} & \textbf{Mejora vs.\ Observed} \\
 \midrule
-Observed (sin corrección) & 30{,}92 & 290{,}96 & --- \\
+Observed (sin corrección) & 30{,}92 & 290{,}96 & n/a \\
 Clipped Scaling ($\gamma=1{,}2$) & 36{,}36 & 336{,}41 & $-$15{,}6\% \\
 Media Histórica Local & 6{,}92 & 46{,}04 & $+$84{,}2\% \\
 \textbf{Supervisada (LightGBM)} & \textbf{6{,}88} & \textbf{39{,}54} & \textbf{$+$86{,}4\%} \\
@@ -87,14 +87,14 @@ La evaluación del componente probabilístico exige dos métricas específicas q
         \midrule
         CatBoost & Latent Supervised & 31,57 & 38,0\% & 6,90 \\
         LightGBM & Latent Supervised & 25,74 & 57,3\% & 10,88 \\
-        \textit{Seasonal Naïve} & \textit{Latent Supervised} & \multicolumn{3}{c}{\textit{n/a --- no genera intervalos de predicción}} \\
+        \textit{Seasonal Naïve} & \textit{Latent Supervised} & \multicolumn{3}{c}{\textit{n/a: no genera intervalos de predicción}} \\
         \bottomrule
     \end{tabular}
-    \caption{Métricas de calibración conformal. Cobertura objetivo: $\geq 90\%$ al nivel $\alpha = 0{,}10$. El Seasonal Naïve es un modelo puntual y no produce intervalos cuantílicos.}
+    \caption{Métricas de calibración conformal. Cobertura objetivo: $\geq 80\%$ para el intervalo $[q_{0.1}, q_{0.9}]$ (nivel $\alpha = 0{,}20$). El Seasonal Naïve es un modelo puntual y no produce intervalos cuantílicos.}
     \label{tab:conformal_metrics}
 \end{table}
 
-La cobertura promedio de ambos modelos (38\% para CatBoost y 57\% para LightGBM) se sitúa significativamente por debajo del objetivo teórico del 90\%. El siguiente apartado examina la varianza entre folds y las causas estructurales de esta infracobertura.
+La cobertura promedio de ambos modelos (38\% para CatBoost y 57\% para LightGBM) se sitúa significativamente por debajo del objetivo teórico del 80\%. El siguiente apartado examina la varianza entre folds y las causas estructurales de esta infracobertura.
 
 \subsection{Análisis por Fold y Diagnóstico de la Baja Cobertura}
 
@@ -111,7 +111,7 @@ La Tabla~\ref{tab:fold_coverage} desagrega la cobertura por fold temporal, revel
         LightGBM     & 46\% & 38\% & 88\% & 57\% \\
         \bottomrule
     \end{tabular}
-    \caption{Cobertura empírica del intervalo $[q_{0.1}, q_{0.9}]$ por fold de backtesting. La garantía teórica es $\geq 90\%$.}
+    \caption{Cobertura empírica del intervalo $[q_{0.1}, q_{0.9}]$ por fold de backtesting. La cobertura nominal del intervalo es del 80\% ($\alpha = 0{,}20$).}
     \label{tab:fold_coverage}
 \end{table}
 
@@ -122,9 +122,9 @@ A esta escala, la varianza extrema no es una anomalía empírica sino el comport
     \widehat{\text{cov}} \;\sim\; \mathrm{Beta}(l,\; n_\text{cal}+1-l), \qquad l = \left\lceil (n_\text{cal}+1)(1-\alpha) \right\rceil.
     \label{eq:beta_coverage}
 \end{equation}
-Para garantizar que el nivel $l$ sea alcanzable (es decir, $l \leq n_\text{cal}$), se requiere $n_\text{cal} \geq 9$ puntos de calibración por estrato al nivel $\alpha = 0{,}10$. A modo de ejemplo ilustrativo, si un estrato dispone de apenas $n_\text{cal} = 5$ observaciones, la ecuación exige buscar el cuantil en la posición $l = \lceil 0{,}9(5+1) \rceil = \lceil 5{,}4 \rceil = 6$. Al demandar el sexto mayor residuo en una distribución empírica de solo cinco elementos, el nivel $l$ supera a $n_\text{cal}$. 
+Al nivel $\alpha = 0{,}20$ (intervalo $[q_{0.1}, q_{0.9}]$ del 80\%), el factor conformal solo se comporta como un cuantil \emph{interior} estable cuando $l < n_\text{cal}$, lo que exige $n_\text{cal} \geq 9$ puntos de calibración por estrato. Por debajo de ese umbral, la posición requerida coincide con el propio tamaño muestral ($l = n_\text{cal}$): por ejemplo, con $n_\text{cal} = 5$ se obtiene $l = \lceil 0{,}8\,(5+1) \rceil = \lceil 4{,}8 \rceil = 5$, de modo que el cuantil conformal colapsa al \textbf{máximo} de los cinco residuos de calibración, un estimador de varianza máxima.
 
-Ante esta imposibilidad matemática ($l > n_\text{cal}$ que ocurre siempre que $n_\text{cal} \in [4,7]$), la implementación recurre al máximo de los residuos de calibración como único valor posible del cuantil conformal. Esto desemboca en intervalos sistemáticamente estrechos y mal calibrados cuando la cola de la distribución de test no ha sido observada en calibración. La varianza extrema entre folds (del 14\% al 86\%) no representa por tanto una inestabilidad del método o del estimador subyacente, sino que es la consecuencia directa y teóricamente esperada de operar muy por debajo del tamaño mínimo de calibración que el marco conformal exige para ofrecer sus garantías.
+Cuando el estrato es aún más pequeño ($n_\text{cal} \leq 3$, donde $l > n_\text{cal}$ es directamente imposible), la implementación recurre por construcción al máximo de los residuos como único valor disponible. En ambos regímenes el resultado es el mismo: con apenas 4--7 observaciones por estrato, el ancho del intervalo queda fijado por el residuo más grande observado en calibración, lo que produce intervalos mal calibrados cuando la cola de la distribución de test no se observó en calibración. La cobertura por fold sigue entonces una distribución $\mathrm{Beta}(n_\text{cal},\,1)$ de media $n_\text{cal}/(n_\text{cal}+1) \approx 0{,}80$--$0{,}88$ pero varianza muy elevada, lo que explica el salto del 14\% al 86\% entre folds. No es por tanto una inestabilidad del método o del estimador subyacente, sino la consecuencia directa y teóricamente esperada de operar por debajo del tamaño mínimo de calibración que el marco conformal exige para ofrecer sus garantías.
 
 Esta limitación es inherente al tamaño del subset de evaluación utilizado en este trabajo ($n=50$ series activas) y no al diseño del método: la garantía teórica del Split Conformal Prediction es de muestra finita, pero la garantía \textit{condicional por estrato} de Mondrian se degrada con estratos pequeños: el factor corrector $\hat{q}_g$ se vuelve inestable con apenas 4--7 observaciones de calibración por categoría, produciendo intervalos excesivamente anchos o mal calibrados. El fold 2, con un conjunto de calibración más representativo, apunta en esta dirección. Para verificar empíricamente esta hipótesis, se repitió el protocolo completo a mayor escala, como se describe a continuación.
 
@@ -144,7 +144,7 @@ Se reejecutó el protocolo de backtesting íntegro ampliando el subset de evalua
         LightGBM  & 55{,}0\% & 74{,}8\% & 64{,}8\% & 64{,}9\% \\
         \bottomrule
     \end{tabular}
-    \caption{Cobertura empírica del intervalo $[q_{0.1}, q_{0.9}]$ por fold con 500 series (1.500 observaciones por modelo). Cobertura objetivo: $\geq 90\%$.}
+    \caption{Cobertura empírica del intervalo $[q_{0.1}, q_{0.9}]$ por fold con 500 series (1.500 observaciones por modelo). Cobertura objetivo: $\geq 80\%$ ($\alpha = 0{,}20$).}
     \label{tab:scale_coverage}
 \end{table}
 
@@ -152,11 +152,11 @@ Los resultados confirman parcialmente el diagnóstico y lo matizan:
 
 \begin{itemize}
     \item \textbf{La inestabilidad desaparece}: la cobertura media sube del 38\% al 63{,}5\% (CatBoost) y la varianza extrema entre folds se colapsa (el rango pasa de 14--86\% a 52--75\%). Esto confirma que los valores críticos del experimento base eran un artefacto del tamaño del conjunto de calibración por estrato, tal y como se hipotetizaba.
-    \item \textbf{Persiste una infracobertura residual} de unos 25 puntos respecto al objetivo teórico. Con estratos de calibración ya razonables, esta brecha no es atribuible al tamaño muestral sino a la \textbf{no-intercambiabilidad temporal} de los datos: el Split CP asume que calibración y test son intercambiables, pero la ventana de calibración (últimos días del train) y la semana de test pertenecen a regímenes de demanda distintos en un panel con estacionalidad fuerte y solo 90 días de historia. Esta es precisamente la motivación de los métodos de CP adaptativa como EnbPI \cite{xu2021conformal} discutidos en el Capítulo~\ref{chap:estado_del_arte}, cuya integración se propone como trabajo futuro.
-    \item \textbf{Las conclusiones logísticas se mantienen parcialmente}: en la simulación dinámica Order-Up-To a 500 series, CatBoost Latent reduce el coste simulado un 3{,}7\% frente al Seasonal Naïve Latent (427.210 frente a 443.449 u.m.) y eleva el nivel de servicio del 79{,}3\% al 94{,}3\%. La corrección de censura mantiene su efecto positivo sobre el \textbf{coste estático} en todos los modelos (CatBoost: $+$3{,}3\%; Seasonal Naïve: $+$15{,}4\%). Sin embargo, en el \textbf{coste dinámico simulado}, CatBoost Observed (424.577 u.m.) supera marginalmente a CatBoost Latent (427.210 u.m., diferencia del 0{,}6\%): el beneficio de la corrección de censura sobre la política dinámica queda acotado a las series de mayor severidad de stockout, sobrerrepresentadas en el subset base de 50 series pero diluidas a mayor escala. Esta inversión puntual no invalida la corrección de censura como práctica ---el efecto sobre el coste estático es consistente y positivo en todos los modelos--- sino que delimita en qué escenarios (catálogos dominados por stockouts severos) el impacto dinámico es más pronunciado.
+    \item \textbf{Persiste una infracobertura residual} de unos 16 puntos respecto al objetivo teórico del 80\%. Con estratos de calibración ya razonables, esta brecha no es atribuible al tamaño muestral sino a la \textbf{no-intercambiabilidad temporal} de los datos: el Split CP asume que calibración y test son intercambiables, pero la ventana de calibración (últimos días del train) y la semana de test pertenecen a regímenes de demanda distintos en un panel con estacionalidad fuerte y solo 90 días de historia. Esta es precisamente la motivación de los métodos de CP adaptativa como EnbPI \cite{xu2021conformal} discutidos en el Capítulo~\ref{chap:estado_del_arte}, cuya integración se propone como trabajo futuro.
+    \item \textbf{Las conclusiones logísticas se mantienen parcialmente}: en la simulación dinámica Order-Up-To a 500 series, CatBoost Latent reduce el coste simulado un 3{,}7\% frente al Seasonal Naïve Latent (427.210 frente a 443.449 u.m.) y eleva el nivel de servicio del 79{,}3\% al 94{,}3\%. La corrección de censura mantiene su efecto positivo sobre el \textbf{coste estático} en todos los modelos (CatBoost: $+$3{,}3\%; Seasonal Naïve: $+$15{,}4\%). Sin embargo, en el \textbf{coste dinámico simulado}, CatBoost Observed (424.577 u.m.) supera marginalmente a CatBoost Latent (427.210 u.m., diferencia del 0{,}6\%): el beneficio de la corrección de censura sobre la política dinámica queda acotado a las series de mayor severidad de stockout, sobrerrepresentadas en el subset base de 50 series pero diluidas a mayor escala. Esta inversión puntual no invalida la corrección de censura como práctica (el efecto sobre el coste estático es consistente y positivo en todos los modelos), sino que delimita en qué escenarios (catálogos dominados por stockouts severos) el impacto dinámico es más pronunciado.
 \end{itemize}
 
-El \textbf{Winkler Score} de LightGBM (25,74) es inferior al de CatBoost (31,57), lo que indica intervalos más eficientes (más estrechos con mayor cobertura). Sin embargo, el criterio de selección del modelo campeón es el coste logístico simulado, no el Winkler Score. En la evaluación de la estrategia \textit{Latent Supervised} sobre el subset base, CatBoost logró el menor coste operativo (34.558 u.m.), dominando a LightGBM (35.349 u.m.) y al \textit{Seasonal Naïve} (38.197 u.m.), lo que justifica plenamente su elección como modelo campeón.
+El \textbf{Winkler Score} de LightGBM (25,74) es inferior al de CatBoost (31,57), lo que indica intervalos más eficientes (más estrechos con mayor cobertura). Sin embargo, el criterio de selección del modelo campeón es el coste logístico simulado, no el Winkler Score. En la simulación dinámica \textit{Order-Up-To} a escala (500 series) con estrategia \textit{Latent Supervised}, CatBoost logró el menor coste simulado (427.210 u.m.), dominando a LightGBM (434.286 u.m.) y al \textit{Seasonal Naïve} (443.449 u.m.), lo que justifica su elección como modelo campeón.
 
 \section{Evaluación Justa de Costes Operativos: La Necesidad de un Target Común}
 \label{sec:resultados_gemelo}
@@ -171,9 +171,9 @@ Los datos de la Tabla~\ref{tab:metrics_cost} evidencian tres conclusiones cuanti
 
 \begin{enumerate}
     \item \textbf{La corrección de censura supervisada es la más eficiente}: La estrategia \textit{Latent Supervised} obtiene el menor coste total operativo con \textbf{12.262,00 u.m.}, lo que representa una reducción del \textbf{4,81\%} en coste frente a la estrategia \textit{Observed} (12.881,98 u.m.).
-    
+
     \item \textbf{Mejora drástica del nivel de servicio (Fill Rate)}: Al corregir el sesgo a la baja de la demanda histórica, la estrategia supervisada realiza pedidos más realistas (pedido medio de \textbf{15,55} unidades frente a \textbf{11,71} del baseline), elevando la tasa de cobertura de demanda (\textit{fill rate}) del \textbf{91,22\%} al \textbf{99,96\%}, reduciendo casi a cero la penalización por rotura.
-    
+
     \item \textbf{Ventaja sobre imputadores heurísticos}: La estimación basada en Machine Learning supera al estimador de media histórica (\textit{Latent Historical Mean}, con 12.487,26 u.m.) y demuestra la ineficacia de las correcciones proporcionales fijas (\textit{Latent Clipped Scaling}, con 13.206,86 u.m.). Esta última empeora un \textbf{2,52\%} respecto al baseline sin corregir, confirmando que sobredimensionar la demanda sin tener en cuenta la variabilidad diaria de cada SKU destruye valor económico a través de costes de sobrestock.
 \end{enumerate}
 
@@ -217,7 +217,7 @@ Del análisis de esta figura se extraen las siguientes conclusiones, que validan
     \item \textbf{Modulación climática:} Las variables meteorológicas como la humedad media (\texttt{avg\_humidity\_lag\_14}) y el nivel de viento (\texttt{avg\_wind\_level\_lag\_14}) se sitúan en las últimas posiciones. En lugar de forzar una dependencia general irreal, el algoritmo las utiliza sutilmente para ajustar los cuantiles extremos únicamente en categorías específicas.
 \end{itemize}
 
-Finalmente, más allá del impacto global de las variables, el sistema implementa un \textbf{Diagnóstico Post-Mortem} a nivel de ítem. El módulo identificó los SKUs con mayor contribución al coste total durante la simulación y, en los casos más problemáticos, atribuyó las pérdidas a una de dos causas: alta intermitencia estructural (series con más del 40\% de días con venta cero, donde cualquier predicción positiva genera sobrestock continuo) o derivas bruscas de tendencia detectadas tarde por el detector Page-Hinkley. Esta trazabilidad convierte los fallos estadísticos en información financiera accionable para el responsable logístico.
+Finalmente, más allá del impacto global de las variables, el sistema implementa un \textbf{Diagnóstico Post-Mortem} a nivel de ítem. El módulo identificó los SKUs con mayor contribución al coste total durante la simulación y, en los casos más problemáticos, atribuyó las pérdidas a una de dos causas: alta intermitencia estructural (series con más del 60\% de días con venta cero, donde cualquier predicción positiva genera sobrestock continuo) o derivas bruscas de tendencia detectadas tarde por el detector Page-Hinkley. Esta trazabilidad convierte los fallos estadísticos en información financiera accionable para el responsable logístico.
 
 \section{Verificación de Objetivos y KPIs}
 \label{sec:resultados_kpis}
@@ -231,20 +231,20 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definid
         \toprule
         \textbf{Objetivo} & \textbf{Target} & \textbf{Resultado} & \textbf{Estado} \\
         \midrule
-        Corrección de censura mejora el coste vs.\ estrategia Observed & $> 0\%$ & $-32{,}3\%$ (CatBoost Latent vs.\ Observed, coste estático) & \checkmark \\
+        Corrección de censura mejora el coste vs.\ estrategia Observed & $> 0\%$ & $-4{,}81\%$ (Latent Supervised vs.\ Observed, coste justo) & \checkmark \\
         \midrule
-        CatBoost supera al Seasonal Naïve en coste logístico & $> 0\%$ & $-9{,}5\%$ (Latent, coste estático) & \checkmark \\
+        CatBoost supera al Seasonal Naïve en coste logístico & $> 0\%$ & $-3{,}7\%$ (Latent, coste simulado a escala, 500 series) & \checkmark \\
         \midrule
         Winkler Score del campeón$^{\dagger}$ frente a las alternativas probabilísticas & Menor & LightGBM: 25,74; CatBoost (campeón): 31,57 & Parcial \\
         \midrule
-        Cobertura empírica al nivel $\alpha = 0{,}10$ & $\geq 90\%$ & 38\% (subset base); 63{,}5\% (500 series) & Limitado \\
+        Cobertura empírica $[q_{0.1}, q_{0.9}]$ ($\alpha = 0{,}20$) & $\geq 80\%$ & 38\% (subset base); 63{,}5\% (500 series) & Limitado \\
         \bottomrule
     \end{tabular}
-    \caption{Verificación de los KPIs definidos en el Capítulo~\ref{chap:introduccion}. \checkmark = cumplido; Parcial = cumplido con matices; Limitado = no alcanzado en el subset de evaluación. $^{\dagger}$El campeón se selecciona por coste logístico simulado, no por Winkler Score; entre los modelos probabilísticos, LightGBM obtiene el mejor Winkler (25,74) pero CatBoost domina en coste logístico dinámico (34.558 u.m. frente a 35.349 u.m. de LightGBM).}
+    \caption{Verificación de los KPIs definidos en el Capítulo~\ref{chap:introduccion}. \checkmark = cumplido; Parcial = cumplido con matices; Limitado = no alcanzado en el subset de evaluación. $^{\dagger}$El campeón se selecciona por coste logístico simulado, no por Winkler Score; entre los modelos probabilísticos, LightGBM obtiene el mejor Winkler (25,74) pero CatBoost domina en coste simulado a escala (427.210 u.m. frente a 434.286 u.m. de LightGBM).}
     \label{tab:kpi_verification}
 \end{table}
 
-Los dos primeros objetivos (el impacto de la corrección de censura y la superioridad en coste del modelo probabilístico) se cumplen con margen. El tercero se cumple solo parcialmente: el Seasonal Naïve no genera intervalos, por lo que la comparación de Winkler Score se restringe a los modelos probabilísticos; entre ellos, LightGBM obtiene el mejor valor (25,74), aunque el campeón se selecciona por coste logístico simulado. Como se adelantó en la Sección~\ref{sec:resultados_escala}, bajo ese criterio CatBoost domina claramente a LightGBM (34.558 u.m. frente a 35.349 u.m.) en el entorno de evaluación base. El cuarto objetivo ($\geq 90\%$ de cobertura) no se alcanza: en el subset base por insuficiencia del conjunto de calibración por estrato, y en la validación a 500 series (Sección~\ref{sec:resultados_escala}), que eleva la cobertura al 63{,}5\% y elimina la inestabilidad entre folds, por la no-intercambiabilidad temporal entre la ventana de calibración y el test, limitación estructural del Split CP sobre paneles de 90 días que motiva la adopción de CP adaptativa como línea de trabajo futuro.
+Los dos primeros objetivos (el impacto de la corrección de censura y la superioridad en coste del modelo probabilístico) se cumplen con margen. El tercero se cumple solo parcialmente: el Seasonal Naïve no genera intervalos, por lo que la comparación de Winkler Score se restringe a los modelos probabilísticos; entre ellos, LightGBM obtiene el mejor valor (25,74), aunque el campeón se selecciona por coste logístico simulado. Como se adelantó en la Sección~\ref{sec:resultados_escala}, bajo ese criterio CatBoost domina claramente a LightGBM (427.210 u.m. frente a 434.286 u.m.) en la simulación dinámica a escala. El cuarto objetivo ($\geq 80\%$ de cobertura) no se alcanza: en el subset base por insuficiencia del conjunto de calibración por estrato, y en la validación a 500 series (Sección~\ref{sec:resultados_escala}), que eleva la cobertura al 63{,}5\% y elimina la inestabilidad entre folds, por la no-intercambiabilidad temporal entre la ventana de calibración y el test, limitación estructural del Split CP sobre paneles de 90 días que motiva la adopción de CP adaptativa como línea de trabajo futuro.
 
 \section{Caso de Uso Ilustrativo: Mecánica de la Política Order-Up-To paso a paso}
 \label{sec:caso_uso_sS}
@@ -277,7 +277,7 @@ El fractil crítico que minimiza el coste esperado del Newsvendor es:
 \end{equation}
 El sistema debe por tanto cubrir el percentil 80 de la distribución de demanda.
 
-\subsection*{Periodo 1 --- primer pedido y demanda}
+\subsection*{Periodo 1: primer pedido y demanda}
 
 El modelo probabilístico predice una demanda para el Periodo 1 donde $q_{0{,}80} \approx 72$. La política puntual predice la mediana $\hat{y}_1 = 50$.
 
@@ -300,7 +300,7 @@ Llegan 0 unidades. La demanda real es $y_1 = 55$.
     \text{coste}_1 &= 0 \times 1 + 55 \times 4 = 220\,\text{u.m.} \quad \text{(para ambas políticas)}
 \end{align*}
 
-\subsection*{Periodo 2 --- llegada del pedido}
+\subsection*{Periodo 2: llegada del pedido}
 
 El modelo predice para el Periodo 2 un $S_2 = 70$ (probabilística) y un $\hat{y}_2 = 50$ (puntual).
 
@@ -336,7 +336,7 @@ Llegan los pedidos del Periodo 1 (72 y 50). La demanda real es $y_2 = 60$.
     \text{coste}_2 &= 0 \times 1 + 65 \times 4 = 260\,\text{u.m.}
 \end{align*}
 
-\subsection*{Periodo 3 --- estabilización}
+\subsection*{Periodo 3: estabilización}
 
 Asumimos una predicción idéntica ($S_3 = 70$, $\hat{y}_3 = 50$).
 
@@ -389,4 +389,4 @@ Llegan los pedidos del Periodo 2 (125 y 105). La demanda es $y_3 = 50$.
     \label{tab:caso_uso_sS}
 \end{table}
 
-La diferencia acumulada (412\,u.m.{} frente a 480\,u.m.{}, una reducción del \textbf{14\%}) ilustra el mecanismo subyacente a la mejora del 9,5\% observada en el backtesting real. La política puntual infraestima sistemáticamente la demanda en escenarios de alta asimetría de costes porque no incorpora el fractil crítico $q^*$ en la selección del nivel objetivo $S$: utiliza la mediana cuando debería utilizar el percentil 80. Este sesgo se acumula periodo a periodo a través del backlog, amplificando el coste total de forma no lineal, exactamente el ``efecto látigo'' que la simulación dinámica está diseñada para capturar.
+La diferencia acumulada (424\,u.m.{} frente a 520\,u.m.{}, una reducción del \textbf{18{,}5\%}) ilustra el mecanismo subyacente a la ventaja en coste del modelo probabilístico observada en el backtesting real. La política puntual infraestima sistemáticamente la demanda en escenarios de alta asimetría de costes porque no incorpora el fractil crítico $q^*$ en la selección del nivel objetivo $S$: utiliza la mediana cuando debería utilizar el percentil 80. Este sesgo se acumula periodo a periodo a través del backlog, amplificando el coste total de forma no lineal, exactamente el ``efecto látigo'' que la simulación dinámica está diseñada para capturar.

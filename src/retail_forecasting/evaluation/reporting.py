@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from retail_forecasting.config import Settings
 from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
 from retail_forecasting.contracts.contracts_business import ChampionRecord, ChampionRegistry
+from retail_forecasting.contracts.contracts_config import RunMode
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_quality import DataQualityReport
 from retail_forecasting.contracts.contracts_tuning import TuningMetadata
@@ -93,7 +94,7 @@ class OperationalRunMetadata(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     run_name: str
-    run_mode: Literal["experiment", "retrain", "score_daily", "simulate_ops"]
+    run_mode: RunMode
     created_at: str
     git_commit: str | None
     config_hash: str

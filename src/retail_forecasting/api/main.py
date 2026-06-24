@@ -997,6 +997,17 @@ def _df_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
     return records
 
 
+def _runs_with(*required_files: str) -> list[Path]:
+    """Run dirs in reports/ that contain all the given files, newest first."""
+    if not _REPORTS_DIR.exists():
+        return []
+    return [
+        d
+        for d in sorted(_REPORTS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)
+        if d.is_dir() and all((d / f).exists() for f in required_files)
+    ]
+
+
 def _parse_drift_alert(run_path: Path) -> str | None:
     report = run_path / "report.md"
     if not report.exists():
@@ -1018,29 +1029,15 @@ class WhatIfRequest(BaseModel):
 @app.get("/api/runs")
 def list_runs() -> list[str]:
     """Return names of experiment dirs in reports/ that have the required CSVs."""
-    if not _REPORTS_DIR.exists():
-        return []
-    runs = [
-        d.name
-        for d in sorted(_REPORTS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)
-        if d.is_dir()
-        and (d / "predictions.csv").exists()
-        and (d / "metrics_summary.csv").exists()
-        and (d / "cost_summary.csv").exists()
+    return [
+        d.name for d in _runs_with("predictions.csv", "metrics_summary.csv", "cost_summary.csv")
     ]
-    return runs
 
 
 @app.get("/api/imputation-runs")
 def list_imputation_runs() -> list[str]:
     """Return names of imputation-comparison run dirs (those with latent_strategies.csv)."""
-    if not _REPORTS_DIR.exists():
-        return []
-    return [
-        d.name
-        for d in sorted(_REPORTS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)
-        if d.is_dir() and (d / "latent_strategies.csv").exists()
-    ]
+    return [d.name for d in _runs_with("latent_strategies.csv")]
 
 
 def _resolve_imputation_run_path(run_name: str) -> Path:
@@ -1104,6 +1101,25 @@ def get_imputation_strategies(run_name: str, series_id: str | None = None) -> di
         "strategies": strategies,
         "quality": quality,
     }
+
+
+@app.get("/api/fair-cost")
+def get_fair_cost() -> dict[str, Any]:
+    """Return the latest fair inventory-cost backtest (strategies vs a common ground truth).
+
+    Reads the most recent ``fair_cost_backtest.csv`` written by the
+    ``fair_cost_backtest`` run-mode. This is the apples-to-apples cost comparison
+    (every strategy charged against the same synthetically-censored true demand),
+    in contrast to the headline per-strategy cost which is biased by censoring.
+    Empty payload (rows=[]) if no backtest has been run yet.
+    """
+    candidates = _runs_with("fair_cost_backtest.csv")
+    if not candidates:
+        return {"rows": [], "run": None}
+
+    latest = candidates[0]
+    df = pd.read_csv(latest / "fair_cost_backtest.csv")
+    return {"rows": _df_to_records(df), "run": latest.name}
 
 
 @app.get("/api/runs/{run_name}/filters")

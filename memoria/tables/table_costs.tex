@@ -1,16 +1,14 @@
-\begin{table}[htbp]
-\caption{Comparativa de costes operativos (Generada automáticamente).}
+\begin{table}[h]
+\caption{Comparativa de costes operativos bajo evaluación justa (evaluada contra la misma demanda real).}
 \label{tab:metrics_cost}
-\begin{tabular}{@{}llcc@{}}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-Estrategia & Modelo & Coste Total & Coste Medio \\
+Estrategia & MAE Señal & Coste Total & Fill Rate (\%) & Pedido Medio \\
 \midrule
-Latent Supervised & Catboost & 34558.59 & 5.49 \\
-Latent Supervised & LightGBM & 35349.83 & 5.61 \\
-Latent Supervised & Seasonal Naive & 38197.18 & 6.06 \\
-Observed & LightGBM & 47238.62 & 7.50 \\
-Observed & Catboost & 51021.84 & 8.10 \\
-Observed & Seasonal Naive & 56525.19 & 8.97 \\
+Observed & 3.81 & 12881.98 & 91.22 & 11.71 \\
+Latent Supervised & 1.17 & 12262.00 & 99.96 & 15.55 \\
+Latent Historical Mean & 1.68 & 12487.26 & 99.76 & 15.56 \\
+Latent Clipped Scaling & 2.96 & 13206.86 & 93.27 & 12.84 \\
 \bottomrule
 \end{tabular}
 \end{table}

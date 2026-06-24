@@ -17,7 +17,6 @@ class InventoryState:
     backlog: float = 0.0
 
     # Configuration
-    lead_time: int = 7  # matching horizon usually
     c_over: float = 1.0
     c_under: float = 4.0
 
@@ -41,12 +40,16 @@ class InventoryState:
         missed_demand = demand - served_demand
 
         # 4. Update backlog (assuming backorders are allowed in this simulation)
+        # Note: backlog is cumulative; unsatisfied demand from prior periods continues
+        # to accumulate here until arrivals satisfy it.
         self.backlog += missed_demand
 
         # 5. Overstock is what remains
         overstock = self.on_hand
 
         # 6. Costs
+        # Note: backlog is penalized with c_under in each period it remains
+        # unsatisfied, modeling a time-dependent backorder holding penalty.
         cost = (overstock * self.c_over) + (self.backlog * self.c_under)
 
         # 7. Place new order
@@ -79,6 +82,10 @@ def simulate_inventory_policy(
     Now uses 'choose_order_quantity' iteratively to implement an
     Inventory-Aware Order-Up-To policy, and applies LP optimization
     if a global capacity constraint is set.
+
+    Returns a DataFrame containing two cost columns with distinct semantics:
+    - 'sim_total_cost': Cumulative dynamic cost over the multi-period simulation.
+    - 'total_cost': Single-period static inventory cost calculated at each fold independently.
     """
     from retail_forecasting.inventory.newsvendor import (
         attach_inventory_costs,
@@ -188,7 +195,8 @@ def simulate_inventory_policy(
                     arrivals=arrivals,
                 )
 
-                # Schedule next arrival
+                # Lead time = planning horizon (orders arrive at the start of the next
+                # fold). Variable/stochastic lead time is left as future work (see ch. 7).
                 pending_orders[series_id].append((fold_id + 1, final_order_qty))
 
                 # Save results

@@ -2,7 +2,7 @@
 \chapter{Metodología}
 \label{chap:metodologia}
 
-Este capítulo describe \textbf{cómo} se resuelve el problema planteado en el Capítulo~\ref{chap:introduccion}: dado el histórico de ventas de un supermercado, \emph{\textquestiondown cuántas unidades debe pedir mañana cada producto?} La idea central es que predecir solo la media de la demanda no es suficiente --- hay que predecir también la incertidumbre, para que la decisión de pedido tenga garantías estadísticas. A partir de ahí, el modelo se conecta directamente con la política de inventario óptima.
+Este capítulo describe \textbf{cómo} se resuelve el problema planteado en el Capítulo~\ref{chap:introduccion}: dado el histórico de ventas de un supermercado, \emph{\textquestiondown cuántas unidades debe pedir mañana cada producto?} La idea central es que predecir solo la media de la demanda no es suficiente: hay que predecir también la incertidumbre, para que la decisión de pedido tenga garantías estadísticas. A partir de ahí, el modelo se conecta directamente con la política de inventario óptima.
 
 El capítulo se organiza en tres bloques, que se corresponden con las tres fases del ciclo de vida del sistema (véase Figura~\ref{fig:bloques_metodologia}):
 
@@ -61,7 +61,7 @@ Para evitar la fuga de información futura (\textit{data leakage}), los valores 
 
 \subsubsection{Corrección de la Demanda Censurada por Stockout}
 \label{sec:demanda_censurada}
-Como se identificó en el análisis exploratorio, aproximadamente el 15\% de las observaciones del panel presentan algún grado de \textit{stockout} (demanda censurada, \textit{censored demand} en la literatura anglosajona \cite{nahmias1994demand}). El dataset \textit{FreshRetailNet-50K} \cite{freshretailnet2025} anota explícitamente estas roturas mediante el número de horas sin stock por día, lo que permite estimar la demanda latente de forma directa sin recurrir a supuestos sobre el mecanismo de censura. El mecanismo de censura es el siguiente: las ventas observadas $y_{s,t}$ no reflejan la demanda real $D_{s,t}$, sino el mínimo entre ésta y el stock disponible. Sea $h_{s,t} \in [0, 16]$ el número de horas sin stock registradas para la serie $s$ en el día $t$ dentro de la ventana operativa de 16 horas (06:00--22:00):
+Como se identificó en el análisis exploratorio (Capítulo~\ref{chap:analisis_datos}), aproximadamente el 44\% de las observaciones del panel (unos 2 millones de registros) presentan algún grado de \textit{stockout} (demanda censurada, \textit{censored demand} en la literatura anglosajona \cite{nahmias1994demand}); la censura económicamente relevante se concentra en el régimen de rotura severa. El dataset \textit{FreshRetailNet-50K} \cite{freshretailnet2025} anota explícitamente estas roturas mediante el número de horas sin stock por día, lo que permite estimar la demanda latente de forma directa sin recurrir a supuestos sobre el mecanismo de censura. El mecanismo de censura es el siguiente: las ventas observadas $y_{s,t}$ no reflejan la demanda real $D_{s,t}$, sino el mínimo entre ésta y el stock disponible. Sea $h_{s,t} \in [0, 16]$ el número de horas sin stock registradas para la serie $s$ en el día $t$ dentro de la ventana operativa de 16 horas (06:00--22:00):
 
 \begin{equation}
     y_{s,t} = \min\!\left(D_{s,t},\ \text{stock}_{s,t}\right)
@@ -315,7 +315,7 @@ evolutivo (basado en NSGA-II \cite{deb2002nsga2}) optimiza simultáneamente dos 
 
 \subsubsection{Winkler Score: Métrica de Calidad de Intervalos}
 \label{sec:winkler}
-El \textbf{Winkler Score} \cite{winkler1972scoring} evalúa simultáneamente la \emph{nitidez} (intervalos estrechos) y la \emph{cobertura} (el valor real cae dentro del intervalo) en una sola cifra. En el contexto del tuning, se aplica sobre los cuantiles extremos $P10$ y $P90$ que produce el modelo --- ya rearreglados para garantizar monotonicidad (Sección~\ref{sec:crossing}) --- con el único fin de discriminar entre configuraciones de hiperparámetros. En la evaluación final, la misma fórmula se aplica sobre las columnas de cuantiles del DataFrame de predicciones, que en ese punto ya contienen los valores ajustados por la capa de calibración (Sección~\ref{sec:conformal}).
+El \textbf{Winkler Score} \cite{winkler1972scoring} evalúa simultáneamente la \emph{nitidez} (intervalos estrechos) y la \emph{cobertura} (el valor real cae dentro del intervalo) en una sola cifra. En el contexto del tuning, se aplica sobre los cuantiles extremos $P10$ y $P90$ que produce el modelo (ya rearreglados para garantizar monotonicidad, Sección~\ref{sec:crossing}) con el único fin de discriminar entre configuraciones de hiperparámetros. En la evaluación final, la misma fórmula se aplica sobre las columnas de cuantiles del DataFrame de predicciones, que en ese punto ya contienen los valores ajustados por la capa de calibración (Sección~\ref{sec:conformal}).
 
 Para un intervalo $[L_{s,t},\, U_{s,t}]$ con nivel de significancia $\alpha$ ($\alpha = 0{,}2$ para el intervalo P10--P90, que deja fuera el $10\%$ inferior y el $10\%$ superior de la distribución):
 
@@ -335,9 +335,9 @@ El primer caso es el \emph{pago base}: siempre se paga la amplitud del intervalo
 \noindent\textbf{Ejemplo numérico.} Supóngase que el modelo predice el intervalo $[10, 20]$ kg para la demanda de mañana (amplitud $= 10$ kg, $\alpha = 0{,}2$):
 
 \begin{itemize}
-    \item \textbf{Caso 1 --- acierto:} la demanda real es $y = 15$ kg (dentro del intervalo). $W = 20 - 10 = \mathbf{10}$. Solo se paga la amplitud.
-    \item \textbf{Caso 2 --- fallo por abajo:} la demanda real es $y = 5$ kg (por debajo de $L = 10$). $W = 10 + \frac{2}{0{,}2}(10 - 5) = 10 + 50 = \mathbf{60}$. El fallo de cobertura multiplica por seis el coste del intervalo válido.
-    \item \textbf{Caso 3 --- fallo por arriba:} la demanda real es $y = 25$ kg (por encima de $U = 20$). $W = 10 + \frac{2}{0{,}2}(25 - 20) = 10 + 50 = \mathbf{60}$. Mismo coste que el caso anterior.
+    \item \textbf{Caso 1 (acierto):} la demanda real es $y = 15$ kg (dentro del intervalo). $W = 20 - 10 = \mathbf{10}$. Solo se paga la amplitud.
+    \item \textbf{Caso 2 (fallo por abajo):} la demanda real es $y = 5$ kg (por debajo de $L = 10$). $W = 10 + \frac{2}{0{,}2}(10 - 5) = 10 + 50 = \mathbf{60}$. El fallo de cobertura multiplica por seis el coste del intervalo válido.
+    \item \textbf{Caso 3 (fallo por arriba):} la demanda real es $y = 25$ kg (por encima de $U = 20$). $W = 10 + \frac{2}{0{,}2}(25 - 20) = 10 + 50 = \mathbf{60}$. Mismo coste que el caso anterior.
 \end{itemize}
 
 Si en cambio el modelo hubiera predicho el intervalo vago $[0, 100]$ kg (amplitud $= 100$ kg), habría acertado siempre pero pagando $W = 100$ en cada predicción, mucho peor que el acierto del intervalo ajustado ($W = 10$). La métrica desincentiva así tanto los intervalos vagos como los que fallan.
@@ -369,10 +369,10 @@ sobre el que se calculan los errores de cobertura; a partir de ellos se obtiene 
 corrector $\hat{q}$ que, aplicado en predicción, garantiza que el $(1-\alpha)\cdot 100\%$ de
 las observaciones futuras caigan dentro del intervalo.
 
-La garantía de un $\hat{q}$ global es de cobertura \textbf{marginal}: el 90\% de cobertura
+La garantía de un $\hat{q}$ global es de cobertura \textbf{marginal}: el 80\% de cobertura
 se cumple \textit{en media sobre todo el catálogo}, pero puede enmascarar desigualdades
-críticas por familia de producto --- el modelo podría cubrir el 99\% de los productos
-estables y solo el 70\% de los intermitentes, y la media seguiría siendo 90\%.
+críticas por familia de producto: el modelo podría cubrir el 90\% de los productos
+estables y solo el 70\% de los intermitentes, y la media seguiría siendo 80\%.
 
 Para obtener cobertura \textbf{condicional por categoría}, el sistema extiende Split CP
 con la estrategia \textbf{Mondrian} \cite{vovk2005algorithmic}: en lugar de un único
@@ -409,7 +409,8 @@ siguiente:
     \item \textbf{Factor de Corrección por Categoría}: Para cada grupo taxonómico $g$,
     se recopila el subconjunto de scores locales $\mathcal{S}_g = \{s_i : \text{SKU}_i \in g\}$.
     El factor de corrección $\hat{q}_g$ se obtiene como el cuantil empírico inflado de esa
-    distribución, que incorpora la corrección finita de Bonferroni:
+    distribución, que incorpora la corrección de muestra finita estándar de la predicción
+    conformal (el factor $(|\mathcal{S}_g|+1)/|\mathcal{S}_g|$):
     \begin{equation}
         \hat{q}_g = \text{Quantile} \left( \mathcal{S}_g, \;
         (1 - \alpha) \left(1 + \frac{1}{|\mathcal{S}_g|}\right) \right)
@@ -438,7 +439,7 @@ propiedad no se cumple en series temporales con dependencia temporal o no-estaci
 residuos de calibración (últimos días del split de entrenamiento) pueden no ser representativos
 del comportamiento del periodo de evaluación. Las implicaciones empíricas de esta limitación
 se discuten en la Sección~\ref{sec:resultados_conformal}; algoritmos que relajan este supuesto
---- como EnbPI \cite{xu2021conformal} o ACI \cite{gibbs2021adaptive} --- quedan como línea de
+(como EnbPI \cite{xu2021conformal} o ACI \cite{gibbs2021adaptive}) quedan como línea de
 trabajo futuro.
 
 \subsubsection{Métricas de Evaluación de Intervalos de Confianza}
@@ -454,7 +455,7 @@ se emplean dos métricas complementarias al Winkler Score (definido en la Secci�
     Donde $\mathbb{I}(\cdot)$ vale 1 si la condición se cumple y 0 si no.
     Con cuantiles P10--P90, la cobertura teórica garantizada por Predicción Conformal es
     $1 - \alpha = 0{,}80$. Un PICP de 0,78 significaría que el intervalo contiene el valor
-    real el 78\% de las veces --- prácticamente lo prometido. Un PICP muy inferior a 0,80
+    real el 78\% de las veces, prácticamente lo prometido. Un PICP muy inferior a 0,80
     indica infracobertura (el modelo es demasiado confiado); muy superior indica
     supercobertura (intervalos excesivamente conservadores).
 
@@ -481,7 +482,7 @@ El sistema implementa un \textbf{backtesting walk-forward} con $K=3$ folds tempo
     \text{Fold}_k: \quad \text{Train} = \{t < t_k\}, \quad \text{Test} = \{t_k \leq t < t_k + H\}
 \end{equation}
 
-donde $H = 7$ días es el horizonte de planificación. Los cortes $t_1 < t_2 < t_3$ dividen el periodo de observación en cuatro segmentos iguales, asegurando que cada fold tenga suficiente historia para construir los lags de 28 días. La calibración conformal descrita en la sección anterior se realiza sobre el último 20\% de cada ventana de entrenamiento, que actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el entrenamiento del modelo base. La Figura~\ref{fig:backtesting_walkforward} ilustra la estructura de los tres folds.
+donde $H = 7$ días es el horizonte de planificación. El sistema utiliza una estrategia de \textbf{ventana de entrenamiento expansiva} (expanding window), donde todos los folds comienzan al inicio del histórico y su fecha de finalización se desplaza progresivamente. La calibración conformal descrita en la sección anterior se realiza sobre una ventana fija correspondiente a los últimos $21$ días de cada conjunto de entrenamiento, la cual actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el ajuste del modelo base. La Figura~\ref{fig:backtesting_walkforward} ilustra la estructura de los tres folds.
 
 \begin{figure}[H]
 \centering
@@ -520,13 +521,23 @@ donde $H = 7$ días es el horizonte de planificación. Los cortes $t_1 < t_2 < t
 \end{tikzpicture}
 \shorthandon{>}%
 \caption{Esquema del \textit{backtesting walk-forward} con $K=3$ folds temporales. El conjunto
-de entrenamiento (azul) se expande progresivamente con cada fold; el 20\% final de cada ventana
-de entrenamiento se reserva como calibración conformal (violeta); la evaluación se realiza sobre
+de entrenamiento (azul) se expande progresivamente con cada fold; los últimos 21 días de cada ventana
+de entrenamiento se reservan como calibración conformal (violeta); la evaluación se realiza sobre
 los 7 días siguientes al corte (naranja).}
 \label{fig:backtesting_walkforward}
 \end{figure}
 
 El modelo \textbf{baseline} de referencia es el \textit{Seasonal Naïve}: para cada serie y fecha de predicción, replica la demanda observada en el mismo día de la semana hace 7 días. Este baseline es el más exigente en contextos con estacionalidad semanal fuerte (como el confirmado en el análisis exploratorio) y es el estándar de comparación utilizado en la competición M5 \cite{makridakis2022m5}. Un modelo que no supere al \textit{Seasonal Naïve} en Winkler Score no aporta valor respecto a una heurística trivial.
+
+\subsubsection{Variación de los Targets de Validación por Estrategia}
+
+Es importante destacar un detalle del protocolo de evaluación predictiva cuando se comparan diferentes estrategias de tratamiento de la censura. Bajo el flujo de validación convencional del backtesting walk-forward:
+\begin{itemize}
+    \item Para la estrategia sin corrección (\textit{Observed}), la variable objetivo en validación ($y_{\text{true}}$) son las ventas reales registradas.
+    \item Para las estrategias con corrección (\textit{Latent}), la variable objetivo en validación es la demanda ya imputada (por ejemplo, mediante el estimador supervisado).
+\end{itemize}
+Dado que el proceso de imputación genera una señal suavizada y con menor varianza estocástica que las ventas observadas (las cuales sufren caídas drásticas por roturas de stock), predecir este target imputado resulta matemáticamente más sencillo. Esto genera un sesgo de evaluación que puede inflar la reducción de error (MAE y RMSE). Por ello, para realizar comparaciones rigurosas, este trabajo complementa la evaluación predictiva con una metodología de evaluación directa mediante censura sintética y análisis de costes bajo un \textit{ground-truth} común (Sección~\ref{sec:imputacion_censura_sintetica} y Sección~\ref{sec:resultados_gemelo}).
+
 
 \subsection{Perfiles de Coste Sintéticos por SKU}
 \label{sec:cost_profiles}
@@ -562,11 +573,12 @@ Ante la ausencia de datos financieros transaccionales explícitos en el dataset 
 \end{enumerate}
 
 Los valores de los pesos son los valores por defecto del sistema, validados sobre el
-experimento base; todos están expuestos como parámetros configurables en
-\texttt{SyntheticCostConfig} para su ajuste operacional. Los factores de escala son:
+experimento base; todos están definidos como constantes heurísticas fijas en el código
+para garantizar la consistencia y reproducibilidad de los perfiles de coste entre experimentos. Los factores de escala son:
 $\beta_0^{perish}=0{,}8$, $\beta_1^{perish}=0{,}8$,
 $\beta_0^{slow}=0{,}9$, $\beta_1^{slow}=0{,}5$,
 $\beta_0^{crit}=0{,}9$, $\beta_1^{crit}=0{,}5$.
+
 
 Cada score se transforma en un factor mediante una reescala lineal parametrizada que garantiza que el factor sea siempre positivo y acotado:
 

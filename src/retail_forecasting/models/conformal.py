@@ -93,9 +93,14 @@ class ConformalForecaster:
 
     def _compute_q_hat(self, scores: np.ndarray, alpha: float) -> float:
         n = len(scores)
-        q_level = (1 - alpha) * (1 + 1 / n)
-        q_level = min(max(q_level, 0.0), 1.0)
-        q_hat = np.quantile(scores, q_level, method="higher")
+        if n == 0:
+            return 0.0
+        k = int(np.ceil((n + 1) * (1 - alpha)))
+        if k > n:
+            q_hat = float(np.max(scores))
+        else:
+            sorted_scores = np.sort(scores)
+            q_hat = float(sorted_scores[k - 1])
         return float(max(q_hat, 0.0))
 
     def predict(self, features: Any) -> np.ndarray:

@@ -34,7 +34,7 @@ def optimize_orders_lp(
 
     total_unconstrained = 0.0
     for sid in series_ids:
-        max_qty = unconstrained_orders[sid]
+        max_qty = max(0.0, unconstrained_orders[sid])
         total_unconstrained += max_qty
         bounds.append((0.0, max_qty))
 

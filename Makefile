@@ -4,7 +4,7 @@
 PYTHON = uv run python
 PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
-.PHONY: help install run retrain score simulate eda api dev mlflow up test test-harness lint format clean pdf
+.PHONY: help install run retrain score simulate backtest-fair-cost eda api dev mlflow up test test-harness lint format clean pdf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -23,6 +23,9 @@ score: ## Generate daily reorder recommendations (production mode)
 
 simulate: ## Run operational simulation comparing retrain cadences
 	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode simulate_ops
+
+backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common ground truth (no training)
+	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode fair_cost_backtest
 
 eda: ## Run the reproducible EDA module on the prepared panel
 	$(PYTHON) -m retail_forecasting.eda.run --config $(CONFIG)

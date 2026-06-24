@@ -1,16 +1,16 @@
-\begin{table}[htbp]
+\begin{table}[h]
 \caption{Comparativa de errores predictivos.}
 \label{tab:metrics_predictive}
 \begin{tabular}{@{}llcc@{}}
 \toprule
 Estrategia & Modelo & MAE & RMSE \\
 \midrule
-Latent Supervised & Seasonal Naive & 2.74 & 4.05 \\
-Latent Supervised & Catboost & 3.27 & 4.86 \\
-Latent Supervised & LightGBM & 3.85 & 6.02 \\
-Observed & Seasonal Naive & 3.64 & 5.11 \\
-Observed & Catboost & 4.09 & 5.71 \\
-Observed & LightGBM & 4.15 & 5.86 \\
+Latent Supervised & Seasonal Naive & 4.47 & 6.05 \\
+Latent Supervised & Auto Boosting & 7.22 & 10.63 \\
+Latent Supervised & Catboost & 7.89 & 10.78 \\
+Observed & Seasonal Naive & 8.73 & 11.82 \\
+Observed & Catboost & 12.91 & 18.28 \\
+Observed & Auto Boosting & 13.71 & 19.76 \\
 \bottomrule
 \end{tabular}
 \end{table}

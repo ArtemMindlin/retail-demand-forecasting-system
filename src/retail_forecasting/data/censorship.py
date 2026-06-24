@@ -10,6 +10,9 @@ import pandas as pd
 # stockout_hours is counted within that window, so this is its normalizing denominator.
 OPERATIVE_WINDOW_HOURS = 16.0
 
+# Single source of truth for the latent-demand imputation strategies.
+ImputationStrategy = Literal["supervised", "historical_mean", "clipped_scaling", "none"]
+
 
 class LatentDemandImputer:
     """Imputes latent demand for periods with stockouts using various strategies.
@@ -20,9 +23,7 @@ class LatentDemandImputer:
 
     def __init__(
         self,
-        strategy: Literal[
-            "supervised", "historical_mean", "clipped_scaling", "none"
-        ] = "supervised",
+        strategy: ImputationStrategy = "supervised",
         stockout_col: str = "stockout_hours",
         target_col: str = "observed_demand",
         scaling_factor: float = 1.2,

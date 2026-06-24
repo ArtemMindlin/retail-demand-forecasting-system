@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import get_args
 
 from pydantic import ValidationError
 
 from retail_forecasting.config import load_config
+from retail_forecasting.contracts.contracts_config import RunMode
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
+    run_fair_cost_backtest,
     run_imputation_comparison,
     run_retrain,
     run_scoring,
@@ -42,7 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--run-mode",
         default=None,
-        choices=["experiment", "retrain", "score_daily", "simulate_ops"],
+        choices=list(get_args(RunMode)),
         help="Optional override for the execution mode.",
     )
     return parser
@@ -94,6 +97,10 @@ def main() -> None:
     if mode == "simulate_ops":
         sim_artifacts = run_operational_simulation(settings)
         print(f"Simulation outputs written to: {sim_artifacts.run_directory}")
+        return
+    if mode == "fair_cost_backtest":
+        run_dir = run_fair_cost_backtest(settings)
+        print(f"Fair-cost backtest written to: {run_dir / 'fair_cost_backtest.csv'}")
         return
     if mode == "score_daily":
         artifacts = run_scoring(settings)
