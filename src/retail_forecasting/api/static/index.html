@@ -5543,69 +5543,67 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     </div>
                   )}
 
-                  {/* What-If toggle */}
+                  {/* What-If toggle + inline panel */}
                   {subTab === "forecast" && (
-                    <button
-                      className={`filter-tab ${wiOpen ? "active" : ""}`}
-                      onClick={() => setWiOpen(o => !o)}
-                      style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "8px 14px",
-                        alignSelf: "flex-end", borderRadius: 8,
-                        background: wiOpen ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.02)",
-                        color: wiOpen ? "#fff" : "var(--text-2)",
-                        borderColor: wiOpen ? "rgba(139,92,246,0.45)" : "var(--border)" }}>
-                      <Icon name="zap" size={13} />
-                      What-If
-                    </button>
+                    <>
+                      <button
+                        className={`filter-tab ${wiOpen ? "active" : ""}`}
+                        onClick={() => setWiOpen(o => !o)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "8px 14px",
+                          alignSelf: "flex-end", borderRadius: 8,
+                          background: wiOpen ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.02)",
+                          color: wiOpen ? "#fff" : "var(--text-2)",
+                          borderColor: wiOpen ? "rgba(139,92,246,0.45)" : "var(--border)" }}>
+                        <Icon name="zap" size={13} />
+                        What-If
+                      </button>
+                      {wiOpen && filters && (
+                        <>
+                          <div style={{ alignSelf: "flex-end", width: 1, height: 32,
+                            background: "var(--border)", margin: "0 4px" }} />
+                          <div style={{ minWidth: 160 }}>
+                            <div style={{ ...labelStyle, color: "var(--c-inv)" }}>C_over: {cOver.toFixed(1)}</div>
+                            <input type="range" min={0.1} max={5.0} step={0.1} value={cOver}
+                              onChange={e => setCOver(parseFloat(e.target.value))}
+                              style={{ "--track-fill": "var(--c-inv)", "--track-percent": `${((cOver - 0.1) / 4.9) * 100}%` }} />
+                          </div>
+                          <div style={{ minWidth: 160 }}>
+                            <div style={{ ...labelStyle, color: "var(--c-drift)" }}>C_under: {cUnder.toFixed(1)}</div>
+                            <input type="range" min={0.5} max={20.0} step={0.5} value={cUnder}
+                              onChange={e => setCUnder(parseFloat(e.target.value))}
+                              style={{ "--track-fill": "var(--c-drift)", "--track-percent": `${((cUnder - 0.5) / 19.5) * 100}%` }} />
+                          </div>
+                          <div>
+                            <div style={labelStyle}>Capacidad (u)</div>
+                            <input type="number" placeholder="sin límite"
+                              value={wiCapacity} onChange={e => setWiCapacity(e.target.value)}
+                              style={{ ...selectStyle, width: 120 }} />
+                          </div>
+                          <button className="btn-run"
+                            disabled={wiLoading || !selectedModel}
+                            onClick={handleWhatIf}
+                            style={{ padding: "9px 18px", fontSize: 12, width: "auto", alignSelf: "flex-end" }}>
+                            {wiLoading ? "Simulando…" : "▶ Simular"}
+                          </button>
+                          {wiResult && (
+                            <div style={{ alignSelf: "flex-end", fontFamily: "var(--font-mono)", fontSize: 12,
+                              color: "var(--text-2)", paddingBottom: 2 }}>
+                              <span style={{ color: wiResult.cost_delta < 0 ? "var(--c-conf)" : "#ef4444" }}>
+                                {wiResult.cost_delta < 0 ? "↓" : "↑"} ${Math.abs(wiResult.cost_delta).toFixed(2)}
+                              </span>
+                              {" vs base · SL: "}
+                              <span style={{ color: "var(--c-inv)" }}>
+                                {(wiResult.whatif_service_level * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
                   )}
                 </>
               )}
             </div>
-
-            {/* What-if panel */}
-            {wiOpen && subTab === "forecast" && filters && (
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px dashed var(--border)",
-                display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
-                <div style={{ minWidth: 180 }}>
-                  <div style={{ ...labelStyle, color: "var(--c-inv)" }}>
-                    C_over: {cOver.toFixed(1)}
-                  </div>
-                  <input type="range" min={0.1} max={5.0} step={0.1} value={cOver}
-                    onChange={e => setCOver(parseFloat(e.target.value))}
-                    style={{ "--track-fill": "var(--c-inv)", "--track-percent": `${((cOver - 0.1) / 4.9) * 100}%` }} />
-                </div>
-                <div style={{ minWidth: 180 }}>
-                  <div style={{ ...labelStyle, color: "var(--c-drift)" }}>
-                    C_under: {cUnder.toFixed(1)}
-                  </div>
-                  <input type="range" min={0.5} max={20.0} step={0.5} value={cUnder}
-                    onChange={e => setCUnder(parseFloat(e.target.value))}
-                    style={{ "--track-fill": "var(--c-drift)", "--track-percent": `${((cUnder - 0.5) / 19.5) * 100}%` }} />
-                </div>
-                <div>
-                  <div style={labelStyle}>Capacidad (u)</div>
-                  <input type="number" placeholder="sin límite"
-                    value={wiCapacity} onChange={e => setWiCapacity(e.target.value)}
-                    style={{ ...selectStyle, width: 130 }} />
-                </div>
-                <button className="btn-run"
-                  disabled={wiLoading || !selectedModel}
-                  onClick={handleWhatIf}
-                  style={{ padding: "9px 18px", fontSize: 12, width: "auto" }}>
-                  {wiLoading ? "Simulando…" : "▶ Simular"}
-                </button>
-                {wiResult && (
-                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-2)" }}>
-                    <span style={{ color: wiResult.cost_delta < 0 ? "var(--c-conf)" : "#ef4444" }}>
-                      {wiResult.cost_delta < 0 ? "↓" : "↑"} ${Math.abs(wiResult.cost_delta).toFixed(2)}
-                    </span>
-                    {" vs base · SL: "}
-                    <span style={{ color: "var(--c-inv)" }}>
-                      {(wiResult.whatif_service_level * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
           )}
 
