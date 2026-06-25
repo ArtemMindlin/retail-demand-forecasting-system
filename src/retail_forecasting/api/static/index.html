@@ -6825,7 +6825,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         setLoading(false);
         const t = new Date();
         setLastRunAt(t.toTimeString().slice(0, 8));
-      }, [params]);
+      }, [params, selectedSkuId]);
 
       // Initial load — wait until auth is confirmed to avoid a spurious 401 before login
       useEffect(() => {
@@ -6839,7 +6839,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         debounceRef.current = setTimeout(() => reload(400), 280);
         return () => clearTimeout(debounceRef.current);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [params]);
+      }, [params, selectedSkuId]);
 
       // Auto scroll console logs to bottom when updated
       useEffect(() => {
