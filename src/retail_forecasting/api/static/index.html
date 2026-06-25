@@ -5376,8 +5376,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         }
       }, [impData, subTab, runVerdict]);
 
-      // Compute KPIs from summary
-      const kpis = useMemo(() => {
+      // Compute KPIs from summary (aggregate, fallback when no series selected)
+      const aggregateKpis = useMemo(() => {
         if (!summary || !selectedModel) return null;
         const m = (summary.metrics || []).find(r =>
           r.model_name === selectedModel &&
@@ -5396,6 +5396,28 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           serviceLevel: c?.sim_service_level ?? c?.service_level ?? null,
         };
       }, [summary, selectedModel, selectedStrategy]);
+
+      // Per-series KPIs computed from chart data when a series is selected
+      const seriesKpis = useMemo(() => {
+        if (!chartData || !chartData.y_true?.length || !selectedSeries) return null;
+        const pairs = chartData.y_true
+          .map((yt, i) => ({ yt, yp: chartData.y_pred[i], ql: chartData.q_low[i], qh: chartData.q_high[i] }))
+          .filter(p => p.yt != null && p.yp != null);
+        if (!pairs.length) return null;
+        const mae = pairs.reduce((s, p) => s + Math.abs(p.yt - p.yp), 0) / pairs.length;
+        const hasBands = pairs.some(p => p.ql != null && p.qh != null);
+        const coverage = hasBands
+          ? (pairs.filter(p => p.ql != null && p.qh != null && p.yt >= p.ql && p.yt <= p.qh).length / pairs.length) * 100
+          : null;
+        const sl = pairs.filter(p => p.yp >= p.yt).length / pairs.length;
+        const totalCost = pairs.reduce((s, p) => {
+          const q = p.yp;
+          return s + (q >= p.yt ? (q - p.yt) * cOver : (p.yt - q) * cUnder);
+        }, 0);
+        return { mae, coverage, serviceLevel: sl, totalCost };
+      }, [chartData, selectedSeries, cOver, cUnder]);
+
+      const kpis = seriesKpis ?? aggregateKpis;
 
       const handleWhatIf = async () => {
         if (!selectedRun || !selectedModel) return;
