@@ -518,6 +518,166 @@ def get_eda_figure(name: str) -> FileResponse:
     return FileResponse(path=figure_path, media_type="image/png")
 
 
+def _histogram(values: list[float], n_bins: int = 25) -> tuple[list[float], list[int]]:
+    arr = np.array([v for v in values if v is not None and not np.isnan(v)])
+    if len(arr) == 0:
+        return [], []
+    counts, edges = np.histogram(arr, bins=n_bins)
+    centers = [float((edges[i] + edges[i + 1]) / 2) for i in range(len(counts))]
+    return centers, counts.tolist()
+
+
+@app.get("/api/eda/data/{name}")
+def get_eda_chart_data(name: str) -> dict[str, Any]:
+    """Return chart-ready JSON data for a named EDA figure (replaces static PNG)."""
+    known_names = {fig["name"] for fig in _EDA_FIGURES}
+    if name not in known_names:
+        raise HTTPException(status_code=404, detail="Figure not found.")
+
+    eda_path = _get_latest_eda_path()
+    if eda_path is None:
+        raise HTTPException(status_code=404, detail="No EDA report found.")
+
+    def read(fname: str) -> pd.DataFrame | None:
+        p = eda_path / fname
+        return pd.read_csv(p) if p.exists() else None
+
+    if name == "weekday_demand_profile":
+        df = read("weekday_summary.csv")
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data not available.")
+        return {
+            "type": "line_dual",
+            "data": df[["weekday_name", "observed_demand_mean", "observed_demand_median"]].to_dict(
+                "records"
+            ),
+            "series": [
+                {"key": "observed_demand_mean", "label": "Media", "color": "#10b981"},
+                {"key": "observed_demand_median", "label": "Mediana", "color": "#3b82f6"},
+            ],
+        }
+
+    if name == "stockout_band_demand":
+        df = read("stockout_demand_bands.csv")
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data not available.")
+        cols = [
+            c for c in ["stockout_band", "observed_demand_mean", "observations"] if c in df.columns
+        ]
+        return {"type": "bar_group", "data": df[cols].to_dict("records"), "x_key": "stockout_band"}
+
+    if name == "correlation_heatmap":
+        df = read("correlation_summary.csv")
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data not available.")
+        df = df.sort_values("absolute_correlation", ascending=False).head(15)
+        return {
+            "type": "bar_horizontal",
+            "data": df[["feature_name", "correlation_with_observed_demand"]].to_dict("records"),
+        }
+
+    if name == "zero_demand_rate_by_series":
+        df = read("series_summary.csv")
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data not available.")
+        rates = df["zero_demand_rate"].dropna().tolist()
+        centers, counts = _histogram(rates, 25)
+        median_r = float(np.median(rates)) if rates else 0.0
+        pct50 = float(sum(1 for r in rates if r > 0.5) / len(rates) * 100) if rates else 0.0
+        return {
+            "type": "histogram",
+            "centers": centers,
+            "counts": counts,
+            "x_label": "Tasa demanda cero",
+            "median": median_r,
+            "pct_above_50": pct50,
+        }
+
+    if name == "observed_demand_distribution":
+        df = read("series_summary.csv")
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data not available.")
+        means = df["observed_demand_mean"].dropna().tolist()
+        centers, counts = _histogram(means, 30)
+        log_counts = [float(np.log10(c)) if c > 0 else 0.0 for c in counts]
+        return {
+            "type": "histogram_dual",
+            "centers": centers,
+            "counts": counts,
+            "log_counts": log_counts,
+            "x_label": "Demanda media por serie",
+        }
+
+    if name == "stockout_hours_distribution":
+        df = read("stockout_by_series_summary.csv") or read("series_summary.csv")
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data not available.")
+        col = "mean_stockout_hours" if "mean_stockout_hours" in df.columns else "stockout_day_rate"
+        vals = df[col].dropna().tolist()
+        centers, counts = _histogram(vals, 25)
+        return {
+            "type": "histogram",
+            "centers": centers,
+            "counts": counts,
+            "x_label": col.replace("_", " "),
+        }
+
+    if name == "stockout_vs_demand_scatter":
+        df = read("series_summary.csv")
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data not available.")
+        sub = df[["observed_demand_mean", "mean_stockout_hours"]].dropna().head(500)
+        return {
+            "type": "scatter",
+            "data": sub.rename(
+                columns={"observed_demand_mean": "x", "mean_stockout_hours": "y"}
+            ).to_dict("records"),
+        }
+
+    if name == "observed_demand_boxplot_top_series":
+        df = read("series_summary.csv")
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data not available.")
+        top = df.nlargest(20, "observed_demand_sum")[
+            ["series_id", "observed_demand_mean", "observed_demand_std"]
+        ].dropna()
+        boxes = []
+        for _, row in top.iterrows():
+            m, s = float(row["observed_demand_mean"]), float(row["observed_demand_std"])
+            boxes.append(
+                {
+                    "id": str(row["series_id"]),
+                    "min": max(0.0, m - 2 * s),
+                    "q1": max(0.0, m - s),
+                    "median": m,
+                    "q3": m + s,
+                    "max": m + 2 * s,
+                }
+            )
+        return {"type": "boxplot", "data": boxes}
+
+    if name == "representative_series_panels":
+        df = read("series_summary.csv")
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data not available.")
+        cols = [
+            c
+            for c in [
+                "series_id",
+                "observed_demand_mean",
+                "observed_demand_std",
+                "zero_demand_rate",
+                "stockout_day_rate",
+                "history_days",
+            ]
+            if c in df.columns
+        ]
+        top = df.nlargest(12, "observed_demand_sum")[cols]
+        return {"type": "series_grid", "series": top.to_dict("records")}
+
+    raise HTTPException(status_code=404, detail="Figure data not available.")
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # Operational simulation (OPS plane) — walk-forward week-by-week playback.
 # Reads the artifact produced by run_operational_simulation
