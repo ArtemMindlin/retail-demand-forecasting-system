@@ -6181,7 +6181,17 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             const label = side === 0 ? "lineal" : "log";
             return (
               <g key={side}>
-                <line x1={offX} x2={offX + half} y1={H - pad.b} y2={H - pad.b} stroke="var(--border)" strokeWidth={0.5} />
+                {[0, maxV / 2, maxV].map(v => {
+                  const yp = pad.t + (1 - v / (maxV || 1)) * iH;
+                  return (
+                    <g key={v}>
+                      <line x1={offX} x2={offX + half} y1={yp} y2={yp} stroke="var(--border)" strokeWidth={0.5} />
+                      <text x={offX - 6} y={yp + 3} textAnchor="end" fontSize={8} fill="var(--text-3)">
+                        {v >= 1000 ? (v/1000).toFixed(1) + 'k' : Math.floor(v)}
+                      </text>
+                    </g>
+                  );
+                })}
                 <text x={offX + half / 2} y={pad.t - 4} textAnchor="middle" fontSize={9} fill="var(--text-3)">{label}</text>
                 {vals.map((c, i) => {
                   const bh = (c / maxV) * iH;
