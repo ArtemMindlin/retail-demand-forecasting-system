@@ -126,10 +126,19 @@ def prepare_daily_panel(
         if "discount" in panel.columns:
             panel["discount"] = panel["discount"].fillna(1.0)
 
+        # Weather covariates are imputed causally within each series: a
+        # forward-fill carries the last observed reading (past information only),
+        # a backward-fill covers leading gaps at the very start of a series, and
+        # a global median is the final fallback for series with no reading at
+        # all. This avoids the look-ahead bias of a split-wide median, which
+        # would let future observations inform the imputed values of past rows.
         weather_columns = ["avg_temperature", "avg_humidity", "avg_wind_level"]
         for column in weather_columns:
-            if column in panel.columns:
-                panel[column] = panel[column].fillna(panel[column].median())
+            if column not in panel.columns:
+                continue
+            filled = panel.groupby("series_id")[column].ffill()
+            filled = filled.groupby(panel["series_id"]).bfill()
+            panel[column] = filled.fillna(filled.median())
 
     return panel.reset_index(drop=True)
 

@@ -386,6 +386,15 @@ def _resolve_cold_start_fallbacks(
     panel: pd.DataFrame,
     horizon: int,
 ) -> pd.DataFrame:
+    """Assign a hierarchical mean-based prediction to cold-start rows.
+
+    This runs only at inference time. ``panel`` must contain history available
+    at the scoring origin (callers pass the training split or, in the dynamic
+    simulation, rows strictly before the decision date), so the demand means
+    used here rely solely on observed past data and introduce no look-ahead
+    leakage: the future lead-time demand being predicted is never part of
+    ``panel``.
+    """
     series_means = panel.groupby("series_id")["observed_demand"].mean()
     product_means = panel.groupby("product_id")["observed_demand"].mean()
     third_category_means = panel.groupby("third_category_id")["observed_demand"].mean()
