@@ -30,7 +30,7 @@ El capítulo se organiza en tres bloques, que se corresponden con las tres fases
 El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: reentrenamiento del modelo seleccionado y generación diaria de recomendaciones de pedido bajo restricciones logísticas reales. El \textbf{Bloque III} cubre la fase MLOps: simulación en streaming para determinar la cadencia óptima de reentrenamiento en producción.
 
 % ==============================================================================
-\section{Bloque I: Investigación (\texttt{experiment})}
+\section{Bloque I: Investigación}
 % ==============================================================================
 
 \subsection{Formulación del Problema}
@@ -689,13 +689,13 @@ a una política base-stock de revisión continua, que es el caso límite de la f
 cuando el coste fijo de pedido es nulo \cite{silver1998inventory}.
 
 % ==============================================================================
-\section{Bloque II: Operación (\texttt{retrain} y \texttt{score\_daily})}
+\section{Bloque II: Operación}
 % ==============================================================================
 
 Una vez identificado el modelo óptimo en la fase de investigación, el sistema entra en modo operacional. El modo \texttt{retrain} reentrena el modelo champion sobre la totalidad de los datos disponibles y lo persiste. El modo \texttt{score\_daily} carga ese modelo y genera diariamente las recomendaciones de pedido para cada SKU, aplicando las restricciones logísticas reales mediante programación lineal.
 
 \subsection{Resolución de Conflictos: Optimización Global por Programación Lineal}
-Las recomendaciones individuales de cada SKU pueden ser matemáticamente óptimas a nivel aislado, pero el despliegue en un supermercado real está sujeto a severas restricciones de volumen físico de almacenaje o de capital presupuestario.
+Las recomendaciones individuales de cada SKU pueden ser matemáticamente óptimas a nivel aislado, pero el despliegue en un supermercado real está sujeto a severas restricciones de volumen físico de almacenaje.
 
 Para cerrar la brecha entre Machine Learning e Investigación de Operaciones (OR), la decisión final se orquesta a través de un \textbf{Módulo de Programación Lineal (LP)}. El problema se plantea como un \textit{Continuous Knapsack}:
 
@@ -705,7 +705,7 @@ Para cerrar la brecha entre Machine Learning e Investigación de Operaciones (OR
     \item \textbf{Restricciones}: La suma total de unidades pedidas en el catálogo no debe exceder una constante $C_{max}$ (ej. Límite del camión logístico).
 \end{itemize}
 
-El módulo utiliza el solver \texttt{HiGHS} de SciPy para reducir las órdenes allí donde el impacto de una rotura sea menor, permitiendo tomar decisiones de pedido razonables incluso cuando el presupuesto o el espacio son limitados.
+El módulo utiliza el solver \texttt{HiGHS} de SciPy para reducir las órdenes allí donde el impacto de una rotura sea menor, permitiendo tomar decisiones de pedido razonables incluso cuando la capacidad de almacén es limitada.
 
 \subsection{Criterio de Promoción del Modelo Campeón}
 
@@ -719,7 +719,7 @@ El ciclo de operación no es estático: tras cada ejecución del modo \texttt{ex
 Este diseño prioriza la estabilidad operacional frente a la optimización agresiva: un modelo que recorte costes a costa de roturas frecuentes nunca alcanzará producción. La implementación detallada y el flujo de decisión se describen en la Sección~\ref{sec:champion_promotion}.
 
 % ==============================================================================
-\section{Bloque III: MLOps (\texttt{simulate\_ops})}
+\section{Bloque III: MLOps}
 % ==============================================================================
 
 \label{sec:simulate_ops}
