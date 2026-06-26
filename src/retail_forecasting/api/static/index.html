@@ -1451,7 +1451,7 @@
   <script type="text/babel" data-presets="env,react">
     const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-    function KpiCard({ label, value, suffix, delta, deltaUnit = "%", color, loading, sub, lower_is_better = false }) {
+    function KpiCard({ label, value, suffix, delta, deltaPrefix = "", deltaUnit = "%", color, loading, sub, lower_is_better = false }) {
       const isUp = (delta ?? 0) >= 0;
       // Color of delta: depends on whether lower is better
       const good = lower_is_better ? !isUp : isUp;
@@ -1498,7 +1498,7 @@
               fontWeight: 600,
             }}>
               <Icon name={isUp ? "arrowUp" : "arrowDown"} size={11} strokeWidth={2.4} />
-              {loading ? "—" : `${Math.abs(delta).toFixed(deltaUnit === "%" ? 1 : 2)}${deltaUnit}`}
+              {loading ? "—" : `${deltaPrefix}${Math.abs(delta).toFixed(deltaUnit === "%" ? 1 : 2)}${deltaUnit}`}
             </div>
             {sub && (
               <div style={{ fontSize: 10.5, color: "var(--text-mute)", fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}>
@@ -1518,6 +1518,8 @@
             label="Coste de Inventario"
             value={loading ? "" : fmt.fmtCurrency(k.inventoryCost.value)}
             delta={loading ? 0 : k.inventoryCost.delta}
+            deltaPrefix="$"
+            deltaUnit=""
             color="var(--c-inv)"
             loading={loading}
             sub="vs. base policy"
@@ -6311,6 +6313,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     }
 
     function EDABarGroup({ data }) {
+      const { useState } = React;
+      const [hoverIdx, setHoverIdx] = useState(null);
       const items = data.data || [];
       if (!items.length) return null;
       const W = 480, H = 180, pad = { t: 16, r: 20, b: 36, l: 50 };
@@ -6320,28 +6324,56 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const barW = iW / items.length * 0.6;
       const gapW = iW / items.length;
       return (
+        <div style={{ position: "relative", width: "100%" }}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
-          <line x1={pad.l} x2={W - pad.r} y1={H - pad.b} y2={H - pad.b} stroke="var(--border)" strokeWidth={0.5} />
+          {[0, maxV / 2, maxV].map(v => {
+            const yp = pad.t + (1 - v / (maxV || 1)) * iH;
+            return (
+              <g key={v}>
+                <line x1={pad.l} x2={W - pad.r} y1={yp} y2={yp} stroke="var(--border)" strokeWidth={0.5} />
+                <text x={pad.l - 6} y={yp + 3} textAnchor="end" fontSize={8.5} fill="var(--text-3)">{v.toFixed(1)}</text>
+              </g>
+            );
+          })}
           {items.map((d, i) => {
             const v = d.observed_demand_mean || 0;
             const bh = (v / maxV) * iH;
             const bx = pad.l + i * gapW + (gapW - barW) / 2;
+            const isHover = hoverIdx === i;
             return (
               <g key={i}>
-                <rect x={bx} y={H - pad.b - bh} width={barW} height={bh} rx={3}
-                  fill="rgba(139,92,246,0.75)" />
-                <text x={bx + barW / 2} y={H - pad.b + 12} textAnchor="middle" fontSize={9} fill="var(--text-3)">
+                <rect x={pad.l + i * gapW} y={pad.t} width={gapW} height={iH} fill="transparent" cursor="pointer"
+                  onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} />
+                <rect x={bx} y={H - pad.b - bh} width={barW} height={bh} rx={3} pointerEvents="none"
+                  fill={isHover ? "rgba(167,139,250,1)" : "rgba(139,92,246,0.75)"} style={{ transition: "fill 0.2s" }} />
+                <text x={bx + barW / 2} y={H - pad.b + 12} textAnchor="middle" fontSize={9} fill={isHover ? "var(--text-1)" : "var(--text-3)"} style={{ transition: "fill 0.2s" }} pointerEvents="none">
                   {String(d.stockout_band || d[data.x_key] || i)}
-                </text>
-                <text x={bx + barW / 2} y={H - pad.b - bh - 4} textAnchor="middle" fontSize={8.5} fill="var(--text-2)">
-                  {v.toFixed(2)}
                 </text>
               </g>
             );
           })}
-          <text x={pad.l - 6} y={H - pad.b} textAnchor="end" fontSize={8.5} fill="var(--text-3)">0</text>
-          <text x={pad.l - 6} y={pad.t + 4} textAnchor="end" fontSize={8.5} fill="var(--text-3)">{maxV.toFixed(1)}</text>
         </svg>
+        {hoverIdx !== null && (() => {
+          const d = items[hoverIdx];
+          const v = d.observed_demand_mean || 0;
+          const bh = (v / maxV) * iH;
+          const bx = pad.l + hoverIdx * gapW + (gapW - barW) / 2 + barW / 2;
+          return (
+            <div style={{
+              position: "absolute", left: `${(bx / W) * 100}%`, top: `${((H - pad.b - bh - 4) / H) * 100}%`,
+              transform: "translate(-50%, -100%)", pointerEvents: "none",
+              background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
+              borderRadius: 8, padding: "8px 12px", backdropFilter: "blur(8px)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
+                <span style={{ color: "rgba(167,139,250,1)", fontSize: 11 }}>Demanda Media</span>
+                <span className="tnum" style={{ color: "rgba(167,139,250,1)", fontSize: 11, fontWeight: 500 }}>{v.toFixed(3)}</span>
+              </div>
+            </div>
+          );
+        })()}
+        </div>
       );
     }
 
