@@ -6007,6 +6007,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     // ═══════════════════════════════════════════════════════════════════════
 
     function EDALineDual({ data }) {
+      const { useState } = React;
+      const [hoverIdx, setHoverIdx] = useState(null);
       const W = 480, H = 200, pad = { t: 20, r: 20, b: 36, l: 46 };
       const iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
       const allVals = data.data.flatMap(d => data.series.map(s => d[s.key])).filter(v => v != null);
@@ -6030,14 +6032,41 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               d={line(data.data.map((d, i) => [xs[i], y(d[s.key])]))}
               fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" />
           ))}
-          {data.data.map((d, i) => data.series.map(s => (
-            <circle key={`${i}-${s.key}`} cx={xs[i]} cy={y(d[s.key])} r={3} fill={s.color} />
-          )))}
+          {hoverIdx !== null && (
+            <line x1={xs[hoverIdx]} x2={xs[hoverIdx]} y1={pad.t} y2={H - pad.b} stroke="var(--border)" strokeDasharray="3,3" strokeWidth={0.8} />
+          )}
+          {data.data.map((d, i) => data.series.map(s => {
+            const isHover = hoverIdx === i;
+            return <circle key={`${i}-${s.key}`} cx={xs[i]} cy={y(d[s.key])} r={isHover ? 4.5 : 3} fill={s.color} style={{ transition: "r 0.15s" }} />;
+          }))}
           {data.data.map((d, i) => (
-            <text key={i} x={xs[i]} y={H - 4} textAnchor="middle" fontSize={9} fill="var(--text-3)">
+            <text key={i} x={xs[i]} y={H - 4} textAnchor="middle" fontSize={9} fill={hoverIdx === i ? "var(--text-1)" : "var(--text-3)"} style={{ transition: "fill 0.15s" }}>
               {(d[Object.keys(d)[0]] || "").toString().slice(0, 3)}
             </text>
           ))}
+          {data.data.map((_, i) => {
+            const hw = iW / Math.max(n - 1, 1);
+            return (
+              <rect key={`hz-${i}`} x={xs[i] - hw/2} y={pad.t} width={hw} height={iH}
+                fill="transparent" cursor="pointer"
+                onMouseEnter={() => setHoverIdx(i)}
+                onMouseLeave={() => setHoverIdx(null)} />
+            );
+          })}
+          {hoverIdx !== null && (() => {
+            const d = data.data[hoverIdx];
+            const px = xs[hoverIdx];
+            return (
+              <g transform={`translate(${px}, ${pad.t - 4})`}>
+                <rect x={-40} y={-24} width={80} height={28} fill="var(--bg-1)" stroke="var(--border)" strokeWidth={0.5} rx={3} />
+                {data.series.map((s, j) => (
+                  <text key={s.key} x={0} y={-14 + j*11} textAnchor="middle" fill={s.color} fontSize={8.5} fontWeight={600}>
+                    {s.label}: {d[s.key]?.toFixed(3)}
+                  </text>
+                ))}
+              </g>
+            );
+          })()}
           {data.series.map((s, i) => (
             <g key={s.key} transform={`translate(${W - pad.r - 100 + i * 50},${pad.t - 8})`}>
               <line x1={0} x2={14} y1={5} y2={5} stroke={s.color} strokeWidth={2} />
