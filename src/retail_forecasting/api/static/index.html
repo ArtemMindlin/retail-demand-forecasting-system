@@ -6072,16 +6072,15 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               borderRadius: 8, padding: "8px 12px", backdropFilter: "blur(8px)",
               boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10, minWidth: 120
             }}>
-              <div style={{ fontSize: 10.5, color: "var(--text-3)", marginBottom: 6, textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>
                 {(d[Object.keys(d)[0]] || "").toString()}
               </div>
               {data.series.map(s => (
-                <div key={s.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginTop: 4 }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-2)", fontSize: 11 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color }} />
+                <div key={s.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24, marginTop: 4 }}>
+                  <span style={{ color: s.color, fontSize: 11 }}>
                     {s.label}
                   </span>
-                  <span className="tnum" style={{ color: "var(--text-1)", fontSize: 11, fontWeight: 500 }}>
+                  <span className="tnum" style={{ color: s.color, fontSize: 11, fontWeight: 500 }}>
                     {d[s.key]?.toFixed(3)}
                   </span>
                 </div>
@@ -6144,12 +6143,14 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               position: "absolute", left: `${(bx / W) * 100}%`, top: `${(by / H) * 100}%`,
               transform: "translate(-50%, -100%)", pointerEvents: "none",
               background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
-              borderRadius: 6, padding: "6px 10px", backdropFilter: "blur(8px)",
+              borderRadius: 8, padding: "8px 12px", backdropFilter: "blur(8px)",
               boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(167,139,250,1)" }} />
-                <span className="tnum" style={{ color: "var(--text-1)", fontSize: 11, fontWeight: 500 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
+                <span style={{ color: "rgba(167,139,250,1)", fontSize: 11 }}>
+                  Frecuencia
+                </span>
+                <span className="tnum" style={{ color: "rgba(167,139,250,1)", fontSize: 11, fontWeight: 500 }}>
                   {counts[hoverIdx]}
                 </span>
               </div>
@@ -6214,12 +6215,14 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               position: "absolute", left: `${(bx / W) * 100}%`, top: `${((H - pad.b - bh - 4) / H) * 100}%`,
               transform: "translate(-50%, -100%)", pointerEvents: "none",
               background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
-              borderRadius: 6, padding: "6px 10px", backdropFilter: "blur(8px)",
+              borderRadius: 8, padding: "8px 12px", backdropFilter: "blur(8px)",
               boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(96,165,250,1)" }} />
-                <span className="tnum" style={{ color: "var(--text-1)", fontSize: 11, fontWeight: 500 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
+                <span style={{ color: "rgba(96,165,250,1)", fontSize: 11 }}>
+                  Frecuencia
+                </span>
+                <span className="tnum" style={{ color: "rgba(96,165,250,1)", fontSize: 11, fontWeight: 500 }}>
                   {rawVal >= 1000 ? (rawVal/1000).toFixed(1) + 'k' : rawVal}
                 </span>
               </div>
@@ -6276,12 +6279,17 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               position: "absolute", right: 12, top: `${((pad.t + hoverIdx * rowH + 11) / H) * 100}%`,
               transform: "translateY(-50%)", pointerEvents: "none",
               background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
-              borderRadius: 6, padding: "6px 10px", backdropFilter: "blur(8px)",
+              borderRadius: 8, padding: "8px 12px", backdropFilter: "blur(8px)",
               boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ color: "var(--text-3)", fontSize: 10.5 }}>{d.feature_name.replace(/_/g, " ")}</span>
-                <span className="tnum" style={{ color: isPos ? "rgba(52,211,153,1)" : "rgba(248,113,113,1)", fontSize: 11.5, fontWeight: 600 }}>
+              <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>
+                {d.feature_name.replace(/_/g, " ")}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
+                <span style={{ color: isPos ? "rgba(52,211,153,1)" : "rgba(248,113,113,1)", fontSize: 11 }}>
+                  Correlación
+                </span>
+                <span className="tnum" style={{ color: isPos ? "rgba(52,211,153,1)" : "rgba(248,113,113,1)", fontSize: 11, fontWeight: 500 }}>
                   {corr > 0 ? "+" : ""}{corr.toFixed(3)}
                 </span>
               </div>
@@ -6373,12 +6381,16 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               position: "absolute", left: `${(px(p.x) / W) * 100}%`, top: `${((py(p.y) - 8) / H) * 100}%`,
               transform: "translate(-50%, -100%)", pointerEvents: "none",
               background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
-              borderRadius: 6, padding: "8px 12px", backdropFilter: "blur(8px)",
+              borderRadius: 8, padding: "8px 12px", backdropFilter: "blur(8px)",
               boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10
             }}>
-              <div style={{ display: "flex", gap: 16 }}>
-                <span style={{ color: "var(--text-3)", fontSize: 10 }}>X: <span style={{color:"var(--text-1)", fontWeight:500}}>{p.x.toFixed(2)}</span></span>
-                <span style={{ color: "var(--text-3)", fontSize: 10 }}>Y: <span style={{color:"var(--text-1)", fontWeight:500}}>{p.y.toFixed(2)}</span></span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24, marginBottom: 4 }}>
+                <span style={{ color: "rgba(167,139,250,1)", fontSize: 11 }}>Horas de stockout</span>
+                <span className="tnum" style={{ color: "rgba(167,139,250,1)", fontSize: 11, fontWeight: 500 }}>{p.x.toFixed(2)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
+                <span style={{ color: "rgba(167,139,250,1)", fontSize: 11 }}>Demanda media</span>
+                <span className="tnum" style={{ color: "rgba(167,139,250,1)", fontSize: 11, fontWeight: 500 }}>{p.y.toFixed(2)}</span>
               </div>
             </div>
           );
