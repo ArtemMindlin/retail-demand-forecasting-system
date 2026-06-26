@@ -346,7 +346,7 @@ El endpoint raíz \texttt{GET /} sirve un dashboard React de página única (\te
 
     \item \textbf{Panel de Catálogo de SKUs}: Vista tabular de los 50 SKUs más activos con su estado operacional codificado en color, la tendencia de demanda de los últimos 14 días y las métricas clave. Permite seleccionar un SKU para actualizar el panel de pronóstico.
 
-    \item \textbf{Panel de Drift}: Gráfico de barras con el PSI de cada feature de importancia, calculado por el módulo \texttt{drift/psi.py} y persistido como \texttt{drift\_report.json} al término de cada \texttt{experiment}. Se marca en naranja (PSI $> 0.10$) y rojo (PSI $> 0.20$) las features que han sufrido cambios distribucionales significativos desde el entrenamiento.
+    \item \textbf{Panel de Drift}: Gráfico de barras con el PSI de cada feature de importancia, calculado por el módulo \texttt{drift/psi.py} y persistido como \texttt{drift\_report.json} al término de cada \texttt{experiment}. Se marca en naranja (PSI $> 0{,}10$) y rojo (PSI $> 0{,}20$) las features que han sufrido cambios distribucionales significativos desde el entrenamiento.
 
     \item \textbf{Panel de Alertas}: Lista priorizada de alertas operacionales con enlace directo al endpoint de acción sugerida (reoptimización, reentrenamiento o revisión manual), extraídas del fichero \texttt{exceptions.csv} del último run.
 \end{itemize}

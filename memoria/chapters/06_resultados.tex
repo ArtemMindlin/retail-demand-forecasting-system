@@ -76,7 +76,7 @@ La evaluación directa confirma y refuerza la conclusión de la comparativa down
 \section{Calibración Conformal: Cobertura y Winkler Score}
 \label{sec:resultados_conformal}
 
-La evaluación del componente probabilístico exige dos métricas específicas que no aparecen en la Tabla~\ref{tab:metrics_predictive}: la \textbf{cobertura empírica} del intervalo $[q_{0.1}, q_{0.9}]$ y el \textbf{Winkler Score}. La Tabla~\ref{tab:conformal_metrics} recoge los resultados del run de evaluación (150 observaciones, 3 folds de 50 observaciones cada uno).
+La evaluación del componente probabilístico exige dos métricas específicas que no aparecen en la Tabla~\ref{tab:metrics_predictive}: la \textbf{cobertura empírica} del intervalo $[q_{0{,}1}, q_{0{,}9}]$ y el \textbf{Winkler Score}. La Tabla~\ref{tab:conformal_metrics} recoge los resultados del run de evaluación (150 observaciones, 3 folds de 50 observaciones cada uno).
 
 \begin{table}[htbp]
     \centering
@@ -90,7 +90,7 @@ La evaluación del componente probabilístico exige dos métricas específicas q
         \textit{Seasonal Naïve} & \textit{Latent Supervised} & \multicolumn{3}{c}{\textit{n/a: no genera intervalos de predicción}} \\
         \bottomrule
     \end{tabular}
-    \caption{Métricas de calibración conformal. Cobertura objetivo: $\geq 80\%$ para el intervalo $[q_{0.1}, q_{0.9}]$ (nivel $\alpha = 0{,}20$). El Seasonal Naïve es un modelo puntual y no produce intervalos cuantílicos.}
+    \caption{Métricas de calibración conformal. Cobertura objetivo: $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$). El Seasonal Naïve es un modelo puntual y no produce intervalos cuantílicos.}
     \label{tab:conformal_metrics}
 \end{table}
 
@@ -111,7 +111,7 @@ La Tabla~\ref{tab:fold_coverage} desagrega la cobertura por fold temporal, revel
         LightGBM     & 46\% & 38\% & 88\% & 57\% \\
         \bottomrule
     \end{tabular}
-    \caption{Cobertura empírica del intervalo $[q_{0.1}, q_{0.9}]$ por fold de backtesting. La cobertura nominal del intervalo es del 80\% ($\alpha = 0{,}20$).}
+    \caption{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold de backtesting. La cobertura nominal del intervalo es del 80\% ($\alpha = 0{,}20$).}
     \label{tab:fold_coverage}
 \end{table}
 
@@ -122,7 +122,7 @@ A esta escala, la varianza extrema no es una anomalía empírica sino el comport
     \widehat{\text{cov}} \;\sim\; \mathrm{Beta}(l,\; n_\text{cal}+1-l), \qquad l = \left\lceil (n_\text{cal}+1)(1-\alpha) \right\rceil.
     \label{eq:beta_coverage}
 \end{equation}
-Al nivel $\alpha = 0{,}20$ (intervalo $[q_{0.1}, q_{0.9}]$ del 80\%), el factor conformal solo se comporta como un cuantil \emph{interior} estable cuando $l < n_\text{cal}$, lo que exige $n_\text{cal} \geq 9$ puntos de calibración por estrato. Por debajo de ese umbral, la posición requerida coincide con el propio tamaño muestral ($l = n_\text{cal}$): por ejemplo, con $n_\text{cal} = 5$ se obtiene $l = \lceil 0{,}8\,(5+1) \rceil = \lceil 4{,}8 \rceil = 5$, de modo que el cuantil conformal colapsa al \textbf{máximo} de los cinco residuos de calibración, un estimador de varianza máxima.
+Al nivel $\alpha = 0{,}20$ (intervalo $[q_{0{,}1}, q_{0{,}9}]$ del 80\%), el factor conformal solo se comporta como un cuantil \emph{interior} estable cuando $l < n_\text{cal}$, lo que exige $n_\text{cal} \geq 9$ puntos de calibración por estrato. Por debajo de ese umbral, la posición requerida coincide con el propio tamaño muestral ($l = n_\text{cal}$): por ejemplo, con $n_\text{cal} = 5$ se obtiene $l = \lceil 0{,}8\,(5+1) \rceil = \lceil 4{,}8 \rceil = 5$, de modo que el cuantil conformal colapsa al \textbf{máximo} de los cinco residuos de calibración, un estimador de varianza máxima.
 
 Cuando el estrato es aún más pequeño ($n_\text{cal} \leq 3$, donde $l > n_\text{cal}$ es directamente imposible), la implementación recurre por construcción al máximo de los residuos como único valor disponible. En ambos regímenes el resultado es el mismo: con apenas 4--7 observaciones por estrato, el ancho del intervalo queda fijado por el residuo más grande observado en calibración, lo que produce intervalos mal calibrados cuando la cola de la distribución de test no se observó en calibración. La cobertura por fold sigue entonces una distribución $\mathrm{Beta}(n_\text{cal},\,1)$ de media $n_\text{cal}/(n_\text{cal}+1) \approx 0{,}80$--$0{,}88$ pero varianza muy elevada, lo que explica el salto del 14\% al 86\% entre folds. No es por tanto una inestabilidad del método o del estimador subyacente, sino la consecuencia directa y teóricamente esperada de operar por debajo del tamaño mínimo de calibración que el marco conformal exige para ofrecer sus garantías.
 
@@ -144,7 +144,7 @@ Se reejecutó el protocolo de backtesting íntegro ampliando el subset de evalua
         LightGBM  & 55{,}0\% & 74{,}8\% & 64{,}8\% & 64{,}9\% \\
         \bottomrule
     \end{tabular}
-    \caption{Cobertura empírica del intervalo $[q_{0.1}, q_{0.9}]$ por fold con 500 series (1.500 observaciones por modelo). Cobertura objetivo: $\geq 80\%$ ($\alpha = 0{,}20$).}
+    \caption{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold con 500 series (1.500 observaciones por modelo). Cobertura objetivo: $\geq 80\%$ ($\alpha = 0{,}20$).}
     \label{tab:scale_coverage}
 \end{table}
 
@@ -237,7 +237,7 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definid
         \midrule
         Winkler Score del campeón$^{\dagger}$ frente a las alternativas probabilísticas & Menor & LightGBM: 25,74; CatBoost (campeón): 31,57 & Parcial \\
         \midrule
-        Cobertura empírica $[q_{0.1}, q_{0.9}]$ ($\alpha = 0{,}20$) & $\geq 80\%$ & 38\% (subset base); 63{,}5\% (500 series) & Limitado \\
+        Cobertura empírica $[q_{0{,}1}, q_{0{,}9}]$ ($\alpha = 0{,}20$) & $\geq 80\%$ & 38\% (subset base); 63{,}5\% (500 series) & Limitado \\
         \bottomrule
     \end{tabular}
     \caption{Verificación de los KPIs definidos en el Capítulo~\ref{chap:introduccion}. \checkmark = cumplido; Parcial = cumplido con matices; Limitado = no alcanzado en el subset de evaluación. $^{\dagger}$El campeón se selecciona por coste logístico simulado, no por Winkler Score; entre los modelos probabilísticos, LightGBM obtiene el mejor Winkler (25,74) pero CatBoost domina en coste simulado a escala (427.210 u.m. frente a 434.286 u.m. de LightGBM).}
@@ -370,6 +370,8 @@ Llegan los pedidos del Periodo 2 (125 y 105). La demanda es $y_3 = 50$.
 \end{align*}
 
 \subsection*{Comparación acumulada de costes}
+
+La Tabla~\ref{tab:caso_uso_sS} resume el coste de inventario acumulado por ambas políticas a lo largo de los tres periodos simulados.
 
 \begin{table}[htbp]
     \centering
