@@ -6711,10 +6711,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 28 }}>
                 {statCards.map(c => (
-                  <div key={c.label} className="glass" style={{ padding: "14px 18px" }}>
-                    <div style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "var(--font-mono)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{c.label}</div>
-                    <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: c.color, fontFamily: "var(--font-display)" }}>{c.value}</div>
-                  </div>
+                  <Stat2 key={c.label} label={c.label} value={c.value} color={c.color} />
                 ))}
               </div>
 
