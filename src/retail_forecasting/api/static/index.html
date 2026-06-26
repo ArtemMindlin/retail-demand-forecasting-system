@@ -6049,6 +6049,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     }
 
     function EDAHistogram({ data, dual }) {
+      const { useState } = React;
+      const [hoverIdx, setHoverIdx] = useState(null);
       const W = dual ? 480 : 480, H = 180, pad = { t: 16, r: 16, b: 36, l: 44 };
       const iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
       const counts = data.counts || [];
@@ -6064,8 +6066,11 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           {counts.map((c, i) => {
             const bh = (c / maxC) * iH;
             const bx = pad.l + (i / counts.length) * iW;
+            const isHover = hoverIdx === i;
             return <rect key={i} x={bx} y={H - pad.b - bh} width={barW} height={bh}
-              fill="rgba(139,92,246,0.7)" rx={1} />;
+              fill={isHover ? "rgba(167,139,250,1)" : "rgba(139,92,246,0.7)"} rx={1}
+              onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}
+              style={{ transition: "fill 0.2s", cursor: "pointer" }} />;
           })}
           {data.median != null && (() => {
             const mx = pad.l + ((data.median - centers[0]) / (centers[centers.length-1] - centers[0])) * iW;
@@ -6076,11 +6081,19 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               textAnchor="middle" fontSize={8.5} fill="var(--text-3)">{centers[i]?.toFixed(2)}</text>
           ))}
           {data.x_label && <text x={W / 2} y={H - 2} textAnchor="middle" fontSize={9} fill="var(--text-3)">{data.x_label}</text>}
+          {hoverIdx !== null && (
+            <g transform={`translate(${pad.l + (hoverIdx / counts.length) * iW + barW/2}, ${H - pad.b - (counts[hoverIdx] / maxC) * iH - 6})`}>
+              <rect x={-18} y={-14} width={36} height={14} fill="var(--bg-1)" stroke="var(--border)" strokeWidth={0.5} rx={2} />
+              <text x={0} y={-4} textAnchor="middle" fill="var(--text-1)" fontSize={8.5}>{counts[hoverIdx]}</text>
+            </g>
+          )}
         </svg>
       );
     }
 
     function EDAHistogramDual({ data }) {
+      const { useState } = React;
+      const [hover, setHover] = useState(null);
       const W = 480, H = 180, pad = { t: 16, r: 16, b: 36, l: 44 };
       const iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
       const counts = data.counts || [], logC = data.log_counts || [], centers = data.centers || [];
@@ -6102,8 +6115,11 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 {vals.map((c, i) => {
                   const bh = (c / maxV) * iH;
                   const bx = offX + (i / counts.length) * half;
+                  const isHover = hover?.side === side && hover?.idx === i;
                   return <rect key={i} x={bx} y={H - pad.b - bh} width={barW} height={bh}
-                    fill="rgba(59,130,246,0.7)" rx={1} />;
+                    fill={isHover ? "rgba(96,165,250,1)" : "rgba(59,130,246,0.7)"} rx={1}
+                    onMouseEnter={() => setHover({ side, idx: i })} onMouseLeave={() => setHover(null)}
+                    style={{ transition: "fill 0.2s", cursor: "pointer" }} />;
                 })}
                 {[0, Math.floor(counts.length / 2), counts.length - 1].map(i => (
                   <text key={i} x={offX + (i / counts.length) * half} y={H - pad.b + 11}
@@ -6113,6 +6129,24 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             );
           })}
           {data.x_label && <text x={W / 2} y={H - 2} textAnchor="middle" fontSize={9} fill="var(--text-3)">{data.x_label}</text>}
+          {hover && (() => {
+            const isLog = hover.side === 1;
+            const offX = isLog ? pad.l + half + 16 : pad.l;
+            const vals = isLog ? logC : counts;
+            const maxV = isLog ? maxLog : maxLin;
+            const c = vals[hover.idx];
+            const bh = (c / maxV) * iH;
+            const bx = offX + (hover.idx / counts.length) * half + barW/2;
+            const rawVal = counts[hover.idx];
+            return (
+              <g transform={`translate(${bx}, ${H - pad.b - bh - 6})`}>
+                <rect x={-20} y={-14} width={40} height={14} fill="var(--bg-1)" stroke="var(--border)" strokeWidth={0.5} rx={2} />
+                <text x={0} y={-4} textAnchor="middle" fill="var(--text-1)" fontSize={8.5}>
+                  {rawVal >= 1000 ? (rawVal/1000).toFixed(1) + 'k' : rawVal}
+                </text>
+              </g>
+            );
+          })()}
         </svg>
       );
     }
