@@ -1001,7 +1001,7 @@
     const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
     // ----- helpers
-    const fmtCurrency = (n) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+    const fmtCurrency = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 }) + " u.m.";
     const fmtPct = (n, d = 1) => `${n >= 0 ? "+" : ""}${n.toFixed(d)}%`;
     const fmtUnits = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
@@ -1208,7 +1208,7 @@
               value={params.shortageCost}
               min={5} max={60} step={1}
               color="var(--c-drift)"
-              format={(v) => `$${v}`}
+              format={(v) => `${v} u.m.`}
               onChange={update("shortageCost")}
             />
 
@@ -1218,7 +1218,7 @@
               value={params.holdingCost}
               min={1} max={20} step={0.5}
               color="var(--c-inv)"
-              format={(v) => `$${v.toFixed(1)}`}
+              format={(v) => `${v.toFixed(1)} u.m.`}
               onChange={update("holdingCost")}
             />
 
@@ -1518,8 +1518,8 @@
             label="Coste de Inventario"
             value={loading ? "" : fmt.fmtCurrency(k.inventoryCost.value)}
             delta={loading ? 0 : k.inventoryCost.delta}
-            deltaPrefix="$"
-            deltaUnit=""
+            deltaPrefix=""
+            deltaUnit=" u.m."
             color="var(--c-inv)"
             loading={loading}
             sub="vs. base policy"
@@ -2296,8 +2296,8 @@
 q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
                       c_s=req.shortage_cost, c_h=req.holding_cost)`,
         pills: (p, r) => ([
-          { label: "c_s", value: `$${p.shortageCost}` },
-          { label: "c_h", value: `$${p.holdingCost.toFixed(1)}` },
+          { label: "c_s", value: `${p.shortageCost} u.m.` },
+          { label: "c_h", value: `${p.holdingCost.toFixed(1)} u.m.` },
           { label: "CR*", value: (p.shortageCost / (p.shortageCost + p.holdingCost)).toFixed(3), accent: true },
           { label: "q*", value: `${fmt.fmtUnits(r.qStar)} u` },
         ]),
@@ -2376,7 +2376,7 @@ q_star = <span class="f">newsvendor_q</span>(mu=avg_pred, sigma=conformal_sigma,
         ]),
         defense: [
           "La LP encadena con el Newsvendor: usamos sus q* como cota inferior, manteniendo coherencia entre los dos niveles de decisión.",
-          "El precio sombra λ del dual da una interpretación económica directa al stakeholder: '$X de margen perdido por cada unidad de espacio faltante'.",
+          "El precio sombra λ del dual da una interpretación económica directa al stakeholder: 'X u.m. de margen perdido por cada unidad de espacio faltante'.",
           "Complejidad polinomial — escala a >10k SKUs en <1s con HiGHS. Listo para producción en FastAPI.",
           "Extensible a programación entera mixta (MILP) si se incluyen costes fijos por SKU o restricciones de lote mínimo.",
         ],
@@ -6859,7 +6859,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
 
       const kpis = [
         { label: "Cobertura realizada", value: fmtPct(curBlock.coverage), sub: `objetivo ${fmtPct(target)}`, color: covColor },
-        { label: "Coste de inventario (sem.)", value: "$" + fmtNum(curBlock.total_cost), sub: cadence === "every_7d" ? "política producción" : "sin reentreno", color: "var(--c-inv)" },
+        { label: "Coste de inventario (sem.)", value: fmtNum(curBlock.total_cost) + " u.m.", sub: cadence === "every_7d" ? "política producción" : "sin reentreno", color: "var(--c-inv)" },
         { label: "MAE demanda lead-time", value: fmtNum(curBlock.mae), sub: `${curBlock.n_series ?? 0} series`, color: "var(--c-ai)" },
         { label: "Ahorro vs sin reentreno", value: (costNever && costWeekly) ? fmtPct(1 - costWeekly / costNever) : "—", sub: "coste semanal", color: "var(--c-conf)" },
       ];
