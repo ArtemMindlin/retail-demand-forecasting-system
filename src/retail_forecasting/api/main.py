@@ -803,7 +803,7 @@ def get_ops_series(series_id: str, cadence: str = "every_7d") -> dict[str, Any]:
 
 @app.get("/health")
 def health_check() -> dict[str, Any]:
-    """Liveness probe for Railway and BetterStack uptime monitoring."""
+    """Liveness probe for Railway and Uptime Kuma monitoring."""
     uptime_seconds = int(time.monotonic() - _START_TIME)
     hours, remainder = divmod(uptime_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
