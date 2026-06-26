@@ -11,23 +11,23 @@ El principal recurso del proyecto ha sido la dedicación del ingeniero desarroll
 \begin{table}[htbp]
 \centering
 \small
-\begin{tabular}{@{}p{0.38\textwidth}p{0.42\textwidth}c@{}}
+\begin{tabular}{@{}p{0.33\textwidth}p{0.35\textwidth}cc@{}}
 \toprule
-\textbf{Fase} & \textbf{Descripción} & \textbf{Horas} \\
+\textbf{Fase} & \textbf{Descripción} & \textbf{Horas sin IA} & \textbf{Horas reales} \\
 \midrule
-Investigación bibliográfica & Revisión de literatura: GFMs, Conformal Prediction, inventario estocástico & 40 \\
-Diseño del sistema & Arquitectura MLOps, contratos de datos, diseño de módulos & 25 \\
-Pipeline de datos & Ingesta, Data Quality Gate, corrección de censura & 35 \\
-Feature engineering y modelos & 50 features, CatBoost, LightGBM, Mondrian CP & 55 \\
-Experimentación y backtesting & Walk-forward ($K=3$), optimización NSGA-II, análisis Pareto & 40 \\
-MLOps e infraestructura & FastAPI, Docker, MLflow, GitHub Actions, React dashboard & 45 \\
-Testing y calidad de software & 19 módulos de test, CI/CD, contratos de datos & 25 \\
-Redacción de la memoria & Capítulos, figuras y revisión & 35 \\
+Investigación bibliográfica & Revisión de literatura: GFMs, Conformal Prediction, inventario estocástico & 50 & 40 \\
+Diseño del sistema & Arquitectura MLOps, contratos de datos, diseño de módulos & 35 & 25 \\
+Pipeline de datos & Ingesta, Data Quality Gate, corrección de censura & 50 & 35 \\
+Feature engineering y modelos & 50 features, CatBoost, LightGBM, Mondrian CP & 80 & 55 \\
+Experimentación y backtesting & Walk-forward ($K=3$), optimización NSGA-II, análisis Pareto & 50 & 40 \\
+MLOps e infraestructura & FastAPI, Docker, MLflow, GitHub Actions, React dashboard & 75 & 45 \\
+Testing y calidad de software & 19 módulos de test, CI/CD, contratos de datos & 45 & 25 \\
+Redacción de la memoria & Capítulos, figuras y revisión & 50 & 35 \\
 \midrule
-\textbf{Total} & & \textbf{300} \\
+\textbf{Total} & & \textbf{435} & \textbf{300} \\
 \bottomrule
 \end{tabular}
-\caption{Desglose de horas por fase del proyecto.}
+\caption{Desglose de horas por fase del proyecto, contrastando la estimación temporal tradicional frente a la dedicación real asistida por herramientas de IA generativa (Copilot/Cursor).}
 \label{tab:horas_fases}
 \end{table}
 
@@ -40,9 +40,9 @@ Aplicando la tarifa correspondiente a un perfil de Ingeniero Junior de desarroll
 \toprule
 \textbf{Perfil} & \textbf{Horas} & \textbf{Precio/hora} & \textbf{Subtotal} \\
 \midrule
-Ingeniero Junior (Desarrollo y Análisis) & 300 & 30,00 \texteuro{} & 9.000,00 \texteuro{} \\
+Ingeniero Junior (Machine Learning / MLOps) & 300 & 35,00 \texteuro{} & 10.500,00 \texteuro{} \\
 \midrule
-\textbf{Total personal} & & & \textbf{9.000,00 \texteuro{}} \\
+\textbf{Total personal} & & & \textbf{10.500,00 \texteuro{}} \\
 \bottomrule
 \end{tabular}
 \caption{Presupuesto de recursos humanos.}
@@ -66,11 +66,13 @@ donde $P_{\text{equipo}}$ es el precio de adquisición, $T_{\text{proyecto}}$ la
 \toprule
 \textbf{Concepto} & \textbf{Detalle} & \textbf{Coste} \\
 \midrule
-Amortización hardware & Ordenador portátil Apple M2 (1.800 \texteuro{}, vida útil 3 años): $1.800 \times \frac{4}{36}$ & 200,00 \texteuro{} \\
+Amortización hardware & Estación de trabajo portátil (1.800 \texteuro{}, vida útil 3 años): $1.800 \times \frac{4}{36}$ & 200,00 \texteuro{} \\
+Infraestructura Cloud & AWS EC2 / Google Cloud Compute (100h de entrenamiento de modelos) & 150,00 \texteuro{} \\
 Almacenamiento y \textit{hosting} & Hugging Face, GitHub (niveles gratuitos) & 0,00 \texteuro{} \\
-Software y licencias & Python, CatBoost, VS Code, Tectonic (código abierto) & 0,00 \texteuro{} \\
+Software y licencias & GitHub Copilot / Cursor AI Pro (4 meses a 20 \texteuro{}/mes) & 80,00 \texteuro{} \\
+Software \textit{Open Source} & Python, CatBoost, VS Code & 0,00 \texteuro{} \\
 \midrule
-\textbf{Total materiales} & & \textbf{200,00 \texteuro{}} \\
+\textbf{Total materiales} & & \textbf{430,00 \texteuro{}} \\
 \bottomrule
 \end{tabular}
 \caption{Presupuesto de recursos materiales e infraestructura.}
@@ -88,10 +90,10 @@ Se incluyen los costes indirectos de suministros durante los 4 meses de duració
 \toprule
 \textbf{Concepto} & \textbf{Detalle} & \textbf{Coste} \\
 \midrule
-Electricidad & 25,00 \texteuro{}/mes $\times$ 4 meses & 100,00 \texteuro{} \\
-Conexión a internet & 40,00 \texteuro{}/mes $\times$ 25\% de imputación $\times$ 4 meses & 40,00 \texteuro{} \\
+Electricidad & 30,00 \texteuro{}/mes $\times$ 4 meses & 120,00 \texteuro{} \\
+Conexión a internet & 50,00 \texteuro{}/mes $\times$ 25\% de imputación $\times$ 4 meses & 50,00 \texteuro{} \\
 \midrule
-\textbf{Total gastos generales} & & \textbf{140,00 \texteuro{}} \\
+\textbf{Total gastos generales} & & \textbf{170,00 \texteuro{}} \\
 \bottomrule
 \end{tabular}
 \caption{Presupuesto de gastos generales.}
@@ -109,17 +111,17 @@ La Tabla~\ref{tab:presupuesto_total} presenta el resumen final. Se aplica una co
 \toprule
 \textbf{Concepto} & \textbf{Importe} \\
 \midrule
-Costes de personal     & 9.000,00 \texteuro{} \\
-Recursos materiales    &   200,00 \texteuro{} \\
-Gastos generales       &   140,00 \texteuro{} \\
+Costes de personal     & 10.500,00 \texteuro{} \\
+Recursos materiales    &   430,00 \texteuro{} \\
+Gastos generales       &   170,00 \texteuro{} \\
 \midrule
-\textbf{Base imponible} & \textbf{9.340,00 \texteuro{}} \\
-Contingencia (5\%)     &   467,00 \texteuro{} \\
+\textbf{Base imponible} & \textbf{11.100,00 \texteuro{}} \\
+Contingencia (5\%)     &   555,00 \texteuro{} \\
 \midrule
-\textbf{Subtotal}      & \textbf{9.807,00 \texteuro{}} \\
-IVA (21\%)             & 2.059,47 \texteuro{} \\
+\textbf{Subtotal}      & \textbf{11.655,00 \texteuro{}} \\
+IVA (21\%)             & 2.447,55 \texteuro{} \\
 \midrule
-\textbf{TOTAL DEL PROYECTO} & \textbf{11.866,47 \texteuro{}} \\
+\textbf{TOTAL DEL PROYECTO} & \textbf{14.102,55 \texteuro{}} \\
 \bottomrule
 \end{tabular}
 \caption{Resumen del presupuesto total del proyecto.}

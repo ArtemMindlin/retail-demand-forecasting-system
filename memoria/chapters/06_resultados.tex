@@ -227,6 +227,7 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definid
 \begin{table}[htbp]
     \centering
     \small
+    \resizebox{\textwidth}{!}{%
     \begin{tabular}{p{5.5cm}p{2.2cm}p{4.5cm}c}
         \toprule
         \textbf{Objetivo} & \textbf{Target} & \textbf{Resultado} & \textbf{Estado} \\
@@ -239,7 +240,8 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definid
         \midrule
         Cobertura empírica $[q_{0{,}1}, q_{0{,}9}]$ ($\alpha = 0{,}20$) & $\geq 80\%$ & 38\% (subset base); 63{,}5\% (500 series) & Limitado \\
         \bottomrule
-    \end{tabular}
+    \end{tabular}%
+    }
     \caption{Verificación de los KPIs definidos en el Capítulo~\ref{chap:introduccion}. \checkmark = cumplido; Parcial = cumplido con matices; Limitado = no alcanzado en el subset de evaluación. $^{\dagger}$El campeón se selecciona por coste logístico simulado, no por Winkler Score; entre los modelos probabilísticos, LightGBM obtiene el mejor Winkler (25,74) pero CatBoost domina en coste simulado a escala (427.210 u.m. frente a 434.286 u.m. de LightGBM).}
     \label{tab:kpi_verification}
 \end{table}

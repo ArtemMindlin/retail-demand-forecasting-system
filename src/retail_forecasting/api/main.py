@@ -609,7 +609,9 @@ def get_eda_chart_data(name: str) -> dict[str, Any]:
         }
 
     if name == "stockout_hours_distribution":
-        df = read("stockout_by_series_summary.csv") or read("series_summary.csv")
+        df = read("stockout_by_series_summary.csv")
+        if df is None:
+            df = read("series_summary.csv")
         if df is None:
             raise HTTPException(status_code=404, detail="Data not available.")
         col = "mean_stockout_hours" if "mean_stockout_hours" in df.columns else "stockout_day_rate"
