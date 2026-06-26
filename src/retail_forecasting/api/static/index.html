@@ -6020,8 +6020,9 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const line = pts => "M " + pts.map(([x, yv]) => `${x.toFixed(1)},${yv.toFixed(1)}`).join(" L ");
       const yTicks = [lo, (lo + hi) / 2, hi].map(v => ({ v, y: y(v) }));
       return (
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", overflow: "visible" }}>
-          {yTicks.map(({ v, y: yp }) => (
+        <div style={{ position: "relative", width: "100%" }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", overflow: "visible" }}>
+            {yTicks.map(({ v, y: yp }) => (
             <g key={v}>
               <line x1={pad.l} x2={W - pad.r} y1={yp} y2={yp} stroke="var(--border)" strokeWidth={0.5} />
               <text x={pad.l - 6} y={yp + 4} textAnchor="end" fontSize={9} fill="var(--text-3)">{v.toFixed(2)}</text>
@@ -6053,20 +6054,6 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 onMouseLeave={() => setHoverIdx(null)} />
             );
           })}
-          {hoverIdx !== null && (() => {
-            const d = data.data[hoverIdx];
-            const px = xs[hoverIdx];
-            return (
-              <g transform={`translate(${px}, ${pad.t - 4})`}>
-                <rect x={-40} y={-24} width={80} height={28} fill="var(--bg-1)" stroke="var(--border)" strokeWidth={0.5} rx={3} />
-                {data.series.map((s, j) => (
-                  <text key={s.key} x={0} y={-14 + j*11} textAnchor="middle" fill={s.color} fontSize={8.5} fontWeight={600}>
-                    {s.label}: {d[s.key]?.toFixed(3)}
-                  </text>
-                ))}
-              </g>
-            );
-          })()}
           {data.series.map((s, i) => (
             <g key={s.key} transform={`translate(${W - pad.r - 100 + i * 50},${pad.t - 8})`}>
               <line x1={0} x2={14} y1={5} y2={5} stroke={s.color} strokeWidth={2} />
@@ -6074,6 +6061,35 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             </g>
           ))}
         </svg>
+        {hoverIdx !== null && (() => {
+          const d = data.data[hoverIdx];
+          const px = xs[hoverIdx];
+          return (
+            <div style={{
+              position: "absolute", left: `${(px / W) * 100}%`, top: `${(pad.t / H) * 100}%`,
+              transform: "translate(-50%, -100%)", pointerEvents: "none",
+              background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
+              borderRadius: 8, padding: "8px 12px", backdropFilter: "blur(8px)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10, minWidth: 120
+            }}>
+              <div style={{ fontSize: 10.5, color: "var(--text-3)", marginBottom: 6, textAlign: "center" }}>
+                {(d[Object.keys(d)[0]] || "").toString()}
+              </div>
+              {data.series.map(s => (
+                <div key={s.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginTop: 4 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-2)", fontSize: 11 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color }} />
+                    {s.label}
+                  </span>
+                  <span className="tnum" style={{ color: "var(--text-1)", fontSize: 11, fontWeight: 500 }}>
+                    {d[s.key]?.toFixed(3)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+        </div>
       );
     }
 
@@ -6091,6 +6107,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const tickIdxs = counts.map((_, i) => i).filter(i => i % Math.max(1, Math.floor(counts.length / 6)) === 0);
       const yTicks = [0, maxC / 2, maxC].map(v => ({ v, yp: y(v) }));
       return (
+        <div style={{ position: "relative", width: "100%" }}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
           {yTicks.map(({ v, yp }) => (
             <g key={v}>
@@ -6118,13 +6135,28 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
               textAnchor="middle" fontSize={8.5} fill="var(--text-3)">{centers[i]?.toFixed(2)}</text>
           ))}
           {data.x_label && <text x={W / 2} y={H - 2} textAnchor="middle" fontSize={9} fill="var(--text-3)">{data.x_label}</text>}
-          {hoverIdx !== null && (
-            <g transform={`translate(${pad.l + (hoverIdx / counts.length) * iW + barW/2}, ${H - pad.b - (counts[hoverIdx] / maxC) * iH - 6})`}>
-              <rect x={-18} y={-14} width={36} height={14} fill="var(--bg-1)" stroke="var(--border)" strokeWidth={0.5} rx={2} />
-              <text x={0} y={-4} textAnchor="middle" fill="var(--text-1)" fontSize={8.5}>{counts[hoverIdx]}</text>
-            </g>
-          )}
         </svg>
+        {hoverIdx !== null && (() => {
+          const bx = pad.l + (hoverIdx / counts.length) * iW + barW / 2;
+          const by = H - pad.b - (counts[hoverIdx] / maxC) * iH - 4;
+          return (
+            <div style={{
+              position: "absolute", left: `${(bx / W) * 100}%`, top: `${(by / H) * 100}%`,
+              transform: "translate(-50%, -100%)", pointerEvents: "none",
+              background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
+              borderRadius: 6, padding: "6px 10px", backdropFilter: "blur(8px)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(167,139,250,1)" }} />
+                <span className="tnum" style={{ color: "var(--text-1)", fontSize: 11, fontWeight: 500 }}>
+                  {counts[hoverIdx]}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+        </div>
       );
     }
 
@@ -6139,6 +6171,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const maxLin = Math.max(...counts), maxLog = Math.max(...logC);
       const barW = half / counts.length * 0.82;
       return (
+        <div style={{ position: "relative", width: "100%" }}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
           {[0,1].map(side => {
             const offX = side === 0 ? pad.l : pad.l + half + 16;
@@ -6166,25 +6199,34 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             );
           })}
           {data.x_label && <text x={W / 2} y={H - 2} textAnchor="middle" fontSize={9} fill="var(--text-3)">{data.x_label}</text>}
-          {hover && (() => {
-            const isLog = hover.side === 1;
-            const offX = isLog ? pad.l + half + 16 : pad.l;
-            const vals = isLog ? logC : counts;
-            const maxV = isLog ? maxLog : maxLin;
-            const c = vals[hover.idx];
-            const bh = (c / maxV) * iH;
-            const bx = offX + (hover.idx / counts.length) * half + barW/2;
-            const rawVal = counts[hover.idx];
-            return (
-              <g transform={`translate(${bx}, ${H - pad.b - bh - 6})`}>
-                <rect x={-20} y={-14} width={40} height={14} fill="var(--bg-1)" stroke="var(--border)" strokeWidth={0.5} rx={2} />
-                <text x={0} y={-4} textAnchor="middle" fill="var(--text-1)" fontSize={8.5}>
-                  {rawVal >= 1000 ? (rawVal/1000).toFixed(1) + 'k' : rawVal}
-                </text>
-              </g>
-            );
-          })()}
         </svg>
+        {hover && (() => {
+          const isLog = hover.side === 1;
+          const offX = isLog ? pad.l + half + 16 : pad.l;
+          const vals = isLog ? logC : counts;
+          const maxV = isLog ? maxLog : maxLin;
+          const c = vals[hover.idx];
+          const bh = (c / maxV) * iH;
+          const bx = offX + (hover.idx / counts.length) * half + barW/2;
+          const rawVal = counts[hover.idx];
+          return (
+            <div style={{
+              position: "absolute", left: `${(bx / W) * 100}%`, top: `${((H - pad.b - bh - 4) / H) * 100}%`,
+              transform: "translate(-50%, -100%)", pointerEvents: "none",
+              background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
+              borderRadius: 6, padding: "6px 10px", backdropFilter: "blur(8px)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(96,165,250,1)" }} />
+                <span className="tnum" style={{ color: "var(--text-1)", fontSize: 11, fontWeight: 500 }}>
+                  {rawVal >= 1000 ? (rawVal/1000).toFixed(1) + 'k' : rawVal}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+        </div>
       );
     }
 
@@ -6199,6 +6241,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const W = 480, iW = W - pad.l - pad.r;
       const cx = pad.l + iW / 2;
       return (
+        <div style={{ position: "relative", width: "100%" }}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
           <line x1={cx} x2={cx} y1={pad.t} y2={H - pad.b} stroke="var(--border)" strokeWidth={0.8} />
           {items.map((d, i) => {
@@ -6224,6 +6267,28 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
             );
           })}
         </svg>
+        {hoverIdx !== null && (() => {
+          const d = items[hoverIdx];
+          const corr = d.correlation_with_observed_demand;
+          const isPos = corr >= 0;
+          return (
+            <div style={{
+              position: "absolute", right: 12, top: `${((pad.t + hoverIdx * rowH + 11) / H) * 100}%`,
+              transform: "translateY(-50%)", pointerEvents: "none",
+              background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
+              borderRadius: 6, padding: "6px 10px", backdropFilter: "blur(8px)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: "var(--text-3)", fontSize: 10.5 }}>{d.feature_name.replace(/_/g, " ")}</span>
+                <span className="tnum" style={{ color: isPos ? "rgba(52,211,153,1)" : "rgba(248,113,113,1)", fontSize: 11.5, fontWeight: 600 }}>
+                  {corr > 0 ? "+" : ""}{corr.toFixed(3)}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+        </div>
       );
     }
 
@@ -6277,6 +6342,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const yTicks = [ylo, (ylo + yhi) / 2, yhi];
       const xTicks = [xlo, (xlo + xhi) / 2, xhi];
       return (
+        <div style={{ position: "relative", width: "100%" }}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
           {yTicks.map(v => (
             <g key={v}>
@@ -6299,18 +6365,25 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
           })}
           <text x={W / 2} y={H - 4} textAnchor="middle" fontSize={9} fill="var(--text-3)">Horas de stockout (media)</text>
           <text transform={`translate(12,${H / 2}) rotate(-90)`} textAnchor="middle" fontSize={9} fill="var(--text-3)">Demanda media</text>
-          {hoverIdx !== null && (() => {
-            const p = pts[hoverIdx];
-            return (
-              <g transform={`translate(${px(p.x)}, ${py(p.y) - 14})`}>
-                <rect x={-45} y={-24} width={90} height={24} fill="var(--bg-1)" stroke="var(--border)" strokeWidth={0.5} rx={3} pointerEvents="none" />
-                <text x={0} y={-8} textAnchor="middle" fill="var(--text-1)" fontSize={8.5} pointerEvents="none">
-                  X: {p.x.toFixed(2)} | Y: {p.y.toFixed(2)}
-                </text>
-              </g>
-            );
-          })()}
         </svg>
+        {hoverIdx !== null && (() => {
+          const p = pts[hoverIdx];
+          return (
+            <div style={{
+              position: "absolute", left: `${(px(p.x) / W) * 100}%`, top: `${((py(p.y) - 8) / H) * 100}%`,
+              transform: "translate(-50%, -100%)", pointerEvents: "none",
+              background: "rgba(11, 15, 21, 0.96)", border: "1px solid var(--border-2)",
+              borderRadius: 6, padding: "8px 12px", backdropFilter: "blur(8px)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.5)", fontFamily: "var(--font-mono)", zIndex: 10
+            }}>
+              <div style={{ display: "flex", gap: 16 }}>
+                <span style={{ color: "var(--text-3)", fontSize: 10 }}>X: <span style={{color:"var(--text-1)", fontWeight:500}}>{p.x.toFixed(2)}</span></span>
+                <span style={{ color: "var(--text-3)", fontSize: 10 }}>Y: <span style={{color:"var(--text-1)", fontWeight:500}}>{p.y.toFixed(2)}</span></span>
+              </div>
+            </div>
+          );
+        })()}
+        </div>
       );
     }
 
