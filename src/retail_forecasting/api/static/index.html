@@ -5365,6 +5365,13 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       useEffect(() => {
         if (!impRun && impRuns?.length) setImpRun(impRuns[0]);
       }, [impRuns]);
+
+      // Auto-select latest normal run when entering pareto
+      useEffect(() => {
+        if (subTab === "pareto" && !selectedRun && runs?.length) {
+          setSelectedRun(runs[0]);
+        }
+      }, [subTab, selectedRun, runs]);
       useEffect(() => {
         if (impData?.series_id && impData.series_id !== impSeries) setImpSeries(impData.series_id);
       }, [impData]);
