@@ -7094,20 +7094,15 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         ]},
         { id: "analisis", label: "Análisis", icon: "sigma", tabs: [
           { id: "eda", label: "EDA", icon: "layers" },
-          { id: "experiments", label: "Experimentos", icon: "sparkles" },
+          { id: "latent", label: "Demanda Latente", icon: "eye" },
+          { id: "pareto", label: "Pareto Tuning", icon: "target" },
         ]},
-      ];
-      // Third nav level — only revealed when the Experimentos tab is active.
-      const EXP_SUBTABS = [
-        { id: "latent",   label: "Demanda Latente", icon: "eye" },
-        { id: "pareto",   label: "Pareto Tuning", icon: "target" },
       ];
       // Tabs that show the what-if Sidebar (the rest get the full-width canvas).
       const SIDEBAR_TABS = ["dashboard", "skus", "drift"];
 
       const [activeMode, setActiveMode] = useState("operacion");
       const [activeTab, setActiveTab] = useState("dashboard");
-      const [expSubTab, setExpSubTab] = useState("latent");
       // DOM node in the nav row where ExperimentsView portals its run selector
       const [runSlotEl, setRunSlotEl] = useState(null);
       const [selectedSkuId, setSelectedSkuId] = useState(null);
@@ -7463,29 +7458,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     ))}
                   </div>
 
-                  {/* Level 3 — experiment views, only when Experimentos is active */}
-                  {activeTab === "experiments" && (
+                  {(activeTab === "latent" || activeTab === "pareto") && (
                     <React.Fragment>
-                      <Icon name="chevronRight" size={14} stroke="var(--text-3)" className="nav-sep" style={{ flexShrink: 0 }} />
-                      <div key="exp-sub" className="nav-cascade" style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
-                        {EXP_SUBTABS.map(t => (
-                          <button
-                            key={t.id}
-                            className={`filter-tab ${expSubTab === t.id ? "active" : ""}`}
-                            onClick={() => setExpSubTab(t.id)}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 6,
-                              fontSize: 12, padding: "8px 13px", borderRadius: "8px",
-                              background: expSubTab === t.id ? "rgba(139, 92, 246, 0.12)" : "rgba(255,255,255,0.02)",
-                              color: expSubTab === t.id ? "#fff" : "var(--text-2)",
-                              borderColor: expSubTab === t.id ? "rgba(139, 92, 246, 0.45)" : "var(--border)"
-                            }}
-                          >
-                            <Icon name={t.icon} size={13} />
-                            {t.label}
-                          </button>
-                        ))}
-                      </div>
                       {/* Run selector slot — ExperimentsView portals the Ejecución dropdown here */}
                       <div ref={setRunSlotEl} className="nav-cascade" style={{ marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "flex-end", minWidth: 0 }} />
                     </React.Fragment>
@@ -7542,8 +7516,8 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                   <DriftView params={params} />
                 )}
 
-                {activeTab === "experiments" && (
-                  <ExperimentsView subTab={expSubTab} setSubTab={setExpSubTab} runSlot={runSlotEl} />
+                {(activeTab === "latent" || activeTab === "pareto") && (
+                  <ExperimentsView subTab={activeTab} setSubTab={setActiveTab} runSlot={runSlotEl} />
                 )}
 
                 {activeTab === "eda" && (
