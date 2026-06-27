@@ -474,10 +474,20 @@ def _get_latest_eda_path() -> Path | None:
     return max(eda_dirs, key=lambda d: d.name)
 
 
+@app.get("/api/eda/runs")
+def get_eda_runs() -> list[str]:
+    """Return a list of available EDA runs, sorted newest first."""
+    reports_dir = Path("reports")
+    if not reports_dir.exists():
+        return []
+    eda_dirs = [d.name for d in reports_dir.iterdir() if d.is_dir() and d.name.startswith("eda_")]
+    return sorted(eda_dirs, reverse=True)
+
+
 @app.get("/api/eda")
-def get_eda_meta() -> dict[str, Any]:
-    """Return EDA summary stats and list of available figure names from the latest EDA run."""
-    eda_path = _get_latest_eda_path()
+def get_eda_meta(run: str | None = None) -> dict[str, Any]:
+    """Return EDA summary stats and list of available figure names from an EDA run."""
+    eda_path = Path("reports") / run if run else _get_latest_eda_path()
     if eda_path is None:
         raise HTTPException(status_code=404, detail="No EDA report found in reports/.")
 
@@ -497,8 +507,8 @@ def get_eda_meta() -> dict[str, Any]:
 
 
 @app.get("/api/eda/figure/{name}")
-def get_eda_figure(name: str) -> FileResponse:
-    """Serve a specific EDA figure PNG from the latest EDA run."""
+def get_eda_figure(name: str, run: str | None = None) -> FileResponse:
+    """Serve a specific EDA figure PNG from an EDA run."""
     safe_name = Path(name).name
     if not safe_name or safe_name != name or "/" in name or ".." in name:
         raise HTTPException(status_code=404, detail="Figure not found.")
@@ -507,8 +517,8 @@ def get_eda_figure(name: str) -> FileResponse:
     if safe_name not in known_names:
         raise HTTPException(status_code=404, detail="Figure not found.")
 
-    eda_path = _get_latest_eda_path()
-    if eda_path is None:
+    eda_path = Path("reports") / run if run else _get_latest_eda_path()
+    if eda_path is None or not eda_path.exists():
         raise HTTPException(status_code=404, detail="No EDA report found.")
 
     figure_path = eda_path / f"{safe_name}.png"
@@ -528,14 +538,14 @@ def _histogram(values: list[float], n_bins: int = 25) -> tuple[list[float], list
 
 
 @app.get("/api/eda/data/{name}")
-def get_eda_chart_data(name: str) -> dict[str, Any]:
+def get_eda_chart_data(name: str, run: str | None = None) -> dict[str, Any]:
     """Return chart-ready JSON data for a named EDA figure (replaces static PNG)."""
     known_names = {fig["name"] for fig in _EDA_FIGURES}
     if name not in known_names:
         raise HTTPException(status_code=404, detail="Figure not found.")
 
-    eda_path = _get_latest_eda_path()
-    if eda_path is None:
+    eda_path = Path("reports") / run if run else _get_latest_eda_path()
+    if eda_path is None or not eda_path.exists():
         raise HTTPException(status_code=404, detail="No EDA report found.")
 
     def read(fname: str) -> pd.DataFrame | None:

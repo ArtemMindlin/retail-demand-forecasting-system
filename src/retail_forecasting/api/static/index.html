@@ -6337,8 +6337,10 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
     // ═══════════════════════════════════════════════════════════════════════
     // EdaView — EDA figure gallery: scroll-spy nav, native charts
     // ═══════════════════════════════════════════════════════════════════════
-    function EdaView() {
+    function EdaView({ runSlot }) {
       const { useState, useEffect, useCallback } = React;
+      const [edaRuns, setEdaRuns] = useState([]);
+      const [edaRun, setEdaRun] = useState("");
       const [meta, setMeta] = useState(null);
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState(null);
@@ -6349,20 +6351,36 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
       const [chartData, setChartData] = useState({});
 
       useEffect(() => {
-        fetch("/api/eda")
+        fetch("/api/eda/runs")
+          .then(r => r.ok ? r.json() : [])
+          .then(runs => {
+            setEdaRuns(runs);
+            if (runs.length > 0) {
+              setEdaRun(runs[0]);
+            }
+          })
+          .catch(() => setEdaRuns([]));
+      }, []);
+
+      useEffect(() => {
+        if (!edaRun && edaRuns.length > 0) return;
+        setLoading(true);
+        const q = edaRun ? `?run=${encodeURIComponent(edaRun)}` : "";
+        fetch(`/api/eda${q}`)
           .then(r => { if (!r.ok) throw new Error("EDA no disponible"); return r.json(); })
           .then(d => {
             setMeta(d);
             setLoading(false);
+            setChartData({});
             (d.figures || []).forEach(fig => {
-              fetch(`/api/eda/data/${fig.name}`)
+              fetch(`/api/eda/data/${fig.name}${q}`)
                 .then(r => r.ok ? r.json() : null)
                 .then(cd => { if (cd) setChartData(prev => ({ ...prev, [fig.name]: cd })); })
                 .catch(() => {});
             });
           })
           .catch(e => { setError(e.message); setLoading(false); });
-      }, []);
+      }, [edaRun, edaRuns.length]);
 
       const figures = meta?.figures ?? [];
 
@@ -6441,7 +6459,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         >
           <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, overflow: "hidden", maxWidth: "90vw", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
             <img
-              src={`/api/eda/figure/${lightboxFig.name}`}
+              src={`/api/eda/figure/${lightboxFig.name}${edaRun ? `?run=${encodeURIComponent(edaRun)}` : ""}`}
               alt={lightboxFig.caption}
               style={{ maxWidth: "88vw", maxHeight: "78vh", objectFit: "contain", display: "block" }}
             />
@@ -6466,9 +6484,24 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
         document.body
       ) : null;
 
+      const runSelector = (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Ejecución</div>
+          <select
+            value={edaRun}
+            onChange={e => setEdaRun(e.target.value)}
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", color: "var(--text-1)", borderRadius: 6, minWidth: 0, maxWidth: 300, fontSize: 11.5, padding: "6px 9px", textOverflow: "ellipsis" }}
+          >
+            {edaRuns.length === 0 ? <option value="">— sin ejecuciones —</option> : null}
+            {edaRuns.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+      );
+
       return (
         <>
           {lightboxEl}
+          {runSlot && ReactDOM.createPortal(runSelector, runSlot)}
 
           {/* ── Layout ── */}
           <div style={{ display: "flex", gap: 24, alignItems: "stretch" }}>
@@ -7458,9 +7491,9 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                     ))}
                   </div>
 
-                  {(activeTab === "latent" || activeTab === "pareto") && (
+                  {(activeTab === "latent" || activeTab === "pareto" || activeTab === "eda") && (
                     <React.Fragment>
-                      {/* Run selector slot — ExperimentsView portals the Ejecución dropdown here */}
+                      {/* Run selector slot */}
                       <div ref={setRunSlotEl} className="nav-cascade" style={{ marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "flex-end", minWidth: 0 }} />
                     </React.Fragment>
                   )}
@@ -7521,7 +7554,7 @@ shap_top3    : ["temperature_7d", "promo_intensity", "price_lag_1"]`}</pre>
                 )}
 
                 {activeTab === "eda" && (
-                  <EdaView />
+                  <EdaView runSlot={runSlotEl} />
                 )}
 
                 {activeTab === "ops" && (
