@@ -78,7 +78,7 @@ business:
 reporting:
   output_dir: reports
   run_name: fresh_retailnet_v2
-  make_plots: false
+  make_plots: true
 
 simulation:
   retrain_cadences: [null, 7, 1]

@@ -1,0 +1,62 @@
+% !TEX root = ../main.tex
+\chapter{Capturas de la Interfaz Web}
+\label{anexo:dashboard}
+
+Este apéndice recoge capturas de pantalla del dashboard desplegado en producción (\url{https://artemmindlin.site}), organizadas por los dos planos funcionales de la interfaz: el \textbf{plano de Operación} y el \textbf{plano de Análisis}.
+
+% ─────────────────────────────────────────────
+\section*{Plano de Operación}
+% ─────────────────────────────────────────────
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/dashboard/ui_operacion_dashboard.png}
+    \caption{Vista \textit{Dashboard} del plano de Operación. Muestra los cuatro KPIs principales (coste de inventario, cobertura empírica, MAE y alerta de drift), el gráfico de demanda real vs. predicha con banda conformal calibrada al 95\,\%, y el simulador \textit{What-If} en el panel lateral izquierdo.}
+    \label{fig:ui_operacion_dashboard}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/dashboard/ui_simulacion_ops.png}
+    \caption{Vista \textit{Simulación OPS} del plano de Operación. Presenta el backtest walk-forward semana a semana: cobertura realizada, coste de inventario semanal y ahorro respecto a la política base. El slider permite navegar por las semanas del horizonte evaluado.}
+    \label{fig:ui_simulacion_ops}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/dashboard/ui_analisis_sku.png}
+    \caption{Vista \textit{Análisis SKU} del plano de Operación. Tabla de los 50 SKUs activos con \textit{sparklines} de tendencia de 14 días, cobertura empírica, PSI de drift, pedido propuesto y estado operacional (OK / DRIFT / ROTURA / OVERSTOCK).}
+    \label{fig:ui_analisis_sku}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/dashboard/ui_monitor_drift.png}
+    \caption{Vista \textit{Monitor de Drift} del plano de Operación. Muestra el PSI de cada feature ordenado de mayor a menor, con umbrales de advertencia (0,10) y crítico (0,20). También indica la fecha de la última calibración y la próxima ventana de reentrenamiento automático.}
+    \label{fig:ui_monitor_drift}
+\end{figure}
+
+% ─────────────────────────────────────────────
+\section*{Plano de Análisis}
+% ─────────────────────────────────────────────
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/dashboard/ui_eda_overview.png}
+    \caption{Vista \textit{EDA} del plano de Análisis. Panel resumen con estadísticos globales del dataset (50.000 series únicas, 4,5\,M filas, tasa de stockout 44,3\,\%) y las nueve figuras exploratorias accesibles desde el menú lateral.}
+    \label{fig:ui_eda_overview}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/dashboard/ui_demanda_latente.png}
+    \caption{Vista \textit{Demanda Latente} del plano de Análisis. Comparación de las tres estrategias de imputación de censura (Supervised LGBM, Historical mean y Clipped scaling) en 500 series y 5.009 días evaluados, junto con el gráfico de demanda latente por SKU.}
+    \label{fig:ui_demanda_latente}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/dashboard/ui_pareto_tuning.png}
+    \caption{Vista \textit{Pareto Tuning} del plano de Análisis. Frente de Pareto multiobjeto (Pinball Loss vs. Winkler Score) generado por Optuna NSGA-II, tabla comparativa de los modelos en la frontera y curva de sensibilidad al ratio de costes $c_s/c_h$.}
+    \label{fig:ui_pareto_tuning}
+\end{figure}

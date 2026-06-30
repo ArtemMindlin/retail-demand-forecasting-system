@@ -15,6 +15,7 @@
 \usepackage{eurosym}
 \usepackage{array}
 \usepackage{caption}
+\emergencystretch=1em
 \usepackage{float}
 \usepackage{microtype}
 \usepackage{amsmath}
@@ -43,6 +44,7 @@
 
 \frontmatter
 \input{chapters/abstracts}
+\input{chapters/agradecimientos}
 \input{chapters/anexo_abreviaturas}
 \tableofcontents
 \listoffigures
@@ -64,10 +66,11 @@
 % --- Apéndices ---
 \appendix
 \input{chapters/anexo_ods}
+\input{chapters/anexo_dashboard}
 
 \backmatter
 % --- Bibliografía ---
-\bibliographystyle{unsrt}
+\bibliographystyle{ieeetr}
 \bibliography{references}
 
 \end{document}

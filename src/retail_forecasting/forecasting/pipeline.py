@@ -511,6 +511,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         data_quality_report=quality_report,
         drifts=artifacts_obs.drifts,
         backtest_metadata=combined_metadata,
+        shap_values=artifacts_obs.shap_values,
     )
 
     print("\n💾 Writing run artifacts...")

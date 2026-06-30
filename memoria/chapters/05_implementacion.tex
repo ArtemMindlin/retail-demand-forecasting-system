@@ -70,6 +70,8 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
 \end{tikzpicture}%
 }
 \shorthandon{>}%
+\caption{Arquitectura del sistema: flujo de datos y decisiones entre las cuatro capas funcionales (Datos, Features, Modelado y Decisión) con integración de MLflow para trazabilidad.}
+\label{fig:arquitectura_sistema}
 \end{figure}
 
 La estructura del código se organiza en torno a cuatro capas especializadas:
@@ -113,7 +115,7 @@ Las decisiones más relevantes se justifican a continuación:
 \begin{itemize}
     \item \textbf{CatBoost sobre XGBoost}: Como se argumentó en el Capítulo~\ref{chap:estado_del_arte}, CatBoost gestiona variables categóricas de alta cardinalidad (tienda, producto, categoría) de forma nativa mediante \textit{Ordered Target Statistics}, eliminando el riesgo de \textit{target leakage} que introduce el \textit{target encoding} manual en XGBoost. Adicionalmente, sus árboles oblivious actúan como regularizador implícito, beneficioso para series con alta variabilidad.
 
-    \item \textbf{Optuna sobre Hyperopt o GridSearch}: Optuna implementa el sampler TPE (\textit{Tree-structured Parzen Estimator}) con soporte nativo para optimización multi\-objetivo (NSGA-II), \textit{pruning} de trials poco prometedores y paralelización. GridSearch es inviable a escala (espacio de hiperparámetros continuo) e Hyperopt no soporta nativamente Pareto multi\-objetivo sin extensiones.
+    \item \begin{sloppypar}\textbf{Optuna sobre Hyperopt o GridSearch}: Optuna implementa el sampler TPE (\textit{Tree-structured Parzen Estimator}) con soporte nativo para optimización multi\-objetivo (NSGA-II), \textit{pruning} de trials poco prometedores y paralelización. GridSearch es inviable a escala (espacio de hiperparámetros continuo) e Hyperopt no soporta nativamente Pareto multi\-objetivo sin extensiones.\end{sloppypar}
 
     \item \textbf{FastAPI sobre Flask}: FastAPI genera documentación OpenAPI automática, soporta tipado estático con Pydantic y es asíncrono de forma nativa (ASGI), lo que reduce la latencia bajo carga concurrente, relevante cuando el dashboard realiza múltiples recálculos en paralelo. Flask es síncrono por defecto y requiere extensiones para alcanzar el mismo nivel de robustez.
 
@@ -133,7 +135,9 @@ El pipeline de datos transforma los registros de ventas crudos en el \textit{fra
 
 La función \texttt{load\_raw\_split()} descarga el dataset \textit{FreshRetailNet-50K} \cite{freshretailnet2025} desde Hugging Face con caché local, seleccionando el split \texttt{train} por defecto. El resultado es un \texttt{DataFrame} con las 17 columnas brutas definidas en la especificación del dataset: siete identificadores estáticos de jerarquía (\texttt{city\_id}, \texttt{store\_id}, \texttt{management\_group\_id}, tres niveles de categoría y \texttt{product\_id}), la fecha (\texttt{dt}), las ventas brutas (\texttt{sale\_amount}) y las covariables exógenas (descuento, horas de disponibilidad, indicadores de festivo y promoción, precipitación, temperatura, humedad, viento).
 
-La normalización construye el \texttt{series\_id} como concatenación de \texttt{store\_id} y \texttt{product\_id}, renombra \texttt{sale\_amount} a \texttt{observed\_demand} y \texttt{stock\_}\allowbreak\texttt{hour6\_}\allowbreak\texttt{22\_}\allowbreak\texttt{cnt} a \texttt{stockout\_}\allowbreak\texttt{hours}. En esta misma etapa se descartan las filas con ventas negativas (\texttt{drop\_negative\_sales}) y las series cuyo historial es inferior a \texttt{min\_history\_days} observaciones, garantizando que cada serie tiene longitud suficiente para construir los \textit{lags}. El resultado es el \textbf{panel preparado}: una tabla indexada por (\texttt{series\_id}, \texttt{date}) sin duplicados, base para todas las etapas posteriores.
+La normalización construye \texttt{series\_id} concatenando \texttt{store\_id} y \texttt{product\_id}, renombra la columna de ventas a \texttt{observed\_demand} y la señal de disponibilidad horaria a \texttt{stockout\_hours}.
+
+En esta misma etapa se descartan las filas con ventas negativas (\texttt{drop\_\allowbreak{}negative\_\allowbreak{}sales}) y las series cuyo historial es inferior a \texttt{min\_\allowbreak{}history\_\allowbreak{}days} observaciones, garantizando que cada serie tiene longitud suficiente para construir los \textit{lags}. El resultado es el \textbf{panel preparado}: una tabla indexada por (\texttt{series\_id}, \texttt{date}) sin duplicados, base para todas las etapas posteriores.
 
 \subsection{Puerta de Calidad de Datos (\texttt{quality.py})}
 
@@ -148,7 +152,7 @@ Este diseño de \textit{fail-fast} garantiza que ningún error de datos alcanza 
 
 \subsection{Corrección de Demanda Censurada (\texttt{censorship.py})}
 
-El módulo \texttt{LatentDemandImputer} implementa las tres estrategias de corrección descritas en la Sección~\ref{sec:demanda_censurada}: \texttt{supervised} (modelo auxiliar, estrategia por defecto), \texttt{historical\_mean} (media histórica de la serie en días sin rotura) y \texttt{clipped\_scaling} (escalado proporcional con factor configurable), más el modo \texttt{none}, que desactiva la corrección y sirve de \textit{baseline} para cuantificar el impacto de la censura. La estrategia activa es configurable en \texttt{PreprocessingConfig.}\allowbreak\texttt{imputation\_}\allowbreak\texttt{strategy}, lo que permite comparaciones controladas entre enfoques.
+El módulo \texttt{LatentDemandImputer} implementa las tres estrategias de corrección descritas en la Sección~\ref{sec:demanda_censurada}: \texttt{supervised} (modelo auxiliar, estrategia por defecto), \texttt{historical\_\allowbreak{}mean} (media histórica de la serie en días sin rotura) y \texttt{clipped\_\allowbreak{}scaling} (escalado proporcional con factor configurable), más el modo \texttt{none}, que desactiva la corrección y sirve de \textit{baseline} para cuantificar el impacto de la censura. La estrategia activa es configurable en \texttt{PreprocessingConfig.}\allowbreak\texttt{imputation\_}\allowbreak\texttt{strategy}, lo que permite comparaciones controladas entre enfoques.
 
 La estrategia \texttt{supervised} entrena un regresor LightGBM sobre las observaciones limpias (días con \texttt{stockout\_hours == 0}), usando como covariables los lags históricos de demanda, las variables de calendario y los indicadores exógenos. Después predice la demanda latente en los días censurados. El módulo añade tres columnas al panel: \texttt{latent\_}\allowbreak\texttt{demand\_}\allowbreak\texttt{est} (estimación de la demanda real), \texttt{original\_}\allowbreak\texttt{observed\_}\allowbreak\texttt{demand} (copia de las ventas originales para auditoría) e \texttt{is\_imputed} (indicador binario de las filas corregidas). El campo \texttt{observed\_demand} es sobreescrito con la estimación latente para que el pipeline de features no requiera lógica condicional.
 
@@ -202,7 +206,7 @@ El sistema distingue explícitamente entre operaciones de investigación y opera
 
     \item \textbf{\texttt{retrain}}: Modo de refresco operacional. Entrena el modelo \textit{champion} sobre la totalidad de los datos disponibles sin realizar evaluación por \textit{folds}. Guarda el modelo en disco en formato \texttt{.pkl}. Se ejecuta periódicamente en producción para mantener el modelo actualizado con los datos más recientes.
 
-    \item \textbf{\texttt{score\_daily}}: Modo de producción diario. Carga el modelo \textit{champion} guardado, construye el \textit{inference frame} con los datos más recientes y genera \texttt{reorder\_}\allowbreak\texttt{recommendations.csv}: una fila por par tienda-producto con la \texttt{order\_quantity} óptima para el horizonte $H$, los tres cuantiles calibrados (\texttt{q\_0.1}, \texttt{q\_0.5}, \texttt{q\_0.9}) y la fecha de decisión. Este fichero es el entregable que consumiría el sistema de compras o el responsable de reposición.
+    \item \begin{sloppypar}\textbf{\texttt{score\_daily}}: Modo de producción diario. Carga el modelo \textit{champion} guardado, construye el \textit{inference frame} con los datos más recientes y genera \texttt{reorder\_}\allowbreak\texttt{recommendations.csv}: una fila por par tienda-producto con la \texttt{order\_quantity} óptima para el horizonte $H$, los tres cuantiles calibrados (\texttt{q\_0.1},\allowbreak{} \texttt{q\_0.5},\allowbreak{} \texttt{q\_0.9}) y la fecha de decisión. Este fichero es el entregable que consumiría el sistema de compras o el responsable de reposición.\end{sloppypar}
 
     \item \textbf{\texttt{simulate\_ops}}: Modo de investigación MLOps. Ejecuta la simulación operacional en \textit{streaming} descrita en la Sección~\ref{sec:simulate_ops}, comparando múltiples cadencias de reentrenamiento sobre el split de evaluación.
 \end{enumerate}
@@ -235,7 +239,7 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
 \end{figure}
 
 \begin{enumerate}
-    \item \textbf{Fase de Optimización Mensual (Optuna)}: Ejecutado mediante el modo \texttt{experiment}, este ciclo realiza una búsqueda exhaustiva en el espacio de hiperparámetros utilizando \textit{Optuna}. Dado el volumen de datos (4.5M de filas), el sistema implementa un \textbf{muestreo estratificado por serie temporal}, limitando el entrenamiento del tuning a un máximo de 500k registros representativos. Esto garantiza que la convergencia de Optuna sea ágil sin perder la significancia estadística. Los resultados son validados mediante un análisis humano de estabilidad (comparando Pinball Loss en $q^*$ y Winkler Score), y si se identifican mejoras significativas, se actualiza el archivo \texttt{configs/\allowbreak default.yaml}.
+    \item \begin{sloppypar}\textbf{Fase de Optimización Mensual (Optuna)}: Ejecutado mediante el modo \texttt{experiment}, este ciclo realiza una búsqueda exhaustiva en el espacio de hiperparámetros utilizando \textit{Optuna}. Dado el volumen de datos (4.5M de filas), el sistema implementa un \textbf{muestreo estratificado por serie temporal}, limitando el entrenamiento del tuning a un máximo de 500k registros representativos. Esto garantiza que la convergencia de Optuna sea ágil sin perder la significancia estadística. Los resultados son validados mediante un análisis humano de estabilidad (comparando Pinball Loss en $q^*$ y Winkler Score), y si se identifican mejoras significativas, se actualiza el archivo \texttt{configs/\allowbreak default.yaml}.\end{sloppypar}
     \item \textbf{Fase de Reentrenamiento Operacional (Daily)}: Ejecutado mediante el modo \texttt{retrain}, este proceso es determinista y utiliza la configuración fija definida en \texttt{default.yaml}. Su función es la integración de los datos de ventas más recientes, manteniendo la lógica del modelo estable.
 \end{enumerate}
 
@@ -249,7 +253,7 @@ Al término de cada ejecución en modo \texttt{experiment}, el sistema evalúa a
 \begin{enumerate}
     \item \textbf{Mejora de coste mínima}: Se calcula la mejora relativa en coste de inventario simulado respecto al campeón actual como $\Delta_{\text{cost}} = \frac{C_{\text{champion}} - C_{\text{challenger}}}{C_{\text{champion}}} \times 100$\%. El \textit{challenger} solo es candidato si $\Delta_{\text{cost}} \geq \theta_{\text{cost}}$, donde $\theta_{\text{cost}}$ es el umbral \texttt{champion\_}\allowbreak\texttt{min\_}\allowbreak\texttt{cost\_}\allowbreak\texttt{improvement\_}\allowbreak\texttt{pct} (por defecto 0\%, modificable en \texttt{BusinessConfig}).
 
-    \item \textbf{Guardarraíl de nivel de servicio}: El \textit{challenger} no debe degradar el nivel de servicio más allá de un margen configurable (\texttt{champion\_}\allowbreak\texttt{max\_}\allowbreak\texttt{service\_}\allowbreak\texttt{level\_}\allowbreak\texttt{degradation}). Si $\Delta_{\text{sl}} < -\delta_{\text{sl}}$, el candidato es descartado aunque mejore el coste.
+    \item \begin{sloppypar}\textbf{Guardarraíl de nivel de servicio}: El \textit{challenger} no debe degradar el nivel de servicio más allá de un margen configurable (\texttt{champion\_}\allowbreak\texttt{max\_}\allowbreak\texttt{service\_}\allowbreak\texttt{level\_}\allowbreak\texttt{degradation}). Si $\Delta_{\text{sl}} < -\delta_{\text{sl}}$, el candidato es descartado aunque mejore el coste.\end{sloppypar}
 \end{enumerate}
 
 Entre todos los \textit{challengers} que superan ambos guardarraíles, se selecciona el de menor coste total (con el nivel de servicio como criterio de desempate). La decisión (incluyendo los valores exactos de $\Delta_{\text{cost}}$, $\Delta_{\text{sl}}$, el motivo de aceptación o rechazo y los identificadores de ambos modelos) queda registrada en el campo \texttt{promotion} del metadato de la ejecución, garantizando una trazabilidad completa del historial de cambios de modelo. La Figura~\ref{fig:champion_promotion} muestra el flujo de decisión completo.
@@ -302,9 +306,9 @@ solo reemplaza al modelo actual si supera simultáneamente el umbral de mejora d
 Cada ejecución en modo \texttt{experiment} registra automáticamente un \textit{run} en el servidor MLflow mediante el módulo \texttt{evaluation/mlflow\_logger.py}. Se almacenan tres categorías de información:
 
 \begin{itemize}
-    \item \textbf{Parámetros}: Todos los campos de \texttt{Settings} se aplastan a pares clave-valor y se registran como parámetros del \textit{run} (ej. \texttt{dataset\_}\allowbreak\texttt{horizon=7}, \texttt{validation\_}\allowbreak\texttt{n\_}\allowbreak\texttt{folds=3}, \texttt{model\_}\allowbreak\texttt{quantiles=[0.1, 0.5, 0.9]}).
-    \item \textbf{Métricas del campeón}: Coste de inventario simulado (\texttt{champion\_}\allowbreak\texttt{sim\_}\allowbreak\texttt{total\_}\allowbreak\texttt{cost}), nivel de servicio simulado (\texttt{champion\_}\allowbreak\texttt{sim\_}\allowbreak\texttt{service\_}\allowbreak\texttt{level}), Winkler Score (\texttt{champion\_}\allowbreak\texttt{winkler\_}\allowbreak\texttt{score}), cobertura condicional (\texttt{champion\_}\allowbreak\texttt{interval\_}\allowbreak\texttt{coverage}) y MAE (\texttt{champion\_}\allowbreak\texttt{mae}).
-    \item \textbf{Artefactos}: Todo el directorio de la ejecución (\texttt{predictions.csv}, \texttt{cost\_summary.csv}, \texttt{report.md}, gráficos de Pareto) se adjunta bajo la ruta \texttt{run\_outputs/} del \textit{run}, permitiendo reproducir cualquier experimento histórico a partir del servidor MLflow.
+    \item \textbf{Parámetros}: Todos los campos de \texttt{Settings} se aplastan a pares clave-valor y se registran como parámetros del \textit{run} (ej. \texttt{dataset\_}\allowbreak\texttt{horizon=7}, \texttt{validation\_}\allowbreak\texttt{n\_}\allowbreak\texttt{folds=3}, \texttt{model\_}\allowbreak\texttt{quantiles=}\allowbreak\texttt{[0.1,\,0.5,\,0.9]}).
+    \item \textbf{Métricas del campeón}: \begin{sloppypar}Coste de inventario simulado (\texttt{champion\_}\allowbreak\texttt{sim\_}\allowbreak\texttt{total\_}\allowbreak\texttt{cost}), nivel de servicio simulado (\texttt{champion\_}\allowbreak\texttt{sim\_}\allowbreak\texttt{service\_}\allowbreak\texttt{level}), Winkler Score (\texttt{champion\_}\allowbreak\texttt{winkler\_}\allowbreak\texttt{score}), cobertura condicional (\texttt{champion\_}\allowbreak\texttt{interval\_}\allowbreak\texttt{coverage}) y MAE (\texttt{champion\_}\allowbreak\texttt{mae}).\end{sloppypar}
+    \item \textbf{Artefactos}: Todo el directorio de la ejecución se adjunta bajo la ruta \texttt{run\_\allowbreak{}outputs/} del \textit{run}: \texttt{predictions.csv}, \texttt{cost\_\allowbreak{}summary.csv}, \texttt{report.md} y los gráficos de Pareto. Esto permite reproducir cualquier experimento histórico desde el servidor MLflow.
 \end{itemize}
 
 \section{API REST e Interfaz Web}
@@ -319,7 +323,7 @@ La Tabla~\ref{tab:api_endpoints} describe los endpoints operacionales del servic
 \begin{table}[htbp]
     \centering
     \small
-    \begin{tabular}{lp{2.5cm}p{6.5cm}}
+    \begin{tabular}{l>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{6.5cm}}
         \toprule
         \textbf{Método + Ruta} & \textbf{Nombre} & \textbf{Descripción} \\
         \midrule
@@ -338,7 +342,7 @@ La Tabla~\ref{tab:api_endpoints} describe los endpoints operacionales del servic
 
 \subsection{Dashboard Interactivo}
 
-El endpoint raíz \texttt{GET /} sirve un dashboard React de página única (\textit{Single Page Application}) embebido en el propio servidor FastAPI. El dashboard está organizado en cuatro paneles funcionales:
+El endpoint raíz \texttt{GET /} sirve un dashboard React de página única (\textit{Single Page Application}) embebido en el propio servidor FastAPI. El Apéndice~\ref{anexo:dashboard} recoge capturas de pantalla del sistema desplegado en producción. El dashboard está organizado en cuatro paneles funcionales:
 
 \begin{itemize}
     \item \textbf{Panel de Pronóstico y Simulador \textit{What-If}}: Muestra la serie temporal de predicciones vs. demanda real del SKU seleccionado, con los intervalos conformes superpuestos. El usuario puede ajustar mediante \textit{sliders} el nivel de servicio objetivo, los costes de rotura y sobrestock, y la capacidad del almacén; el endpoint \texttt{POST /api/forecast} recalcula en tiempo real la cantidad óptima $q^*$ y los KPIs de inventario (coste total, cobertura empírica, MAE, PSI de drift).
