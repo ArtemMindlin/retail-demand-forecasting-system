@@ -181,6 +181,7 @@ La Tabla~\ref{tab:features_summary} resume el número de características result
 \begin{table}[htbp]
     \centering
     \small
+    \setlength{\tabcolsep}{4pt}
     \begin{tabular}{lcc}
         \toprule
         \textbf{Grupo} & \textbf{N\textordmasculine{} características} & \textbf{Ejemplos} \\
@@ -730,7 +731,9 @@ Para responder esta pregunta de forma empírica sobre datos genuinamente no vist
 
 \begin{enumerate}
     \item Se entrena un modelo \textit{champion} inicial exclusivamente sobre el split de entrenamiento. Este modelo representa el estado del sistema en el día de despliegue, antes de que llegue ningún dato del periodo de evaluación.
-    \item Se define un conjunto de \textbf{cadencias de reentrenamiento} $K = \{k_1, k_2, \ldots, k_n, \text{nunca}\}$, donde cada $k_i$ es el número de días entre reentrenamientos consecutivos y el parámetro configurable \texttt{simulation\_days} permite limitar la ventana de evaluación. La cadencia \textit{nunca} sirve como \textit{baseline}: el modelo inicial nunca se actualiza.
+    \item Se define un conjunto de \textbf{cadencias de reentrenamiento}:
+    \[K = \{k_1, k_2, \ldots, k_n, \text{nunca}\},\]
+    donde cada $k_i$ es el número de días entre reentrenamientos consecutivos. El parámetro \texttt{simulation\_\allowbreak{}days} limita la ventana de evaluación. La cadencia \textit{nunca} sirve como \textit{baseline}: el modelo inicial nunca se actualiza.
     \item Se itera día a día sobre el split de evaluación. Para cada fecha de decisión $t$ y cada cadencia $k$:
     \begin{itemize}
         \item Se construye la \textbf{historia disponible} $\mathcal{H}_t = \text{train} \cup \text{eval}[\text{date} < t]$, garantizando ausencia de \textit{leakage}.

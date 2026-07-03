@@ -27,26 +27,26 @@ Para mantener una interpretación consistente a lo largo del proyecto, el panel 
         \midrule
         Fecha diaria & \texttt{date} & temporal & Origen de predicción y eje principal del panel. \\
         Identificador de serie & \texttt{series\_id} & categórica & Clave tienda-producto para agrupar historia y construir features por serie. \\
-        Demanda observada & \texttt{observed\_demand} & numérica & Señal objetivo base utilizada para construir la etiqueta acumulada de horizonte. \\
-        Horas de \textit{stockout} & \texttt{stockout\_hours} & numérica & Intensidad de falta de disponibilidad; actúa como contexto operativo y señal de censura. \\
+        Demanda observada & \texttt{observed\_\allowbreak{}demand} & numérica & Señal objetivo base utilizada para construir la etiqueta acumulada de horizonte. \\
+        Horas de \textit{stockout} & \texttt{stockout\_\allowbreak{}hours} & numérica & Intensidad de falta de disponibilidad; actúa como contexto operativo y señal de censura. \\
         Descuento & \texttt{discount} & numérica & Variable comercial exógena que captura promociones o rebajas. \\
         Festivo & \texttt{holiday\_flag} & binaria & Indicador de cierre o comportamiento especial asociado a días festivos. \\
         Actividad promocional & \texttt{activity\_flag} & binaria & Señal contextual de actividad comercial o evento local. \\
         Precipitación & \texttt{precpt} & numérica & Variable meteorológica exógena. \\
-        Temperatura media & \texttt{avg\_temperature} & numérica & Variable meteorológica exógena. \\
-        Humedad media & \texttt{avg\_humidity} & numérica & Variable meteorológica exógena. \\
-        Nivel medio de viento & \texttt{avg\_wind\_level} & numérica & Variable meteorológica exógena. \\
+        Temperatura media & \texttt{avg\_\allowbreak{}temperature} & numérica & Variable meteorológica exógena. \\
+        Humedad media & \texttt{avg\_\allowbreak{}humidity} & numérica & Variable meteorológica exógena. \\
+        Nivel medio de viento & \texttt{avg\_\allowbreak{}wind\_\allowbreak{}level} & numérica & Variable meteorológica exógena. \\
         Ciudad & \texttt{city\_id} & categórica & Identificador jerárquico estático del entorno geográfico. \\
         Tienda & \texttt{store\_id} & categórica & Identificador estático de la ubicación comercial. \\
-        Grupo de gestión & \texttt{management\_group\_id} & categórica & Nivel jerárquico de gestión de la tienda. \\
-        Primera categoría & \texttt{first\_category\_id} & categórica & Primer nivel de la jerarquía del producto. \\
-        Segunda categoría & \texttt{second\_category\_id} & categórica & Segundo nivel de la jerarquía del producto. \\
-        Tercera categoría & \texttt{third\_category\_id} & categórica & Tercer nivel de la jerarquía del producto. \\
+        Grupo de gestión & \texttt{management\_\allowbreak{}group\_\allowbreak{}id} & categórica & Nivel jerárquico de gestión de la tienda. \\
+        Primera categoría & \texttt{first\_\allowbreak{}category\_\allowbreak{}id} & categórica & Primer nivel de la jerarquía del producto. \\
+        Segunda categoría & \texttt{second\_\allowbreak{}category\_\allowbreak{}id} & categórica & Segundo nivel de la jerarquía del producto. \\
+        Tercera categoría & \texttt{third\_\allowbreak{}category\_\allowbreak{}id} & categórica & Tercer nivel de la jerarquía del producto. \\
         Producto & \texttt{product\_id} & categórica & Identificador del SKU concreto modelado. \\
         \bottomrule
     \end{tabular}
-    }
-    \caption{Variables principales del dataset \textit{Fresh RetailNet} y su papel en el panel preparado.}
+    }%
+    \caption{Variables principales del dataset \textit{Fresh Retail\-Net} y su papel en el panel preparado.}
     \label{tab:dataset_variables}
 \end{table}
 

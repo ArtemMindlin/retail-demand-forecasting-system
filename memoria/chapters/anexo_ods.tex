@@ -4,43 +4,51 @@
 
 De acuerdo con la normativa de la Escola Tècnica Superior d'Enginyeria Informàtica (ETSINF) de la Universitat Politècnica de València, todos los Trabajos de Fin de Grado deben incluir una reflexión sobre su relación con los Objetivos de Desarrollo Sostenible (ODS) de la Agenda 2030 de Naciones Unidas.
 
-\section*{Grado de Relación con los ODS}
+\section*{Matriz de Vinculación con los ODS}
 
-La Tabla~\ref{tab:ods_relacion} recoge los 17 ODS y el grado de relación de este trabajo con cada uno de ellos, en una escala de cuatro niveles: \textbf{Alto} (el trabajo aborda directamente el objetivo), \textbf{Medio} (contribución indirecta o parcial), \textbf{Bajo} (relación tangencial) y \textbf{Ninguno} (sin relación).
+La Tabla~\ref{tab:ods_matriz_upv} recoge la \textbf{Matriz de Contribución a los ODS} del presente trabajo. Para cada objetivo se indica el grado de vinculación directa en una escala de cuatro niveles: \textbf{0}~=~sin relación, \textbf{1}~=~relación baja, \textbf{2}~=~relación media, \textbf{3}~=~relación alta.
 
 \begin{table}[htbp]
 \centering
 \small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{p{1.0cm}p{3.6cm}p{6.5cm}p{1.7cm}}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{clcccc}
 \toprule
-\textbf{ODS} & \textbf{Nombre} & \textbf{Relación con el trabajo} & \textbf{Grado} \\
+\textbf{ODS} & \textbf{Objetivo} & \textbf{0} & \textbf{1} & \textbf{2} & \textbf{3} \\
 \midrule
-1  & Fin de la pobreza & Sin relación directa. & Ninguno \\
-2  & Hambre cero & La optimización de la reposición de productos frescos contribuye a reducir la escasez de alimentos en los puntos de venta. & Medio \\
-3  & Salud y bienestar & Sin relación directa. & Ninguno \\
-4  & Educación de calidad & Sin relación directa. & Ninguno \\
-5  & Igualdad de género & Sin relación directa. & Ninguno \\
-6  & Agua limpia & Sin relación directa. & Ninguno \\
-7  & Energía asequible & Sin relación directa. & Ninguno \\
-8  & Trabajo decente y crecimiento económico & La reducción del coste logístico (3,7\% demostrado empíricamente a escala) contribuye a la eficiencia económica del sector distribución, sector con alta empleabilidad. & Medio \\
-9  & Industria, innovación e infraestructura & El sistema implementa un pipeline MLOps completo con técnicas avanzadas (Conformal Prediction, optimización multi-objetivo) aplicadas a un problema real de distribución. & Medio \\
-10 & Reducción de desigualdades & Sin relación directa. & Ninguno \\
-11 & Ciudades sostenibles & Sin relación directa. & Ninguno \\
-12 & Producción y consumo responsables \cite{ods12un} & \textbf{ODS principal.} El sistema reduce directamente el sobrestock de productos frescos perecederos mediante predicción probabilística calibrada, contribuyendo a la reducción del desperdicio alimentario en consonancia con la Ley 1/2025 \cite{leydesperdicio2025} y las directrices de la Comisión Europea \cite{eucommission2023foodwaste}. & \textbf{Alto} \\
-13 & Acción por el clima & La reducción del exceso de inventario disminuye la demanda de producción agrícola y el transporte de retorno de mercancía destruida, con potencial impacto positivo en las emisiones de gases de efecto invernadero de la cadena logística. & \textbf{Alto} \\
-14 & Vida submarina & Sin relación directa. & Ninguno \\
-15 & Vida de ecosistemas terrestres & Sin relación directa. & Ninguno \\
-16 & Paz, justicia e instituciones sólidas & Sin relación directa. & Ninguno \\
-17 & Alianzas para lograr los objetivos & El uso exclusivo de herramientas de código abierto (Python, CatBoost, MLflow) y datos públicos (Hugging Face) fomenta la reproducibilidad y el acceso abierto al conocimiento. & Bajo \\
+1  & Fin de la pobreza                          & \checkmark & & & \\
+2  & Hambre cero                                & & & \checkmark & \\
+3  & Salud y bienestar                          & \checkmark & & & \\
+4  & Educación de calidad                       & \checkmark & & & \\
+5  & Igualdad de género                         & \checkmark & & & \\
+6  & Agua limpia y saneamiento                  & \checkmark & & & \\
+7  & Energía asequible y no contaminante        & \checkmark & & & \\
+8  & Trabajo decente y crecimiento económico    & & & \checkmark & \\
+9  & Industria, innovación e infraestructura    & & & \checkmark & \\
+10 & Reducción de las desigualdades             & \checkmark & & & \\
+11 & Ciudades y comunidades sostenibles         & \checkmark & & & \\
+12 & Producción y consumo responsables          & & & & \checkmark \\
+13 & Acción por el clima                        & & & & \checkmark \\
+14 & Vida submarina                             & \checkmark & & & \\
+15 & Vida de ecosistemas terrestres             & \checkmark & & & \\
+16 & Paz, justicia e instituciones sólidas      & \checkmark & & & \\
+17 & Alianzas para lograr los objetivos         & & \checkmark & & \\
 \bottomrule
 \end{tabular}
-\caption{Grado de relación del TFG con los 17 Objetivos de Desarrollo Sostenible de la Agenda 2030.}
-\label{tab:ods_relacion}
+\caption{Matriz de vinculación del TFG con los ODS. 0: sin relación; 1: baja; 2: media; 3: alta.}
+\label{tab:ods_matriz_upv}
 \end{table}
 
-\section*{Reflexión sobre los ODS Principales}
+\section*{Reflexión sobre los ODS Vinculados}
 
-\textbf{ODS 12: Producción y Consumo Responsables.} Este es el objetivo con mayor vinculación directa al trabajo. El desperdicio alimentario en Europa supone aproximadamente 59 millones de toneladas anuales, con un coste económico estimado de 132.000 millones de euros \cite{eucommission2023foodwaste}. En el sector de distribución de productos frescos, una predicción de demanda deficiente es la causa primaria del sobrestock que termina en destrucción. El sistema desarrollado en este TFG aborda esta causa raíz mediante un motor de decisión probabilístico que combina la estimación de la demanda latente (corrigiendo el sesgo introducido por los stockouts históricos), la calibración de intervalos de confianza por categoría de producto (Mondrian Conformal Prediction) y la optimización del nivel de inventario vía el fractil crítico del Newsvendor. Los resultados empíricos muestran una reducción del 4,81\% en el coste de inventario (bajo evaluación justa, al corregir la demanda censurada) y del 3,7\% en coste simulado a escala frente al modelo estacional ingenuo, coste que en producción real incluiría mermas, liquidaciones y destrucción de producto.
+\textbf{ODS 12: Producción y Consumo Responsables} (vinculación alta). Este es el objetivo con mayor vinculación directa al trabajo. El desperdicio alimentario en Europa supone aproximadamente 59 millones de toneladas anuales, con un coste económico estimado de 132.000 millones de euros \cite{eucommission2023foodwaste}. En el sector de distribución de productos frescos, una predicción de demanda deficiente es la causa primaria del sobrestock que termina en destrucción. El sistema desarrollado en este TFG aborda esta causa raíz mediante un motor de decisión probabilístico que combina la estimación de la demanda latente (corrigiendo el sesgo introducido por los stockouts históricos), la calibración de intervalos de confianza por categoría de producto (Mondrian Conformal Prediction) y la optimización del nivel de inventario vía el fractil crítico del Newsvendor. Los resultados empíricos muestran una reducción del 4,81\% en el coste de inventario (bajo evaluación justa, al corregir la demanda censurada) y del 3,7\% en coste simulado a escala frente al modelo estacional ingenuo, coste que en producción real incluiría mermas, liquidaciones y destrucción de producto.
 
-\textbf{ODS 13: Acción por el Clima.} El sistema contribuye de forma indirecta a la reducción de emisiones al disminuir el volumen de producto que recorre ineficientemente la cadena de frío para ser finalmente destruido. La reducción del exceso de producción agrícola en origen, el menor uso de embalaje y refrigeración en tránsito, y la eliminación de rutas de transporte para gestión de excedentes son externalidades positivas derivadas de una mejor predicción de la demanda. Esta contribución es potencial y se materializaría en un despliegue real sobre las 50.000 series del dataset completo; los resultados del experimento de evaluación son una evidencia preliminar de la viabilidad técnica del enfoque.
+\textbf{ODS 13: Acción por el Clima} (vinculación alta). El sistema contribuye de forma indirecta a la reducción de emisiones al disminuir el volumen de producto que recorre ineficientemente la cadena de frío para ser finalmente destruido. La reducción del exceso de producción agrícola en origen, el menor uso de embalaje y refrigeración en tránsito, y la eliminación de rutas de transporte para gestión de excedentes son externalidades positivas derivadas de una mejor predicción de la demanda. Esta contribución es potencial y se materializaría en un despliegue real sobre las 50.000 series del dataset completo; los resultados del experimento de evaluación son una evidencia preliminar de la viabilidad técnica del enfoque.
+
+\textbf{ODS 2: Hambre Cero} (vinculación media). La optimización de la reposición de productos frescos contribuye a reducir la escasez de alimentos en los puntos de venta. Una menor tasa de rotura de stock implica mayor disponibilidad de producto fresco para el consumidor final, lo que tiene una incidencia indirecta en el acceso equitativo a la alimentación.
+
+\textbf{ODS 8: Trabajo Decente y Crecimiento Económico} (vinculación media). La reducción del coste logístico (3,7\% demostrado empíricamente a escala) contribuye a la eficiencia económica del sector distribución, uno de los mayores empleadores de la economía. Una cadena de suministro más eficiente genera márgenes que pueden redistribuirse en condiciones laborales y expansión de empleo.
+
+\textbf{ODS 9: Industria, Innovación e Infraestructura} (vinculación media). El sistema implementa un pipeline MLOps completo con técnicas avanzadas ---Conformal Prediction, optimización multi-objetivo NSGA-II, simulación walk-forward--- aplicadas a un problema real de distribución a escala industrial. Su arquitectura reproducible y de código abierto constituye una contribución a la infraestructura tecnológica del sector.
+
+\textbf{ODS 17: Alianzas para Lograr los Objetivos} (vinculación baja). El uso exclusivo de herramientas de código abierto (Python, CatBoost, MLflow) y datos públicos (Hugging Face) fomenta la reproducibilidad y el acceso abierto al conocimiento, facilitando que otros investigadores y empresas puedan construir sobre este trabajo.

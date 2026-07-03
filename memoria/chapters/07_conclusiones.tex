@@ -23,6 +23,18 @@ Las conclusiones principales se resumen en los siguientes puntos:
     \item \textbf{Madurez MLOps y Operativización}: El despliegue del sistema como microservicio \textbf{FastAPI} con trazabilidad completa en \textbf{MLflow}, lógica de promoción automática del modelo campeón, autodiagnóstico \textit{post-mortem} y \textit{dashboard What-If} en React demuestra la viabilidad técnica de integrar investigación académica de vanguardia en la operativa diaria de un entorno corporativo.
 \end{itemize}
 
+\section{Legado del Trabajo}
+\label{sec:legado}
+
+Más allá de las conclusiones metodológicas, este TFG deja como legado un sistema completo y reproducible:
+
+\begin{itemize}
+    \item \textbf{Código y reproducibilidad}: la totalidad del código (pipeline de datos, motor de modelos, calibración conformal, optimizador, simulador dinámico, API y \textit{dashboard}) se encuentra versionada en un repositorio Git\footnote{\url{https://github.com/ArtemMindlin/retail-demand-forecasting-system}}, con integración continua (verificación de estilo, tipos estáticos y batería de tests en cada \textit{commit}). La arquitectura completa se levanta con un único comando mediante \texttt{docker-compose}, de modo que un tercero puede reproducir los experimentos y obtener resultados equivalentes sin configuración manual. Cada experimento queda además registrado en MLflow con sus parámetros, métricas y artefactos, lo que permite auditar cualquier cifra de esta memoria hasta el \textit{run} que la produjo.
+    \item \textbf{Datos}: el trabajo se apoya íntegramente en el dataset público \textit{FreshRetailNet-50K} \cite{freshretailnet2025}, disponible en abierto, por lo que la reproducción del análisis no depende de datos propietarios ni de acuerdos de cesión.
+    \item \textbf{Elemento persistente}: el sistema está desplegado como instancia de demostración en un servidor propio, con el \textit{dashboard} operativo sobre los modelos entrenados. A corto plazo su función es servir de soporte a la defensa y de demostrador para terceros; a medio plazo, la arquitectura contenerizada permite trasladarlo a la infraestructura de cualquier organización interesada; y a largo plazo, las líneas de la Sección~\ref{sec:trabajo_futuro} marcan su evolución natural hacia un entorno productivo real.
+    \item \textbf{Beneficiarios}: los responsables de aprovisionamiento de \textit{retail} de frescos disponen de una metodología cuantificada (imputación de censura, previsión probabilística, \textit{Newsvendor} con restricciones) directamente trasladable a sus datos; y la comunidad académica dispone de una implementación de referencia que conecta \textit{Conformal Prediction} con la evaluación económica de inventario, un puente poco transitado en la literatura aplicada.
+\end{itemize}
+
 \section{Sostenibilidad e Impacto Ambiental}
 
 El trabajo presenta una relación directa con los \textbf{ODS 12} (Producción y Consumo Responsables) y \textbf{ODS 13} (Acción por el Clima) a través de la reducción del sobrestock de productos frescos perecederos. La reducción empírica del 3,7\% en coste de inventario simulado frente al modelo estacional implica directamente menos producto caducado en estantería y menor demanda de producción agrícola en origen. El análisis detallado del grado de relación con los 17 ODS se recoge en el Anexo~\ref{anx:ods}, conforme a los requisitos de la ETSINF-UPV.
@@ -62,7 +74,26 @@ El diseño e implementación del sistema presentan ciertas limitaciones y simpli
     \item \textbf{MLOps en Entorno Local}: La arquitectura FastAPI, MLflow y el dashboard React se han desarrollado como un prototipo funcional local. Un entorno productivo corporativo real exigiría una infraestructura distribuida en la nube, el despliegue mediante orquestadores (Kubernetes), el uso de bases de datos de características en tiempo real (Feature Stores) y flujos CI/CD para el reentrenamiento y promoción automática en caliente tras alertas de drift.
 \end{itemize}
 
+\section{Relación del Trabajo con los Estudios Cursados}
+\label{sec:relacion_estudios}
+
+Este trabajo integra conocimientos de prácticamente todos los bloques formativos del Grado en Ciencia de Datos, y su desarrollo ha exigido coordinarlos sobre un problema real de principio a fin:
+
+\begin{itemize}
+    \item \textbf{Análisis y comprensión de datos}: el análisis exploratorio del Capítulo~\ref{chap:analisis_datos} (caracterización de la intermitencia, la censura por \textit{stockouts} y la estacionalidad del panel) aplica directamente las competencias de \textit{Análisis Exploratorio de Datos}, \textit{Visualización} y \textit{Proyecto I: Comprensión de Datos}.
+    \item \textbf{Preparación e integración}: la construcción del panel balanceado, la ingeniería de variables con contrato causal y la imputación de demanda latente se apoyan en \textit{Gestión de Datos}, \textit{Bases de Datos} y \textit{Proyecto II: Integración y Preparación de Datos}.
+    \item \textbf{Modelización estadística y aprendizaje automático}: el núcleo predictivo (regresión cuantílica con \textit{Gradient Boosting}, evaluación por \textit{backtesting} y métricas probabilísticas) descansa sobre \textit{Modelos Descriptivos y Predictivos I y II} y sobre la base inferencial de \textit{Modelos Estadísticos para la Toma de Decisiones I y II}, de la que deriva también el marco de decisión bajo incertidumbre que fundamenta el modelo \textit{Newsvendor}.
+    \item \textbf{Optimización y simulación}: la capa de Programación Lineal para las restricciones de almacén y el simulador dinámico \textit{Order-Up-To} conectan con \textit{Algorítmica} y \textit{Modelado y Simulación Continuos}.
+    \item \textbf{Ingeniería y despliegue}: la arquitectura de microservicio (FastAPI, MLflow, contenedores) y su operación aplican las competencias de \textit{Programación}, \textit{Estructuras de Datos}, \textit{Fundamentos de Computadores y Sistemas Operativos} e \textit{Infraestructura para el Procesamiento de Datos}.
+    \item \textbf{Dimensión económica y de negocio}: la traducción del error predictivo a coste de inventario, el caso de uso logístico y el presupuesto del Capítulo~\ref{chap:presupuesto} se benefician de \textit{Fundamentos de Organización de Empresas} y \textit{Economía Digital}.
+\end{itemize}
+
+No obstante, una parte sustancial del trabajo exigió aprendizaje autónomo más allá del plan de estudios: la \textit{Conformal Prediction} (y en particular su variante Mondrian), la literatura de imputación de demanda censurada, el ecosistema MLOps (MLflow, promoción automática de modelos, detección de \textit{drift}) y el desarrollo del \textit{dashboard} en React. Este proceso evidencia la capacidad de aprendizaje permanente que el grado persigue como competencia de salida.
+
+En cuanto a las \textbf{competencias transversales} UPV, el trabajo pone en práctica de forma directa la \textit{comprensión e integración} de conocimientos de múltiples disciplinas sobre un mismo sistema; el \textit{análisis y resolución de problemas} mediante descomposición incremental (predicción $\rightarrow$ calibración $\rightarrow$ decisión $\rightarrow$ simulación) con decisiones justificadas y validadas; el \textit{pensamiento crítico}, reflejado en la verificación honesta de objetivos de la Sección~\ref{sec:resultados_kpis}, donde se reconocen explícitamente los KPIs no alcanzados y se diagnostica su causa; la \textit{planificación y gestión del tiempo}, con un desarrollo por fases dentro de las 300 horas de dedicación estimadas en el presupuesto; y la \textit{responsabilidad ética, medioambiental y profesional}, tratada en las secciones anteriores de este capítulo y en el Anexo~\ref{anx:ods}.
+
 \section{Líneas de Trabajo Futuro}
+\label{sec:trabajo_futuro}
 La arquitectura modular desarrollada deja el camino preparado para futuras expansiones. Las líneas propuestas fluyen directamente de las limitaciones identificadas en el capítulo de resultados y en la Sección~\ref{sec:limitaciones}:
 
 \begin{itemize}

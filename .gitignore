@@ -248,3 +248,9 @@ mlflow.db
 
 # Claude Code
 .claude/
+
+# Local working files (not part of the deliverable)
+.agents/
+node_modules/
+ORIGINAL_REQUEST.md
+memoria/AUDITORIA_TFG.md
