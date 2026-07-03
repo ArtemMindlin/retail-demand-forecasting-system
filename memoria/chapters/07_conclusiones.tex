@@ -7,7 +7,17 @@ Este capítulo final sintetiza las contribuciones principales de este Trabajo de
 \section{Conclusiones Generales}
 El desarrollo de este sistema ha ido más allá de un ejercicio de \textit{Machine Learning}: ha producido un \textbf{Sistema de Apoyo a la Decisión (DSS)} que conecta el modelo predictivo con la política de reposición. El trabajo valida empíricamente que la calidad de un modelo de previsión no puede medirse solo por el error puntual (MAE), sino por su capacidad para inducir decisiones logísticas económicamente mejores bajo incertidumbre.
 
-Las conclusiones principales se resumen en los siguientes puntos:
+Antes de desarrollar las conclusiones temáticas, se revisa el grado de consecución de cada uno de los objetivos específicos planteados en la Sección~\ref{sec:objetivos}, cuya verificación cuantitativa detallada se recoge en la Tabla~\ref{tab:kpi_verification}:
+
+\begin{itemize}
+    \item \textbf{\ref{obj:pipeline} (Pipeline de datos e imputación de censura): alcanzado.} El pipeline reproducible con compuertas de calidad quedó operativo (Capítulos~\ref{chap:analisis_datos} y~\ref{chap:implementacion}), la ausencia de fuga de información se verificó mediante el contrato causal de las variables, y la imputación de demanda latente demostró su valor económico: $-4{,}81\%$ de coste bajo evaluación justa.
+    \item \textbf{\ref{obj:modelos} (Modelos globales probabilísticos): alcanzado.} CatBoost supera al \textit{baseline} Seasonal Naïve en coste logístico simulado ($-3{,}7\%$ a escala de 500 series), validando la hipótesis central de que el modelo probabilístico global induce mejores decisiones aunque no gane en MAE.
+    \item \textbf{\ref{obj:conformal} (Calibración conformal $\geq 80\%$): no alcanzado, con diagnóstico preciso.} La cobertura empírica se quedó en el 38\% en el subset base y el 63{,}5\% a escala. El análisis delimitó la causa (no-intercambiabilidad temporal en un panel de 90 días, no el tamaño muestral) y la solución (CP adaptativa), convirtiendo el incumplimiento en la línea de trabajo futuro prioritaria.
+    \item \textbf{\ref{obj:gemelo} (Gemelo digital con restricciones): alcanzado.} La simulación dinámica \textit{Order-Up-To} con capa de Programación Lineal cuantificó la reducción de coste frente a la política puntual y expuso efectos (látigo, acumulación de backlog) invisibles para la evaluación estática.
+    \item \textbf{\ref{obj:mlops} (Operativización MLOps): alcanzado.} El sistema quedó desplegado como microservicio FastAPI con trazabilidad MLflow, explicabilidad SHAP, \textit{dashboard} React, contenedores Docker e integración continua (Capítulo~\ref{chap:implementacion}).
+\end{itemize}
+
+Cuatro de los cinco objetivos específicos se cumplen íntegramente; el tercero no alcanza su KPI pero produce el diagnóstico metodológico más valioso del trabajo. Las conclusiones principales se resumen en los siguientes puntos:
 
 \begin{itemize}
     \item \textbf{Censura y Demanda Latente}: La imputación de la demanda censurada por \textit{stockouts} es el factor técnico más determinante para la rentabilidad de la cadena de suministro. Bajo una evaluación justa con un target común de demanda real, los modelos entrenados con la estrategia de Demanda Latente Supervisada reducen el coste total de inventario en un \textbf{4,81\%} frente al baseline observado sin corregir (12.262,00 frente a 12.881,98 unidades monetarias), elevando el nivel de servicio (\textit{fill rate}) del \textbf{91,22\%} al \textbf{99,96\%}. Este resultado valida de forma cuantitativa y sin sesgo de evaluación el beneficio de recuperar la señal latente.

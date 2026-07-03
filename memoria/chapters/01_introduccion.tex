@@ -24,19 +24,20 @@ El enfoque tradicional del \textit{demand forecasting} se ha centrado histórica
 Este trabajo aborda estas limitaciones mediante un enfoque unificado: desde un \textbf{forecasting probabilístico} avanzado con garantías matemáticas (\textit{Mondrian Conformal Prediction}) hasta la toma de decisión bajo restricciones mediante Investigación de Operaciones (Programación Lineal) y MLOps, todo empaquetado en una arquitectura industrial lista para despliegue.
 
 \section{Objetivos}
+\label{sec:objetivos}
 El objetivo general de este proyecto es diseñar, evaluar y desplegar un sistema completo de apoyo a la reposición para \textit{retail} fresco, elevando la solución desde un experimento estadístico hasta un sistema desplegable que cierra el bucle entre predicción y decisión de reposición, con el fin último de minimizar el desperdicio alimentario y maximizar el margen de beneficio operativo.
 
 Para alcanzar este objetivo general, se plantean los siguientes objetivos específicos:
-\begin{itemize}
-    \item Desarrollar un \textit{pipeline} de datos reproducible que incluya compuertas de calidad (\textit{Data Quality Gates}) y la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}, verificando que ninguna observación censurada por stockout introduce fuga de información hacia la etiqueta objetivo.
-    \item Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos, obteniendo un coste de inventario simulado en el conjunto de test inferior al de un \textit{baseline} estacional ingenuo (\textit{seasonal naïve}).
-    \item \begin{sloppypar}Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con hiper-optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$) sobre el conjunto de test.\end{sloppypar}
-    \item Evaluar el rendimiento del sistema completo mediante un gemelo digital logístico (Simulación Dinámica de Inventario $s,S$) con restricciones globales vía Programación Lineal, cuantificando la reducción del coste logístico total y de las mermas por producto caducado frente a una política basada en predicción puntual, demostrando así su viabilidad como núcleo para un Plan de Prevención.
-    \item Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software,
+\begin{enumerate}[label=\textbf{O\arabic*.}, ref=O\arabic*]
+    \item \label{obj:pipeline} Desarrollar un \textit{pipeline} de datos reproducible que incluya compuertas de calidad (\textit{Data Quality Gates}) y la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}, verificando que ninguna observación censurada por stockout introduce fuga de información hacia la etiqueta objetivo.
+    \item \label{obj:modelos} Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos, obteniendo un coste de inventario simulado en el conjunto de test inferior al de un \textit{baseline} estacional ingenuo (\textit{seasonal naïve}).
+    \item \label{obj:conformal} \begin{sloppypar}Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con hiper-optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$) sobre el conjunto de test.\end{sloppypar}
+    \item \label{obj:gemelo} Evaluar el rendimiento del sistema completo mediante un gemelo digital logístico (Simulación Dinámica de Inventario $s,S$) con restricciones globales vía Programación Lineal, cuantificando la reducción del coste logístico total y de las mermas por producto caducado frente a una política basada en predicción puntual, demostrando así su viabilidad como núcleo para un Plan de Prevención.
+    \item \label{obj:mlops} Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software,
     incluyendo seguimiento (MLflow), explicabilidad (SHAP), microservicio (FastAPI) y un
     cuadro de mandos interactivo \textit{What-If} desarrollado en \textit{React}, soportado por \textit{Docker} e
     Integración Continua (CI/CD).
-\end{itemize}
+\end{enumerate}
 
 \section{Alcance}
 El presente trabajo se enmarca en el contexto de la previsión de demanda a corto plazo para productos frescos en el sector \textit{retail}. A continuación se delimitan explícitamente los límites del sistema para evitar interpretaciones erróneas sobre su cobertura.
