@@ -17,6 +17,9 @@ services:
     environment:
       - RETAIL_PROJECT__RUN_MODE=score_daily
     restart: unless-stopped
+    networks:
+      - default
+      - caddy
 
   # 2. MLflow Tracking Server
   mlflow:
@@ -31,3 +34,7 @@ services:
       - ./mlruns:/app/mlruns
       - ./mlflow.db:/app/mlflow.db
     restart: unless-stopped
+
+networks:
+  caddy:
+    external: true
