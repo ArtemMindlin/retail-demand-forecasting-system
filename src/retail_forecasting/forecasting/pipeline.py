@@ -1001,7 +1001,7 @@ def run_experiment_from_frame(
             print(f"--- Calculating SHAP values for {model_to_explain.model_name} ---")
             shap_values = calculate_shap_values(
                 model=model_to_explain,
-                X=supervised_frame.loc[:, feature_columns],
+                X=supervised_frame[feature_columns],
             )
 
     artifacts = RunArtifacts(
