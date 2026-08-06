@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DJANGO_DEBUG=true",
+        "uv",
+        "run",
+        "--env-file",
+        ".env",
+        "python",
+        "manage.py",
+        "runserver",
+        "127.0.0.1:8000"
+      ],
+      "port": 8000
+    }
+  ]
+}

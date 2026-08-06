@@ -1,4 +1,4 @@
-"""Backfill ``drift_report.json`` for the latest API-visible run.
+"""Backfill ``drift_report.json`` for the latest dashboard-visible run.
 
 Loads the champion model and a sample of the prepared panel, computes SHAP
 importance, and writes a real PSI drift report into the run directory the API
@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from retail_forecasting.api.main import _get_latest_run_path
+from retail_forecasting.api.services.runs import ArtifactStore
 from retail_forecasting.config import load_config
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.drift import label_all_regimes
@@ -33,6 +33,7 @@ def main() -> None:
     n_series = int(sys.argv[2]) if len(sys.argv) > 2 else 200
 
     settings = load_config(config_path)
+    store = ArtifactStore()
 
     panel = load_prepared_panel(
         dataset_config=settings.dataset,
@@ -58,7 +59,7 @@ def main() -> None:
     shap_values = calculate_shap_values(model=model, X=frame.loc[:, metadata.feature_columns])
     report = build_feature_drift_report(supervised_frame=frame, shap_values=shap_values)
 
-    run_dir: Path = _get_latest_run_path()
+    run_dir: Path = store.latest_run_path()
     out = run_dir / "drift_report.json"
     out.write_text(json.dumps(report, indent=2), encoding="utf-8")
 

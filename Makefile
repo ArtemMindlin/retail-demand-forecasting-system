@@ -4,7 +4,7 @@
 PYTHON = uv run python
 PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
-.PHONY: help install run retrain score simulate backtest-fair-cost eda api dev mlflow up test test-harness lint format clean pdf
+.PHONY: help install run retrain score simulate backtest-fair-cost eda api dev collectstatic mlflow up test test-harness lint format clean pdf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -30,11 +30,14 @@ backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common gro
 eda: ## Run the reproducible EDA module on the prepared panel
 	$(PYTHON) -m retail_forecasting.eda.run --config $(CONFIG)
 
-api: ## Start the FastAPI microservice
-	uv run uvicorn retail_forecasting.api.main:app --reload
+api: ## Start the dashboard over ASGI (production-style, no autoreload)
+	uv run uvicorn retail_forecasting.api.asgi:application --host 0.0.0.0 --port 8000
 
-dev: ## Run the local dev server (API + dashboard) with autoreload at http://localhost:8000
-	uv run --env-file .env uvicorn retail_forecasting.api.main:app --reload --host 127.0.0.1 --port 8000
+dev: ## Run the Django dev server (dashboard + API) at http://localhost:8000
+	DJANGO_DEBUG=true uv run --env-file .env python manage.py runserver 127.0.0.1:8000
+
+collectstatic: ## Collect static assets into staticfiles/ (needed when DEBUG=false)
+	uv run python manage.py collectstatic --noinput
 
 mlflow: ## Start the MLflow UI
 	uv run mlflow ui

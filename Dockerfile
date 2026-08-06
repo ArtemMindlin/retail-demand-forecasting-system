@@ -22,8 +22,13 @@ RUN uv pip install --system -e ".[ml,dev]"
 # Copy the rest of the project
 COPY . .
 
-# Expose ports for FastAPI (8000), MLflow (5000), and Streamlit (8501)
-EXPOSE 8000 5000 8501
+# Collect the dashboard's static assets into STATIC_ROOT so they can be served
+# with the hashed filenames ManifestStaticFilesStorage expects in production.
+RUN DJANGO_DEBUG=false DJANGO_SECRET_KEY=build-time-only \
+    python manage.py collectstatic --noinput
 
-# Start FastAPI with uvicorn, using PORT env var injected by Railway (default 8000 locally)
-CMD ["sh", "-c", "uvicorn retail_forecasting.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Expose ports for the dashboard (8000) and MLflow (5000)
+EXPOSE 8000 5000
+
+# Serve the Django app over ASGI. PORT is injected by the platform when present.
+CMD ["sh", "-c", "uvicorn retail_forecasting.api.asgi:application --host 0.0.0.0 --port ${PORT:-8000}"]
