@@ -72,9 +72,6 @@ memoria/figures/eda/*
 .claude/*
 !.claude/launch.json
 
-# Local working files (not part of the deliverable)
-node_modules/
-
 # Django collectstatic output
 staticfiles/
 
