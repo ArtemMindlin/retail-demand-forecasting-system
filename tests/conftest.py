@@ -1,7 +1,21 @@
 from __future__ import annotations
 
+import os
+
+import django
 import numpy as np
 import pandas as pd
+
+# Configure Django before any test imports a view or the ORM-free settings.
+# Values here are test-only: a throwaway password and non-secure cookies so the
+# test client can hold a session over plain HTTP.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "retail_forecasting.api.settings")
+os.environ.setdefault("DJANGO_DEBUG", "true")
+os.environ.setdefault("DJANGO_SECRET_KEY", "test-only-secret-key")
+os.environ.setdefault("AUTH_USERNAME", "test-operator")
+os.environ.setdefault("AUTH_PASSWORD", "test-password")
+os.environ.setdefault("COOKIE_SECURE", "false")
+django.setup()
 
 
 def make_synthetic_panel(num_series: int = 3, num_days: int = 70) -> pd.DataFrame:
