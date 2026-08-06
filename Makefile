@@ -2,6 +2,8 @@
 PYTHON = uv run python
 PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
+SIM_CONFIG = configs/simulation.yaml
+OPS_SPLIT = data/processed/ops_sim/eval.parquet
 .PHONY: help install run retrain score simulate backtest-fair-cost eda api dev collectstatic up test test-harness lint format clean pdf
 
 help: ## Show this help message
@@ -19,8 +21,13 @@ retrain: ## Retrain champion model on all available data
 score: ## Generate daily reorder recommendations (production mode)
 	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode score_daily
 
-simulate: ## Run operational simulation comparing retrain cadences
-	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode simulate_ops
+simulate: $(OPS_SPLIT) ## Run operational simulation comparing retrain cadences
+	$(PYTHON) -m retail_forecasting.run --config $(SIM_CONFIG) --run-mode simulate_ops
+
+# The OPS plane streams a dedicated train/eval split carved out of the prepared
+# panel. Built once, on demand: `simulate` depends on the file, not the script.
+$(OPS_SPLIT):
+	$(PYTHON) scripts/build_ops_sim_split.py --train-days 49 --n-series 100
 
 backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common ground truth (no training)
 	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode fair_cost_backtest

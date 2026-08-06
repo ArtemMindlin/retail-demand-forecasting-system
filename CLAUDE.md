@@ -11,6 +11,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 - `docs/`: system of record for architecture, contracts, invariants, and decisions.
 - `notebooks/`: lightweight exploration only. Production pipeline logic belongs in `src/`.
 - `reports/`: generated experiment outputs. Do not edit manually unless documenting a final result.
+- `scripts/build_ops_sim_split.py`: carves the dedicated train/eval split the OPS plane streams, into `data/processed/ops_sim/`. Invoked by `make simulate` when the split is missing; not something to run by hand.
 - `manage.py`: Django management entrypoint for the dashboard (`src/retail_forecasting/api/`).
 - `src/retail_forecasting/config.py`: typed settings loaded from YAML.
 - `src/retail_forecasting/data/`: raw dataset loading, raw-to-panel preparation, and `censorship.py` (`LatentDemandImputer` — stockout/censored-demand reconstruction strategies).
