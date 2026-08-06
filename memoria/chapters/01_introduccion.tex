@@ -34,9 +34,9 @@ Para alcanzar este objetivo general, se plantean los siguientes objetivos espec�
     \item \label{obj:conformal} \begin{sloppypar}Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con hiper-optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$) sobre el conjunto de test.\end{sloppypar}
     \item \label{obj:gemelo} Evaluar el rendimiento del sistema completo mediante un gemelo digital logístico (Simulación Dinámica de Inventario $s,S$) con restricciones globales vía Programación Lineal, cuantificando la reducción del coste logístico total y de las mermas por producto caducado frente a una política basada en predicción puntual, demostrando así su viabilidad como núcleo para un Plan de Prevención.
     \item \label{obj:mlops} Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software,
-    incluyendo seguimiento (MLflow), explicabilidad (SHAP), microservicio (FastAPI) y un
-    cuadro de mandos interactivo \textit{What-If} desarrollado en \textit{React}, soportado por \textit{Docker} e
-    Integración Continua (CI/CD).
+    incluyendo trazabilidad de experimentos mediante artefactos versionados, explicabilidad (SHAP),
+    una API operacional y un cuadro de mandos interactivo \textit{What-If} renderizado en servidor
+    (Django), soportado por \textit{Docker} e Integración Continua (CI/CD).
 \end{enumerate}
 
 \section{Alcance}
@@ -49,7 +49,7 @@ El presente trabajo se enmarca en el contexto de la previsión de demanda a cort
     \item Corrección del sesgo por demanda censurada (stockout) mediante técnicas de imputación supervisada.
     \item Cuantificación de la incertidumbre con garantías estadísticas formales (Mondrian Conformal Prediction) y optimización multi-objetivo de hiperparámetros.
     \item Simulación de inventario a nivel de tienda bajo una política de reposición dinámica Order-Up-To y resolución de conflictos mediante Programación Lineal.
-    \item Operativización del sistema mediante estándares MLOps (MLflow, FastAPI, CI/CD) y visualización interactiva.
+    \item Operativización del sistema mediante estándares MLOps (trazabilidad de ejecuciones, API operacional, CI/CD) y visualización interactiva.
 \end{itemize}
 
 \textbf{Fuera del alcance:}
@@ -73,7 +73,7 @@ Las aportaciones originales de este trabajo, diferenciadas del estado del arte r
 
     \item \textbf{Comparativa sistemática de estrategias de corrección de demanda censurada.} Se evalúan y comparan tres enfoques de imputación (escalado estático, media histórica local y modelo supervisor LightGBM) bajo el mismo protocolo de backtesting, cuantificando su efecto tanto en el error predictivo como en el coste logístico simulado.
 
-    \item \textbf{Arquitectura MLOps operativa sobre el problema.} Se diseña e implementa una arquitectura completa con seguimiento de experimentos (MLflow), microservicio de inferencia (FastAPI), explicabilidad automática (SHAP), cuadro de mandos \textit{What-If} (React) e integración continua (CI/CD), operativizando el sistema más allá del prototipo experimental.
+    \item \textbf{Arquitectura MLOps operativa sobre el problema.} Se diseña e implementa una arquitectura completa con trazabilidad de experimentos mediante artefactos versionados (\textit{hash} de configuración y \textit{commit} de Git por ejecución), API operacional de \textit{scoring}, explicabilidad automática (SHAP), cuadro de mandos \textit{What-If} renderizado en servidor e integración continua (CI/CD), operativizando el sistema más allá del prototipo experimental.
 \end{enumerate}
 
 \section{Estructura del Documento}

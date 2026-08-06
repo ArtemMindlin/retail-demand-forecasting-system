@@ -23,7 +23,7 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
     s5/.style={draw, rectangle, rounded corners=5pt,
                minimum width=8cm, minimum height=0.9cm, text width=7.8cm, fill=green!14},
     mlf/.style={draw, rectangle, rounded corners=4pt, dashed,
-                minimum width=2.4cm, minimum height=0.9cm, fill=gray!10},
+                minimum width=2.6cm, minimum height=0.9cm, fill=gray!10},
     lbl/.style={font=\sffamily\scriptsize\bfseries, gray!75},
     arr/.style={->, thick},
     darr/.style={->, thick, dashed, gray!60}
@@ -46,10 +46,10 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
     $\;\to\;$ LP Optimizer (Knapsack)};
 
   \node[s5] (reco)   at (0,-6.2)  {\texttt{reorder\_recommendations.csv}
-    $\;\to\;$ FastAPI\,/\,Dashboard};
+    $\;\to\;$ Dashboard Django};
 
-  %% ── MLflow lateral ──────────────────────────────────────────────
-  \node[mlf] (mlflow) at (7.8,-3.2) {MLflow\\Tracking};
+  %% ── Registro de ejecuciones lateral ─────────────────────────────
+  \node[mlf] (mlflow) at (7.8,-3.2) {\texttt{reports/}\\Registro de\\ejecuciones};
 
   %% ── ETIQUETAS DE CAPA ──────────────────────────────────────────
   \node[lbl, left=0.15cm of datos] {Datos};
@@ -63,14 +63,14 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
   \draw[arr] (model.south) -- (dec.north);
   \draw[arr] (dec.south)   -- (reco.north);
 
-  %% ── MLflow ──────────────────────────────────────────────────────
+  %% ── Registro de ejecuciones ─────────────────────────────────────
   \draw[darr] (model.east) -- (mlflow.west);
   \draw[darr] (dec.east)   to[out=0,in=-90] (mlflow.south);
 
 \end{tikzpicture}%
 }
 \shorthandon{>}%
-\caption{Arquitectura del sistema: flujo de datos y decisiones entre las cuatro capas funcionales (Datos, Features, Modelado y Decisión) con integración de MLflow para trazabilidad.}
+\caption{Arquitectura del sistema: flujo de datos y decisiones entre las cuatro capas funcionales (Datos, Features, Modelado y Decisión), con persistencia de cada ejecución en un directorio versionado bajo \texttt{reports/} para trazabilidad.}
 \label{fig:arquitectura_sistema}
 \end{figure}
 
@@ -97,12 +97,12 @@ La Tabla~\ref{tab:tech_stack} resume las herramientas principales del sistema. C
         Modelado probabilístico & CatBoost, LightGBM & XGBoost, scikit-learn \\
         Optimización multi-objetivo & Optuna (NSGA-II) & Hyperopt, GridSearch \\
         Optimización lineal & SciPy HiGHS & PuLP, CVXPY \\
-        Experiment tracking & MLflow & Weights \& Biases, Neptune \\
-        Microservicio de inferencia & FastAPI & Flask, Django REST \\
+        Trazabilidad de experimentos & Artefactos versionados en disco & MLflow, Weights \& Biases \\
+        Capa web y API operacional & Django & FastAPI, Flask \\
         Contenerización & Docker + Compose & Entornos virtuales \\
         Validación de contratos & Pydantic v2 & dataclasses, marshmallow \\
         Explicabilidad & SHAP & LIME, eli5 \\
-        Dashboard interactivo & React & Streamlit, Dash \\
+        Dashboard interactivo & Plantillas Django + htmx & React, Streamlit, Dash \\
         CI/CD & GitHub Actions & Jenkins, GitLab CI \\
         \bottomrule
     \end{tabular}
@@ -117,13 +117,13 @@ Las decisiones más relevantes se justifican a continuación:
 
     \item \begin{sloppypar}\textbf{Optuna sobre Hyperopt o GridSearch}: Optuna implementa el sampler TPE (\textit{Tree-structured Parzen Estimator}) con soporte nativo para optimización multi\-objetivo (NSGA-II), \textit{pruning} de trials poco prometedores y paralelización. GridSearch es inviable a escala (espacio de hiperparámetros continuo) e Hyperopt no soporta nativamente Pareto multi\-objetivo sin extensiones.\end{sloppypar}
 
-    \item \textbf{FastAPI sobre Flask}: FastAPI genera documentación OpenAPI automática, soporta tipado estático con Pydantic y es asíncrono de forma nativa (ASGI), lo que reduce la latencia bajo carga concurrente, relevante cuando el dashboard realiza múltiples recálculos en paralelo. Flask es síncrono por defecto y requiere extensiones para alcanzar el mismo nivel de robustez.
+    \item \textbf{Django sobre FastAPI o Flask}: el sistema no tiene base de datos ni servicio en línea: el estado son los artefactos que cada ejecución escribe en \texttt{reports/}, y la interfaz es un cuadro de mandos que los lee. Con ese perfil, lo que se necesita de un \textit{framework} no es asincronía sino un motor de plantillas, enrutado, sesiones y protección CSRF de serie. Django los aporta sin dependencias adicionales; FastAPI resolvía bien la superficie JSON pero obligaba a construir la capa de presentación aparte, que fue exactamente el origen de la interfaz monolítica descrita más abajo. El ORM y el sistema de migraciones quedan deliberadamente sin usar (\texttt{DATABASES} vacío), de modo que un acceso accidental a base de datos falla de forma explícita en lugar de crear un almacén silencioso.
 
     \item \textbf{Pydantic v2 sobre dataclasses}: Pydantic valida y convierte tipos en tiempo de ejecución, no solo en tiempo de análisis estático. Esto permite rechazar configuraciones incoherentes (ej. un horizonte negativo o una ruta de modelo inexistente) antes de que lleguen al pipeline, convirtiendo los errores tardíos en fallos rápidos y auditables.
 
     \item \textbf{Docker sobre entornos virtuales}: Un entorno virtual resuelve las dependencias Python pero no fija el sistema operativo, las librerías del sistema ni la versión de CUDA. Docker garantiza que el entorno de entrenamiento y el de inferencia son bitwise idénticos, eliminando la clase entera de bugs ``funciona en mi máquina''.
 
-    \item \textbf{React sobre Streamlit o Dash}: Streamlit y Dash son adecuados para prototipos, pero reconstruyen toda la página ante cada interacción del usuario. El dashboard \textit{What-If} requiere recalcular la simulación de inventario en tiempo real mientras el usuario ajusta los sliders de coste, lo que demanda actualizaciones de estado parciales (virtual DOM de React) para mantener la latencia por debajo de 200ms.
+    \item \textbf{Renderizado en servidor sobre una \textit{Single Page Application}}: el argumento habitual para React ---actualizaciones parciales de estado--- no aplica aquí, porque el cliente no calculaba nada: cada movimiento de un \textit{slider} ya provocaba una llamada a la API y el servidor devolvía los números. El navegador era una capa de presentación sobre resultados ajenos. Sustituirlo por plantillas Django con htmx conserva esa actualización parcial (se intercambia solo la región de contenido) y elimina la transpilación en el navegador. La consecuencia de diseño más útil es que los parámetros del escenario pasan a vivir en la \textit{query string}: cualquier configuración del simulador es una URL compartible y recargable, algo imposible cuando el estado residía en componentes. Streamlit y Dash, que reconstruyen la página entera en cada interacción, siguen descartados por el mismo motivo que antes.
 \end{itemize}
 
 \section{Pipeline de Datos: De la Ingesta al Frame Supervisado}
@@ -300,68 +300,81 @@ solo reemplaza al modelo actual si supera simultáneamente el umbral de mejora d
 \label{fig:champion_promotion}
 \end{figure}
 
-\subsection{Seguimiento de Experimentos con MLflow}
-\label{sec:mlflow_tracking}
+\subsection{Trazabilidad de Experimentos}
+\label{sec:experiment_tracking}
 
-Cada ejecución en modo \texttt{experiment} registra automáticamente un \textit{run} en el servidor MLflow mediante el módulo \texttt{evaluation/mlflow\_logger.py}. Se almacenan tres categorías de información:
+Cada ejecución escribe un directorio propio bajo \texttt{reports/}, identificado por marca temporal, que constituye el registro completo y autocontenido del experimento. Se persisten cuatro categorías de información:
 
 \begin{itemize}
-    \item \textbf{Parámetros}: Todos los campos de \texttt{Settings} se aplastan a pares clave-valor y se registran como parámetros del \textit{run} (ej. \texttt{dataset\_}\allowbreak\texttt{horizon=7}, \texttt{validation\_}\allowbreak\texttt{n\_}\allowbreak\texttt{folds=3}, \texttt{model\_}\allowbreak\texttt{quantiles=}\allowbreak\texttt{[0.1,\,0.5,\,0.9]}).
-    \item \textbf{Métricas del campeón}: \begin{sloppypar}Coste de inventario simulado (\texttt{champion\_}\allowbreak\texttt{sim\_}\allowbreak\texttt{total\_}\allowbreak\texttt{cost}), nivel de servicio simulado (\texttt{champion\_}\allowbreak\texttt{sim\_}\allowbreak\texttt{service\_}\allowbreak\texttt{level}), Winkler Score (\texttt{champion\_}\allowbreak\texttt{winkler\_}\allowbreak\texttt{score}), cobertura condicional (\texttt{champion\_}\allowbreak\texttt{interval\_}\allowbreak\texttt{coverage}) y MAE (\texttt{champion\_}\allowbreak\texttt{mae}).\end{sloppypar}
-    \item \textbf{Artefactos}: Todo el directorio de la ejecución se adjunta bajo la ruta \texttt{run\_\allowbreak{}outputs/} del \textit{run}: \texttt{predictions.csv}, \texttt{cost\_\allowbreak{}summary.csv}, \texttt{report.md} y los gráficos de Pareto. Esto permite reproducir cualquier experimento histórico desde el servidor MLflow.
+    \item \textbf{Configuración y procedencia}: \texttt{backtest\_}\allowbreak\texttt{metadata.json} recoge el dataset, las \textit{features}, la definición de los \textit{folds}, los modelos evaluados, el \textit{hash} de la configuración y el \textit{commit} de Git con el que se generó. Esos dos últimos campos son los que permiten reconstruir el experimento exacto: el \textit{hash} identifica los parámetros y el \textit{commit} el código.
+    \item \textbf{Métricas}: \texttt{metrics\_}\allowbreak\texttt{summary.csv} y \texttt{cost\_}\allowbreak\texttt{summary.csv} contienen, por modelo y estrategia de datos, el coste de inventario simulado, el nivel de servicio, el Winkler Score, la cobertura condicional y el MAE.
+    \item \textbf{Predicciones y decisiones}: \texttt{predictions.csv} conserva la predicción puntual, los cuantiles calibrados y la cantidad de pedido para cada par serie-fecha de validación, de modo que cualquier métrica publicada es recomputable a posteriori sin volver a entrenar.
+    \item \textbf{Campeón vigente}: \texttt{champion\_}\allowbreak\texttt{registry.json} persiste entre ejecuciones qué modelo está operativo y bajo qué métricas fue promocionado, cerrando el ciclo con la \textit{promotion logic} de la Figura~\ref{fig:champion_promotion}.
 \end{itemize}
+
+Una versión anterior del sistema replicaba esta información en un servidor MLflow. Se retiró al constatar que era una segunda copia de datos que ya vivían en disco y que ninguna herramienta consumía: el cuadro de mandos lee los artefactos directamente. La trazabilidad efectiva la aportan el \textit{hash} de configuración y el \textit{commit} de Git, no el servidor; prescindir de él elimina una dependencia pesada y un contenedor sin reducir lo que puede auditarse.
 
 \section{API REST e Interfaz Web}
 \label{sec:api}
 
-El sistema expone un microservicio FastAPI que actúa como capa de acceso unificada para clientes externos (dashboard, sistemas de compras, scripts de automatización). Todos los modelos de datos de entrada y salida están tipados con Pydantic v2, lo que genera automáticamente documentación OpenAPI interactiva en \texttt{/docs}.
+La capa web es una aplicación Django que cumple dos funciones separadas: renderiza el cuadro de mandos en servidor y expone una superficie JSON reducida para clientes máquina (sistemas de compras, \textit{scripts} de automatización). La separación es estricta: la lógica de dominio vive en \texttt{api/services/}, que no importa Django y opera sobre \textit{DataFrames}, mientras que las vistas se limitan a leer parámetros, invocar un servicio y renderizar. Esa frontera es la que permite verificar el cálculo conforme o la cantidad Newsvendor sin instanciar un cliente web.
 
-\subsection{Endpoints Principales}
+El sistema no emplea base de datos: el estado son los artefactos en disco, y la única información propia de la capa web es la sesión del operador, transportada en una \textit{cookie} firmada.
 
-La Tabla~\ref{tab:api_endpoints} describe los endpoints operacionales del servicio.
+\subsection{Superficie JSON}
+
+Durante la migración a renderizado en servidor, los \textit{endpoints} que existían únicamente para alimentar al cliente JavaScript fueron sustituidos por vistas HTML. Se conservó el subconjunto que constituye una interfaz máquina-a-máquina real, descrito en la Tabla~\ref{tab:api_endpoints} y documentado en la propia aplicación bajo la ruta \texttt{/api/}.
 
 \begin{table}[htbp]
     \centering
     \small
-    \begin{tabular}{l>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{6.5cm}}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{6.5cm}}
         \toprule
         \textbf{Método + Ruta} & \textbf{Nombre} & \textbf{Descripción} \\
         \midrule
-        \texttt{POST /predict\_orders} & Scoring operacional & Ejecuta el modo \texttt{score\_daily} y devuelve \texttt{reorder\_recommendations}: una fila por par tienda-producto con \texttt{order\_quantity}, cuantiles calibrados y fecha de decisión. \\
-        \texttt{POST /api/run} & Ejecución asíncrona & Lanza el pipeline completo en un subproceso en segundo plano. Devuelve inmediatamente una respuesta de aceptación; el progreso y los logs de ejecución son consultables vía \texttt{GET /api/run/status}. \\
-        \texttt{POST /api/forecast} & Simulador \textit{What-If} & Recalcula en tiempo real los cuantiles conformes empíricos y la cantidad óptima $q^*$ del Newsvendor dado un conjunto de parámetros (\texttt{serviceLevel}, \texttt{shortageCost}, \texttt{holdingCost}, \texttt{capacity}) y un \texttt{selectedSkuId}. \\
+        \texttt{POST /predict\_\allowbreak orders} & Scoring operacional & Ejecuta el modo \texttt{score\_daily} y devuelve \texttt{reorder\_recommendations}: una fila por par tienda-producto con \texttt{order\_quantity}, cuantiles calibrados y fecha de decisión. \\
+        \texttt{POST /api/forecast} & Simulador \textit{What-If} & Recalcula los cuantiles conformes empíricos y la cantidad óptima $q^*$ del Newsvendor dado un conjunto de parámetros (\texttt{serviceLevel}, \texttt{shortageCost}, \texttt{holdingCost}, \texttt{capacity}) y un \texttt{selectedSkuId}. \\
         \texttt{GET /api/skus} & Catálogo de SKUs & Devuelve hasta 50 SKUs con métricas calculadas sobre las predicciones del último run: cobertura empírica, PSI de drift, $q^*$ y estado operacional (\textit{ok}/\textit{drift}/\textit{shortage}/\textit{overstock}). \\
-        \texttt{GET /api/drift} & Monitor de drift & Devuelve el PSI (\textit{Population Stability Index}) de las siete features de mayor importancia SHAP, calculado comparando la distribución de la ventana de entrenamiento (mitad antigua) con la reciente, junto con ambos histogramas pre/post para diagnóstico visual. \\
-        \texttt{GET /api/alerts} & Alertas operacionales & Extrae las filas marcadas en \texttt{exceptions.csv} del último run y las serializa como alertas con severidad (\textit{critical}/\textit{warning}), descripción y endpoint de acción sugerida. \\
-        \texttt{GET /health} & Sonda de disponibilidad & Devuelve estado del servicio, versión, \textit{uptime} y si las predicciones están cargadas en caché; pensada para integrarse con herramientas de monitorización externas. \\
+        \texttt{GET /api/\allowbreak download/\allowbreak predictions} & Descarga de predicciones & Sirve el \texttt{predictions.csv} de la ejecución más reciente, para análisis externo o auditoría. \\
+        \texttt{GET /api/\allowbreak download/costs} & Descarga de costes & Sirve el resumen de costes de la ejecución más reciente. \\
+        \texttt{GET /health} & Sonda de disponibilidad & Devuelve estado del servicio, versión, \textit{uptime} y si las predicciones están cargadas en caché; pensada para integrarse con herramientas de monitorización externas. Es el único endpoint público: el resto exige sesión. \\
         \bottomrule
     \end{tabular}
-    \caption{Endpoints del microservicio FastAPI del sistema de previsión de demanda.}
+    \caption{Superficie JSON documentada del sistema. El monitor de drift y las alertas, que antes eran \textit{endpoints}, se sirven ahora como vistas HTML renderizadas en servidor.}
     \label{tab:api_endpoints}
 \end{table}
 
-\subsection{Dashboard Interactivo}
+\subsection{Cuadro de Mandos}
 
-El endpoint raíz \texttt{GET /} sirve un dashboard React de página única (\textit{Single Page Application}) embebido en el propio servidor FastAPI. El Apéndice~\ref{anexo:dashboard} recoge capturas de pantalla del sistema desplegado en producción. El dashboard está organizado en cuatro paneles funcionales:
+El cuadro de mandos se organiza en dos planos que reproducen la separación del propio sistema entre operación e investigación. El Apéndice~\ref{anexo:dashboard} recoge capturas de las siete vistas.
+
+El \textbf{plano de Operación} responde a las dos preguntas del ciclo diario: cuánto pedir de cada SKU y qué excepciones revisar antes de aprobar el plan.
 
 \begin{itemize}
-    \item \textbf{Panel de Pronóstico y Simulador \textit{What-If}}: Muestra la serie temporal de predicciones vs. demanda real del SKU seleccionado, con los intervalos conformes superpuestos. El usuario puede ajustar mediante \textit{sliders} el nivel de servicio objetivo, los costes de rotura y sobrestock, y la capacidad del almacén; el endpoint \texttt{POST /api/forecast} recalcula en tiempo real la cantidad óptima $q^*$ y los KPIs de inventario (coste total, cobertura empírica, MAE, PSI de drift).
+    \item \textbf{Simulación OPS}: reproducción semana a semana del \textit{backtest} \textit{walk-forward}, con la trayectoria de una serie ---predicción, banda conformal y demanda revelada--- y la comparación entre cadencias de reentrenamiento.
 
-    \item \textbf{Panel de Catálogo de SKUs}: Vista tabular de los 50 SKUs más activos con su estado operacional codificado en color, la tendencia de demanda de los últimos 14 días y las métricas clave. Permite seleccionar un SKU para actualizar el panel de pronóstico.
+    \item \textbf{Dashboard}: los cuatro KPIs principales (coste de inventario, cobertura empírica, MAE y PSI de \textit{drift}), el gráfico de demanda real frente a predicha con la banda conformal, y los módulos matemáticos que documentan las tres formulaciones del sistema (\textit{Conformal Prediction}, Newsvendor y optimización de capacidad).
 
-    \item \textbf{Panel de Drift}: Gráfico de barras con el PSI de cada feature de importancia, calculado por el módulo \texttt{drift/psi.py} y persistido como \texttt{drift\_report.json} al término de cada \texttt{experiment}. Se marca en naranja (PSI $> 0{,}10$) y rojo (PSI $> 0{,}20$) las features que han sufrido cambios distribucionales significativos desde el entrenamiento.
+    \item \textbf{Análisis SKU}: tabla de los SKUs activos con búsqueda, filtro por estado y ordenación, donde el gestor puede ajustar manualmente la cantidad propuesta antes de exportar el plan de reposición.
 
-    \item \textbf{Panel de Alertas}: Lista priorizada de alertas operacionales con enlace directo al endpoint de acción sugerida (reoptimización, reentrenamiento o revisión manual), extraídas del fichero \texttt{exceptions.csv} del último run.
+    \item \textbf{Monitor de Drift}: PSI por \textit{feature} con los histogramas de referencia y actual superpuestos, calculado por \texttt{drift/psi.py} y persistido como \texttt{drift\_report.json} al término de cada \texttt{experiment}.
 \end{itemize}
+
+El \textbf{plano de Análisis} sirve a la justificación metodológica: la vista de \textbf{EDA} publica las figuras del módulo exploratorio; \textbf{Demanda Latente} contrasta las tres estrategias de reconstrucción de censura con su veredicto de calidad; y \textbf{Pareto Tuning} muestra el frente multiobjetivo, la sensibilidad al ratio de costes y el \textit{backtest} de coste justo.
+
+Transversal a ambos planos, el simulador \textit{What-If} permite ajustar mediante \textit{sliders} el nivel de servicio objetivo, los costes de rotura y almacenamiento y la capacidad; el servidor recalcula la política y devuelve la región de contenido actualizada. Como esos parámetros viajan en la \textit{query string}, cualquier escenario explorado queda registrado en la URL y puede compartirse o reproducirse.
+
+Dos decisiones de implementación merecen mención por su efecto en la defensa del sistema. La primera es que \textbf{todos los gráficos se generan como SVG en el servidor}: la geometría se calcula en Python y se envía como marcado, sin librería de graficación en el cliente. La segunda es que \textbf{la ausencia de un artefacto se comunica explícitamente}: una ejecución sin \texttt{drift\_report.json} muestra un aviso que nombra el modo de ejecución que lo produce, en lugar de un panel vacío que podría confundirse con ``sin deriva detectada''.
 
 \section{Calidad de Software e Infraestructura CI/CD}
 Para garantizar que la deuda técnica no limite el escalado del sistema, se han aplicado prácticas fundamentales de \textit{DevOps}:
 \begin{itemize}
     \item \textbf{Contratos Estrictos (Pydantic)}: Toda la configuración y los metadatos transitan a través de esquemas validados y tipados estáticamente, rechazando configuraciones incoherentes o derivas de datos no controladas.
-    \item \textbf{Contenerización (Docker)}: La API (que sirve el microservicio FastAPI y
-    la interfaz React integrada), el servidor MLflow y un proxy inverso Caddy están orquestados
-    conjuntamente mediante \texttt{docker-compose.yml}, garantizando que cualquier investigador
-    pueda levantar la arquitectura completa con un solo comando en cualquier sistema operativo.
+    \item \textbf{Contenerización (Docker)}: La aplicación Django, que sirve tanto el cuadro
+    de mandos como la superficie JSON, se despliega sobre un servidor ASGI y se orquesta junto
+    a un proxy inverso Caddy mediante \texttt{docker-compose.yml}, garantizando que cualquier
+    investigador pueda levantar la arquitectura completa con un solo comando en cualquier
+    sistema operativo.
     \item \textbf{Integración Continua (GitHub Actions)}: El repositorio cuenta con un pipeline de CI (\texttt{ci.yml}) que, ante cada nuevo \textit{commit}, despliega un entorno virgen, verifica el estilo y el formato del código (Ruff), comprueba los tipos estáticos (Mypy) y ejecuta la batería de tests automatizados descritos en la sección siguiente.
 \end{itemize}
 
@@ -381,7 +394,7 @@ El sistema cuenta con 20 módulos de test organizados en cinco niveles, cada uno
         Anti-\textit{data leakage} & Que ninguna feature contiene información del periodo de predicción. \\
         Contratos de configuración & Que los guardarraíles experimentales se preservan ante cambios de config; correctitud aritmética de Pinball Loss por cuantil. \\
         Unitarios de lógica & Correctitud aritmética de lags, Winkler Score y Newsvendor. \\
-        Integración y humo & Pipeline end-to-end sobre datos sintéticos, endpoints FastAPI y CI/CD. \\
+        Integración y humo & Pipeline end-to-end sobre datos sintéticos, vistas y \textit{endpoints} de la capa web, y CI/CD. \\
         \bottomrule
     \end{tabular}
     \caption{Estrategia de testing por niveles: 20 módulos clasificados por tipo de fallo.}
