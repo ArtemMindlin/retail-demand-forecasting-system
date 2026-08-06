@@ -5,12 +5,12 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOC_PATHS = [
-    REPO_ROOT / "AGENTS.md",
+    REPO_ROOT / "CLAUDE.md",
     REPO_ROOT / "README.md",
     *sorted((REPO_ROOT / "docs").rglob("*.md")),
 ]
 LOCAL_PATH_PREFIXES = (
-    "AGENTS.md",
+    "CLAUDE.md",
     "README.md",
     "configs/",
     "docs/",
@@ -66,6 +66,10 @@ def _is_local_project_reference(reference: str) -> bool:
     if "<" in reference or ">" in reference:
         return False
     if "YYYY" in reference or "short-kebab-case-title" in reference:
+        return False
+    # Glob patterns describe a family of files (tests/test_*_contract.py), not a
+    # single path that must exist on disk.
+    if any(char in reference for char in "*?[") and "]" not in reference:
         return False
     if "://" in reference or reference.startswith("/"):
         return False
