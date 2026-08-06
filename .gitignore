@@ -30,7 +30,6 @@ htmlcov/
 # Deploy-target-local overrides. These match nothing on a dev machine by
 # design — they exist only on the VPS, where the infra is machine-specific.
 docker-compose.override.yml
-caddy-conf.d/*.caddy
 
 # Django. No database today (sessions are signed cookies), but these are cheap
 # insurance if that ever changes.
@@ -78,6 +77,4 @@ mlflow.db
 !.claude/launch.json
 
 # Local working files (not part of the deliverable)
-.agents/
 node_modules/
-memoria/AUDITORIA_TFG.md

@@ -1,23 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. Caddy — reverse proxy + automatic HTTPS
-  caddy:
-    image: caddy:2-alpine
-    container_name: retail_forecasting_caddy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./caddy-conf.d:/etc/caddy/conf.d:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - api
-    restart: unless-stopped
-
-  # 2. FastAPI Model Serving
+  # 1. FastAPI Model Serving
   api:
     build: .
     container_name: retail_forecasting_api
@@ -47,7 +31,3 @@ services:
       - ./mlruns:/app/mlruns
       - ./mlflow.db:/app/mlflow.db
     restart: unless-stopped
-
-volumes:
-  caddy_data:
-  caddy_config:
