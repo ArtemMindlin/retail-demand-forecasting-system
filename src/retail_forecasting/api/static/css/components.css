@@ -671,8 +671,12 @@
 .academic-formula {
   padding: 10px 12px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border);
   border-radius: 8px; color: var(--text-2); margin: 10px 0 12px; overflow-x: auto;
-  display: flex; justify-content: center;
+  /* Centring a formula wider than the card clips BOTH ends, which reads as a
+     rendering bug. Align left so the overflow is one-sided and scrollable. */
+  display: flex; justify-content: flex-start;
 }
+.academic-formula .katex { font-size: 0.8em; }
+.academic-formula .katex-display { margin: 0; }
 .academic-short { font-size: 12.5px; color: var(--text-2); line-height: 1.55; }
 .academic-foot {
   margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);

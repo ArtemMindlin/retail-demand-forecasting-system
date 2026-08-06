@@ -16,14 +16,29 @@ from retail_forecasting.api.store import get_store
 
 logger = logging.getLogger(__name__)
 
-# Dataset-summary keys worth surfacing as headline stats, in display order.
+
+# Headline stats surfaced from dataset_summary.csv, in display order. The keys
+# are the column names the EDA module writes; each entry carries an optional
+# formatter so counts, rates and dates each read naturally.
+def _thousands(value: Any) -> str:
+    return f"{float(value):,.0f}".replace(",", ".")
+
+
+def _percent(value: Any) -> str:
+    return f"{float(value) * 100:.1f}".replace(".", ",") + " %"
+
+
+def _plain(value: Any) -> str:
+    return str(value)
+
+
 _SUMMARY_FIELDS = (
-    ("n_series", "Series"),
-    ("n_observations", "Observaciones"),
-    ("n_stores", "Tiendas"),
-    ("n_products", "Productos"),
-    ("date_min", "Desde"),
-    ("date_max", "Hasta"),
+    ("unique_series", "Series únicas", _thousands),
+    ("rows", "Observaciones", _thousands),
+    ("stockout_day_rate", "Tasa de stockout", _percent),
+    ("zero_demand_rate", "Demanda cero", _percent),
+    ("date_min", "Desde", _plain),
+    ("date_max", "Hasta", _plain),
 )
 
 
@@ -39,8 +54,8 @@ def eda(request: HttpRequest) -> HttpResponse:
 
     summary = eda_service.dataset_summary(eda_path)
     stats = [
-        {"label": label, "value": summary[key]}
-        for key, label in _SUMMARY_FIELDS
+        {"label": label, "value": fmt(summary[key])}
+        for key, label, fmt in _SUMMARY_FIELDS
         if summary.get(key) is not None
     ]
 
