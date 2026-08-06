@@ -439,9 +439,11 @@ intercambiables, es decir, que su distribución conjunta es invariante a permuta
 propiedad no se cumple en series temporales con dependencia temporal o no-estacionariedad: los
 residuos de calibración (últimos días del split de entrenamiento) pueden no ser representativos
 del comportamiento del periodo de evaluación. Las implicaciones empíricas de esta limitación
-se discuten en la Sección~\ref{sec:resultados_conformal}; algoritmos que relajan este supuesto
-(como EnbPI \cite{xu2021conformal} o ACI \cite{gibbs2021adaptive}) quedan como línea de
-trabajo futuro.
+se discuten en la Sección~\ref{sec:resultados_conformal}. Conviene precisar que el incumplimiento
+del supuesto no anula la garantía sino que la degrada de forma acotada en función de la magnitud de
+la desviación \cite{barber2023beyond}; los algoritmos que lo relajan explícitamente
+(como EnbPI \cite{xu2021conformal} o ACI \cite{gibbs2021adaptive}, comparados empíricamente sobre
+series de demanda por Zaffran et al.\ \cite{zaffran2022adaptive}) quedan como línea de trabajo futuro.
 
 \subsubsection{Métricas de Evaluación de Intervalos de Confianza}
 Para evaluar la calidad de los intervalos de confianza generados por la capa conformal,
@@ -477,13 +479,17 @@ se emplean dos métricas complementarias al Winkler Score (definido en la Secci�
 
 La evaluación de modelos de series temporales requiere respetar el orden cronológico de los datos. La validación cruzada estándar (\textit{k-fold}) mezclaría observaciones futuras con pasadas, introduciendo \textit{data leakage} y produciendo estimaciones de rendimiento optimistas e irreales.
 
-El sistema implementa un \textbf{backtesting walk-forward} con $K=3$ folds temporales. En cada fold, el modelo se entrena exclusivamente sobre datos anteriores a una fecha de corte $t_k$ y se evalúa sobre el horizonte inmediatamente posterior:
+El sistema implementa un \textbf{backtesting walk-forward} con $K=3$ folds temporales. En cada fold, el modelo se entrena sobre datos anteriores a una fecha de corte $t_k$ y se evalúa sobre el horizonte inmediatamente posterior. Entre ambos conjuntos se interpone un \textbf{intervalo de guarda} (\textit{gap}) de exactamente $H$ días:
 
 \begin{equation}
-    \text{Fold}_k: \quad \text{Train} = \{t < t_k\}, \quad \text{Test} = \{t_k \leq t < t_k + H\}
+    \text{Fold}_k: \quad \text{Train} = \{t \leq t_k - H\}, \quad
+    \underbrace{\{t_k - H < t < t_k\}}_{\text{gap}}, \quad
+    \text{Test} = \{t_k \leq t < t_k + H\}
 \end{equation}
 
-donde $H = 7$ días es el horizonte de planificación. El sistema utiliza una estrategia de \textbf{ventana de entrenamiento expansiva} (expanding window), donde todos los folds comienzan al inicio del histórico y su fecha de finalización se desplaza progresivamente. La calibración conformal descrita en la sección anterior se realiza sobre una ventana fija correspondiente a los últimos $21$ días de cada conjunto de entrenamiento, la cual actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el ajuste del modelo base. La Figura~\ref{fig:backtesting_walkforward} ilustra la estructura de los tres folds.
+donde $H = 7$ días es el horizonte de planificación. El \textit{gap} no es un detalle de implementación, sino una condición necesaria de este diseño: dado que la etiqueta $Y_{s,t}$ es la demanda \emph{acumulada} de los $H$ días siguientes a $t$ (Sección~\ref{sec:pinball}), un origen de predicción situado a menos de $H$ días del corte tendría su etiqueta parcialmente solapada con el periodo de test. Al retroceder la última fecha de entrenamiento en $H$ días se garantiza que ninguna etiqueta de entrenamiento contiene información del periodo evaluado. Esta invariante se verifica automáticamente en la batería de tests anti-\textit{data leakage} descrita en la Sección~\ref{sec:testing}.
+
+El sistema utiliza una estrategia de \textbf{ventana de entrenamiento expansiva} (expanding window), donde todos los folds comienzan al inicio del histórico y su fecha de finalización se desplaza progresivamente. La calibración conformal descrita en la sección anterior se realiza sobre una ventana fija correspondiente a los últimos $21$ días de cada conjunto de entrenamiento (por tanto, anteriores al \textit{gap}), la cual actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el ajuste del modelo base. La Figura~\ref{fig:backtesting_walkforward} ilustra la estructura de los tres folds.
 
 \begin{figure}[H]
 \centering
@@ -491,6 +497,7 @@ donde $H = 7$ días es el horizonte de planificación. El sistema utiliza una es
 \begin{tikzpicture}[xscale=0.97, yscale=1.0,
     train/.style={fill=blue!40, draw=blue!60, minimum height=0.48cm},
     calib/.style={fill=violet!35, draw=violet!60, minimum height=0.48cm},
+    gap/.style={fill=gray!18, draw=gray!55, minimum height=0.48cm},
     test/.style={fill=orange!55, draw=orange!70, minimum height=0.48cm},
     fold/.style={font=\sffamily\scriptsize, anchor=east}]
   % Time axis
@@ -502,29 +509,36 @@ donde $H = 7$ días es el horizonte de planificación. El sistema utiliza una es
   }
   % Fold 1
   \node[fold] at (-0.1,2.9) {Fold 1};
-  \node[train, minimum width=2.0cm, anchor=west] at (0.0,2.65) {};
-  \node[calib, minimum width=0.5cm, anchor=west] at (2.0,2.65) {};
+  \node[train, minimum width=1.7cm, anchor=west] at (0.0,2.65) {};
+  \node[calib, minimum width=0.5cm, anchor=west] at (1.7,2.65) {};
+  \node[gap,   minimum width=0.3cm, anchor=west] at (2.2,2.65) {};
   \node[test,  minimum width=0.9cm, anchor=west] at (2.5,2.65) {};
   % Fold 2
   \node[fold] at (-0.1,2.0) {Fold 2};
-  \node[train, minimum width=4.5cm, anchor=west] at (0.0,1.75) {};
-  \node[calib, minimum width=0.5cm, anchor=west] at (4.5,1.75) {};
+  \node[train, minimum width=4.2cm, anchor=west] at (0.0,1.75) {};
+  \node[calib, minimum width=0.5cm, anchor=west] at (4.2,1.75) {};
+  \node[gap,   minimum width=0.3cm, anchor=west] at (4.7,1.75) {};
   \node[test,  minimum width=0.9cm, anchor=west] at (5.0,1.75) {};
   % Fold 3
   \node[fold] at (-0.1,1.1) {Fold 3};
-  \node[train, minimum width=7.0cm, anchor=west] at (0.0,0.85) {};
-  \node[calib, minimum width=0.5cm, anchor=west] at (7.0,0.85) {};
+  \node[train, minimum width=6.7cm, anchor=west] at (0.0,0.85) {};
+  \node[calib, minimum width=0.5cm, anchor=west] at (6.7,0.85) {};
+  \node[gap,   minimum width=0.3cm, anchor=west] at (7.2,0.85) {};
   \node[test,  minimum width=0.9cm, anchor=west] at (7.5,0.85) {};
-  % Legend
-  \fill[blue!40]   (0.0,3.55) rectangle (0.55,3.85); \node[right,font=\sffamily\scriptsize] at (0.6,3.70) {Entrenamiento};
-  \fill[violet!35] (3.3,3.55) rectangle (3.85,3.85); \node[right,font=\sffamily\scriptsize] at (3.9,3.70) {Calibración conformal};
-  \fill[orange!55] (7.0,3.55) rectangle (7.55,3.85); \node[right,font=\sffamily\scriptsize] at (7.6,3.70) {Test ($H=7$d)};
+  % Legend (two rows)
+  \fill[blue!40]   (0.0,3.95) rectangle (0.55,4.25); \node[right,font=\sffamily\scriptsize] at (0.6,4.10) {Entrenamiento};
+  \fill[violet!35] (3.3,3.95) rectangle (3.85,4.25); \node[right,font=\sffamily\scriptsize] at (3.9,4.10) {Calibración conformal};
+  \fill[gray!18]   (0.0,3.50) rectangle (0.55,3.80); \draw[gray!55] (0.0,3.50) rectangle (0.55,3.80);
+  \node[right,font=\sffamily\scriptsize] at (0.6,3.65) {Gap ($H=7$d)};
+  \fill[orange!55] (3.3,3.50) rectangle (3.85,3.80); \node[right,font=\sffamily\scriptsize] at (3.9,3.65) {Test ($H=7$d)};
 \end{tikzpicture}
 \shorthandon{>}%
 \caption{Esquema del \textit{backtesting walk-forward} con $K=3$ folds temporales. El conjunto
 de entrenamiento (azul) se expande progresivamente con cada fold; los últimos 21 días de cada ventana
-de entrenamiento se reservan como calibración conformal (violeta); la evaluación se realiza sobre
-los 7 días siguientes al corte (naranja).}
+de entrenamiento se reservan como calibración conformal (violeta); un intervalo de guarda de $H$ días
+(gris) separa el entrenamiento del test para impedir que la etiqueta acumulada del último origen de
+predicción solape con el periodo evaluado; la evaluación se realiza sobre los 7 días siguientes al
+corte $t_k$ (naranja).}
 \label{fig:backtesting_walkforward}
 \end{figure}
 

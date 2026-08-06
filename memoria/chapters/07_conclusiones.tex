@@ -47,7 +47,7 @@ Más allá de las conclusiones metodológicas, este TFG deja como legado un sist
 
 \section{Sostenibilidad e Impacto Ambiental}
 
-El trabajo presenta una relación directa con los \textbf{ODS 12} (Producción y Consumo Responsables) y \textbf{ODS 13} (Acción por el Clima) a través de la reducción del sobrestock de productos frescos perecederos. La reducción empírica del 3,7\% en coste de inventario simulado frente al modelo estacional implica directamente menos producto caducado en estantería y menor demanda de producción agrícola en origen. El análisis detallado del grado de relación con los 17 ODS se recoge en el Anexo~\ref{anx:ods}, conforme a los requisitos de la ETSINF-UPV.
+El trabajo presenta una relación directa y cuantificada con el \textbf{ODS 12} (Producción y Consumo Responsables), y una relación indirecta con el \textbf{ODS 13} (Acción por el Clima), ambas a través de la reducción del sobrestock de productos frescos perecederos. La reducción empírica del 3,7\% en coste de inventario simulado frente al modelo estacional implica directamente menos producto caducado en estantería y menor demanda de producción agrícola en origen. El análisis detallado del grado de relación con los 17 ODS se recoge en el Anexo~\ref{anx:ods}, conforme a los requisitos de la ETSINF-UPV.
 
 \section{Análisis de Impacto Ético, Social y Privacidad}
 Más allá de los resultados logísticos, el sistema se ha estructurado atendiendo a criterios
@@ -109,9 +109,12 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
 \begin{itemize}
     \item \textbf{Conformal Prediction Adaptativa (EnbPI)}: La validación a escala demostró que,
     eliminada la inestabilidad por estratos pequeños, la brecha de cobertura restante proviene de la
-    no-intercambiabilidad temporal entre calibración y test. La línea prioritaria es sustituir el
-    Split CP estático por métodos adaptativos como EnbPI \cite{xu2021conformal}, que reajustan el
-    ancho del intervalo con los errores recientes observados, y verificar la convergencia hacia el
+    no-intercambiabilidad temporal entre calibración y test, cuyo efecto sobre la garantía está
+    teóricamente acotado \cite{barber2023beyond}. La línea prioritaria es sustituir el
+    Split CP estático por métodos adaptativos como EnbPI \cite{xu2021conformal} o ACI
+    \cite{gibbs2021adaptive}, que reajustan respectivamente el ancho del intervalo y el nivel de
+    significancia con los errores recientes observados, siguiendo el protocolo comparativo de
+    Zaffran et al.\ \cite{zaffran2022adaptive}, y verificar la convergencia hacia el
     80\% nominal sobre el dataset completo (50.000 series) con historia más larga.
 
     \item \textbf{Costes Reales e Integración ERP}: Los perfiles de coste sintéticos ($c_u$, $c_o$)
@@ -154,8 +157,10 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     sustitución entre productos de la misma categoría durante un stockout, incorporando efectos
     cruzados en la estimación de la demanda latente.
 
-    \item \textbf{Modelos Hurdle para Demanda Intermitente}: El 3{,}3\% de observaciones con demanda
-    genuinamente nula (días sin ninguna venta, excluidos los ceros inducidos por stockout) no justifica
+    \item \textbf{Modelos Hurdle para Demanda Intermitente}: De las 200.760 observaciones con venta
+    cero identificadas en el Capítulo~\ref{chap:analisis_datos} (un 4{,}5\% del panel), el subconjunto
+    con demanda \emph{genuinamente} nula ---es decir, excluyendo los ceros inducidos por stockout---
+    representa el 3{,}3\% del panel. Esa fracción no justifica
     un modelo de dos etapas para el catálogo general, pero sí para los SKUs de alta intermitencia
     donde la probabilidad de venta cero es estructuralmente distinta de la magnitud cuando sí se
     vende. La arquitectura natural es un clasificador binario (si hay o no venta) seguido de un regresor

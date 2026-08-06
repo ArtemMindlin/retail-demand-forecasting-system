@@ -4,7 +4,7 @@
 
 Este capítulo presenta el análisis empírico de la ejecución del sistema sobre el dataset \textit{Fresh RetailNet}. Los resultados se organizan en cinco niveles de evaluación: métricas predictivas, calibración conformal, impacto logístico en el gemelo digital, optimización global bajo restricciones y explicabilidad. El capítulo cierra con una verificación explícita de los KPIs definidos en el Capítulo~\ref{chap:introduccion}.
 
-\textbf{Nota sobre el diseño experimental:} Es fundamental remarcar que la selección del modelo campeón y la evaluación del impacto de la corrección de censura se realizan deliberadamente sobre un \textbf{subset base de 50 series de alta rotación} (las de mayor volumen de ventas histórico). Este subset actúa como un entorno de laboratorio diseñado específicamente para aislar el problema central de esta tesis allí donde tiene mayor impacto económico: los SKUs top ventas, en los que cualquier rotura de stock genera una penalización severa en coste. La posterior validación a escala con 500 series (que introduce la larga cola de productos de menor rotación) se usa únicamente para evaluar la estabilidad estadística de la \textit{Conformal Prediction} (Sección~\ref{sec:resultados_escala}). Evaluar la política de imputación promediando sobre 500 series diluiría el beneficio de la corrección bajo una enorme masa de productos de ventas bajas (donde las roturas apenas suponen pérdidas de 1 o 2 unidades), ocultando el valor logístico del modelo en los productos estratégicos.
+\textbf{Nota sobre el diseño experimental:} Es fundamental remarcar que la selección del modelo campeón y la evaluación del impacto de la corrección de censura se realizan deliberadamente sobre un \textbf{subset base de 50 series de alta rotación} (las de mayor volumen de ventas histórico). Este subset actúa como un entorno de laboratorio diseñado específicamente para aislar el problema central de esta tesis allí donde tiene mayor impacto económico: los SKUs top ventas, en los que cualquier rotura de stock genera una penalización severa en coste. La posterior validación a escala con 500 series (que introduce la larga cola de productos de menor rotación) se usa únicamente para evaluar la estabilidad estadística de la \textit{Conformal Prediction} (Sección~\ref{sec:resultados_escala}). Evaluar la política de imputación promediando sobre 500 series diluiría el beneficio de la corrección bajo una enorme masa de productos de ventas bajas (donde las roturas apenas suponen pérdidas de 1 o 2 unidades), ocultando el valor logístico del modelo en los productos estratégicos. Los dos protocolos de censura sintética constituyen la excepción a este esquema y operan sobre sus propios subconjuntos, indicados explícitamente en cada caso: 500 series para el error de reconstrucción (Sección~\ref{sec:imputacion_censura_sintetica}) y 30 series para la evaluación de coste justo (Sección~\ref{sec:resultados_gemelo}), al no requerir ninguno de los dos el entrenamiento del modelo de \textit{forecasting}.
 
 \section{Métricas Predictivas y la Trampa del MAE}
 \label{sec:resultados_predictivos}
@@ -29,15 +29,16 @@ No obstante, es fundamental contextualizar este resultado desde una perspectiva 
 \subsection{Evaluación Downstream de las Estrategias de Imputación}
 \label{sec:resultados_imputacion}
 
-El módulo \texttt{LatentDemandImputer} implementa tres estrategias de imputación alternativas (véase Sección~\ref{chap:metodologia}). La Tabla~\ref{tab:imputation_comparison} recoge su comparativa empírica sobre 50 series con $n=100$ observaciones de evaluación, empleando LightGBM como modelo de forecasting en todos los casos.
+El módulo \texttt{LatentDemandImputer} implementa tres estrategias de imputación alternativas (véase Sección~\ref{sec:demanda_censurada}). La Tabla~\ref{tab:imputation_comparison} recoge su comparativa empírica sobre 50 series con $n=100$ observaciones de evaluación, empleando LightGBM como modelo de forecasting en todos los casos. Las cifras absolutas de Winkler de esta tabla no son directamente comparables con las de la Tabla~\ref{tab:conformal_metrics}: proceden de un \textit{run} distinto, con otro subconjunto de evaluación y otro tamaño muestral, por lo que solo deben leerse en términos relativos \emph{dentro} de la tabla.
 
 \begin{table}[h]
 \centering
-\caption{Comparativa de estrategias de imputación de demanda latente (LightGBM, $n=100$).}
+\small
+\caption{Comparativa de estrategias de imputación de demanda latente (LightGBM, $n=100$). La última columna expresa la mejora relativa en Winkler Score respecto a la estrategia sin corrección.}
 \label{tab:imputation_comparison}
 \begin{tabular}{lrrr}
 \toprule
-\textbf{Estrategia} & \textbf{MAE} & \textbf{Winkler Score} & \textbf{Mejora vs.\ Observed} \\
+\textbf{Estrategia} & \textbf{MAE} & \textbf{Winkler Score} & \textbf{Mejora Winkler vs.\ Observed} \\
 \midrule
 Observed (sin corrección) & 30{,}92 & 290{,}96 & n/a \\
 Clipped Scaling ($\gamma=1{,}2$) & 36{,}36 & 336{,}41 & $-$15{,}6\% \\
@@ -131,7 +132,7 @@ Esta limitación es inherente al tamaño del subset de evaluación utilizado en 
 \subsection{Validación a Escala: 500 Series}
 \label{sec:resultados_escala}
 
-Se reejecutó el protocolo de backtesting íntegro ampliando el subset de evaluación en un orden de magnitud: 500 series activas, 3 folds de 7 días con reentrenamiento por fold y 1.500 observaciones de evaluación por combinación modelo-estrategia (frente a las 150 del experimento base). La Tabla~\ref{tab:scale_coverage} resume el efecto sobre la calibración conformal.
+Se reejecutó el protocolo de backtesting íntegro ampliando el subset de evaluación en un orden de magnitud: 500 series activas, 3 folds de 7 días con reentrenamiento por fold y 1.500 observaciones de evaluación por combinación modelo-estrategia (frente a las 150 del experimento base). La Tabla~\ref{tab:scale_coverage} resume el efecto sobre la calibración conformal, y la Figura~\ref{fig:cobertura_folds} lo contrasta visualmente con el experimento base.
 
 \begin{table}[htbp]
     \centering
@@ -148,6 +149,13 @@ Se reejecutó el protocolo de backtesting íntegro ampliando el subset de evalua
     \label{tab:scale_coverage}
 \end{table}
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figures/cobertura_folds.pdf}
+    \caption{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold para CatBoost (estrategia \textit{Latent Supervised}): subset base de 50 series frente a la validación a escala con 500 series. La línea discontinua marca la cobertura nominal del 80\% ($\alpha=0{,}20$) y las líneas punteadas la media de cada experimento. Al escalar, la varianza extrema entre folds (14--86\%) desaparece y la cobertura media sube del 38{,}0\% al 63{,}5\%, pero persiste la infracobertura residual atribuible a la no-intercambiabilidad temporal.}
+    \label{fig:cobertura_folds}
+\end{figure}
+
 Los resultados confirman parcialmente el diagnóstico y lo matizan:
 
 \begin{itemize}
@@ -156,14 +164,31 @@ Los resultados confirman parcialmente el diagnóstico y lo matizan:
     \item \textbf{Las conclusiones logísticas se mantienen parcialmente}: en la simulación dinámica Order-Up-To a 500 series, CatBoost Latent reduce el coste simulado un 3{,}7\% frente al Seasonal Naïve Latent (427.210 frente a 443.449 u.m.) y eleva el nivel de servicio del 79{,}3\% al 94{,}3\%. La corrección de censura mantiene su efecto positivo sobre el \textbf{coste estático} en todos los modelos (CatBoost: $+$3{,}3\%; Seasonal Naïve: $+$15{,}4\%). Sin embargo, en el \textbf{coste dinámico simulado}, CatBoost Observed (424.577 u.m.) supera marginalmente a CatBoost Latent (427.210 u.m., diferencia del 0{,}6\%): el beneficio de la corrección de censura sobre la política dinámica queda acotado a las series de mayor severidad de stockout, sobrerrepresentadas en el subset base de 50 series pero diluidas a mayor escala. Esta inversión puntual no invalida la corrección de censura como práctica (el efecto sobre el coste estático es consistente y positivo en todos los modelos), sino que delimita en qué escenarios (catálogos dominados por stockouts severos) el impacto dinámico es más pronunciado.
 \end{itemize}
 
-El \textbf{Winkler Score} de LightGBM (25,74) es inferior al de CatBoost (31,57), lo que indica intervalos más eficientes (más estrechos con mayor cobertura). Sin embargo, el criterio de selección del modelo campeón es el coste logístico simulado, no el Winkler Score. En la simulación dinámica \textit{Order-Up-To} a escala (500 series) con estrategia \textit{Latent Supervised}, CatBoost logró el menor coste simulado (427.210 u.m.), dominando a LightGBM (434.286 u.m.) y al \textit{Seasonal Naïve} (443.449 u.m.), lo que justifica su elección como modelo campeón.
+El \textbf{Winkler Score} de LightGBM (25,74) es inferior al de CatBoost (31,57), lo que indica intervalos más eficientes (más estrechos con mayor cobertura). Sin embargo, el criterio de selección del modelo campeón es el coste logístico simulado, no el Winkler Score. En la simulación dinámica \textit{Order-Up-To} a escala (500 series) con estrategia \textit{Latent Supervised}, CatBoost logró el menor coste simulado (427.210 u.m.), dominando a LightGBM (434.286 u.m.) y al \textit{Seasonal Naïve} (443.449 u.m.), lo que justifica su elección como modelo campeón. La Figura~\ref{fig:mae_vs_coste} sintetiza esta disociación entre error puntual y coste logístico, que constituye el resultado central del trabajo: el orden de los modelos por MAE es exactamente el inverso de su orden por coste simulado.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figures/mae_vs_coste.pdf}
+    \caption{Disociación entre el error puntual y el coste logístico en la validación a escala (500 series, estrategia \textit{Latent Supervised}): el \textit{Seasonal Naïve} obtiene el mejor MAE del backtesting predictivo pero el peor coste en la simulación dinámica \textit{Order-Up-To}, mientras que CatBoost presenta el patrón inverso. Optimizar el error puntual no equivale a optimizar la política de inventario.}
+    \label{fig:mae_vs_coste}
+\end{figure}
 
 \section{Evaluación Justa de Costes Operativos: La Necesidad de un Target Común}
 \label{sec:resultados_gemelo}
 
 El análisis del coste operativo presenta un desafío metodológico crítico. En una evaluación directa convencional, cada estrategia mide su coste Newsvendor frente a su propio target (las ventas observadas para la estrategia \textit{Observed}, y la demanda reconstruida para las estrategias de tipo \textit{Latent}). Como las ventas observadas están sistemáticamente infravaloradas en días de rotura, esta comparación convencional favorece artificialmente al baseline sin corregir, ocultando el coste de oportunidad real.
 
-Para resolver este sesgo de evaluación, implementamos una metodología de \textbf{coste justo (fair cost)}. Esta metodología extiende el protocolo de censura sintética introducido en la Sección~\ref{sec:imputacion_censura_sintetica}, pero en lugar de medir la precisión matemática de la señal por sí sola, evalúa su impacto financiero directo en la operativa de inventario. Bajo esta aproximación, todas las estrategias se evalúan bajo la política Newsvendor contra la \textbf{misma demanda real (ground truth común)} mediante la inserción de las mismas censuras sintéticas muestreadas sobre días limpios. Los resultados de esta comparativa equitativa se presentan en la Tabla~\ref{tab:metrics_cost}.
+Para resolver este sesgo de evaluación, implementamos una metodología de \textbf{coste justo (fair cost)}. Esta metodología extiende el protocolo de censura sintética introducido en la Sección~\ref{sec:imputacion_censura_sintetica}, pero en lugar de medir la precisión matemática de la señal por sí sola, evalúa su impacto financiero directo en la operativa de inventario. Bajo esta aproximación, todas las estrategias se evalúan bajo la política Newsvendor contra la \textbf{misma demanda real (ground truth común)} mediante la inserción de las mismas censuras sintéticas muestreadas sobre días limpios.
+
+\paragraph{Aislamiento deliberado de la señal.} Es importante precisar el alcance de este protocolo, porque su diseño difiere intencionadamente del pipeline completo descrito en el Capítulo~\ref{chap:metodologia}. El objetivo aquí no es medir el sistema de previsión en su conjunto, sino \textbf{atribuir la diferencia de coste exclusivamente a la calidad de la señal de demanda}. Para lograrlo se neutralizan todas las demás fuentes de variación:
+
+\begin{itemize}
+    \item \textbf{Política de pedido común y simplificada}: la cantidad a pedir no proviene de los cuantiles del modelo de \textit{forecasting} ni de la capa conformal, sino de una aproximación normal \textit{order-up-to} idéntica para todas las estrategias, $q^* = \max(\text{señal} + z_{q^*}\cdot\sigma,\, 0)$, donde $z_{q^*}$ es el cuantil normal estándar del fractil crítico. Esta comparativa mide por tanto el \textbf{imputador}, no el modelo campeón; el rendimiento del sistema completo se evalúa en la simulación dinámica de la Sección~\ref{sec:resultados_escala}.
+    \item \textbf{Costes aplanados}: los perfiles de coste sintéticos por SKU de la Sección~\ref{sec:cost_profiles} se desactivan (\texttt{use\_series\_costs = false}) y se aplica un único par $(c_o, c_u)$ a todas las series, de modo que ninguna estrategia se beneficia de una composición de catálogo favorable.
+    \item \textbf{Término de seguridad compartido}: la escala $\sigma$ del \textit{safety stock} se estima como la desviación típica de la demanda real del conjunto de evaluación y se comparte entre estrategias. Al ser un valor común, no altera el orden entre ellas ---que es la magnitud de interés---, pero conviene advertir que es una cantidad de tipo oráculo: en producción $\sigma$ tendría que estimarse sobre el histórico disponible, por lo que los niveles absolutos de coste y de \textit{fill rate} de la Tabla~\ref{tab:metrics_cost} deben leerse como una cota optimista.
+\end{itemize}
+
+Los resultados de esta comparativa equitativa, calculada sobre un subconjunto de 30 series y $n = 2\,018$ días censurados sintéticamente, se presentan en la Tabla~\ref{tab:metrics_cost}.
 
 \input{tables/table_costs}
 
@@ -236,13 +261,13 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definid
         \midrule
         CatBoost supera al Seasonal Naïve en coste logístico & $> 0\%$ & $-3{,}7\%$ (Latent, coste simulado a escala, 500 series) & \checkmark \\
         \midrule
-        Winkler Score del campeón$^{\dagger}$ frente a las alternativas probabilísticas & Menor & LightGBM: 25,74; CatBoost (campeón): 31,57 & Parcial \\
+        Winkler Score del campeón$^{\dagger}$ frente a las alternativas probabilísticas$^{\ddagger}$ & Menor & LightGBM: 25,74; CatBoost (campeón): 31,57 & Parcial \\
         \midrule
         Cobertura empírica $[q_{0{,}1}, q_{0{,}9}]$ ($\alpha = 0{,}20$) & $\geq 80\%$ & 38\% (subset base); 63{,}5\% (500 series) & Limitado \\
         \bottomrule
     \end{tabular}%
     }
-    \caption{Verificación de los KPIs definidos en el Capítulo~\ref{chap:introduccion}. \checkmark = cumplido; Parcial = cumplido con matices; Limitado = no alcanzado en el subset de evaluación. $^{\dagger}$El campeón se selecciona por coste logístico simulado, no por Winkler Score; entre los modelos probabilísticos, LightGBM obtiene el mejor Winkler (25,74) pero CatBoost domina en coste simulado a escala (427.210 u.m. frente a 434.286 u.m. de LightGBM).}
+    \caption{Verificación de los KPIs del trabajo. Las tres primeras filas se corresponden con los objetivos \ref{obj:pipeline}, \ref{obj:modelos} y \ref{obj:conformal} de la Sección~\ref{sec:objetivos}. \checkmark = cumplido; Parcial = cumplido con matices; Limitado = no alcanzado en el subset de evaluación. $^{\dagger}$El campeón se selecciona por coste logístico simulado, no por Winkler Score; entre los modelos probabilísticos, LightGBM obtiene el mejor Winkler (25,74) pero CatBoost domina en coste simulado a escala (427.210 u.m. frente a 434.286 u.m. de LightGBM). $^{\ddagger}$Este criterio no figura entre los objetivos específicos del Capítulo~\ref{chap:introduccion}: procede del protocolo de evaluación de la Sección~\ref{sec:backtesting}, que establece el Winkler Score frente al \textit{Seasonal Naïve} como umbral mínimo de aportación de valor probabilístico. Se incluye aquí por completitud.}
     \label{tab:kpi_verification}
 \end{table}
 
