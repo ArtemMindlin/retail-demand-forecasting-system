@@ -24,21 +24,28 @@ El pipeline transforma datos brutos de ventas en recomendaciones operacionales d
 4. **Optimización bajo Restricciones:** Resolución de escasez global de presupuesto o volumen mediante Programación Lineal (*Continuous Knapsack*) utilizando SciPy.
 5. **Ecosistema MLOps Profesional:**
    * **MLflow:** Registro automático de experimentos, parámetros y artefactos visuales (SHAP, Pareto).
-   * **FastAPI:** Despliegue como microservicio productivo para integración con ERPs.
+   * **Django:** Dashboard renderizado en servidor y API operacional JSON para integración con ERPs.
    * **Post-Mortem Analysis:** Módulo de autodiagnóstico algorítmico que explica fallos por drift, intermitencia o ruido.
    * **Docker & CI/CD:** Arquitectura 100% reproducible y protegida por GitHub Actions.
 
 ## Inicio Rápido con Docker (Recomendado)
 
-Levanta todo el ecosistema (API + Dashboard + MLflow) con un solo comando:
+Levanta todo el ecosistema (dashboard + API + MLflow) con un solo comando:
 
 ```bash
 docker compose up
 ```
 
-- **Dashboard What-If:** `http://localhost:8501`
+- **Dashboard:** `http://localhost:8000`
 - **MLflow Tracking:** `http://localhost:5000`
-- **API Documentation:** `http://localhost:8000/docs`
+- **API Documentation:** `http://localhost:8000/api/`
+
+### Variables de entorno
+
+El dashboard no usa base de datos: las sesiones son cookies firmadas con
+`DJANGO_SECRET_KEY`. Copia `.env.example` a `.env` y rellénalo. En producción es
+obligatorio fijar `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` y `AUTH_PASSWORD`
+(un `AUTH_PASSWORD` vacío deshabilita el acceso).
 
 ## Instalación Local (Desarrollo)
 
@@ -52,7 +59,7 @@ make install
 make run
 
 # 3. Lanzar servicios individualmente
-make api        # Levanta FastAPI (API + dashboard integrado)
+make dev        # Levanta el dashboard Django (UI + API operacional)
 make mlflow     # Levanta UI de MLflow
 
 ```
@@ -60,7 +67,7 @@ make mlflow     # Levanta UI de MLflow
 ## Suite de Verificación
 
 ```bash
-# Ejecutar los 83 tests automatizados
+# Ejecutar los 123 tests automatizados
 make test
 ```
 

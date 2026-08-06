@@ -491,6 +491,119 @@ main()
 - Devuelve: `str`.
 - Se usa en: `write_run_artifacts()`.
 
+## Web Layer
+
+Funciones de `src/retail_forecasting/api/`. Ver `docs/web_layer.md` para la
+arquitectura. La regla que las gobierna: `services/` es pandas puro sin Django,
+y las vistas solo leen parametros, llaman a un servicio y renderizan.
+
+### `ArtifactStore`
+- Archivo: `src/retail_forecasting/api/services/runs.py`
+- Que hace: acceso cacheado y de solo lectura a los artefactos de `reports/`. Localiza el run mas reciente, carga y filtra las predicciones por el champion, y valida nombres de run contra path traversal.
+- Metodos principales: `latest_run_path()`, `latest_predictions()`, `grouped_predictions()`, `resolve_run()`, `runs_with()`, `list_eda_runs()`, `invalidate()`.
+- Se usa en: todas las vistas, via `api/store.get_store()`.
+
+### `WhatIfParams`
+- Archivo: `src/retail_forecasting/api/services/forecast.py`
+- Que hace: agrupa los cuatro parametros del simulador (nivel de servicio, coste de rotura, coste de almacenamiento, capacidad) y deriva `alpha` y `critical_ratio`.
+- Recibe: `from_mapping()` acepta tanto los nombres de query string como los camelCase del cuerpo JSON.
+- Devuelve: instancia inmutable.
+- Se usa en: dashboard, tabla de SKU y los endpoints JSON.
+
+### `empirical_conformal`
+- Archivo: `src/retail_forecasting/api/services/forecast.py`
+- Que hace: calcula la semianchura del intervalo conformal como el cuantil `1 - alpha` de los residuos absolutos, y la cobertura observada.
+- Recibe:
+  - `sku_df`;
+  - `alpha`.
+- Devuelve: `ConformalStats`.
+- Se usa en: `compute_forecast()` y `compute_sku_table()`.
+
+### `compute_forecast`
+- Archivo: `src/retail_forecasting/api/services/forecast.py`
+- Que hace: payload completo del dashboard para un SKU: serie del grafico, KPIs (coste, cobertura, MAE, PSI) y la recomendacion Newsvendor.
+- Recibe:
+  - `grouped`;
+  - `params`;
+  - `selected_sku`.
+- Devuelve: `dict`, o `{"status": "no_predictions"}` si no hay artefactos.
+- Se usa en: vista `dashboard` y `POST /api/forecast`.
+
+### `compute_sku_table`
+- Archivo: `src/retail_forecasting/api/services/forecast.py`
+- Que hace: una fila por SKU con cobertura empirica, PSI, margen, cantidad recomendada y estado operativo.
+- Recibe:
+  - `grouped`;
+  - `params`;
+  - `limit`.
+- Devuelve: `list[dict]`.
+- Se usa en: vista `skus` y `GET /api/skus`.
+
+### `per_sku_psi`
+- Archivo: `src/retail_forecasting/api/services/forecast.py`
+- Que hace: PSI de la demanda de una serie comparando su mitad antigua con la reciente.
+- Recibe:
+  - `demand` (array).
+- Devuelve: `float` (0.0 si la serie es demasiado corta).
+- Se usa en: KPIs del dashboard y estado por SKU.
+
+### `load_feature_drift` / `load_alerts`
+- Archivo: `src/retail_forecasting/api/services/forecast.py`
+- Que hace: leen `drift_report.json` y `exceptions.csv` del run. Devuelven listas vacias si el artefacto no existe, en lugar de fabricar valores.
+- Recibe:
+  - `run_path`.
+- Devuelve: `list[dict]`.
+- Se usa en: vista `drift` y panel de alertas.
+
+### `weekly_summary` / `series_trajectory`
+- Archivo: `src/retail_forecasting/api/services/ops.py`
+- Que hace: indexan la simulacion walk-forward por origen semanal. `weekly_summary` agrega metricas por cadencia de reentreno; `series_trajectory` devuelve la trayectoria de una serie.
+- Recibe:
+  - `simulation` (`OpsSimulation`);
+  - `series_id` y `cadence` en el segundo caso.
+- Devuelve: `dict`.
+- Se usa en: vista `ops`.
+- Nota: cobertura y MAE se calculan solo sobre filas con actuals completos; el coste suma el grupo entero.
+
+### `chart_data`
+- Archivo: `src/retail_forecasting/api/services/eda.py`
+- Que hace: convierte los CSV que escribe el modulo de EDA en payloads listos para graficar (histograma, scatter, boxplot, barras…).
+- Recibe:
+  - `eda_path`;
+  - `name` (validado contra el catalogo de figuras).
+- Devuelve: `dict` con la clave `type` que elige el renderizador.
+- Se usa en: vista `eda`.
+
+### `imputation_strategies` / `rank_quality`
+- Archivo: `src/retail_forecasting/api/services/experiments.py`
+- Que hace: reconstruccion latente por estrategia para una serie, y ranking de las estrategias por MAE de reconstruccion con su sesgo y direccion (infra/sobre-imputa).
+- Recibe:
+  - `run_path` y `series_id`; `quality` en el segundo caso.
+- Devuelve: `dict` / `list[dict]`.
+- Se usa en: vista `latent`.
+
+### `PipelineRunner`
+- Archivo: `src/retail_forecasting/api/services/pipeline.py`
+- Que hace: lanza `python -m retail_forecasting.run` como subproceso en background, con lock de ejecucion unica, rate limit por IP y volcado a `reports/active_run.log`.
+- Metodos principales: `start()`, `read_log()`, `reset()`, `check_rate_limit()`.
+- Se usa en: consola de pipeline del dashboard.
+
+### `forecast_chart` / `ops_trajectory_chart` / `distribution_chart` / `sparkline`
+- Archivo: `src/retail_forecasting/api/charts.py`
+- Que hace: primitivas SVG renderizadas en servidor. `forecast_chart` devuelve ademas la geometria por punto para que el tooltip no recalcule nada en el navegador.
+- Recibe: la serie o los puntos ya calculados.
+- Devuelve: `SafeString` (o `dict` con `svg` y `points` en `forecast_chart`).
+- Se usa en: dashboard, OPS, drift y tabla de SKU.
+
+### `render`
+- Archivo: `src/retail_forecasting/api/eda_charts.py`
+- Que hace: despacha un payload de `chart_data()` al renderizador SVG correspondiente segun su `type`.
+- Recibe:
+  - `data`.
+- Devuelve: `SafeString`.
+- Se usa en: vista `eda`.
+- Renderizadores disponibles: `line_dual`, `histogram`, `histogram_dual`, `bar_horizontal`, `bar_group`, `scatter`, `boxplot`, `series_grid`.
+
 ## Utilities
 
 ### `ensure_directory`

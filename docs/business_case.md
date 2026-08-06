@@ -118,6 +118,11 @@ Operational assumption:
 - the core output is a recommendation artifact, not an interactive prediction
   API.
 
+The dashboard (`docs/web_layer.md`) serves step 4 of that cadence: it is where
+the manager reviews flagged exceptions and explores what-if scenarios before
+approving. It is a review surface over the batch artifact, not an online serving
+path — the recommendation is still produced by the scheduled run.
+
 ## Required Business Output
 
 The core business artifact should be a daily reorder recommendation table.

@@ -30,7 +30,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 
 The v1 pipeline supports only `FreshRetailNet-50K` through `dataset.source = fresh_retailnet`.
 
-Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/censorship.py`), compared against the raw observed-demand baseline. Model selection and champion evaluation run on a base subset of the 50 highest-rotation series; a separate 500-series run validates conformal-calibration stability at scale, and a 30-series fair-cost backtest isolates the imputation signal from the rest of the pipeline under a common ground truth. See `docs/experimental_design.md` for the full rationale — do not average metrics across these subsets as if they were the same experiment.
+Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/censorship.py`), compared against the raw observed-demand baseline. Model selection and champion evaluation run on a base subset of the 50 highest-rotation series; a separate 500-series run validates conformal-calibration stability at scale, and a 30-series fair-cost backtest isolates the imputation signal from the rest of the pipeline under a common ground truth. Each subset answers a different question, so do not average metrics across them as if they were the same experiment.
 
 CatBoost is the current champion model, selected by simulated logistic cost (Order-Up-To), not by MAE or Winkler Score alone — point-error and logistic-cost rankings can (and do) invert.
 
@@ -78,8 +78,8 @@ Read these first:
 - `docs/invariants.md`
 - `docs/contracts/dataframes.md`
 - `docs/conventions.md`
-- `docs/experimental_design.md`
 - `docs/system_design.md`
+- `docs/web_layer.md` (only when touching `src/retail_forecasting/api/`)
 
 Prefer small changes that preserve the pipeline contract. If a change modifies target semantics, fold semantics, dataframe schemas, or inventory policy, update docs and tests in the same change.
 

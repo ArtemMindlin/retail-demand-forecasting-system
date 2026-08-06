@@ -188,6 +188,8 @@ entre disponibilidad y desperdicio aproximado.
 
 ## 12. Visualizacion de resultados
 
+### Artefactos por corrida
+
 Cada corrida genera:
 
 - tablas de metricas predictivas;
@@ -201,6 +203,25 @@ Cada corrida genera:
 - graficos simples de coste y trade-off error-coste;
 - un reporte Markdown final en `reports/`.
 
+### Cuadro de mandos
+
+Sobre esos artefactos se sirve un dashboard Django renderizado en servidor, con
+dos planos que reflejan la separacion del propio sistema:
+
+- **operacion**: simulacion OPS, dashboard de decision, analisis por SKU y
+  monitor de drift;
+- **investigacion**: EDA, demanda latente y tuning multiobjetivo.
+
+El dashboard no calcula nada del dominio: lee los artefactos de `reports/` y
+llama a `forecasting/`, `inventory/`, `simulation/` y `eda/`. Los graficos se
+generan como SVG en Python, sin libreria de graficos en el cliente.
+
+Junto al cuadro de mandos se expone una superficie JSON reducida para
+integracion maquina-a-maquina (`/api/forecast`, `/api/skus`, descargas CSV,
+`/predict_orders`, `/health`).
+
+El detalle completo de esta capa esta en `docs/web_layer.md`.
+
 ## 13. Como se evita usar informacion futura
 
 La politica anti-leakage es un requisito central del sistema:
@@ -212,14 +233,31 @@ La politica anti-leakage es un requisito central del sistema:
 
 Esto asegura que el rendimiento estimado sea defendible academicamente.
 
-## 14. Evolucion futura prevista
+## 14. Estado y evolucion futura
 
-La arquitectura queda lista para:
+Esta seccion listaba en su dia una hoja de ruta. La mayor parte ya esta
+implementada; se conserva la distincion para no confundir lo entregado con lo
+pendiente.
 
-- demanda latente o censurada;
-- conformal prediction;
-- recalibracion de cuantiles;
-- detectores de drift;
-- reentrenamiento adaptativo;
-- base-stock o reorder point;
-- dashboard con Streamlit.
+### Ya implementado
+
+- reconstruccion de demanda latente o censurada (`data/censorship.py`);
+- conformal prediction, incluida la variante Mondrian por categoria;
+- deteccion de drift por PSI, con informe por feature (`drift_report.json`);
+- reentrenamiento como modo de ejecucion (`retrain`) y comparacion de cadencias
+  de reentreno en la simulacion operativa (`simulate_ops`);
+- politica Order-Up-To con simulacion dinamica de inventario;
+- cuadro de mandos y API operacional (Django, ver `docs/web_layer.md`).
+
+### Pendiente
+
+- **Split `eval` oficial como holdout.** Deliberadamente no cableado hasta
+  verificar su semantica temporal; hoy la evaluacion sale del walk-forward.
+- **Mas de un dataset.** La v1 solo soporta `FreshRetailNet-50K` a traves de
+  `dataset.source = fresh_retailnet`.
+- **Conformal ponderado ante covariate shift.** La garantia actual asume
+  intercambiabilidad, supuesto que se rompe en rebajas y festivos.
+- **Reentrenamiento disparado por alerta de drift.** Hoy la deteccion informa;
+  no promueve un reentreno automatico.
+- **Infraestructura distribuida.** Orquestacion, feature store en tiempo real y
+  promocion automatica en caliente quedan fuera del alcance del prototipo.

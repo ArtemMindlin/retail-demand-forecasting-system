@@ -31,7 +31,22 @@ Use these file naming conventions:
 - contracts: `docs/contracts/<domain>.md`
 - general docs: `snake_case.md`
 
-Keep `AGENTS.md` short. Put detailed rules in the main `docs/` files and link to them from `AGENTS.md`.
+Keep `CLAUDE.md` short. Put detailed rules in the main `docs/` files and link to them from `CLAUDE.md`.
+
+## Web Layer
+
+Conventions for `src/retail_forecasting/api/`. See `docs/web_layer.md` for the
+architecture.
+
+- templates: `templates/views/<tab>.html` for whole pages, `templates/partials/<component>.html` for fragments swapped by htmx
+- static assets: `static/css/`, `static/js/`, `static/img/`, and `static/vendor/` for third-party libraries served from our own domain
+- URL names match the tab ids in `api/context.py`; the navigation context processor resolves the active tab from `request.resolver_match.url_name`
+- one view module per plane: `views/pages.py`, `views/ops.py`, `views/eda.py`, `views/experiments.py`, `views/panels.py`, `views/pipeline.py`, `views/json_api.py`
+
+Two template rules that are easy to get wrong and fail silently:
+
+- `{# … #}` is single-line only. Use `{% comment %}…{% endcomment %}` for anything longer, or it renders as visible text.
+- Any number that lands in JavaScript, CSS, or an SVG attribute must bypass es-ES localization: use `|floatformat:"3u"` or `|unlocalize`. Applying `|unlocalize` after `floatformat` does nothing.
 
 ## Tests
 

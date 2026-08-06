@@ -113,3 +113,41 @@ These rules protect the experimental validity and architecture of the project.
     Do not treat them as source of truth for pipeline behavior.
 
 26. Durable design decisions belong in the main methodology and design documents.
+
+## Web Layer
+
+See `docs/web_layer.md` for the full description.
+
+27. The web layer renders and orchestrates. It must not duplicate forecasting,
+    inventory, or evaluation logic.
+
+    A new number on screen is computed in `api/services/` or in the pipeline,
+    never in a view or a template.
+
+28. `api/services/` must not import Django.
+
+    Django only enters through `api/store.py`, `api/views/` and the settings
+    module, which keeps the services unit-testable without a web client.
+
+29. The dashboard has no database.
+
+    System state lives in `reports/`; the only web-owned state is the operator
+    session, carried in a signed cookie. Adding a relational store is a design
+    change, not an implementation detail.
+
+30. Missing artifacts render an explicit empty state that names the command
+    which produces them.
+
+    Never fabricate placeholder values. A run without `drift_report.json` says
+    so; it does not render an empty panel that reads as "no drift".
+
+31. User-supplied run names are validated against the artifact catalogue before
+    touching the filesystem.
+
+    `ArtifactStore.resolve_run` and the EDA figure lookup exist to make path
+    traversal impossible by construction.
+
+32. Charts are rendered as SVG on the server.
+
+    No client-side charting library. The scenario parameters live in the query
+    string so every dashboard state is a shareable, reloadable URL.
