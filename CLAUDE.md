@@ -19,7 +19,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 - `src/retail_forecasting/models/`: forecast models only (`naive.py`, `boosting.py` for LightGBM, `catboosting.py` for CatBoost — the current champion).
 - `src/retail_forecasting/inventory/`: newsvendor order quantity, cost profiles, optimization, and dynamic simulation logic.
 - `src/retail_forecasting/simulation/`: operational (OPS-plane) walk-forward simulation, reused by the dashboard's `/ops/` view.
-- `src/retail_forecasting/evaluation/`: metrics, MLflow logging, post-mortem analysis, and XAI/explainability.
+- `src/retail_forecasting/evaluation/`: metrics, run reporting, post-mortem analysis, and XAI/explainability.
 - `src/retail_forecasting/drift/`: regime/drift analysis hooks.
 - `src/retail_forecasting/eda/`: exploratory analysis and figure generation, surfaced in the dashboard's `/eda/` tab.
 - `src/retail_forecasting/contracts/`: pandera/pydantic-style contracts for backtesting, business rules, config, drift, feature engineering, quality, and tuning — enforced by the `tests/test_*_contract.py` / `tests/test_*_boundaries.py` suite.

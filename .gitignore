@@ -64,9 +64,6 @@ memoria/.build/*
 memoria/figures/eda/*
 !memoria/figures/eda/.gitkeep
 
-# MLflow
-mlruns/
-mlflow.db
 
 # Claude Code. Session state and worktrees are local, but launch.json is shared
 # project configuration (how to start the dev server), so it stays tracked.

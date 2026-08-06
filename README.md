@@ -23,21 +23,19 @@ El pipeline transforma datos brutos de ventas en recomendaciones operacionales d
 3. **Simulación Dinámica (s, S):** Gemelo digital logístico que arrastra el stock remanente y pendientes (*backlog*) entre periodos para medir el verdadero impacto económico (Efecto Látigo).
 4. **Optimización bajo Restricciones:** Resolución de escasez global de presupuesto o volumen mediante Programación Lineal (*Continuous Knapsack*) utilizando SciPy.
 5. **Ecosistema MLOps Profesional:**
-   * **MLflow:** Registro automático de experimentos, parámetros y artefactos visuales (SHAP, Pareto).
    * **Django:** Dashboard renderizado en servidor y API operacional JSON para integración con ERPs.
    * **Post-Mortem Analysis:** Módulo de autodiagnóstico algorítmico que explica fallos por drift, intermitencia o ruido.
    * **Docker & CI/CD:** Arquitectura 100% reproducible y protegida por GitHub Actions.
 
 ## Inicio Rápido con Docker (Recomendado)
 
-Levanta todo el ecosistema (dashboard + API + MLflow) con un solo comando:
+Levanta el ecosistema (dashboard + API) con un solo comando:
 
 ```bash
 docker compose up
 ```
 
 - **Dashboard:** `http://localhost:8000`
-- **MLflow Tracking:** `http://localhost:5000`
 - **API Documentation:** `http://localhost:8000/api/`
 
 ### Variables de entorno
@@ -55,12 +53,11 @@ El proyecto utiliza `uv` para la gestión de dependencias.
 # 1. Instalar dependencias
 make install
 
-# 2. Ejecutar experimento completo y registrar en MLflow
+# 2. Ejecutar el experimento completo
 make run
 
-# 3. Lanzar servicios individualmente
-make dev        # Levanta el dashboard Django (UI + API operacional)
-make mlflow     # Levanta UI de MLflow
+# 3. Levantar el dashboard (UI + API operacional)
+make dev
 
 ```
 

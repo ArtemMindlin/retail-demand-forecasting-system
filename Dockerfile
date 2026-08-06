@@ -27,8 +27,8 @@ COPY . .
 RUN DJANGO_DEBUG=false DJANGO_SECRET_KEY=build-time-only \
     python manage.py collectstatic --noinput
 
-# Expose ports for the dashboard (8000) and MLflow (5000)
-EXPOSE 8000 5000
+# Expose the dashboard port
+EXPOSE 8000
 
 # Serve the Django app over ASGI. PORT is injected by the platform when present.
 CMD ["sh", "-c", "uvicorn retail_forecasting.api.asgi:application --host 0.0.0.0 --port ${PORT:-8000}"]

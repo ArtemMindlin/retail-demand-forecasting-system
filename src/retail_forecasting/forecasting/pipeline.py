@@ -518,13 +518,6 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     artifacts_with_files = write_run_artifacts(final_artifacts, settings)
     print(f"✅ Artifacts saved to: {artifacts_with_files.run_directory}\n")
 
-    try:
-        from retail_forecasting.evaluation.mlflow_logger import log_experiment_to_mlflow
-
-        log_experiment_to_mlflow(artifacts_with_files, settings)
-    except ImportError as e:
-        print(f"MLflow logging skipped: {e}")
-
     return artifacts_with_files
 
 

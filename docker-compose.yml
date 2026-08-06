@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. Django dashboard + operational JSON API
+  # Django dashboard + operational JSON API
   api:
     build: .
     container_name: retail_forecasting_api
@@ -21,19 +21,6 @@ services:
       - default
       - caddy
 
-  # 2. MLflow Tracking Server
-  mlflow:
-    build: .
-    container_name: retail_forecasting_mlflow
-    ports:
-      - "5000:5000"
-    command: ["mlflow", "ui", "--host", "0.0.0.0", "--port", "5000"]
-    environment:
-      - MLFLOW_SERVER_ALLOWED_HOSTS=*
-    volumes:
-      - ./mlruns:/app/mlruns
-      - ./mlflow.db:/app/mlflow.db
-    restart: unless-stopped
 
 networks:
   caddy:

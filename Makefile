@@ -1,10 +1,8 @@
-# Retail Demand Forecasting System - TFG Makefile
-
 # Variables
 PYTHON = uv run python
 PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
-.PHONY: help install run retrain score simulate backtest-fair-cost eda api dev collectstatic mlflow up test test-harness lint format clean pdf
+.PHONY: help install run retrain score simulate backtest-fair-cost eda api dev collectstatic up test test-harness lint format clean pdf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -38,9 +36,6 @@ dev: ## Run the Django dev server (dashboard + API) at http://localhost:8000
 
 collectstatic: ## Collect static assets into staticfiles/ (needed when DEBUG=false)
 	uv run python manage.py collectstatic --noinput
-
-mlflow: ## Start the MLflow UI
-	uv run mlflow ui
 
 up: ## Start the entire ecosystem with Docker Compose
 	docker compose up --build
