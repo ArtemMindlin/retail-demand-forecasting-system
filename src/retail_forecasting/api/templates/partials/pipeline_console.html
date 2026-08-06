@@ -1,0 +1,58 @@
+{% comment %}Pipeline console. While the run is in flight the whole overlay
+re-requests itself once a second and swaps in place — that polling loop is the
+htmx equivalent of the old setInterval, and it stops on its own because a
+finished run renders without the hx-trigger.{% endcomment %}
+<div class="terminal-overlay"
+     x-data="{ close() { document.getElementById('overlay-slot').innerHTML = '' } }"
+     x-on:keydown.escape.window="close()"
+     x-on:click.self="close()"
+     {% if status == "running" %}
+       hx-get="{% url 'pipeline-status' %}"
+       hx-trigger="every 1s"
+       hx-target="#overlay-slot"
+       hx-swap="innerHTML"
+     {% endif %}
+     role="dialog" aria-modal="true" aria-label="Consola del pipeline">
+  <div class="terminal-window">
+    <div class="terminal-header">
+      <div class="terminal-dot-group">
+        <span class="terminal-dot" style="background:#ff5f57"></span>
+        <span class="terminal-dot" style="background:#febc2e"></span>
+        <span class="terminal-dot" style="background:#28c840"></span>
+      </div>
+      <div class="terminal-title">
+        {% icon "terminal" 12 "var(--c-ai)" %}
+        retail_forecasting.run
+        <span class="terminal-status terminal-status-{{ status }}">{{ status }}</span>
+      </div>
+      <button type="button" class="modal-close" x-on:click="close()" aria-label="Cerrar">
+        {% icon "x" 15 %}
+      </button>
+    </div>
+
+    <pre class="terminal-body" x-init="$el.scrollTop = $el.scrollHeight"
+    >{{ logs|default:"Esperando salida del proceso…" }}{% if status == "running" %}<span class="blink-cursor">▋</span>{% endif %}</pre>
+
+    {% if error %}
+      <div class="terminal-error">{% icon "alertTri" 13 %} {{ error }}</div>
+    {% endif %}
+
+    <div class="terminal-footer">
+      <span>reports/active_run.log</span>
+      <span class="terminal-footer-actions">
+        {% if status == "running" %}
+          <span class="terminal-polling">actualizando cada 1 s…</span>
+        {% else %}
+          <button type="button" class="btn-ghost btn-sm"
+                  hx-post="{% url 'pipeline-reset' %}"
+                  hx-target="#overlay-slot" hx-swap="innerHTML">
+            Liberar bloqueo
+          </button>
+          <button type="button" class="btn-ghost btn-sm" x-on:click="window.location.reload()">
+            Recargar datos
+          </button>
+        {% endif %}
+      </span>
+    </div>
+  </div>
+</div>

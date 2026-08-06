@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}API operacional · Forecast.ai{% endblock %}
+
+{% block content %}
+<div class="view-header">
+  <div class="label-mono">REFERENCIA · API OPERACIONAL</div>
+  <div class="h-display view-title">Superficie JSON del sistema</div>
+  <div class="view-subtitle">
+    El dashboard se sirve renderizado en servidor; estos son los endpoints que se mantienen
+    como interfaz máquina-a-máquina. Todos salvo <code>/health</code> requieren sesión.
+  </div>
+</div>
+
+<div class="glass api-docs">
+  <table class="data-table">
+    <thead>
+      <tr><th>Método</th><th>Ruta</th><th>Auth</th><th>Descripción</th></tr>
+    </thead>
+    <tbody>
+      {% for endpoint in endpoints %}
+        <tr>
+          <td><span class="api-method api-method-{{ endpoint.method|lower }}">{{ endpoint.method }}</span></td>
+          <td class="api-path">{{ endpoint.path }}</td>
+          <td class="api-auth">{{ endpoint.auth }}</td>
+          <td class="api-summary">{{ endpoint.summary }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

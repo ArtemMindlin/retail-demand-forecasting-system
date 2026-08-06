@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load l10n %}
+
+{% block title %}Simulación OPS · Forecast.ai{% endblock %}
+
+{% block content %}
+{% comment %}Cadence, week and series are query parameters. Every control
+re-requests this view and swaps the content region, so any frame of the
+playback is a shareable URL.{% endcomment %}
+<div class="view-header">
+  <div class="label-mono">plano de operación · backtest walk-forward</div>
+  <div class="h-display view-title">Simulación de producción semana a semana</div>
+  <div class="view-subtitle">
+    El modelo elegido corre en el tiempo: cada semana pronostica con banda conformal, decide el
+    pedido (Newsvendor) y se revela la demanda real.
+  </div>
+</div>
+
+<form class="ops-controls" method="get" action="{% url 'ops' %}"
+      hx-get="{% url 'ops' %}"
+      hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-trigger="change, input changed delay:200ms from:input[type='range']">
+
+  <div class="ops-cadence" role="group" aria-label="Cadencia de reentreno">
+    {% for option in cadence_options %}
+      <label class="ops-cadence-option{% if option.id == cadence %} active{% endif %}">
+        <input type="radio" name="cadence" value="{{ option.id }}"
+               {% if option.id == cadence %}checked{% endif %}>
+        {{ option.label }}
+      </label>
+    {% endfor %}
+  </div>
+
+  <div class="ops-week" x-data="{ week: {{ week_index|unlocalize }} }">
+    <span class="ops-week-label">
+      Semana <span x-text="week + 1"></span>/{{ week_count }} · {{ origin_date }}
+    </span>
+    <input type="range" name="week"
+           min="{{ first_week|unlocalize }}" max="{{ last_week|unlocalize }}" step="1"
+           x-model.number="week"
+           aria-label="Semana de la simulación"
+           :style="`--track-fill: var(--c-ai); --track-percent: ${ {{ week_count|unlocalize }} > 1 ? (week / ({{ week_count|unlocalize }} - 1)) * 100 : 0 }%`">
+    {% if partial_week %}<span class="ops-partial">semana parcial</span>{% endif %}
+  </div>
+
+  <input type="hidden" name="series" value="{{ series_id|default:'' }}">
+</form>
+
+<div class="ops-kpis">
+  {% for kpi in kpis %}
+    <div class="glass ops-kpi">
+      <div class="ops-kpi-label">{{ kpi.label }}</div>
+      <div class="tnum ops-kpi-value" style="color: {{ kpi.color }}">{{ kpi.value }}</div>
+      <div class="ops-kpi-sub">{{ kpi.sub }}</div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="glass chart-card ops-chart">
+  <div class="ops-chart-head">
+    <div>
+      <div class="ops-chart-title">Trayectoria de la serie · pronóstico vs realidad</div>
+      <div class="ops-chart-subtitle">
+        banda conformal {{ target_pct }} · línea = predicción · puntos = demanda real
+        (verde dentro de banda, rojo fuera)
+      </div>
+    </div>
+
+    <form method="get" action="{% url 'ops' %}"
+          hx-get="{% url 'ops' %}"
+          hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML"
+          hx-push-url="true" hx-trigger="change">
+      <input type="hidden" name="cadence" value="{{ cadence }}">
+      <input type="hidden" name="week" value="{{ week_index|unlocalize }}">
+      <select name="series" class="ops-series-select" aria-label="Serie a inspeccionar">
+        {% for s in series_list %}
+          <option value="{{ s }}"{% if s == series_id %} selected{% endif %}>SKU {{ s }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+
+  {% if has_points %}
+    {{ chart }}
+  {% else %}
+    <div class="ops-chart-empty">Sin datos para esta serie</div>
+  {% endif %}
+</div>
+
+<div class="ops-footer">reports/{{ run }}/simulation/predictions_by_day.parquet</div>
+{% endblock %}

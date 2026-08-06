@@ -1,0 +1,6 @@
+{% load l10n %}{% comment %}Carries the what-if sliders through a GET form so a
+search or filter submit does not silently reset the scenario.{% endcomment %}
+<input type="hidden" name="service_level" value="{{ params.service_level|unlocalize }}">
+<input type="hidden" name="shortage_cost" value="{{ params.shortage_cost|unlocalize }}">
+<input type="hidden" name="holding_cost" value="{{ params.holding_cost|unlocalize }}">
+<input type="hidden" name="capacity" value="{{ params.capacity|unlocalize }}">

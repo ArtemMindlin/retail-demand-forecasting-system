@@ -1,0 +1,33 @@
+{% comment %}Page header: title, alerts trigger, configuration and pipeline
+controls. Each opens an overlay swapped into #overlay-slot.{% endcomment %}
+<div class="topbar">
+  <div class="h-display topbar-title">Analítica Predictiva &amp; Decisiones de Inventario</div>
+
+  <div class="topbar-actions">
+    <button type="button" class="btn-ghost btn-ghost-rel"
+            hx-get="{% url 'alerts-panel' %}" hx-target="#overlay-slot" hx-swap="innerHTML">
+      {% icon "bell" 13 %}
+      {% comment %}hx-target="this" is load-bearing: htmx attributes inherit, so
+      without it this span would adopt the button's hx-target="#overlay-slot"
+      and replace the overlay container with itself.{% endcomment %}
+      <span id="alerts-badge"
+            hx-get="{% url 'alerts-badge' %}" hx-trigger="load"
+            hx-target="this" hx-swap="outerHTML">alertas</span>
+    </button>
+
+    <button type="button" class="btn-ghost"
+            hx-get="{% url 'config' %}" hx-target="#overlay-slot" hx-swap="innerHTML">
+      {% icon "settings" 13 %} Config
+    </button>
+
+    <button type="button" class="btn-ghost"
+            hx-post="{% url 'pipeline-run' %}" hx-target="#overlay-slot" hx-swap="innerHTML">
+      {% icon "play" 13 %} Ejecutar
+    </button>
+
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn-ghost">{% icon "logout" 13 %} Salir</button>
+    </form>
+  </div>
+</div>

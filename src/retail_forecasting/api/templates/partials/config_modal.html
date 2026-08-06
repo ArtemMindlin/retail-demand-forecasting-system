@@ -1,0 +1,53 @@
+{% comment %}Configuration editor. Saving validates the YAML through
+load_config against a temporary file first, so an invalid edit can never
+overwrite the live configuration.{% endcomment %}
+<div class="modal-backdrop"
+     x-data="{ close() { document.getElementById('overlay-slot').innerHTML = '' } }"
+     x-on:keydown.escape.window="close()" x-on:click.self="close()"
+     role="dialog" aria-modal="true" aria-labelledby="config-title">
+  <div class="modal-window modal-window-wide">
+    <div class="modal-header">
+      <div class="modal-header-main">
+        <div class="academic-icon" style="border: 1px solid var(--border-2)">
+          {% icon "settings" 18 "var(--c-ai)" %}
+        </div>
+        <div>
+          <div class="label-mono">CONFIGURACIÓN DEL PIPELINE</div>
+          <div class="h-display modal-title" id="config-title">{{ path }}</div>
+        </div>
+      </div>
+      <button type="button" class="modal-close" x-on:click="close()" aria-label="Cerrar">
+        {% icon "x" 16 %}
+      </button>
+    </div>
+
+    <form class="modal-body" method="post" action="{% url 'config' %}"
+          hx-post="{% url 'config' %}" hx-target="#overlay-slot" hx-swap="innerHTML">
+      {% csrf_token %}
+
+      {% if missing %}
+        <div class="config-notice warn">
+          {% icon "alertTri" 13 %} El archivo no existe todavía; al guardar se creará.
+        </div>
+      {% endif %}
+      {% if error %}
+        <div class="config-notice error" role="alert">{% icon "alertTri" 13 %} {{ error }}</div>
+      {% endif %}
+      {% if saved %}
+        <div class="config-notice ok" role="status">
+          {% icon "check" 13 %} Configuración guardada y validada.
+        </div>
+      {% endif %}
+
+      <textarea name="yaml" class="config-editor" spellcheck="false"
+                aria-label="Contenido YAML de la configuración">{{ yaml_text }}</textarea>
+
+      <div class="config-actions">
+        <span class="config-hint">
+          Se valida con <code>load_config</code> sobre un archivo temporal antes de escribir.
+        </span>
+        <button type="submit" class="btn-run btn-sm">Guardar y validar</button>
+      </div>
+    </form>
+  </div>
+</div>

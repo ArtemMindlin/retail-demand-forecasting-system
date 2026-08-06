@@ -1,0 +1,24 @@
+{% comment %}KPI row. Direction (arrow) and sentiment (colour) are decided in
+the view, because "up" is good for coverage and bad for cost.{% endcomment %}
+<div class="grid-kpi">
+  {% for card in kpi_cards %}
+    <div class="glass kpi" style="--kpi-color: {{ card.color }}">
+      <div class="kpi-head">
+        <div class="label-mono">{{ card.label }}</div>
+        <div class="kpi-dot" style="background: {{ card.color }}; box-shadow: 0 0 8px {{ card.color }}"></div>
+      </div>
+
+      <div class="kpi-value-row">
+        <div class="tnum h-display kpi-value">{{ card.value }}</div>
+        {% if card.suffix %}<div class="kpi-suffix">{{ card.suffix }}</div>{% endif %}
+      </div>
+
+      <div class="kpi-foot">
+        <div class="kpi-delta{% if card.delta_good %} good{% else %} bad{% endif %}">
+          {% icon card.delta_icon 11 "currentColor" 2.4 %}{{ card.delta_text }}
+        </div>
+        {% if card.sub %}<div class="kpi-sub">{{ card.sub }}</div>{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</div>

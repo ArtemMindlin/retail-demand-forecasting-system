@@ -1,0 +1,48 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceder · Forecast.ai</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
+  <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/components.css' %}">
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-logo">{% icon "sparkles" 18 "#fff" 2 %}</div>
+      <div>
+        <div class="h-display login-wordmark">Forecast<span>.ai</span></div>
+        <div class="login-tagline">RETAIL DEMAND FORECASTING</div>
+      </div>
+    </div>
+
+    <p class="login-intro">Accede al sistema de predicción y gestión de inventario.</p>
+
+    <form method="post" action="{% url 'login' %}" class="login-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+
+      <div>
+        <label class="login-label" for="id_username">Usuario</label>
+        <input class="login-input" id="id_username" type="text" name="username"
+               autocomplete="username" required autofocus value="{{ username|default:'' }}">
+      </div>
+
+      <div>
+        <label class="login-label" for="id_password">Contraseña</label>
+        <input class="login-input" id="id_password" type="password" name="password"
+               autocomplete="current-password" required>
+      </div>
+
+      {% if error %}
+        <div class="login-error" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <button type="submit" class="btn-run login-submit">Iniciar sesión</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Simulación OPS · Forecast.ai{% endblock %}
+
+{% block content %}
+<div class="glass empty-state">
+  <div class="empty-state-icon">{% icon "activity" 28 "var(--c-ai)" 1.5 %}</div>
+  <div class="label-mono">SIN SIMULACIÓN</div>
+  <div class="h-display empty-state-title">La simulación operacional no se ha ejecutado</div>
+  <p class="empty-state-body">
+    {{ detail }} El plano OPS lee
+    <code>reports/&lt;run&gt;/simulation/predictions_by_day.parquet</code>, que produce el modo
+    <code>simulate_ops</code> del pipeline.
+  </p>
+  <p class="empty-state-body">
+    Genérala con: <code>make simulate CONFIG=configs/simulation.yaml</code>
+  </p>
+</div>
+{% endblock %}

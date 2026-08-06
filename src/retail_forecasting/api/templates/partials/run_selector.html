@@ -1,0 +1,15 @@
+{% comment %}Run picker shown next to the view header on the research plane.
+Changing it re-requests the view with ?run=… so the choice is in the URL.
+{% endcomment %}
+{% if runs|length > 1 %}
+  <form method="get" action="" hx-get="" hx-target="#view-content" hx-select="#view-content"
+        hx-swap="outerHTML" hx-push-url="true" hx-trigger="change">
+    <select name="run" class="ops-series-select" aria-label="Ejecución">
+      {% for r in runs %}
+        <option value="{{ r }}"{% if r == run %} selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select>
+  </form>
+{% else %}
+  <span class="run-badge">{{ run }}</span>
+{% endif %}

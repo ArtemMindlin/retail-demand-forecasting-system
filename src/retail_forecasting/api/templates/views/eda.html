@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}EDA · Forecast.ai{% endblock %}
+
+{% block content %}
+{% comment %}Each figure is redrawn as SVG from the CSV the EDA module wrote.
+The original PNG stays reachable through the lightbox, so nothing that used to
+be visible has been lost.{% endcomment %}
+<div class="eda-header">
+  <div>
+    <div class="label-mono">VIEW · EXPLORATORY DATA ANALYSIS</div>
+    <div class="h-display view-title">Análisis exploratorio del panel</div>
+    <div class="view-subtitle">
+      Figuras reproducibles generadas por <code>retail_forecasting.eda</code> · run {{ run }}
+    </div>
+  </div>
+
+  {% if runs|length > 1 %}
+    <form method="get" action="{% url 'eda' %}"
+          hx-get="{% url 'eda' %}"
+          hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML"
+          hx-push-url="true" hx-trigger="change">
+      <select name="run" class="ops-series-select" aria-label="Run de EDA">
+        {% for r in runs %}
+          <option value="{{ r }}"{% if r == run %} selected{% endif %}>{{ r }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  {% endif %}
+</div>
+
+{% if stats %}
+  <div class="eda-stats">
+    {% for stat in stats %}
+      <div class="glass eda-stat">
+        <div class="label-mono">{{ stat.label }}</div>
+        <div class="tnum eda-stat-value">{{ stat.value }}</div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="eda-grid" x-data="{ lightbox: null }">
+  {% for figure in figures %}
+    <figure class="glass eda-figure{% if figure.wide %} wide{% endif %}">
+      <figcaption class="eda-figure-head">
+        <div>
+          <div class="label-mono">{{ figure.nav_label }}</div>
+          <div class="eda-figure-caption">{{ figure.caption }}</div>
+        </div>
+        <button type="button" class="btn-ghost btn-sm"
+                x-on:click="lightbox = '{{ figure.name }}'">
+          {% icon "eye" 12 %} PNG original
+        </button>
+      </figcaption>
+
+      <div class="eda-figure-body">
+        {% if figure.chart %}
+          {{ figure.chart }}
+        {% else %}
+          <img src="{% url 'eda-figure' figure.name %}?run={{ run }}"
+               alt="{{ figure.caption }}" loading="lazy" class="eda-figure-img">
+        {% endif %}
+      </div>
+
+      <p class="eda-interpretation">{{ figure.interpretation }}</p>
+    </figure>
+  {% empty %}
+    <div class="glass drift-empty">
+      <div class="h-display">Sin figuras en este run</div>
+      <p>El directorio <code>reports/{{ run }}</code> no contiene ninguna figura conocida.</p>
+    </div>
+  {% endfor %}
+
+  <div class="eda-lightbox" x-show="lightbox" x-cloak
+       x-on:click="lightbox = null" x-on:keydown.escape.window="lightbox = null"
+       role="dialog" aria-modal="true" aria-label="Figura a tamaño completo">
+    <img x-show="lightbox" :src="lightbox ? `/eda/figura/${lightbox}.png?run={{ run }}` : ''"
+         alt="Figura del análisis exploratorio">
+  </div>
+</div>
+{% endblock %}

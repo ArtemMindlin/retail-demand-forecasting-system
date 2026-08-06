@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} · Forecast.ai{% endblock %}
+
+{% block content %}
+<div class="glass empty-state">
+  <div class="empty-state-icon">{% icon "sigma" 28 "var(--c-ai)" 1.5 %}</div>
+  <div class="label-mono">PLANO DE ANÁLISIS</div>
+  <div class="h-display empty-state-title">{{ title }}</div>
+  <p class="empty-state-body">{{ detail }}</p>
+</div>
+{% endblock %}

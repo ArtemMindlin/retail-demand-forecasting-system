@@ -1,0 +1,9 @@
+{% comment %}Alert count for the top bar.
+
+`oob` must only be set when this fragment rides along inside ANOTHER response
+(the alerts panel). Marking it out-of-band in its own direct response makes htmx
+swap it twice and clobber sibling elements — that is what removed #overlay-slot.
+{% endcomment %}
+<span id="alerts-badge"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {{ count }} alerta{{ count|pluralize:"s" }}{% if count %}<span class="badge">{{ count }}</span>{% endif %}
+</span>

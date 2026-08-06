@@ -1,0 +1,48 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Forecast.ai · Retail Demand Forecasting System{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
+  <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/components.css' %}">
+  {% comment %}KaTeX is still loaded from a CDN, exactly as the single-file
+  dashboard did. Self-hosting it means vendoring the stylesheet and ~20 font
+  files.{% endcomment %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" defer></script>
+  <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+  <script src="{% static 'vendor/alpine.min.js' %}" defer></script>
+  <script src="{% static 'js/chart.js' %}" defer></script>
+  <script src="{% static 'js/latex.js' %}" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<div class="app"{% if not show_sidebar %} style="grid-template-columns: 1fr"{% endif %}>
+
+  {% if show_sidebar %}{% include "partials/sidebar.html" %}{% endif %}
+
+  <main class="canvas canvas-bg">
+    <div class="canvas-content">
+      {% include "partials/topbar.html" %}
+      {% include "partials/nav.html" %}
+
+      {% comment %}The sidebar re-renders this region via hx-select, so every
+      view's markup must live inside it.{% endcomment %}
+      <div id="view-content">
+        {% block content %}{% endblock %}
+      </div>
+
+      {# Modals and slide-over panels are swapped in here. #}
+      <div id="overlay-slot"></div>
+
+      <div class="api-footer">
+        <span>POST /api/forecast · GET /api/skus · GET /api/download/predictions</span>
+        <span>django 6.1 · python 3.12</span>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{% comment %}Two-level navigation: mode (Operación / Análisis) › tab. Real
+links, so the back button and deep links work — this was client-side state
+before.{% endcomment %}
+<nav class="nav-cascade-row" aria-label="Navegación principal">
+
+  <div class="nav-modes">
+    {% for mode in modes %}
+      <a class="nav-mode{% if mode.id == active_mode %} active{% endif %}"
+         href="{% url mode.tabs.0.url_name %}"
+         {% if mode.id == active_mode %}aria-current="page"{% endif %}>
+        {% icon mode.icon 15 %} {{ mode.label }}
+      </a>
+    {% endfor %}
+  </div>
+
+  <span class="nav-separator" aria-hidden="true">{% icon "chevronRight" 15 "var(--text-3)" %}</span>
+
+  <div class="nav-tabs">
+    {% for mode in modes %}{% if mode.id == active_mode %}
+      {% for tab in mode.tabs %}
+        <a class="filter-tab{% if tab.id == active_tab %} active{% endif %}"
+           href="{% url tab.url_name %}"
+           {% if tab.id == active_tab %}aria-current="page"{% endif %}>
+          {% icon tab.icon 14 %} {{ tab.label }}
+        </a>
+      {% endfor %}
+    {% endif %}{% endfor %}
+  </div>
+
+  {# Views needing a run selector render it here via hx-swap-oob. #}
+  <div id="nav-run-slot" class="nav-run-slot"></div>
+</nav>

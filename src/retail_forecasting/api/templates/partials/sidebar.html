@@ -1,0 +1,137 @@
+{% load l10n %}{% comment %}
+What-if simulator. The four sliders are a GET form whose values live in the
+query string: htmx re-requests the current view and swaps #view-content, so the
+server recomputes and the URL stays shareable. Without JavaScript the same form
+still works via its submit button.
+
+Every number interpolated into JavaScript or CSS goes through |unlocalize — the
+es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
+{% endcomment %}
+<aside class="sidebar"
+       x-data="{
+         serviceLevel: {{ params.service_level|unlocalize }},
+         shortageCost: {{ params.shortage_cost|unlocalize }},
+         holdingCost: {{ params.holding_cost|unlocalize }},
+         capacity: {{ params.capacity|unlocalize }},
+         get criticalRatio() {
+           return (this.shortageCost / (this.shortageCost + this.holdingCost)).toFixed(3);
+         },
+         get alpha() { return (1 - this.serviceLevel / 100).toFixed(3); }
+       }">
+
+  <div class="sidebar-head">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">{% icon "sparkles" 16 "#fff" 2 %}</div>
+      <div>
+        <div class="h-display sidebar-wordmark">Forecast<span>.ai</span></div>
+        <div class="sidebar-version">RETAIL · v0.3.1</div>
+      </div>
+    </div>
+
+    <div class="sidebar-status">
+      <div class="sidebar-host">
+        <span class="live-dot"></span>
+        <span>API · {{ request.get_host }}</span>
+      </div>
+      <div class="sidebar-links">
+        <a href="https://status.artemmindlin.site/status/forecasting"
+           target="_blank" rel="noopener noreferrer" class="status-link">
+          {% icon "shield" 11 "var(--c-conf)" %}<span>SISTEMA: ONLINE</span>
+        </a>
+        <a href="{% url 'api-index' %}" class="status-link">
+          {% icon "terminal" 11 "var(--c-ai)" %}<span>API JSON</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <form class="sidebar-form"
+        method="get"
+        action=""
+        hx-get=""
+        hx-target="#view-content"
+        hx-select="#view-content"
+        hx-swap="outerHTML"
+        hx-push-url="true"
+        hx-trigger="input changed delay:280ms, submit">
+
+    <div class="sidebar-section-head">
+      {% icon "terminal" 12 "var(--c-ai)" %}
+      <span class="label-mono">What-If Simulator</span>
+    </div>
+    <p class="sidebar-section-intro">
+      Ajusta los parámetros del modelo Newsvendor + Conformal y reoptimiza la política de
+      inventario.
+    </p>
+
+    <div class="slider-field">
+      <div class="slider-head">
+        <div>
+          <div class="slider-label">Target Service Level</div>
+          <div class="slider-hint">Probabilidad objetivo de no rotura</div>
+        </div>
+        <div class="tnum slider-value" style="color: var(--c-conf)"
+             x-text="serviceLevel.toFixed(1) + '%'"></div>
+      </div>
+      <input type="range" name="service_level" min="80" max="99.5" step="0.5"
+             x-model.number="serviceLevel"
+             :style="`--track-fill: var(--c-conf); --track-percent: ${((serviceLevel - 80) / 19.5) * 100}%`">
+    </div>
+
+    <div class="slider-field">
+      <div class="slider-head">
+        <div>
+          <div class="slider-label">Coste de Rotura</div>
+          <div class="slider-hint">Penalización por unidad faltante · c_s</div>
+        </div>
+        <div class="tnum slider-value" style="color: var(--c-drift)"
+             x-text="shortageCost + ' u.m.'"></div>
+      </div>
+      <input type="range" name="shortage_cost" min="5" max="60" step="1"
+             x-model.number="shortageCost"
+             :style="`--track-fill: var(--c-drift); --track-percent: ${((shortageCost - 5) / 55) * 100}%`">
+    </div>
+
+    <div class="slider-field">
+      <div class="slider-head">
+        <div>
+          <div class="slider-label">Coste de Almacenamiento</div>
+          <div class="slider-hint">Holding cost por unidad/día · c_h</div>
+        </div>
+        <div class="tnum slider-value" style="color: var(--c-inv)"
+             x-text="holdingCost.toFixed(1) + ' u.m.'"></div>
+      </div>
+      <input type="range" name="holding_cost" min="1" max="20" step="0.5"
+             x-model.number="holdingCost"
+             :style="`--track-fill: var(--c-inv); --track-percent: ${((holdingCost - 1) / 19) * 100}%`">
+    </div>
+
+    <div class="slider-field">
+      <div class="slider-head">
+        <div>
+          <div class="slider-label">Capacidad de Almacén</div>
+          <div class="slider-hint">Máximo de unidades almacenables</div>
+        </div>
+        <div class="tnum slider-value" style="color: var(--c-ai)"
+             x-text="(capacity / 1000).toFixed(1) + 'k u'"></div>
+      </div>
+      <input type="range" name="capacity" min="5000" max="25000" step="500"
+             x-model.number="capacity"
+             :style="`--track-fill: var(--c-ai); --track-percent: ${((capacity - 5000) / 20000) * 100}%`">
+    </div>
+
+    <div class="derived-box">
+      <div class="derived-label">derived</div>
+      <div class="derived-line">
+        <span style="color: var(--c-ai)">CR*</span> = c_s / (c_s + c_h) =
+        <span class="tnum derived-value" x-text="criticalRatio"></span>
+      </div>
+      <div class="derived-line">
+        <span style="color: var(--c-conf)">α</span> = 1 − SL =
+        <span class="tnum derived-value" x-text="alpha"></span>
+      </div>
+    </div>
+
+    <noscript><button type="submit" class="btn-run">Recalcular</button></noscript>
+  </form>
+</aside>

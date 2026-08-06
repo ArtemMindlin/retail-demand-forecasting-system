@@ -1,0 +1,58 @@
+{% comment %}Operational alerts, derived from the latest run's exceptions.csv.
+Nothing synthetic: an empty file means an empty panel.{% endcomment %}
+<div class="drawer-backdrop"
+     x-data="{ close() { document.getElementById('overlay-slot').innerHTML = '' } }"
+     x-on:keydown.escape.window="close()" x-on:click.self="close()"
+     role="dialog" aria-modal="true" aria-labelledby="alerts-title">
+  <aside class="drawer">
+    <div class="drawer-header">
+      <div>
+        <div class="label-mono">EXCEPCIONES OPERATIVAS</div>
+        <div class="h-display drawer-title" id="alerts-title">
+          {{ alerts|length }} alerta{{ alerts|length|pluralize:"s" }}
+        </div>
+      </div>
+      <button type="button" class="modal-close" x-on:click="close()" aria-label="Cerrar">
+        {% icon "x" 16 %}
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      {% for alert in alerts %}
+        <article class="alert-item" x-data="{ open: false }">
+          <div class="alert-row-1">
+            <span class="alert-sev" style="color: {{ alert.color }}">
+              {% icon alert.icon 13 %}{{ alert.sev_label }}
+            </span>
+            <button type="button" class="alert-btn" x-on:click="open = !open"
+                    :aria-expanded="open">
+              <span x-text="open ? 'Ocultar' : 'Detalle'"></span>
+            </button>
+          </div>
+          <div class="alert-title">{{ alert.title }}</div>
+          <div class="alert-desc">{{ alert.desc }}</div>
+
+          <dl class="alert-meta" x-show="open" x-cloak>
+            {% for item in alert.meta %}
+              <div><dt>{{ item.k }}</dt><dd>{{ item.v }}</dd></div>
+            {% endfor %}
+          </dl>
+        </article>
+      {% empty %}
+        <div class="drift-empty">
+          <div class="h-display">Sin excepciones</div>
+          <p>
+            El run más reciente no ha generado <code>exceptions.csv</code>, o el archivo está
+            vacío. No se fabrican alertas sintéticas.
+          </p>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="drawer-footer">
+      <span>reports/{{ run_name|default:"—" }}/exceptions.csv</span>
+    </div>
+  </aside>
+</div>
+
+{% include "partials/alerts_badge.html" with count=alerts|length oob=True %}

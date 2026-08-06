@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% load l10n %}
+
+{% block title %}Análisis SKU · Forecast.ai{% endblock %}
+
+{% block content %}
+{% comment %}Search, status filter and sort are query parameters resolved on the
+server. Only the manual order overrides are client state — they live in
+localStorage, as they always have, and never reach the backend.{% endcomment %}
+<div x-data="orderOverrides()" x-init="hydrate()">
+
+  <div class="sku-header">
+    <div>
+      <div class="label-mono">VIEW · SKU-LEVEL</div>
+      <div class="h-display view-title">Control de Pedidos e Inventario</div>
+      <div class="view-subtitle">
+        {{ counts.all }} SKUs activos · Gestiona propuestas algorítmicas con ajustes manuales.
+      </div>
+    </div>
+
+    <div class="sku-header-actions">
+      <button type="button" class="btn-export" x-on:click="exportCsv()">
+        {% icon "arrowDown" 14 "var(--c-conf)" 2 %} Exportar Propuesta (CSV)
+      </button>
+
+      <form class="sku-search" method="get" action="{% url 'skus' %}"
+            hx-get="{% url 'skus' %}"
+            hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML"
+            hx-push-url="true"
+            hx-trigger="input changed delay:300ms from:input[name='q'], submit">
+        {% include "partials/whatif_hidden.html" %}
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        <input type="hidden" name="sort" value="{{ sort_key }}">
+        <input type="hidden" name="dir" value="{{ sort_dir }}">
+        <input type="search" name="q" value="{{ search }}" placeholder="Buscar SKU o categoría…"
+               aria-label="Buscar SKU o categoría">
+      </form>
+    </div>
+  </div>
+
+  <div class="sku-summary">
+    <div>
+      <div class="label-mono">Líneas de Pedido (SKUs)</div>
+      <div class="sku-summary-value" x-text="lineCount + ' / {{ counts.all }}'"></div>
+    </div>
+    <div>
+      <div class="label-mono">Volumen Total de Pedidos</div>
+      <div class="sku-summary-value tnum" style="color: var(--c-ai)">
+        <span x-text="totalVolume.toLocaleString()"></span> <span class="unit">u</span>
+      </div>
+    </div>
+    <div>
+      <div class="label-mono">Ajustes Manuales</div>
+      <div class="sku-summary-value tnum" x-text="overrideCount"></div>
+    </div>
+    <div>
+      <div class="label-mono">Capacidad Utilizada</div>
+      <div class="sku-summary-value tnum"
+           :style="totalVolume > {{ params.capacity|unlocalize }} ? 'color: var(--c-drift)' : ''">
+        <span x-text="((totalVolume / {{ params.capacity|unlocalize }}) * 100).toFixed(1) + '%'"></span>
+        <span class="sku-over" x-show="totalVolume > {{ params.capacity|unlocalize }}">¡SOBREPASADA!</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sku-filters">
+    {% for tab in filter_tabs %}
+      <a class="filter-tab{% if tab.id == status_filter %} active{% endif %}"
+         {% if tab.id == status_filter %}style="color: {{ tab.color }}; border-color: {{ tab.color }}"{% endif %}
+         href="?{% querystring status=tab.id %}"
+         hx-get="?{% querystring status=tab.id %}"
+         hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML" hx-push-url="true">
+        {{ tab.label }} <span class="filter-tab-count">{{ tab.count }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="glass sku-table">
+    <div class="sku-grid header">
+      {% for column in columns %}
+        {% if column.key %}
+          <a class="sku-th sortable"
+             href="?{% querystring sort=column.key dir=column.next_dir %}"
+             hx-get="?{% querystring sort=column.key dir=column.next_dir %}"
+             hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML"
+             hx-push-url="true">
+            {{ column.label }}{% if column.arrow %} <span class="sku-sort-arrow">{{ column.arrow }}</span>{% endif %}
+          </a>
+        {% else %}
+          <div class="sku-th">{{ column.label }}</div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="sku-rows">
+      {% for row in rows %}
+        <div class="sku-grid row" data-sku="{{ row.id }}" data-qstar="{{ row.q_star|unlocalize }}">
+          <div class="sku-cell sku-id">{{ row.id }}</div>
+          <div class="sku-cell sku-cat">{{ row.cat }}</div>
+          <div class="sku-cell">{{ row.trend }}</div>
+          <div class="sku-cell tnum sku-actual">{{ row.lastActual }}</div>
+          <div class="sku-cell tnum sku-pred">{{ row.lastPred }}</div>
+          <div class="sku-cell">
+            <div class="sku-coverage">
+              <div class="cov-bar" title="{{ row.empCoverage|floatformat:'1u' }}% / target {{ row.coverageTarget|floatformat:'0u' }}%">
+                <div class="cov-bar-fill"
+                     style="width: {{ row.empCoverage|floatformat:'1u' }}%; background: {{ row.coverage_color }}"></div>
+                <div class="cov-bar-target" style="left: {{ row.coverageTarget|floatformat:'0u' }}%"></div>
+              </div>
+              <span class="tnum sku-coverage-value" style="color: {{ row.coverage_color }}">
+                {{ row.empCoverage|floatformat:"1u" }}%
+              </span>
+            </div>
+          </div>
+          <div class="sku-cell tnum" style="color: {{ row.status_color }}">
+            {{ row.driftPsi|floatformat:"3u" }}
+          </div>
+          <div class="sku-cell tnum">{{ row.margin|floatformat:"2u" }}</div>
+          <div class="sku-cell">
+            <input type="number" min="0" class="sku-order-input"
+                   :class="{ 'overridden': isOverridden('{{ row.id }}') }"
+                   :value="valueFor('{{ row.id }}', {{ row.q_star|unlocalize }})"
+                   x-on:input="setOverride('{{ row.id }}', $event.target.value)"
+                   aria-label="Cantidad final para {{ row.id }}">
+          </div>
+          <div class="sku-cell">
+            <span class="sku-status" style="color: {{ row.status_color }}">{{ row.status_label }}</span>
+            <a class="sku-inspect" href="{% url 'dashboard' %}?{% querystring sku=row.id %}"
+               title="Ver en el dashboard">{% icon "chevronRight" 13 %}</a>
+          </div>
+        </div>
+      {% empty %}
+        <div class="sku-empty">Ningún SKU coincide con el filtro actual.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+  function orderOverrides() {
+    return {
+      overrides: {},
+      hydrate() {
+        try {
+          this.overrides = JSON.parse(localStorage.getItem("order_overrides") || "{}");
+        } catch (err) {
+          this.overrides = {};
+        }
+      },
+      persist() {
+        localStorage.setItem("order_overrides", JSON.stringify(this.overrides));
+      },
+      isOverridden(sku) {
+        return Object.prototype.hasOwnProperty.call(this.overrides, sku);
+      },
+      valueFor(sku, qStar) {
+        return this.isOverridden(sku) ? this.overrides[sku] : qStar;
+      },
+      setOverride(sku, value) {
+        if (value === "") {
+          delete this.overrides[sku];
+        } else {
+          this.overrides[sku] = parseInt(value, 10) || 0;
+        }
+        this.persist();
+      },
+      get rows() {
+        return Array.from(document.querySelectorAll(".sku-grid.row"));
+      },
+      get lineCount() {
+        return this.rows.filter(
+          (r) => this.valueFor(r.dataset.sku, Number(r.dataset.qstar)) > 0
+        ).length;
+      },
+      get totalVolume() {
+        return this.rows.reduce(
+          (sum, r) => sum + Number(this.valueFor(r.dataset.sku, Number(r.dataset.qstar))),
+          0
+        );
+      },
+      get overrideCount() {
+        return Object.keys(this.overrides).length;
+      },
+      exportCsv() {
+        var headers = [
+          "SKU", "Categoria", "Ultimo_Actual", "Ultimo_Predicho", "Cobertura_Empirica",
+          "Drift_PSI", "Margen", "Cantidad_Recomendada_qStar", "Cantidad_Final_Pedido",
+          "Ajustado_Manualmente", "Estado"
+        ];
+        var self = this;
+        var lines = this.rows.map(function (r) {
+          var sku = r.dataset.sku;
+          var qStar = Number(r.dataset.qstar);
+          var cells = r.querySelectorAll(".sku-cell");
+          return [
+            sku,
+            cells[1].textContent.trim(),
+            cells[3].textContent.trim(),
+            cells[4].textContent.trim(),
+            cells[5].textContent.trim().replace("%", ""),
+            cells[6].textContent.trim(),
+            cells[7].textContent.trim(),
+            qStar,
+            self.valueFor(sku, qStar),
+            self.isOverridden(sku) ? "SI" : "NO",
+            cells[9].textContent.trim()
+          ].join(",");
+        });
+        var blob = new Blob([[headers.join(",")].concat(lines).join("\n")],
+                            { type: "text/csv;charset=utf-8" });
+        var link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "plan_reposicion_retail_" +
+          new Date().toISOString().split("T")[0] + ".csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+      }
+    };
+  }
+</script>
+{% endblock %}

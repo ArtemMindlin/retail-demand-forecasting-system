@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Sin predicciones · Forecast.ai{% endblock %}
+
+{% block content %}
+<div class="glass empty-state">
+  <div class="empty-state-icon">{% icon "boxes" 28 "var(--c-ai)" 1.5 %}</div>
+  <div class="label-mono">SIN ARTEFACTOS</div>
+  <div class="h-display empty-state-title">Todavía no hay predicciones que mostrar</div>
+  <p class="empty-state-body">
+    No se ha encontrado ningún run con <code>predictions.csv</code> bajo <code>reports/</code>.
+    Lanza el pipeline para generar el primer conjunto de recomendaciones.
+  </p>
+
+  <button type="button" class="btn-run empty-state-action"
+          hx-post="{% url 'pipeline-run' %}"
+          hx-target="#overlay-slot"
+          hx-swap="innerHTML">
+    {% icon "play" 14 %} Ejecutar pipeline
+  </button>
+</div>
+{% endblock %}

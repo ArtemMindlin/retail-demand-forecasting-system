@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Monitor de Drift · Forecast.ai{% endblock %}
+
+{% block content %}
+<div class="view-header">
+  <div class="label-mono">VIEW · DRIFT MONITOR</div>
+  <div class="h-display view-title">Distribución de features</div>
+  <div class="view-subtitle">
+    Population Stability Index por feature · referencia: mitad antigua del panel supervisado
+    frente a la mitad reciente
+  </div>
+</div>
+
+<div class="grid-kpi view-kpis">
+  <div class="glass kpi-inline">
+    <div class="label-mono">Features con drift</div>
+    <div class="kpi-inline-value">
+      <span class="tnum h-display">{{ critical_count }}</span>
+      <span class="kpi-inline-suffix">/ {{ feature_count }}</span>
+      <span class="kpi-inline-dot" style="background: var(--c-drift); box-shadow: 0 0 8px var(--c-drift)"></span>
+    </div>
+  </div>
+  <div class="glass kpi-inline">
+    <div class="label-mono">PSI promedio</div>
+    <div class="kpi-inline-value">
+      <span class="tnum h-display">{% if average_psi is not None %}{{ average_psi|floatformat:"3u" }}{% else %}—{% endif %}</span>
+      <span class="kpi-inline-dot" style="background: var(--c-ai); box-shadow: 0 0 8px var(--c-ai)"></span>
+    </div>
+  </div>
+  <div class="glass kpi-inline">
+    <div class="label-mono">Umbral crítico</div>
+    <div class="kpi-inline-value">
+      <span class="tnum h-display">0.20</span>
+      <span class="kpi-inline-dot" style="background: var(--c-conf); box-shadow: 0 0 8px var(--c-conf)"></span>
+    </div>
+  </div>
+  <div class="glass kpi-inline">
+    <div class="label-mono">Run analizado</div>
+    <div class="kpi-inline-value">
+      <span class="tnum kpi-inline-run">{{ run_name|default:"—" }}</span>
+      <span class="kpi-inline-dot" style="background: var(--c-inv); box-shadow: 0 0 8px var(--c-inv)"></span>
+    </div>
+  </div>
+</div>
+
+<div class="glass drift-panel">
+  <div class="drift-panel-head">
+    <div class="h-display drift-panel-title">Features · ordenadas por PSI</div>
+    <div class="drift-legend">
+      <span><span class="legend-swatch legend-swatch-ref"></span> referencia</span>
+      <span><span class="legend-swatch" style="background: var(--c-drift)"></span> actual</span>
+    </div>
+  </div>
+
+  {% for feature in features %}
+    <div class="drift-row">
+      <div>
+        <div class="drift-row-name">
+          <span class="drift-dot" style="background: {{ feature.color }}"></span>
+          <span class="drift-feature">{{ feature.name }}</span>
+          <span class="chip chip-sm">{{ feature.type }}</span>
+        </div>
+        <div class="drift-importance">importance: {{ feature.importance_pct }}%</div>
+      </div>
+
+      <div class="drift-bar-cell">
+        <div class="psi-bar">
+          <div class="psi-bar-fill"
+               style="width: {{ feature.bar_pct|floatformat:"1u" }}%; background: {{ feature.color }}"></div>
+          <div class="psi-bar-mark"
+               style="left: {{ warning_marker_pct|floatformat:"1u" }}%"
+               title="warning threshold 0.10"></div>
+          <div class="psi-bar-mark crit"
+               style="left: {{ critical_marker_pct|floatformat:"1u" }}%"
+               title="critical threshold 0.20"></div>
+        </div>
+        <div class="tnum drift-psi-value" style="color: {{ feature.color }}">
+          PSI {{ feature.psi|floatformat:"3u" }}
+        </div>
+      </div>
+
+      {{ feature.chart }}
+
+      <div class="drift-status" style="color: {{ feature.color }}">{{ feature.status }}</div>
+    </div>
+  {% empty %}
+    <div class="drift-empty">
+      <div class="h-display">Sin informe de drift</div>
+      <p>
+        El artefacto <code>drift_report.json</code> se genera durante una ejecución en modo
+        <code>experiment</code> con explicabilidad SHAP activada. El run más reciente no lo
+        contiene, así que no hay PSI por feature que mostrar.
+      </p>
+    </div>
+  {% endfor %}
+
+  <div class="drift-panel-foot">
+    <span>reports/{{ run_name|default:"—" }}/drift_report.json</span>
+    <span>thresholds · warn 0.10 · crit 0.20</span>
+  </div>
+</div>
+{% endblock %}

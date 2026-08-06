@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Pareto Tuning · Forecast.ai{% endblock %}
+
+{% block content %}
+<div class="eda-header">
+  <div>
+    <div class="label-mono">VIEW · PARETO TUNING</div>
+    <div class="h-display view-title">Frente de Pareto — tuning multiobjetivo</div>
+    <div class="view-subtitle">
+      Compromiso entre <em>pinball loss</em> (calibración del cuantil) y <em>Winkler score</em>
+      (anchura penalizada del intervalo). Ninguna configuración del frente domina a otra.
+    </div>
+  </div>
+  {% include "partials/run_selector.html" %}
+</div>
+
+<div class="pareto-grid">
+  <div class="glass chart-card">
+    <div class="ops-chart-title">Frente · {{ front_count }} configuraciones</div>
+    {% if front %}
+      {{ pareto_chart }}
+    {% else %}
+      <div class="ops-chart-empty">
+        Este run no contiene <code>tuning_pareto.csv</code>.
+      </div>
+    {% endif %}
+  </div>
+
+  {% if best %}
+    <div class="glass pareto-best">
+      <div class="label-mono pareto-best-label">MEJOR PINBALL DEL FRENTE</div>
+      <dl class="pareto-best-list">
+        {% for key, value in best_items %}
+          <div>
+            <dt>{{ key }}</dt>
+            <dd class="tnum">{{ value }}</dd>
+          </div>
+        {% endfor %}
+      </dl>
+    </div>
+  {% endif %}
+</div>
+
+<div class="glass chart-card pareto-sensitivity">
+  <div class="ops-chart-title">Sensibilidad al ratio Cs/Co</div>
+  <div class="ops-chart-subtitle">
+    Cómo se mueven coste y nivel de servicio al variar la asimetría de costes.
+  </div>
+  {% if has_sensitivity %}
+    {{ sensitivity_chart }}
+  {% else %}
+    <div class="ops-chart-empty">Este run no contiene <code>sensitivity_summary.csv</code>.</div>
+  {% endif %}
+</div>
+
+<div class="glass pareto-fair">
+  <div class="ops-chart-title">Backtest de coste justo</div>
+  <div class="ops-chart-subtitle">
+    Cada estrategia cargada contra la <strong>misma</strong> demanda real censurada
+    sintéticamente. Es la comparación válida: el coste por estrategia del titular está
+    sesgado por la propia censura.
+  </div>
+
+  {% if fair_rows %}
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>{% for column in fair_columns %}<th>{{ column }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+          {% for row in fair_rows %}
+            <tr>
+              {% for column in fair_columns %}
+                <td class="tnum">{{ row|get:column|default_if_none:"—" }}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="ops-footer">reports/{{ fair_run }}/fair_cost_backtest.csv</div>
+  {% else %}
+    <div class="ops-chart-empty">
+      Sin backtest de coste justo. Genéralo con:
+      <code>make backtest-fair-cost</code>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

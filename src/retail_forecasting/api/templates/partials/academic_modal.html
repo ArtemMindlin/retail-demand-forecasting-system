@@ -1,0 +1,63 @@
+{% comment %}Expanded detail for one mathematical module. Rendered into
+#overlay-slot by htmx; Escape and the backdrop clear it again.{% endcomment %}
+<div class="modal-backdrop"
+     x-data="{ close() { document.getElementById('overlay-slot').innerHTML = '' } }"
+     x-init="$nextTick(() => $el.querySelector('.modal-close').focus())"
+     x-on:keydown.escape.window="close()"
+     x-on:click.self="close()"
+     role="dialog" aria-modal="true" aria-labelledby="academic-modal-title">
+  <div class="modal-window">
+    <div class="modal-glow" style="background: {{ module.color }}"></div>
+
+    <div class="modal-header">
+      <div class="modal-header-main">
+        <div class="academic-icon"
+             style="background: linear-gradient(135deg, {{ module.color }}, transparent 140%);
+                    border: 1px solid {{ module.color }}55">
+          {% icon module.icon 18 module.color 2 %}
+        </div>
+        <div>
+          <div class="label-mono">{{ module.kicker }}</div>
+          <div class="h-display modal-title" id="academic-modal-title">{{ module.title }}</div>
+        </div>
+      </div>
+      <button type="button" class="modal-close" x-on:click="close()" aria-label="Cerrar">
+        {% icon "x" 16 %}
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div class="formula-big" data-latex="{{ module.big_formula }}" data-display="block"></div>
+
+      <div class="pill-row">
+        {% for pill in module.pills %}
+          <div class="pill{% if pill.accent %} pill-accent{% endif %}">
+            <span>{{ pill.label }}</span><span class="tnum">{{ pill.value }}</span>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="modal-section-title">Intuición</div>
+      <div class="modal-text">{{ module.intuition|safe }}</div>
+
+      <div class="modal-section-title">Derivación</div>
+      <div class="modal-text">{{ module.derivation|safe }}</div>
+
+      <div class="modal-section-title">Con los parámetros actuales</div>
+      <div class="modal-text">{{ module.example|safe }}</div>
+
+      <div class="modal-section-title">Implementación</div>
+      <pre class="code-block"><code>{{ module.code }}</code></pre>
+
+      <div class="modal-section-title">Notas de defensa</div>
+      <ul class="modal-text modal-list">
+        {% for note in module.defense %}<li>{{ note }}</li>{% endfor %}
+      </ul>
+
+      <div class="modal-section-title">Referencias</div>
+      <ul class="modal-text modal-list modal-refs">
+        {% for ref in module.refs %}<li>{{ ref }}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
