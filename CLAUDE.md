@@ -6,7 +6,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 
 ## Repo Map
 
-- `configs/`: experiment configuration. `configs/experiment.yaml` is the canonical v1 config; `configs/experiment_large.yaml`/`experiment_daily.yaml` cover the scale/daily variants, `configs/imputation_comparison.yaml` the imputation study, `configs/simulation.yaml` the operational simulation.
+- `configs/`: experiment configuration. `configs/experiment.yaml` is the canonical v1 config; `configs/experiment_large.yaml`/`experiment_daily.yaml` cover the scale/daily variants, `configs/imputation_compare.yaml` the imputation study, `configs/simulation.yaml` the operational simulation.
 - `data/`: local raw/interim/processed caches. Do not commit generated datasets.
 - `docs/`: system of record for architecture, contracts, invariants, and decisions.
 - `notebooks/`: lightweight exploration only. Production pipeline logic belongs in `src/`.
@@ -23,7 +23,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 - `src/retail_forecasting/evaluation/`: metrics, run reporting, post-mortem analysis, and XAI/explainability.
 - `src/retail_forecasting/drift/`: regime/drift analysis hooks.
 - `src/retail_forecasting/eda/`: exploratory analysis and figure generation, surfaced in the dashboard's `/eda/` tab.
-- `src/retail_forecasting/contracts/`: pandera/pydantic-style contracts for backtesting, business rules, config, drift, feature engineering, quality, and tuning — enforced by the `tests/test_*_contract.py` / `tests/test_*_boundaries.py` suite.
+- `src/retail_forecasting/contracts/`: pydantic-style contracts for backtesting, business rules, config, drift, feature engineering, quality, and tuning — enforced by the `tests/test_*_contract.py` / `tests/test_*_boundaries.py` suite.
 - `src/retail_forecasting/api/`: Django dashboard and JSON API (`views/`, `templates/`, `static/`, `services/`) — visualizes experiments, EDA, drift, latent-demand imputation, the OPS plane, and exposes a documented JSON surface (`/api/forecast`, `/api/skus`, `/predict_orders`, etc.). Served via `asgi.py`/`wsgi.py`.
 - `tests/`: contract tests, smoke tests, synthetic-panel tests, and API tests.
 
