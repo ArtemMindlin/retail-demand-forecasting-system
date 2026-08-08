@@ -47,6 +47,7 @@ dependencies = [
   "scipy>=1.11.0",
   "shap>=0.45.0",
   "django>=5.1",
+  "whitenoise>=6.7.0",
   "uvicorn>=0.29.0",
   "optuna>=4.0.0",
   "pydantic>=2.10.0",
