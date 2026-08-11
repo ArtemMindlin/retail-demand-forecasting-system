@@ -132,6 +132,9 @@ class RunArtifacts:
     metrics_summary: pd.DataFrame
     fold_metrics: pd.DataFrame
     cost_summary: pd.DataFrame
+    # Every validation origin, before the dynamic simulation narrows the frame to
+    # one decision per series and fold. This is what the forecast metrics summarize.
+    validation_predictions: pd.DataFrame | None = None
     sensitivity_summary: pd.DataFrame | None = None
     tuning_pareto: pd.DataFrame | None = None
     reorder_recommendations: pd.DataFrame | None = None
@@ -182,6 +185,10 @@ def _persist_experiment_artifacts(
 ) -> None:
     """Write the full experiment outputs: prediction/metric/cost CSVs, plots and report."""
     artifacts.predictions.to_csv(run_dir / "predictions.csv", index=False)
+    if artifacts.validation_predictions is not None:
+        # Kept alongside predictions.csv so the forecast metrics stay auditable:
+        # metrics_summary.csv is computed over this frame, not over the decision rows.
+        artifacts.validation_predictions.to_csv(run_dir / "validation_predictions.csv", index=False)
     artifacts.metrics_summary.to_csv(run_dir / "metrics_summary.csv", index=False)
     artifacts.fold_metrics.to_csv(run_dir / "fold_metrics.csv", index=False)
     artifacts.cost_summary.to_csv(run_dir / "cost_summary.csv", index=False)

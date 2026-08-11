@@ -3,9 +3,20 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from retail_forecasting.config import FeatureConfig, ValidationConfig
+from retail_forecasting.config import (
+    DatasetConfig,
+    FeatureConfig,
+    ModelConfig,
+    ReportingConfig,
+    Settings,
+    ValidationConfig,
+)
 from retail_forecasting.features.engineering import build_supervised_frame
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
+from retail_forecasting.forecasting.pipeline import (
+    _split_train_calibration,
+    run_experiment_from_frame,
+)
 from tests import make_synthetic_panel
 
 
@@ -121,6 +132,66 @@ def test_walk_forward_folds_leave_horizon_gap_before_validation() -> None:
                 days=horizon - 1,
             )
             assert latest_training_target_end < fold.validation_start_date
+
+
+def test_calibration_split_embargoes_the_horizon() -> None:
+    """Conformal calibration targets must not overlap the sub-training targets.
+
+    Without the embargo the last ``horizon - 1`` training rows carry demand from
+    days inside the calibration window, so the conformity scores come out
+    optimistically small and the resulting intervals undercover.
+    """
+    panel = make_synthetic_panel(num_series=2, num_days=120)
+    horizon = 7
+    supervised, _ = build_supervised_frame(
+        panel=panel,
+        feature_config=FeatureConfig(lags=[1, 2], rolling_windows=[3]),
+        horizon=horizon,
+    )
+    settings = Settings(
+        dataset=DatasetConfig(top_n_series=2, min_history_days=70, horizon=horizon),
+        validation=ValidationConfig(calibration_days=14),
+    )
+
+    sub_train, calib, _ = _split_train_calibration(supervised, settings)
+
+    assert not sub_train.empty
+    assert not calib.empty
+
+    latest_training_target_end = sub_train["date"].max() + pd.Timedelta(days=horizon - 1)
+    assert latest_training_target_end < calib["date"].min()
+
+
+def test_forecast_metrics_cover_every_validation_origin() -> None:
+    """Forecast metrics must summarize all validation origins, not the decision subset.
+
+    The dynamic Order-Up-To simulation narrows the frame to one order per series and
+    fold. Measuring MAE, Winkler or coverage on that subset would silently discard
+    ``fold_size_days - 1`` of every ``fold_size_days`` predictions.
+    """
+    panel = make_synthetic_panel(num_series=3, num_days=90)
+    settings = Settings(
+        dataset=DatasetConfig(top_n_series=3, min_history_days=70, horizon=7),
+        models=ModelConfig(use_tuning=False),
+        reporting=ReportingConfig(make_plots=False),
+    )
+
+    artifacts = run_experiment_from_frame(panel, settings, save_artifacts=False)
+
+    validation = artifacts.validation_predictions
+    assert validation is not None
+    # The decision frame is a strict subset: one row per series, fold and model.
+    assert len(artifacts.predictions) < len(validation)
+
+    group_cols = ["data_strategy", "model_name", "backend_name"]
+    observations = (
+        artifacts.metrics_summary.set_index(group_cols)["observations"]
+        if all(col in artifacts.metrics_summary.columns for col in group_cols)
+        else artifacts.metrics_summary.set_index("model_name")["observations"]
+    )
+    expected = validation.groupby(group_cols).size()
+    for key, count in expected.items():
+        assert observations.loc[key] == count
 
 
 def _series_source(panel: pd.DataFrame, series_id: str) -> pd.DataFrame:

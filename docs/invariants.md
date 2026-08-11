@@ -62,29 +62,50 @@ These rules protect the experimental validity and architecture of the project.
     train_end_date = validation_start_date - horizon
     ```
 
-12. `dataset.use_eval_as_holdout = true` must remain unsupported until the temporal meaning of the official eval split is documented and tested.
+12. The conformal calibration split must embargo the horizon as well.
+
+    Splitting a fold's training frame into sub-train and calibration follows the
+    same rule as the fold split itself:
+
+    ```text
+    sub_train_end_date = calibration_start_date - horizon
+    ```
+
+    Without the gap the last `horizon - 1` sub-train rows carry targets covering
+    days inside the calibration window, the conformity scores come out
+    optimistically small, and the intervals undercover.
+
+13. Forecast metrics are summarized over every validation origin.
+
+    The dynamic Order-Up-To simulation narrows the frame to one decision per
+    series and fold, because the ordering cadence equals the fold length. That
+    subset is the correct domain for `summarize_costs()` and the sensitivity
+    analysis, and the wrong one for `summarize_predictions()`: MAE, Winkler and
+    coverage must not be computed on it.
+
+14. `dataset.use_eval_as_holdout = true` must remain unsupported until the temporal meaning of the official eval split is documented and tested.
 
 ## Models
 
-13. Models receive already-built feature matrices and targets.
+15. Models receive already-built feature matrices and targets.
 
     They must not load datasets, build raw features, choose order quantities, or write reports.
 
-14. Forecast outputs must be non-negative demand forecasts.
+16. Forecast outputs must be non-negative demand forecasts.
 
-15. Quantile forecasts must be monotonically non-decreasing by quantile level.
+17. Quantile forecasts must be monotonically non-decreasing by quantile level.
 
-16. Quantile column names must be generated with `quantile_column_name()`.
+18. Quantile column names must be generated with `quantile_column_name()`.
 
 ## Inventory
 
-17. Inventory decisions live in `src/retail_forecasting/inventory/`.
+19. Inventory decisions live in `src/retail_forecasting/inventory/`.
 
-18. The current inventory policy is single-period newsvendor.
+20. The current inventory policy is single-period newsvendor.
 
-19. `order_quantity` is derived from point forecasts or quantile forecasts plus the critical fractile.
+21. `order_quantity` is derived from point forecasts or quantile forecasts plus the critical fractile.
 
-20. Cost columns must be derived from `y_true` and `order_quantity`.
+22. Cost columns must be derived from `y_true` and `order_quantity`.
 
    Required cost columns:
 
@@ -96,58 +117,58 @@ These rules protect the experimental validity and architecture of the project.
 
 ## Evaluation and Reporting
 
-21. Evaluation summarizes predictions and costs.
+23. Evaluation summarizes predictions and costs.
 
     It must not retrain models, mutate forecasts, or change order quantities.
 
-22. The primary ranking metric for the TFG is economic cost, not MAE.
+24. The primary ranking metric for the TFG is economic cost, not MAE.
 
-23. MAE and RMSE are diagnostic metrics.
+25. MAE and RMSE are diagnostic metrics.
 
-24. Pinball loss and coverage are probabilistic diagnostics when quantile forecasts exist.
+26. Pinball loss and coverage are probabilistic diagnostics when quantile forecasts exist.
 
 ## Generated Outputs
 
-25. Reports, plots, cached datasets, notebook outputs, and PDFs are generated artifacts.
+27. Reports, plots, cached datasets, notebook outputs, and PDFs are generated artifacts.
 
     Do not treat them as source of truth for pipeline behavior.
 
-26. Durable design decisions belong in the main methodology and design documents.
+28. Durable design decisions belong in the main methodology and design documents.
 
 ## Web Layer
 
 See `docs/web_layer.md` for the full description.
 
-27. The web layer renders and orchestrates. It must not duplicate forecasting,
+29. The web layer renders and orchestrates. It must not duplicate forecasting,
     inventory, or evaluation logic.
 
     A new number on screen is computed in `api/services/` or in the pipeline,
     never in a view or a template.
 
-28. `api/services/` must not import Django.
+30. `api/services/` must not import Django.
 
     Django only enters through `api/store.py`, `api/views/` and the settings
     module, which keeps the services unit-testable without a web client.
 
-29. The dashboard has no database.
+31. The dashboard has no database.
 
     System state lives in `reports/`; the only web-owned state is the operator
     session, carried in a signed cookie. Adding a relational store is a design
     change, not an implementation detail.
 
-30. Missing artifacts render an explicit empty state that names the command
+32. Missing artifacts render an explicit empty state that names the command
     which produces them.
 
     Never fabricate placeholder values. A run without `drift_report.json` says
     so; it does not render an empty panel that reads as "no drift".
 
-31. User-supplied run names are validated against the artifact catalogue before
+33. User-supplied run names are validated against the artifact catalogue before
     touching the filesystem.
 
     `ArtifactStore.resolve_run` and the EDA figure lookup exist to make path
     traversal impossible by construction.
 
-32. Charts are rendered as SVG on the server.
+34. Charts are rendered as SVG on the server.
 
     No client-side charting library. The scenario parameters live in the query
     string so every dashboard state is a shareable, reloadable URL.

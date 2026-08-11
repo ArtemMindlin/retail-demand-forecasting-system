@@ -71,11 +71,20 @@ def _split_train_calibration(
     """Split a supervised frame into (sub_train, calibration, mondrian_group_ids).
 
     The most recent ``validation.calibration_days`` are reserved for conformal
-    calibration. Falls back to training on the whole frame (empty calibration)
-    when the split would leave no training rows.
+    calibration. A ``horizon``-day embargo separates the two: a training row dated
+    ``t`` carries the demand of ``[t, t + horizon - 1]`` as its target, so without
+    the gap the last ``horizon - 1`` training rows would cover days that fall inside
+    the calibration window. The model would then have partly seen the calibration
+    targets, making the conformity scores optimistically small, ``q_hat`` too tight
+    and the resulting intervals systematically undercovered.
+
+    Falls back to training on the whole frame (empty calibration) when the split
+    would leave no training rows.
     """
+    horizon = settings.dataset.horizon
     calib_cutoff = frame["date"].max() - pd.Timedelta(days=settings.validation.calibration_days)
-    sub_train = frame[frame["date"] <= calib_cutoff].copy()
+    train_cutoff = calib_cutoff - pd.Timedelta(days=horizon)
+    sub_train = frame[frame["date"] <= train_cutoff].copy()
     calib = frame[frame["date"] > calib_cutoff].copy()
     if sub_train.empty:
         return frame, pd.DataFrame(), None
@@ -951,15 +960,24 @@ def run_experiment_from_frame(
     if not fold_predictions:
         raise ValueError("Backtest did not produce any validation predictions.")
 
-    predictions = pd.concat(fold_predictions, ignore_index=True)
-    # Run dynamic inventory simulation
+    # Every validation origin the models forecast. This is the evaluation set for
+    # forecast quality: one row per series, date, model and strategy.
+    validation_predictions = pd.concat(fold_predictions, ignore_index=True)
+
+    # The dynamic Order-Up-To simulation acts once per series and fold (the ordering
+    # cadence equals the fold length), so it deliberately returns one decision row
+    # per series and fold — a strict subset of the validation origins.
     predictions = simulate_inventory_policy(
-        predictions,
+        validation_predictions,
         inventory_config=settings.inventory,
         series_cost_profile=series_cost_profile,
     )
 
-    metrics_summary, fold_metrics = summarize_predictions(predictions)
+    # Forecast quality is measured over every validation origin; inventory economics
+    # only over the points where the policy actually places an order. Measuring the
+    # former on the decision subset would discard ``fold_size_days - 1`` of every
+    # ``fold_size_days`` predictions and inflate the variance of coverage and Winkler.
+    metrics_summary, fold_metrics = summarize_predictions(validation_predictions)
     cost_summary = summarize_costs(predictions)
     sensitivity_summary = run_sensitivity_analysis(
         predictions=predictions,
@@ -1001,6 +1019,7 @@ def run_experiment_from_frame(
         prepared_panel=prepared_panel,
         supervised_frame=supervised_frame,
         predictions=predictions,
+        validation_predictions=validation_predictions,
         metrics_summary=metrics_summary,
         fold_metrics=fold_metrics,
         cost_summary=cost_summary,

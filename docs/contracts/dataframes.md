@@ -250,6 +250,27 @@ Expected properties:
 - `order_quantity >= 0` when `clip_negative_orders = true`
 - quantile columns are monotonic by level within each row
 
+### Two persisted variants
+
+The prediction frame is written twice, at two different granularities. They share
+the schema above and differ only in which rows survive.
+
+| Artifact | Rows | Produced by | Consumed by |
+| --- | --- | --- | --- |
+| `validation_predictions.csv` | every validation origin: one per series, date, model and strategy | `pd.concat(fold_predictions)` | `summarize_predictions()` → `metrics_summary.csv`, `fold_metrics.csv` |
+| `predictions.csv` | one decision per series, fold, model and strategy | `simulate_inventory_policy()` | `summarize_costs()`, `run_sensitivity_analysis()`, the dashboard |
+
+`predictions.csv` is a strict row subset of `validation_predictions.csv`, because
+the dynamic Order-Up-To policy orders once per fold (the ordering cadence equals
+`fold_size_days`). It additionally carries the simulation columns `sim_on_hand`,
+`sim_backlog`, `sim_arrivals` and `sim_total_cost`, and its `order_quantity` and
+cost columns hold the *dynamic* decision rather than the single-period one.
+
+Forecast metrics must be read from the validation frame and inventory economics
+from the decision frame — see invariant 13. Computing coverage or Winkler on the
+decision frame silently drops `fold_size_days - 1` of every `fold_size_days`
+predictions.
+
 ## Business Output Frame
 
 Intended for:
