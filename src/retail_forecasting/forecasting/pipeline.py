@@ -465,11 +465,9 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     )
 
     # 4. Merge Artifacts
-    # Both strategies are merged at two granularities, mirroring what each one is
-    # for: every validation origin (forecast metrics) and one decision per series
-    # and fold (inventory economics). Each strategy already ran its own dynamic
-    # simulation, so re-simulating the merged decision rows here would replay the
-    # inventory state machine over its own output.
+    # Merged at two granularities, mirroring what each one is for: every validation
+    # origin (forecast metrics) and one decision per series and fold (inventory
+    # economics).
     merged_validation = pd.concat(
         [
             frame
@@ -481,8 +479,23 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         ],
         ignore_index=True,
     )
-    merged_predictions = pd.concat(
-        [artifacts_obs.predictions, artifacts_latent.predictions], ignore_index=True
+
+    # Extract cost profile from one of the strategies (they share the same series)
+    # This is safe as the synthetic cost profile is built from the same initial panel
+    sample_series_cost_profile = None
+    if settings.inventory.use_series_costs:
+        sample_series_cost_profile = build_series_cost_profile(raw_panel, settings.inventory)
+
+    print("\n📦 Running inventory simulation on merged predictions...")
+    # The multi-period state is built here, over the merged validation origins, so
+    # both strategies advance their inventory under one common simulation. Running
+    # it per strategy inside run_experiment_from_frame and merging the results
+    # afterwards collapses the state (sim_on_hand ends at 0 and sim_total_cost stops
+    # discriminating between models), so this pass is the authoritative one.
+    merged_predictions = simulate_inventory_policy(
+        merged_validation,
+        inventory_config=settings.inventory,
+        series_cost_profile=sample_series_cost_profile,
     )
 
     merged_metrics, merged_folds = summarize_predictions(merged_validation)

@@ -136,9 +136,17 @@ def simulate_inventory_policy(
             row_map = {}
             arrivals_map = {}
 
+            # The policy orders once per series and fold, at the latest origin in the
+            # window. Collapsing first matters: consuming `pending_orders` inside a
+            # per-row loop drained it on the first row of each series and wrote
+            # `arrivals = 0` for every later one, so a frame carrying more than one
+            # origin per series silently lost every arrival.
+            decision_rows = {
+                row["series_id"]: row for _, row in fold_subset.sort_values("date").iterrows()
+            }
+
             # 1. First pass: Determine unconstrained orders for all SKUs
-            for _, row in fold_subset.iterrows():
-                series_id = row["series_id"]
+            for series_id, row in decision_rows.items():
                 row_map[series_id] = row
                 state = states[series_id]
 
