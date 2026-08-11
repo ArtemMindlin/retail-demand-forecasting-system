@@ -245,7 +245,26 @@ Para resolver este sesgo de evaluación, implementamos una metodología de \text
     \item \textbf{Término de seguridad compartido}: la escala $\sigma$ del \textit{safety stock} se estima como la desviación típica de la demanda real del conjunto de evaluación y se comparte entre estrategias. Al ser un valor común, no altera el orden entre ellas ---que es la magnitud de interés---, pero conviene advertir que es una cantidad de tipo oráculo: en producción $\sigma$ tendría que estimarse sobre el histórico disponible, por lo que los niveles absolutos de coste y de \textit{fill rate} de la Tabla~\ref{tab:metrics_cost} deben leerse como una cota optimista.
 \end{itemize}
 
-Los resultados de esta comparativa equitativa, calculada sobre un subconjunto de 30 series y $n = 2\,018$ días censurados sintéticamente, se presentan en la Tabla~\ref{tab:metrics_cost}.
+Los resultados de esta comparativa equitativa, calculada sobre un subconjunto de 30 series muestreadas del panel de 500 y $n = 2\,018$ días censurados sintéticamente, se presentan en la Tabla~\ref{tab:metrics_cost}.
+
+\begin{quote}
+\small
+\textbf{Precisión necesaria sobre el muestreo.} El protocolo extrae 30 series por
+motivos de coste computacional, y el resultado es \emph{sensible al panel del que se
+extraen}. Muestreadas del panel de 500 series se reproduce el orden de la
+Tabla~\ref{tab:metrics_cost}: \textit{Latent Supervised} resulta la estrategia más
+barata (1.774{,}82 frente a 1.843{,}41 u.m.\ de \textit{Observed} en una reejecución
+de control, un $-3{,}7\%$). Muestreadas en cambio del subset base de 50 series de alta
+rotación, el orden \textbf{se invierte} y \textit{Observed} pasa a ser la más barata
+(844{,}01 frente a 927{,}80 u.m.). La causa es que el subset base contiene demasiadas
+pocas series con regímenes de rotura severa para que la corrección emerja por encima
+del ruido de muestreo con $n=30$: precisamente el mecanismo por el que la ventaja se
+diluye a escala, aquí operando en sentido contrario. La conclusión de esta sección debe
+leerse por tanto acotada al panel de 500 series, que es el que declara la columna
+\texttt{source\_panel\_series} del artefacto \texttt{fair\_cost\_backtest.csv}, y no
+como una propiedad independiente del subconjunto evaluado. Ampliar $n$ hasta que el
+signo sea estable frente al remuestreo queda como verificación pendiente.
+\end{quote}
 
 \input{tables/table_costs}
 

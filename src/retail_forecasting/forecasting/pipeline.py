@@ -370,6 +370,13 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
     inventory cost against a common synthetically-censored ground truth, and writes
     ``fair_cost_backtest.csv``. Use this to sanity-check the methodology before integrating.
 
+    The sample is drawn from whatever panel the config loads, and the result is sensitive
+    to that choice: 30 series taken from the 500-series panel reproduce the published
+    ranking (Latent_supervised cheapest), while 30 taken from the 50-series panel invert
+    it, because the top-rotation subset has too few severe-stockout series for the
+    correction to show up over sampling noise. The panel actually used is therefore
+    recorded in the artifact so the number is never read without its provenance.
+
     Returns:
         The created run directory path.
     """
@@ -382,6 +389,7 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
         preprocessing_config=settings.preprocessing,
         split="train",
     )
+    source_series = panel["series_id"].nunique() if "series_id" in panel.columns else 0
     if "series_id" in panel.columns and n_series:
         unique_ids = panel["series_id"].drop_duplicates().to_numpy()
         if len(unique_ids) > n_series:
@@ -389,11 +397,15 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
             keep = rng.choice(unique_ids, size=n_series, replace=False)
             panel = panel[panel["series_id"].isin(keep)].reset_index(drop=True)
     n_kept = panel["series_id"].nunique() if "series_id" in panel.columns else 0
-    print(f"✅ Panel: {len(panel):,} rows · {n_kept} series (sample)")
+    print(f"✅ Panel: {len(panel):,} rows · {n_kept} of {source_series} series (sample)")
 
     result = evaluate_fair_inventory_cost(
         panel, settings.inventory, seed=settings.project.random_seed
     )
+    # Provenance: the ranking flips with the source panel, so the artifact must say
+    # which one it came from rather than leaving it to the reader's memory.
+    result.insert(1, "source_panel_series", source_series)
+    result.insert(2, "sampled_series", n_kept)
 
     run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
     run_dir.mkdir(parents=True, exist_ok=True)
