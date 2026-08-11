@@ -112,8 +112,9 @@ localStorage, as they always have, and never reach the backend.{% endcomment %}
               </span>
             </div>
           </div>
+          {# None when the SKU has too few origins for a PSI; see per_sku_psi. #}
           <div class="sku-cell tnum" style="color: {{ row.status_color }}">
-            {{ row.driftPsi|floatformat:"3u" }}
+            {% if row.driftPsi is None %}n/d{% else %}{{ row.driftPsi|floatformat:"3u" }}{% endif %}
           </div>
           <div class="sku-cell tnum">{{ row.margin|floatformat:"2u" }}</div>
           <div class="sku-cell">

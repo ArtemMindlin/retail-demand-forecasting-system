@@ -47,16 +47,23 @@ which needs the per-point geometry the server already computed.
   </div>
 
   <div class="chart-stats">
+    {# q* here is the single-period Newsvendor quantity, not the Order-Up-To level the
+       pipeline decides with: the dashboard has no inventory position to subtract. The
+       label says so to avoid reading it as the pipeline's order. #}
     <div>
-      <div class="label-mono">q* (order)</div>
+      <div class="label-mono">q* newsvendor estático</div>
       <div class="tnum chart-stat-value">{{ recommendation.qStar|fmt_units }}<span>u</span></div>
     </div>
+    {# Standard-normal equivalent of the service level, shown for reference only: q*
+       comes from the empirical residual quantile, not from mu + z*sigma. #}
     <div>
-      <div class="label-mono">z-score</div>
+      <div class="label-mono">z equivalente (ref.)</div>
       <div class="tnum chart-stat-value">{{ recommendation.z|floatformat:"2u" }}</div>
     </div>
     <div>
-      <div class="label-mono">critical ratio</div>
+      <div class="label-mono">
+        critical ratio{% if recommendation.criticalRatioSource == "series" %} · serie{% endif %}
+      </div>
       <div class="tnum chart-stat-value">{{ recommendation.criticalRatio|floatformat:"3u" }}</div>
     </div>
     <div>

@@ -82,6 +82,11 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     chart = forecast_chart(data["forecast"])
     kpis = data["kpis"]
+    # Every per-SKU statistic below is computed on this many forecast origins. Shown
+    # because coverage, the MAE trend and the PSI are not interpretable on a handful.
+    observations = data.get("observations", 0)
+    sample = f"n = {observations}"
+    psi = kpis["driftPSI"]["value"]
 
     context = {
         "sku": data["sku"],
@@ -107,7 +112,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
                 kpis["coverage"]["delta"],
                 suffix="%",
                 color="var(--c-conf)",
-                sub=f"target {kpis['coverage']['target']:.1f}%",
+                sub=f"target {kpis['coverage']['target']:.1f}% · {sample}",
                 delta_unit=" pts",
             ),
             _kpi_card(
@@ -116,18 +121,24 @@ def dashboard(request: HttpRequest) -> HttpResponse:
                 kpis["mae"]["delta"],
                 suffix="u",
                 color="var(--c-ai)",
-                sub="14-day rolling",
+                sub=f"media de residuos · {sample}",
                 delta_unit=" u",
                 delta_decimals=2,
                 lower_is_better=True,
             ),
             _kpi_card(
                 "Alerta de Drift",
-                f"{kpis['driftPSI']['value']:.3f}",
+                # None means the sample cannot support a PSI; see per_sku_psi. Showing
+                # "n/d" keeps the card honest instead of implying stability or an alarm.
+                f"{psi:.3f}" if psi is not None else "n/d",
                 kpis["driftPSI"]["delta"],
-                suffix="PSI",
+                suffix="PSI" if psi is not None else "",
                 color="var(--c-drift)",
-                sub="threshold 0.20",
+                sub=(
+                    "threshold 0.20"
+                    if psi is not None
+                    else f"muestra insuficiente ({sample}) · ver /drift/"
+                ),
                 lower_is_better=True,
             ),
         ],

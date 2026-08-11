@@ -97,26 +97,55 @@ def empirical_conformal(sku_df: pd.DataFrame, alpha: float) -> ConformalStats:
     return ConformalStats(residuals, abs_residuals, width, coverage)
 
 
-def per_sku_psi(demand: np.ndarray) -> float:
-    """PSI of a SKU's own demand, older half vs recent half (0.0 if too short)."""
+# PSI bins each half into ten buckets. Below this many observations the buckets are
+# too sparse for the statistic to be meaningful: empty bins get clipped to epsilon and
+# the log ratio explodes, so a handful of origins yields values orders of magnitude
+# above the 0.20 threshold that mean nothing at all.
+MIN_PSI_OBSERVATIONS = 60
+
+
+def per_sku_psi(demand: np.ndarray) -> float | None:
+    """PSI of a SKU's own demand, older half vs recent half.
+
+    Returns ``None`` when the sample cannot support the statistic, so callers render an
+    explicit "not available" instead of a number. Reporting a spurious 0.000 reads as
+    "no drift" and a spurious 8.701 reads as a critical alert; both are fabrications.
+    The per-feature monitor at ``/drift/`` is the one that measures drift properly, on
+    the full supervised frame.
+    """
+    if len(demand) < MIN_PSI_OBSERVATIONS:
+        return None
     half = len(demand) // 2
-    if half < 1:
-        return 0.0
     return round(compute_psi(demand[:half], demand[half:])[0], 3)
 
 
 def build_forecast_series(sku_df: pd.DataFrame, conformal_width: float) -> list[dict[str, Any]]:
-    """Per-day actual/predicted values with a symmetric conformal band."""
+    """Per-origin actual/predicted values with a symmetric conformal band.
+
+    Labels carry the real forecast-origin date rather than a positional ``D01``: the
+    origins are not necessarily consecutive days (walk-forward folds can leave gaps),
+    and a positional axis invites reading the slope between points as a daily trend.
+    """
+    dates = pd.to_datetime(sku_df["date"], errors="coerce")
     return [
         {
             "day": idx + 1,
-            "label": f"D{idx + 1:02d}",
+            "label": (
+                date.strftime("%d/%m")
+                if isinstance(date, pd.Timestamp) and pd.notna(date)
+                else f"D{idx + 1:02d}"
+            ),
+            "date": (
+                date.strftime("%Y-%m-%d")
+                if isinstance(date, pd.Timestamp) and pd.notna(date)
+                else None
+            ),
             "actual": round(float(row.y_true)),
             "predicted": round(float(row.y_pred)),
             "lower": round(max(0.0, float(row.y_pred) - conformal_width)),
             "upper": round(float(row.y_pred) + conformal_width),
         }
-        for idx, row in enumerate(sku_df.itertuples())
+        for idx, (row, date) in enumerate(zip(sku_df.itertuples(), dates, strict=True))
     ]
 
 
@@ -168,8 +197,14 @@ def compute_forecast(
     sku_df = grouped[sku].sort_values("date")
 
     conformal = empirical_conformal(sku_df, params.alpha)
+    # The slider ratio is the what-if input, but when the artifact carries the SKU's
+    # real critical fractile (per-series costs) that is the one the pipeline actually
+    # decides with, so it takes precedence — the same rule compute_sku_table follows.
     cr = params.critical_ratio
-    cr_quantile = float(np.quantile(conformal.residuals, cr))
+    series_cr = None
+    if "critical_fractile" in sku_df.columns and not sku_df["critical_fractile"].isna().all():
+        series_cr = float(sku_df["critical_fractile"].iloc[-1])
+    cr_quantile = float(np.quantile(conformal.residuals, series_cr if series_cr else cr))
 
     last_pred = float(sku_df.iloc[-1]["y_pred"])
     q_star = min(max(0.0, last_pred + cr_quantile), params.capacity)
@@ -191,6 +226,9 @@ def compute_forecast(
     return {
         "status": "ok",
         "sku": sku,
+        # Sample size behind every per-SKU statistic below. The views surface it because
+        # coverage, the MAE trend and the PSI are meaningless on a handful of origins.
+        "observations": int(len(sku_df)),
         "forecast": build_forecast_series(sku_df, conformal.width),
         "kpis": {
             "inventoryCost": {"value": inventory_cost, "delta": inventory_delta},
@@ -200,12 +238,16 @@ def compute_forecast(
                 "delta": conformal.coverage_pct - params.service_level,
             },
             "mae": {"value": mae, "delta": mae_delta},
-            "driftPSI": {"value": psi, "delta": (psi - PSI_DRIFT_THRESHOLD) * 100.0},
+            "driftPSI": {
+                "value": psi,
+                "delta": (psi - PSI_DRIFT_THRESHOLD) * 100.0 if psi is not None else 0.0,
+            },
         },
         "recommendation": {
             "qStar": round(q_star),
             "z": _BASELINE_Z,
-            "criticalRatio": cr,
+            "criticalRatio": series_cr if series_cr else cr,
+            "criticalRatioSource": "series" if series_cr else "slider",
             "targetCR": target_cr,
             "ratioDelta": (target_cr - cr) * 100.0,
             "utilization": min(100.0, round((q_star / params.capacity) * 100.0, 1)),
@@ -213,9 +255,12 @@ def compute_forecast(
     }
 
 
-def sku_status(coverage_pct: float, drift_psi: float, service_level: float) -> str:
-    """Classify a SKU for the status column: drift beats coverage deviation."""
-    if drift_psi > PSI_DRIFT_THRESHOLD:
+def sku_status(coverage_pct: float, drift_psi: float | None, service_level: float) -> str:
+    """Classify a SKU for the status column: drift beats coverage deviation.
+
+    An unavailable PSI is not evidence of stability, so it simply does not vote.
+    """
+    if drift_psi is not None and drift_psi > PSI_DRIFT_THRESHOLD:
         return "drift"
     if coverage_pct < service_level - 3:
         return "shortage"

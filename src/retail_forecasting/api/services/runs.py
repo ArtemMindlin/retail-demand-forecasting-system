@@ -205,6 +205,15 @@ class ArtifactStore:
     def latest_predictions(self) -> pd.DataFrame:
         """Champion-filtered predictions frame from the latest run, cached.
 
+        Prefers ``validation_predictions.csv``, which carries every validation origin,
+        over ``predictions.csv``, which the dynamic simulation narrows to one decision
+        row per series and fold. The dashboard reports forecast quality (coverage, MAE,
+        drift), so it needs all the origins: on the decision frame a 7-day fold
+        collapses to a single point and every per-SKU statistic runs on three
+        observations. Runs written before that artifact existed fall back to the
+        decision frame, and the sample size travels with the payload so the views can
+        say which one they are showing.
+
         Raises:
             NoPredictionsError: if no run with predictions exists.
         """
@@ -213,7 +222,9 @@ class ArtifactStore:
             return cached
 
         run_path = self.latest_run_path()
-        predictions_csv = run_path / "predictions.csv"
+        predictions_csv = run_path / "validation_predictions.csv"
+        if not predictions_csv.exists():
+            predictions_csv = run_path / "predictions.csv"
         try:
             df = pd.read_csv(predictions_csv, usecols=_PREDICTION_COLUMNS)
         except ValueError:
