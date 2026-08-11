@@ -273,9 +273,94 @@ La robustez del sistema fue evaluada introduciendo una restricción dura de capa
     \label{eq:lp_capacity}
 \end{equation}
 
-donde $q_i$ es la cantidad a pedir del SKU $i$, $d_i$ la cantidad óptima sin restricción (Newsvendor individual, que actúa como cota superior), $u_i$ la utilidad marginal de cada unidad (el coste de rotura evitado $c_{u,i}$) y $C$ la capacidad global del almacén. Como cada unidad consume exactamente un hueco de capacidad, la solución óptima asigna el presupuesto de forma voraz a los SKUs con mayor utilidad marginal $u_i$ hasta agotar su cota $d_i$: los productos con alta penalización de rotura absorben capacidad a costa de los de baja utilidad marginal. El solver empleado es \texttt{scipy.optimize.linprog} con el método \texttt{highs}.
+donde $q_i$ es la cantidad a pedir del SKU $i$, $d_i$ la cantidad óptima sin restricción (Newsvendor individual, que actúa como cota superior), $u_i$ la utilidad marginal de cada unidad y $C$ la capacidad global del almacén. El solver empleado es \texttt{scipy.optimize.linprog} con el método \texttt{highs}.
 
-El resultado operativo relevante es que el coste total bajo restricción es estrictamente inferior al de un recorte proporcional ciego (reducir todos los $q_i$ en el mismo porcentaje, que es precisamente el mecanismo de \textit{fallback} si el solver falla): al sacrificar inventario en los SKUs de menor utilidad marginal, el sistema preserva el suministro de los productos donde la rotura es más cara, maximizando el nivel de servicio global dentro del presupuesto. A modo de comprobación empírica, en un escenario de simulación restringido al 75\% de la capacidad ideal sobre el panel de 50 productos, la formulación LP logró reducir la penalización total por rotura de stock en un 51{,}4\% frente a la regla de recorte proporcional ciego (1.980 u.m.\ frente a 4.072 u.m.). Esta priorización inteligente constituye el puente entre el modelo probabilístico y la operativa logística real con recursos finitos.
+\subsection{El Coste de Asumir Utilidad Marginal Constante}
+\label{sec:lp_utilidad_constante}
+
+La formulación de la Ecuación~\ref{eq:lp_capacity} admite una lectura ingenua que
+resulta ser incorrecta: tomar $u_i = c_{u,i}$, es decir, asumir que \emph{toda}
+unidad del SKU $i$ evita una rotura y por tanto vale lo mismo. Bajo ese supuesto el
+objetivo es lineal en $q_i$ sobre restricciones de caja, y el óptimo es
+necesariamente una \textbf{solución de esquina}: el solver llena hasta su cota $d_i$
+los SKUs de mayor $c_{u,i}$ y asigna \emph{cero} al resto. No es un defecto del
+solver, sino la respuesta matemáticamente correcta a un objetivo mal especificado.
+
+La consecuencia empírica es severa. Comparada contra el recorte proporcional ciego
+--- el mecanismo de \textit{fallback} del propio módulo --- esta formulación resulta
+\emph{peor} en todos los regímenes de capacidad evaluados, entre un 30\% y un 163\%
+más de penalización por rotura (Tabla~\ref{tab:lp_sweep}). El motivo es que los
+pedidos Order-Up-To incorporan stock de seguridad y cobertura de \textit{lead time},
+lo que les da un holgura media de $2{,}18\times$ sobre la demanda finalmente
+realizada: un recorte uniforme del 25\% deja a todos los SKUs cubiertos, mientras que
+anular por completo 52 de las 150 decisiones garantiza otras tantas roturas.
+
+\subsection{Formulación Correcta: Valor Marginal Decreciente}
+\label{sec:lp_tramos}
+
+El valor de una unidad no es constante: vale $c_{u,i}$ solo mientras cubra demanda que
+de otro modo se perdería, y a partir de ahí genera coste de almacenamiento. Derivando
+el coste esperado del Newsvendor, el valor marginal de la unidad situada en la
+posición $q$ es
+\begin{equation}
+    \frac{\partial V_i}{\partial q} \;=\; c_{u,i} \;-\; (c_{u,i} + c_{o,i})\, F_i(q),
+    \label{eq:lp_marginal}
+\end{equation}
+positivo únicamente mientras $F_i(q)$ se mantenga por debajo del fractil crítico
+$c_{u,i}/(c_{u,i}+c_{o,i})$, que es exactamente la condición del Newsvendor de la
+Sección~\ref{sec:newsvendor}. La función de valor es por tanto \textbf{cóncava}, y su
+aproximación lineal por tramos sigue siendo resoluble como un LP: basta introducir una
+variable por cada par (SKU, tramo), acotada por la anchura del tramo, y dejar que el
+solver llene primero las unidades globalmente más valiosas.
+
+La distribución $F_i$ no requiere ningún supuesto paramétrico adicional: se lee
+directamente de los cuantiles que el modelo ya predice, tomando el nivel medio de cada
+intervalo como probabilidad representativa del tramo. Los tramos situados más allá del
+fractil crítico reciben valor negativo y el solver los deja vacíos por sí mismo, sin
+necesidad de restricciones adicionales.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{lrrr}
+        \toprule
+        \textbf{Capacidad} & \textbf{LP por tramos} & \textbf{LP utilidad const.} & \textbf{Series anuladas (tramos / const.)} \\
+        \midrule
+        75\% & $-11{,}7\%$ & $-160{,}1\%$ & 9 / 52 \\
+        60\% & $-1{,}0\%$  & $-163{,}4\%$ & 20 / 79 \\
+        50\% & $\mathbf{+2{,}5\%}$ & $-157{,}8\%$ & 26 / 95 \\
+        40\% & $\mathbf{+2{,}7\%}$ & $-111{,}5\%$ & 39 / 110 \\
+        30\% & $\mathbf{+3{,}5\%}$ & $-69{,}9\%$  & 59 / 121 \\
+        20\% & $\mathbf{+2{,}7\%}$ & $-30{,}5\%$  & 78 / 131 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Reducción de la penalización por rotura frente al recorte proporcional ciego, según la capacidad disponible expresada como fracción de las unidades solicitadas sin restricción (subset base de 50 series, CatBoost \textit{Latent Supervised}). Valores positivos indican que la asignación bate al recorte proporcional. Ambas políticas consumen exactamente la misma capacidad, por lo que el coste de almacenamiento es idéntico y la penalización por rotura es el único diferenciador. Reproducible con \texttt{scripts/capacity\_lp\_experiment.py}.}
+    \label{tab:lp_sweep}
+\end{table}
+
+La formulación por tramos revierte el signo del resultado: bate al recorte
+proporcional en los cuatro niveles en los que la capacidad restringe de forma
+apreciable ($\leq 50\%$), con reducciones del 2{,}5\% al 3{,}5\%, y reduce las
+decisiones anuladas de 52 a 9 en el escenario más holgado.
+
+Conviene precisar por qué \emph{pierde} con capacidad holgada (75\% y 60\%), porque no
+se trata de un defecto de la formulación. Con esos presupuestos la holgura de los
+pedidos Order-Up-To es suficiente para que repartir uniformemente cubra la demanda
+realizada de todos los SKUs y no produzca ninguna rotura. El LP optimiza el coste
+\emph{esperado} bajo la distribución predicha, no el realizado, y no puede saber
+\textit{ex ante} que sobraba capacidad; el recorte proporcional se beneficia aquí de
+una ventaja puramente \textit{ex post} que ninguna política prospectiva puede
+explotar. La conclusión operativa es por tanto acotada pero honesta: la asignación por
+programación lineal aporta valor cuando la restricción de capacidad es genuinamente
+severa, y es indistinguible del reparto proporcional cuando no lo es.
+
+Las magnitudes son además modestas (2--4\%), muy lejos de lo que sugeriría el
+razonamiento cualitativo de priorizar los SKUs de rotura más cara. La razón es que en
+este panel los costes de rotura son casi homogéneos ($c_u$ entre 3{,}70 y 3{,}96 u.m.),
+de modo que hay poca señal sobre la que discriminar. Un catálogo con perfiles de coste
+más heterogéneos ---productos de alta caducidad frente a bienes de larga rotación---
+es el escenario en el que esta priorización debería rendir de forma apreciable, y su
+verificación queda como línea de trabajo futuro.
 
 \section{Explicabilidad y Diagnóstico Automático}
 \label{sec:resultados_xai}

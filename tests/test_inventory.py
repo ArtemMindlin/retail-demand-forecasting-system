@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from retail_forecasting.config import InventoryConfig
 from retail_forecasting.inventory.cost_profiles import (
@@ -12,6 +13,7 @@ from retail_forecasting.inventory.newsvendor import (
     choose_order_quantity,
     critical_fractile,
 )
+from retail_forecasting.inventory.optimization import optimize_orders_lp
 from tests import make_synthetic_panel
 
 
@@ -132,3 +134,82 @@ def test_attach_series_costs_reuses_existing_series_cost_columns() -> None:
     assert float(enriched.loc[0, "c_over"]) == 1.2
     assert float(enriched.loc[0, "c_under"]) == 4.8
     assert float(enriched.loc[0, "critical_fractile"]) == 0.8
+
+
+def test_capacity_lp_is_inactive_when_the_constraint_does_not_bind() -> None:
+    """The early exit matters: every experiment config sets capacity far above demand."""
+    orders = {"a": 10.0, "b": 20.0}
+    utilities = {"a": 4.0, "b": 4.0}
+
+    allocated = optimize_orders_lp(orders, utilities, global_capacity=1_000.0)
+
+    assert allocated == orders
+
+
+def test_capacity_lp_fills_the_most_valuable_units_first() -> None:
+    """With a demand distribution the LP must spread, not starve whole SKUs.
+
+    Two identical SKUs and half the requested capacity. The first tranche of each --
+    the units below ``q_0.1``, which are almost certain to sell -- outvalues any deeper
+    tranche, so both SKUs must receive at least that much before either goes further.
+    A constant marginal utility would instead fill one to its cap and zero the other.
+
+    The split of the leftover capacity is not asserted: with identical value curves the
+    LP has degenerate optima and any vertex summing to the budget is equally optimal.
+    """
+    orders = {"a": 10.0, "b": 10.0}
+    utilities = {"a": 4.0, "b": 4.0}
+    holding = {"a": 1.0, "b": 1.0}
+    first_tranche = 2.0
+    quantiles = {
+        "a": [(0.1, first_tranche), (0.5, 6.0), (0.9, 10.0)],
+        "b": [(0.1, first_tranche), (0.5, 6.0), (0.9, 10.0)],
+    }
+
+    allocated = optimize_orders_lp(
+        orders,
+        utilities,
+        global_capacity=10.0,
+        demand_quantiles=quantiles,
+        holding_costs=holding,
+    )
+
+    assert sum(allocated.values()) == pytest.approx(10.0)
+    assert allocated["a"] >= first_tranche
+    assert allocated["b"] >= first_tranche
+
+
+def test_capacity_lp_prioritises_the_costlier_stockout() -> None:
+    """When shortage costs differ, the scarce capacity leans to the expensive SKU."""
+    orders = {"cheap": 10.0, "costly": 10.0}
+    utilities = {"cheap": 2.0, "costly": 20.0}
+    holding = {"cheap": 1.0, "costly": 1.0}
+    quantiles = {
+        "cheap": [(0.1, 2.0), (0.5, 6.0), (0.9, 10.0)],
+        "costly": [(0.1, 2.0), (0.5, 6.0), (0.9, 10.0)],
+    }
+
+    allocated = optimize_orders_lp(
+        orders,
+        utilities,
+        global_capacity=10.0,
+        demand_quantiles=quantiles,
+        holding_costs=holding,
+    )
+
+    assert sum(allocated.values()) == pytest.approx(10.0)
+    assert allocated["costly"] > allocated["cheap"]
+
+
+def test_capacity_lp_never_exceeds_the_unconstrained_request() -> None:
+    orders = {"a": 3.0, "b": 40.0}
+    utilities = {"a": 4.0, "b": 4.0}
+    quantiles = {"a": [(0.5, 3.0)], "b": [(0.5, 40.0)]}
+
+    allocated = optimize_orders_lp(
+        orders, utilities, global_capacity=20.0, demand_quantiles=quantiles
+    )
+
+    assert sum(allocated.values()) <= 20.0 + 1e-9
+    for series_id, quantity in allocated.items():
+        assert -1e-9 <= quantity <= orders[series_id] + 1e-9
