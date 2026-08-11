@@ -133,6 +133,8 @@ def simulate_inventory_policy(
 
             unconstrained_orders = {}
             marginal_utilities = {}
+            holding_costs = {}
+            demand_quantiles = {}
             row_map = {}
             arrivals_map = {}
 
@@ -178,6 +180,15 @@ def simulate_inventory_policy(
 
                 unconstrained_orders[series_id] = new_order_qty
                 marginal_utilities[series_id] = state.c_under
+                holding_costs[series_id] = state.c_over
+                # The predicted quantiles give the LP the demand distribution it needs
+                # to value successive units correctly instead of assuming every unit of
+                # an SKU is worth the same.
+                if quantile_columns:
+                    demand_quantiles[series_id] = [
+                        (level, float(row[column]))
+                        for level, column in zip(quantile_levels, quantile_columns, strict=True)
+                    ]
 
             # 2. Global Optimization Pass
             global_cap = getattr(inventory_config, "global_capacity_units", None)
@@ -186,6 +197,8 @@ def simulate_inventory_policy(
                     unconstrained_orders=unconstrained_orders,
                     marginal_utilities=marginal_utilities,
                     global_capacity=global_cap,
+                    demand_quantiles=demand_quantiles or None,
+                    holding_costs=holding_costs,
                 )
             else:
                 constrained_orders = unconstrained_orders

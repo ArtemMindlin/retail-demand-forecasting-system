@@ -64,50 +64,68 @@ def main() -> None:
     if frame.empty:
         raise SystemExit(f"No rows for {args.model}/{args.strategy} in {args.run}")
 
+    quantile_columns = sorted(c for c in frame.columns if c.startswith("q_"))
+    quantile_levels = [float(c.replace("q_", "").replace("_", ".")) for c in quantile_columns]
+
     periods = []
     for fold_id, period in frame.groupby("fold_id"):
         periods.append(
-            (
-                fold_id,
-                {
+            {
+                "fold_id": fold_id,
+                "orders": {
                     str(row.series_id): max(0.0, float(row.order_quantity))
                     for row in period.itertuples()
                 },
-                {str(row.series_id): float(row.c_under) for row in period.itertuples()},
-                {str(row.series_id): float(row.y_true) for row in period.itertuples()},
-            )
+                "c_under": {str(row.series_id): float(row.c_under) for row in period.itertuples()},
+                "c_over": {str(row.series_id): float(row.c_over) for row in period.itertuples()},
+                "demand": {str(row.series_id): float(row.y_true) for row in period.itertuples()},
+                "quantiles": {
+                    str(row["series_id"]): list(
+                        zip(quantile_levels, [float(row[c]) for c in quantile_columns], strict=True)
+                    )
+                    for _, row in period.iterrows()
+                },
+            }
         )
 
     records = []
     for fraction in args.capacity_fraction:
-        lp_total = prop_total = 0.0
-        lp_stockouts = prop_stockouts = 0
-        zeroed = 0
-        for _fold_id, unconstrained, utilities, demand in periods:
-            requested = sum(unconstrained.values())
+        totals = {"piecewise": 0.0, "flat": 0.0, "proportional": 0.0}
+        zeroed = {"piecewise": 0, "flat": 0}
+        for period in periods:
+            orders, c_under, c_over = period["orders"], period["c_under"], period["c_over"]
+            demand, quantiles = period["demand"], period["quantiles"]
+            requested = sum(orders.values())
             capacity = requested * fraction
             scale = capacity / requested if requested > 0 else 0.0
 
-            lp_orders = optimize_orders_lp(unconstrained, utilities, capacity)
-            proportional = {sid: qty * scale for sid, qty in unconstrained.items()}
+            allocations = {
+                "piecewise": optimize_orders_lp(
+                    orders, c_under, capacity, demand_quantiles=quantiles, holding_costs=c_over
+                ),
+                "flat": optimize_orders_lp(orders, c_under, capacity),
+                "proportional": {sid: qty * scale for sid, qty in orders.items()},
+            }
+            for name, allocation in allocations.items():
+                totals[name] += penalty(allocation, demand, c_under)
+                if name in zeroed:
+                    zeroed[name] += sum(1 for qty in allocation.values() if qty < 1e-9)
 
-            lp_total += penalty(lp_orders, demand, utilities)
-            prop_total += penalty(proportional, demand, utilities)
-            lp_stockouts += sum(1 for sid in lp_orders if demand[sid] > lp_orders[sid])
-            prop_stockouts += sum(1 for sid in proportional if demand[sid] > proportional[sid])
-            zeroed += sum(1 for qty in lp_orders.values() if qty < 1e-9)
-
+        baseline = totals["proportional"]
         records.append(
             {
                 "capacity_fraction": fraction,
-                "lp_stockout_penalty": round(lp_total, 2),
-                "proportional_stockout_penalty": round(prop_total, 2),
-                "penalty_reduction_pct": round(
-                    (prop_total - lp_total) / prop_total * 100.0 if prop_total else 0.0, 2
+                "piecewise_lp_penalty": round(totals["piecewise"], 2),
+                "flat_lp_penalty": round(totals["flat"], 2),
+                "proportional_penalty": round(baseline, 2),
+                "piecewise_vs_proportional_pct": round(
+                    (baseline - totals["piecewise"]) / baseline * 100.0 if baseline else 0.0, 2
                 ),
-                "lp_series_stocked_out": lp_stockouts,
-                "proportional_series_stocked_out": prop_stockouts,
-                "lp_series_zeroed": zeroed,
+                "flat_vs_proportional_pct": round(
+                    (baseline - totals["flat"]) / baseline * 100.0 if baseline else 0.0, 2
+                ),
+                "piecewise_series_zeroed": zeroed["piecewise"],
+                "flat_series_zeroed": zeroed["flat"],
             }
         )
 
@@ -115,18 +133,22 @@ def main() -> None:
     output = args.run / OUTPUT_NAME
     result.to_csv(output, index=False)
 
-    print("\n── Capacity LP vs proportional cutback (positive reduction = LP wins) ──")
+    print("\n── Capacity allocation vs proportional cutback (positive = beats it) ──")
     print(result.to_string(index=False))
-    wins = result[result["penalty_reduction_pct"] > 0]
-    if wins.empty:
-        print("\n⚠️  The LP never beats the proportional cutback on this panel.")
-    else:
-        best = wins.loc[wins["penalty_reduction_pct"].idxmax()]
-        print(
-            f"\n✅ Best for the LP: {best['capacity_fraction']:.0%} capacity, "
-            f"{best['penalty_reduction_pct']:.1f}% lower stockout penalty"
-        )
-    print(f"   written to {output}\n")
+    for column, label in (
+        ("piecewise_vs_proportional_pct", "piecewise LP"),
+        ("flat_vs_proportional_pct", "flat-utility LP"),
+    ):
+        wins = result[result[column] > 0]
+        if wins.empty:
+            print(f"\n⚠️  The {label} never beats the proportional cutback.")
+        else:
+            best = wins.loc[wins[column].idxmax()]
+            print(
+                f"\n✅ {label}: beats proportional at {len(wins)}/{len(result)} capacity levels, "
+                f"best {best[column]:.1f}% at {best['capacity_fraction']:.0%}"
+            )
+    print(f"\n   written to {output}\n")
 
 
 if __name__ == "__main__":
