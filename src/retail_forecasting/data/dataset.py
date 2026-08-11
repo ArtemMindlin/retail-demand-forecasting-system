@@ -145,6 +145,15 @@ def prepare_daily_panel(
     return panel.reset_index(drop=True)
 
 
+def panel_cache_filename(dataset_config: DatasetConfig, split: str) -> str:
+    """File name ``load_prepared_panel`` reads and writes for ``split``.
+
+    Public so that pre-built panels (the OPS simulation split) can be written under
+    the name the loader will look for, instead of duplicating the convention.
+    """
+    return f"{split}_{_panel_cache_key(dataset_config)}.parquet"
+
+
 def _panel_cache_key(dataset_config: DatasetConfig) -> str:
     """Short fingerprint of the settings that change the shape of the prepared panel.
 
@@ -179,9 +188,7 @@ def load_prepared_panel(
         The processed panel as a DataFrame.
     """
 
-    target_path = (
-        dataset_config.processed_panel_dir / f"{split}_{_panel_cache_key(dataset_config)}.parquet"
-    )
+    target_path = dataset_config.processed_panel_dir / panel_cache_filename(dataset_config, split)
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
     if dataset_config.use_cache and target_path.exists():

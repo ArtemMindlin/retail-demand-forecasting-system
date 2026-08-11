@@ -3,7 +3,7 @@ PYTHON = uv run python
 PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
 SIM_CONFIG = configs/simulation.yaml
-OPS_SPLIT = data/processed/ops_sim/eval.parquet
+OPS_SPLIT = data/processed/ops_sim/.built
 .PHONY: help install run retrain score simulate backtest-fair-cost eda api dev collectstatic up test test-harness lint format clean pdf
 
 help: ## Show this help message

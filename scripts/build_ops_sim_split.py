@@ -7,7 +7,8 @@ the number of simulated weeks we carve the simulation window out of the existing
     train = first ``--train-days`` days   (warm-up + initial champion training)
     eval  = the remaining days            (the streamed "production" window)
 
-Outputs are written to ``data/processed/ops_sim/{train,eval}.parquet`` so the
+Outputs are written to ``data/processed/ops_sim/`` under the hashed names that
+``load_prepared_panel`` derives from the simulation config, so the
 canonical ``data/processed`` splits are never touched. The simulation config
 (``configs/simulation.yaml``) points ``dataset.processed_panel_dir`` here.
 
@@ -22,8 +23,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from retail_forecasting.config import load_config
+from retail_forecasting.data.dataset import panel_cache_filename
+
 SOURCE_PANEL = Path("data/processed/train.parquet")
 OUTPUT_DIR = Path("data/processed/ops_sim")
+SIM_CONFIG = Path("configs/simulation.yaml")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -54,7 +59,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         type=Path,
         default=OUTPUT_DIR,
-        help="Where to write train.parquet / eval.parquet.",
+        help="Where to write the split.",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=SIM_CONFIG,
+        help="Simulation config whose dataset settings name the output files.",
     )
     return parser
 
@@ -80,11 +91,20 @@ def main() -> None:
     train = panel[panel["date"] < cutoff].copy()
     eval_ = panel[panel["date"] >= cutoff].copy()
 
+    # Written under the names load_prepared_panel derives from the simulation
+    # config, so the OPS plane finds this split instead of rebuilding one from raw.
+    settings = load_config(args.config)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    train.to_parquet(args.output_dir / "train.parquet", index=False)
-    eval_.to_parquet(args.output_dir / "eval.parquet", index=False)
+    train_name = panel_cache_filename(settings.dataset, "train")
+    eval_name = panel_cache_filename(settings.dataset, "eval")
+    train.to_parquet(args.output_dir / train_name, index=False)
+    eval_.to_parquet(args.output_dir / eval_name, index=False)
+    # Stamp file: the Makefile depends on this rather than on the parquet names,
+    # which carry a hash of the dataset settings and change with the config.
+    (args.output_dir / ".built").write_text(f"{train_name}\n{eval_name}\n", encoding="utf-8")
 
     print(f"✅ Wrote OPS simulation split to {args.output_dir}")
+    print(f"   files       : {train_name} | {eval_name}")
     print(f"   series kept : {panel['series_id'].nunique()}")
     print(
         f"   train       : {len(train):,} rows | "
