@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 import pandas as pd
 
 from retail_forecasting.config import DatasetConfig, PreprocessingConfig
@@ -143,6 +145,24 @@ def prepare_daily_panel(
     return panel.reset_index(drop=True)
 
 
+def _panel_cache_key(dataset_config: DatasetConfig) -> str:
+    """Short fingerprint of the settings that change the shape of the prepared panel.
+
+    Keying the cache on the split name alone made every config share one file, so
+    running the 50-series subset after the 500-series one silently reused the
+    500-series panel and ``top_n_series`` had no effect. The base subset and the
+    scale validation answer different questions and must not collapse into
+    whichever panel happens to be on disk.
+    """
+    shape = (
+        dataset_config.top_n_series,
+        dataset_config.min_history_days,
+        dataset_config.max_rows,
+        dataset_config.horizon,
+    )
+    return hashlib.sha1(repr(shape).encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
+
+
 def load_prepared_panel(
     dataset_config: DatasetConfig,
     preprocessing_config: PreprocessingConfig,
@@ -159,7 +179,9 @@ def load_prepared_panel(
         The processed panel as a DataFrame.
     """
 
-    target_path = dataset_config.processed_panel_dir / f"{split}.parquet"
+    target_path = (
+        dataset_config.processed_panel_dir / f"{split}_{_panel_cache_key(dataset_config)}.parquet"
+    )
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
     if dataset_config.use_cache and target_path.exists():
