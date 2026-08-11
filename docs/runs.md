@@ -1,0 +1,61 @@
+# Run provenance
+
+Which run backs which result in the thesis, and with what code.
+
+`reports/` is gitignored and accumulates every execution, so without this file there is
+no way to tell a citable run from a scratch one. That gap caused a real defect: the
+conformal-calibration table in chapter 6 was published from a run predating the
+target-leakage fix of 16 May 2026, and nothing in the repository recorded it.
+
+**Rule: a number that reaches the thesis names its run here, with the commit that
+produced it.** A run whose commit is not an ancestor of the current `HEAD` is not
+citable — re-run it before citing.
+
+## Current results (audit of 11 Aug 2026, commit `b6778ef`)
+
+| Result in chapter 6 | Run | Panel | Notes |
+| --- | --- | --- | --- |
+| `tab:conformal_metrics`, `tab:fold_coverage` | `fresh_retailnet_v2_20260811_123002` | 50 series, 4 500 rows | 1 050 evaluation origins |
+| `tab:embargo_control` (embargo off) | `fresh_retailnet_v2_20260811_123106` | 50 series, 4 500 rows | Control: only the calibration embargo differs |
+| `tab:scale_coverage`, simulated costs, `fig:mae_vs_coste` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | 10 500 evaluation origins |
+| `tab:metrics_cost` (fair cost) | `fresh_retailnet_large_20260811_184959` | 30 sampled from 500 | Sign depends on the source panel — see below |
+| `tab:imputation_reconstruction` | `imputation_compare_20260811_174500` | 500 series | Bit-identical to the June run: no forecasting involved |
+| `tab:lp_sweep` | `fresh_retailnet_v2_20260811_123002` | 50 series | Via `scripts/capacity_lp_experiment.py` |
+
+## Traps this file exists to prevent
+
+**The processed-panel cache used to ignore `top_n_series`.** Before commit `94b1224`
+the cache key was the split name alone, so all five configs shared one
+`data/processed/train.parquet` and whichever panel was on disk won. A run of
+`experiment.yaml` (50 series) silently reused a 500-series panel. The key now
+fingerprints `top_n_series`, `min_history_days`, `max_rows` and `horizon`, so a config
+change rebuilds the panel — the first run after switching configs is slower by design.
+
+**The fair-cost backtest is sensitive to the panel it samples from.** It draws 30 series;
+from the 500-series panel `Latent_supervised` is cheapest (1 774.82 vs 1 843.41 u.m.),
+from the 50-series top-rotation subset the order inverts (927.80 vs 844.01). The
+artifact records `source_panel_series`, so always read the ranking together with it.
+
+**Subsets answer different questions.** The 50-series base subset isolates the economics
+on high-rotation SKUs; the 500-series run tests conformal stability at scale; the 30-series
+fair-cost backtest isolates the imputation signal under a common ground truth. Do not
+average metrics across them or quote a figure from one beside a figure from another
+without saying so.
+
+## Reproducing
+
+```bash
+make run                 # base subset      → configs/experiment.yaml
+make simulate            # OPS plane        → configs/simulation.yaml (builds the split if missing)
+uv run python -m retail_forecasting.run --config configs/experiment_large.yaml
+uv run python -m retail_forecasting.run --config configs/experiment.yaml --run-mode fair_cost_backtest
+uv run python -m retail_forecasting.run --config configs/imputation_compare.yaml
+```
+
+Figures and the capacity experiment read finished runs:
+
+```bash
+uv run python scripts/plot_coverage_folds.py --base <base-run> --scale <scale-run>
+uv run python scripts/plot_mae_vs_cost.py --run <scale-run>
+uv run python scripts/capacity_lp_experiment.py --run <base-run>
+```

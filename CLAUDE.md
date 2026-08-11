@@ -56,7 +56,12 @@ run.py
  -> write_run_artifacts()
 ```
 
-Related entry points in `forecasting/pipeline.py`: `run_imputation_comparison()`, `run_fair_cost_backtest()`, `train_and_save_champion()` / `run_retrain()`, `run_scoring()`, `run_whatif_simulation()`.
+Related entry points in `forecasting/pipeline.py`: `run_imputation_comparison()`, `run_fair_cost_backtest()`, `train_and_save_champion()` / `run_retrain()`, `run_scoring()`.
+
+The dashboard's what-if simulator does not go through the pipeline: it recomputes a
+single-period Newsvendor quantity in `api/services/forecast.py` from the run's
+predictions. There is no `run_whatif_simulation()` — a pipeline-side version existed,
+was never wired to the CLI or the web layer, and has been removed.
 
 ## Hard Rules
 
@@ -81,6 +86,7 @@ Read these first:
 - `docs/conventions.md`
 - `docs/system_design.md`
 - `docs/web_layer.md` (only when touching `src/retail_forecasting/api/`)
+- `docs/runs.md` (only when a number is going into the thesis, or when reading one out of `reports/`)
 
 Prefer small changes that preserve the pipeline contract. If a change modifies target semantics, fold semantics, dataframe schemas, or inventory policy, update docs and tests in the same change.
 

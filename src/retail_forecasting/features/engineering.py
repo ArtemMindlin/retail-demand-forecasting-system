@@ -80,20 +80,14 @@ def build_feature_frame(
         std_column = f"demand_roll_std_{window}"
         frame[mean_column] = _rolling_feature(grouped, "observed_demand", window, "mean")
         frame[sum_column] = _rolling_feature(grouped, "observed_demand", window, "sum")
-
-        # Hierarchical fallback for rolling standard deviation (avoids cold-start std = 0.0 bias):
-        # backfill missing per-series std with the category mean, then a global mean.
-        raw_std = _rolling_feature(grouped, "observed_demand", window, "std")
-        if raw_std.isna().any():
-            if "third_category_id" in frame.columns:
-                category_means = raw_std.groupby(frame["third_category_id"], sort=False).transform(
-                    "mean"
-                )
-                raw_std = raw_std.fillna(category_means)
-            global_mean = raw_std.mean()
-            raw_std = raw_std.fillna(0.0 if pd.isna(global_mean) else global_mean)
-
-        frame[std_column] = raw_std
+        # No cold-start fallback for the standard deviation. A hierarchical backfill used
+        # to live here, filling missing values from the category mean and then a global
+        # mean, both computed over the whole frame -- future dates included, which broke
+        # invariant 8. Removing it changes nothing: mean, sum and std share
+        # ``min_periods=window``, so their NaNs land on exactly the same rows, and those
+        # rows are dropped by the feature dropna regardless of whether std was filled.
+        # Verified to leave the supervised frame bit-identical.
+        frame[std_column] = _rolling_feature(grouped, "observed_demand", window, "std")
         feature_columns.extend([mean_column, sum_column, std_column])
 
     if feature_config.include_discount_lags:

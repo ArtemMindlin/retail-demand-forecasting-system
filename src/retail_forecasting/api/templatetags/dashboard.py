@@ -163,26 +163,10 @@ def _thousands(value: float, decimals: int = 0) -> str:
 
 
 @register.filter
-def fmt_currency(value: float | None) -> str:
-    if value is None:
-        return "—"
-    return f"{_thousands(float(value))} u.m."
-
-
-@register.filter
 def fmt_units(value: float | None) -> str:
     if value is None:
         return "—"
     return _thousands(float(value))
-
-
-@register.filter
-def fmt_pct(value: float | None, decimals: int = 1) -> str:
-    if value is None:
-        return "—"
-    num = float(value)
-    sign = "+" if num >= 0 else ""
-    return f"{sign}{num:.{decimals}f}%"
 
 
 @register.filter
