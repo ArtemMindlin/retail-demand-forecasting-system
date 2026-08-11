@@ -311,8 +311,8 @@ Esta operación garantiza:
 Históricamente, los modelos de \textit{demand forecasting} minimizaban una única métrica de error promedio, como el MAE o el RMSE. Sin embargo, en un problema de optimización de inventarios donde la gestión de la incertidumbre es vital, buscar únicamente reducir la media del error puede resultar en modelos con varianza infraestimada o sobreajustada.
 
 Para abordar este problema, el sistema implementa una \textbf{Búsqueda de Hiperparámetros Multi-Objetivo}
-utilizando \textit{Optuna} \cite{akiba2019optuna}. Durante la fase de sintonización, el algoritmo
-evolutivo (basado en NSGA-II \cite{deb2002nsga2}) optimiza simultáneamente dos funciones de pérdida en conflicto: la Pinball Loss en el fractil crítico (ya definida en la Sección~\ref{sec:pinball}) y el \textbf{Winkler Score}, que se define a continuación.
+utilizando \textit{Optuna} \cite{akiba2019optuna}. Durante la fase de sintonización, el muestreador
+multiobjetivo de Optuna optimiza simultáneamente dos funciones de pérdida en conflicto: la Pinball Loss en el fractil crítico (ya definida en la Sección~\ref{sec:pinball}) y el \textbf{Winkler Score}, que se define a continuación. La implementación emplea el muestreador multiobjetivo por defecto de la librería (TPE multiobjetivo) en lugar de un algoritmo evolutivo como NSGA-II \cite{deb2002nsga2}, alternativa igualmente disponible en Optuna; la aportación metodológica reside en la formulación biobjetivo de la búsqueda, no en el muestreador concreto que la recorre.
 
 \subsubsection{Winkler Score: Métrica de Calidad de Intervalos}
 \label{sec:winkler}
