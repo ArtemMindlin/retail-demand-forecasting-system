@@ -11,16 +11,39 @@ target-leakage fix of 16 May 2026, and nothing in the repository recorded it.
 produced it.** A run whose commit is not an ancestor of the current `HEAD` is not
 citable — re-run it before citing.
 
-## Current results (audit of 11 Aug 2026, commit `b6778ef`)
+## Current results (audit of 13 Aug 2026, commit `df15b1d`)
 
 | Result in chapter 6 | Run | Panel | Notes |
 | --- | --- | --- | --- |
+| `tab:metrics_predictive` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | Generated; see "Generated tables" below |
 | `tab:conformal_metrics`, `tab:fold_coverage` | `fresh_retailnet_v2_20260811_123002` | 50 series, 4 500 rows | 1 050 evaluation origins |
 | `tab:embargo_control` (embargo off) | `fresh_retailnet_v2_20260811_123106` | 50 series, 4 500 rows | Control: only the calibration embargo differs |
 | `tab:scale_coverage`, simulated costs, `fig:mae_vs_coste` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | 10 500 evaluation origins |
-| `tab:metrics_cost` (fair cost) | `fresh_retailnet_large_20260811_184959` | 30 sampled from 500 | Sign depends on the source panel — see below |
+| `tab:metrics_cost` (fair cost) | `fresh_retailnet_large_20260811_184959` | 30 sampled from 500 | Generated. Ranking depends on the source panel — see below |
 | `tab:imputation_reconstruction` | `imputation_compare_20260811_174500` | 500 series | Bit-identical to the June run: no forecasting involved |
 | `tab:lp_sweep` | `fresh_retailnet_v2_20260811_123002` | 50 series | Via `scripts/capacity_lp_experiment.py` |
+
+Every numbered table in chapter 6 is listed above. A table that is not in this list has
+no declared provenance, which is the state that produced the August 13 findings: both
+generated tables had drifted to June runs while this file declared newer ones, and
+neither was listed here at all.
+
+## Generated tables
+
+`tab:metrics_predictive` and `tab:metrics_cost` are written by the exporter, never edited
+by hand. Regenerate both together:
+
+```bash
+uv run python -m retail_forecasting.utils.latex_exporter \
+    --metrics-run reports/fresh_retailnet_large_20260811_125735 \
+    --fair-cost-run reports/fresh_retailnet_large_20260811_184959
+```
+
+The runs are arguments, not defaults: the exporter used to pin them in `__main__`, which
+is how it kept republishing June runs. It also could not execute at all between `14ad8b4`
+(Jinja2 dropped) and `c274522`, so a stale table could not have been refreshed even
+deliberately. If a table and this file disagree, run the command above before believing
+either.
 
 ## Traps this file exists to prevent
 

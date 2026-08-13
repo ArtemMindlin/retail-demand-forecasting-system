@@ -55,6 +55,7 @@ Un supuesto crítico atraviesa toda la familia: la \textbf{intercambiabilidad} e
 Sin embargo, la CP estándar solo garantiza cobertura \textit{marginal}: el intervalo puede ser correcto en media pero fallar sistemáticamente en subgrupos específicos, como las categorías de alta estacionalidad o los productos intermitentes. La \textbf{Mondrian Conformal Prediction} \cite{vovk2005algorithmic} extiende la garantía a cobertura \textit{condicional} al estratificar la calibración por grupos homogéneos, asegurando que cada subgrupo tenga su propia garantía de cobertura independiente. Esta propiedad es crítica en un catálogo retail heterogéneo.
 
 \section{Optimización de Inventarios: El Problema del Newsvendor}
+\label{sec:newsvendor}
 La conexión entre el pronóstico y la acción operativa se realiza mediante la teoría de gestión de inventarios estocásticos. El modelo del \textbf{Newsvendor} \cite{silver1998inventory} es el marco de referencia para decisiones de pedido bajo demanda incierta en un único periodo: determina la cantidad óptima a pedir ($Q^*$) minimizando el coste esperado, que equilibra el coste de sobrestock ($c_o$, exceso de producto que se desperdicia o deprecia) y el coste de infra-stock ($c_u$, venta perdida y pérdida de fidelidad del cliente).
 
 La solución óptima viene dada por el \textit{fractil crítico}:

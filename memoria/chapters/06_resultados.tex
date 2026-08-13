@@ -26,34 +26,26 @@ No obstante, es fundamental contextualizar este resultado desde una perspectiva 
 
 
 
-\subsection{Evaluación Downstream de las Estrategias de Imputación}
+\subsection{Las Tres Estrategias de Imputación y sus Dos Rutas de Evaluación}
 \label{sec:resultados_imputacion}
 
-El módulo \texttt{LatentDemandImputer} implementa tres estrategias de imputación alternativas (véase Sección~\ref{sec:demanda_censurada}). La Tabla~\ref{tab:imputation_comparison} recoge su comparativa empírica sobre 50 series con $n=100$ observaciones de evaluación, empleando LightGBM como modelo de forecasting en todos los casos. Las cifras absolutas de Winkler de esta tabla no son directamente comparables con las de la Tabla~\ref{tab:conformal_metrics}: proceden de un \textit{run} distinto, con otro subconjunto de evaluación y otro tamaño muestral, por lo que solo deben leerse en términos relativos \emph{dentro} de la tabla.
+El módulo \texttt{LatentDemandImputer} implementa tres estrategias de imputación alternativas (véase Sección~\ref{sec:demanda_censurada}): un escalado proporcional fijo (\textit{Clipped Scaling}, $\gamma = 1{,}2$), la media histórica local de la serie y una estimación supervisada con LightGBM condicionada a las covariables del día. Elegir entre ellas exige decidir \emph{contra qué} se las mide, y este trabajo las evalúa por dos rutas metodológicamente independientes:
 
-\begin{table}[h]
-\centering
-\small
-\caption{Comparativa de estrategias de imputación de demanda latente (LightGBM, $n=100$). La última columna expresa la mejora relativa en Winkler Score respecto a la estrategia sin corrección.}
-\label{tab:imputation_comparison}
-\begin{tabular}{lrrr}
-\toprule
-\textbf{Estrategia} & \textbf{MAE} & \textbf{Winkler Score} & \textbf{Mejora Winkler vs.\ Observed} \\
-\midrule
-Observed (sin corrección) & 30{,}92 & 290{,}96 & n/a \\
-Clipped Scaling ($\gamma=1{,}2$) & 36{,}36 & 336{,}41 & $-$15{,}6\% \\
-Media Histórica Local & 6{,}92 & 46{,}04 & $+$84{,}2\% \\
-\textbf{Supervisada (LightGBM)} & \textbf{6{,}88} & \textbf{39{,}54} & \textbf{$+$86{,}4\%} \\
-\bottomrule
-\end{tabular}
-\end{table}
+\begin{itemize}
+    \item \textbf{Fidelidad de reconstrucción} (directa): cuánto se acerca la señal imputada a la demanda real, medida sobre días limpios censurados artificialmente, donde esa demanda sí se conoce. Es la Sección~\ref{sec:imputacion_censura_sintetica}.
+    \item \textbf{Utilidad económica} (\textit{downstream}): cuánto coste de inventario induce cada señal cuando alimenta la política de pedido, con todas las estrategias puntuadas contra una misma demanda real. Es la evaluación de coste justo de la Sección~\ref{sec:resultados_gemelo}.
+\end{itemize}
 
-La estrategia \textbf{Supervisada} obtiene el mejor Winkler Score (39{,}54), superando a la Media Histórica Local en un 14\% y al \textit{Clipped Scaling} en un 88\%. Destaca que el \textit{Clipped Scaling} empeora respecto a no hacer ninguna corrección: al escalar uniformemente un 20\% la demanda observada, introduce ruido en días con stockouts cortos (1--2 horas) donde la corrección necesaria es mínima, degradando la señal de entrenamiento. La estrategia Supervisada evita este problema al estimar la corrección de forma condicional a las covariables del día (ratio de stockout, media histórica de la serie, calendario y variables meteorológicas), lo que le permite hacer una imputación proporcionada a la severidad real de cada rotura de stock.
+Ambas rutas convergen en la estrategia Supervisada, y el interés está en que \emph{no} coinciden en el orden de las dos heurísticas: la discusión de esa discrepancia se aborda en la Sección~\ref{sec:resultados_gemelo}, donde se dispone de las dos tablas para contrastarlas.
+
+Una tercera ruta ---comparar las estrategias por el Winkler Score del modelo de \textit{forecasting} entrenado sobre cada señal--- se exploró en una iteración anterior del sistema, pero no se reporta aquí: el punto de entrada actual \texttt{run\_imputation\_comparison()} es deliberadamente previo al modelado (no entrena modelos ni ejecuta \textit{folds}), de modo que esas cifras no son reproducibles con el código de esta versión y no superan la regla de trazabilidad que se aplica al resto del capítulo (todo número citado debe nombrar el \textit{run} y el \textit{commit} que lo produjo). Se omite antes que reportar una cifra que no puede auditarse hasta su artefacto.
+
+Sí conviene anticipar el mecanismo que distingue a las tres, porque explica los resultados de ambas rutas. El \textit{Clipped Scaling} escala uniformemente un 20\% la demanda observada, de modo que introduce ruido en días con stockouts cortos (1--2 horas), donde la corrección necesaria es mínima, y se queda muy corto en las roturas severas; de ahí su sesgo estructural negativo. La media histórica local ignora igualmente la severidad, pero en el sentido contrario: imputa el nivel medio de la serie con independencia de si la rotura duró una hora o doce. La estrategia Supervisada evita ambos problemas al estimar la corrección de forma condicional a las covariables del día (ratio de stockout, media histórica de la serie, calendario y variables meteorológicas), lo que le permite hacer una imputación proporcionada a la severidad real de cada rotura de stock.
 
 \subsection{Evaluación Directa mediante Censura Sintética}
 \label{sec:imputacion_censura_sintetica}
 
-La comparativa anterior es una evaluación \textit{indirecta}: mide la calidad de cada estrategia a través del rendimiento del modelo de forecasting entrenado sobre los datos corregidos. Tiene una limitación conceptual de fondo: la demanda latente en un día con rotura real es un \textbf{contrafactual no observable}, ya que nunca se conoce cuánto se habría vendido con disponibilidad plena, por lo que no existe una verdad-terreno contra la que medir directamente el error de reconstrucción sobre esos días.
+La ruta económica de la sección anterior es una evaluación \textit{indirecta}: mide la calidad de cada estrategia a través de las decisiones que induce. Medir directamente el error de reconstrucción tropieza con una limitación conceptual de fondo: la demanda latente en un día con rotura real es un \textbf{contrafactual no observable}, ya que nunca se conoce cuánto se habría vendido con disponibilidad plena, por lo que sobre esos días no existe verdad-terreno alguna contra la que comparar.
 
 Para sortear esta imposibilidad se diseña un protocolo de \textbf{censura sintética} sobre los días limpios, donde la demanda real sí es conocida. El procedimiento es: (i) se reserva un subconjunto aleatorio del 30\% de los días sin rotura (\texttt{stockout\_hours}~$=0$); (ii) a cada día reservado se le asigna un ratio de rotura muestreado de la \textbf{distribución empírica de los stockouts reales} del panel, y se reduce su venta de forma proporcional ($\text{venta}_{\text{censurada}} = \text{demanda}_{\text{real}}\cdot(1-r)$), simulando así una rotura realista; (iii) cada estrategia reconstruye esos días censurados artificialmente; y (iv) se compara la estimación contra la demanda real conocida. La Tabla~\ref{tab:imputation_reconstruction} recoge el error de reconstrucción sobre $n=5\,009$ días censurados sintéticamente en el panel de 500 series.
 
