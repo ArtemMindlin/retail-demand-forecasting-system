@@ -36,6 +36,60 @@ def reports_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def ops_backtest_artifact(reports_dir: Path) -> Path:
+    """A tiny OPS backtest artifact: two cadences, two weekly origins, one partial.
+
+    Mirrors what ``run_operational_simulation`` writes, including the paired
+    cadence comparison, so the view is exercised end to end.
+    """
+    from retail_forecasting.api.views import ops as ops_view
+
+    sim_dir = reports_dir / "ops_sim" / "simulation"
+    sim_dir.mkdir(parents=True)
+
+    rows = []
+    for day_index, complete in ((0, True), (7, False)):
+        for cadence in ("never", "every_7d"):
+            rows.append(
+                {
+                    "series_id": "s1",
+                    "y_pred": 100.0,
+                    "y_true": 110.0 if complete else 20.0,
+                    "q_0_1": 90.0,
+                    "q_0_9": 120.0,
+                    "order_quantity": 115.0,
+                    "total_cost": 50.0 if cadence == "never" else 40.0,
+                    "decision_date": pd.Timestamp("2024-05-16") + pd.Timedelta(days=day_index),
+                    "day_index": day_index,
+                    "cadence": cadence,
+                    "retrained_this_step": cadence == "every_7d",
+                    "actuals_complete": complete,
+                }
+            )
+    pd.DataFrame(rows).to_parquet(sim_dir / "predictions_by_day.parquet", index=False)
+    pd.DataFrame(
+        [
+            {
+                "cadence": "every_7d",
+                "baseline": "never",
+                "n_origins": 5,
+                "n_series": 100,
+                "cost_change_pct": -17.0,
+                "ci95_low_pct": -46.5,
+                "ci95_high_pct": 32.5,
+                "origins_cheaper_than_baseline": 3,
+                "conclusive": False,
+                "underpowered": True,
+            }
+        ]
+    ).to_csv(sim_dir / "cadence_comparison.csv", index=False)
+
+    ops_view._simulation = None
+    yield sim_dir
+    ops_view._simulation = None
+
+
+@pytest.fixture
 def run_with_predictions(reports_dir: Path) -> Path:
     """A run directory holding a small but realistic predictions.csv."""
     run = reports_dir / "20260101_120000_test"
@@ -224,6 +278,27 @@ def test_academic_modal_renders_live_parameters(
 
 def test_unknown_academic_module_is_404(auth_client: Client, reports_dir: Path) -> None:
     assert auth_client.get("/dashboard/modulo/nope/").status_code == 404
+
+
+def test_ops_view_renders_the_backtest_and_qualifies_the_saving(
+    auth_client: Client, ops_backtest_artifact: Path
+) -> None:
+    """The saving KPI must carry its interval, not read as a settled result."""
+    response = auth_client.get("/ops/")
+    assert response.status_code == 200
+    body = response.content.decode()
+
+    assert "+17.0%" in body  # saving is the negated cost change
+    assert "no concluyente" in body
+
+
+def test_ops_view_hides_metrics_for_a_partially_revealed_week(
+    auth_client: Client, ops_backtest_artifact: Path
+) -> None:
+    response = auth_client.get("/ops/?cadence=never&week=1")
+    body = response.content.decode()
+    assert response.status_code == 200
+    assert "semana parcial" in body
 
 
 def test_ops_view_reports_a_missing_simulation(auth_client: Client, reports_dir: Path) -> None:

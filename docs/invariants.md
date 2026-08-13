@@ -196,3 +196,9 @@ See `docs/web_layer.md` for the full description.
     Their `y_true` is a partial-window sum, so any cost computed against it
     understates the shortage half. They are scored and stored, then excluded from
     every summary, chart and KPI.
+
+38. Retrain cadences are compared paired, with an interval, and the comparison
+    declares itself underpowered when there are too few origins.
+
+    A raw cost difference over a handful of weeks ranks nothing. See
+    `_compare_cadences`.

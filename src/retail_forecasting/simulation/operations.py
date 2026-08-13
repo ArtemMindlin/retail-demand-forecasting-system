@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from retail_forecasting.config import Settings
@@ -34,9 +35,17 @@ class OperationalSimulationArtifacts:
     cadence_summary: pd.DataFrame
     retrain_events: list[dict[str, Any]]
     run_directory: Path
+    cadence_comparison: pd.DataFrame = field(default_factory=pd.DataFrame)
     cumulative_cost_plot: Path | None = None
     report_path: Path | None = None
     cadence_models: dict[str, Path] = field(default_factory=dict)
+
+
+BASELINE_CADENCE_LABEL = "never"
+# Origins below this count make the cadence comparison anecdotal: the clustered
+# bootstrap has too few clusters for its interval to mean much.
+MIN_ORIGINS_FOR_INFERENCE = 8
+N_BOOTSTRAP_RESAMPLES = 2000
 
 
 def _cadence_label(cadence: int | None) -> str:
@@ -238,6 +247,7 @@ def _persist_simulation_outputs(
     sim_root: Path,
     predictions_by_day: pd.DataFrame,
     cadence_summary: pd.DataFrame,
+    cadence_comparison: pd.DataFrame,
     retrain_events: list[dict[str, Any]],
     settings: Settings,
     eval_dates: list[Any],
@@ -246,6 +256,7 @@ def _persist_simulation_outputs(
     horizon = settings.dataset.horizon
     predictions_by_day.to_parquet(sim_root / "predictions_by_day.parquet", index=False)
     cadence_summary.to_csv(sim_root / "cadence_summary.csv", index=False)
+    cadence_comparison.to_csv(sim_root / "cadence_comparison.csv", index=False)
     (sim_root / "retrain_events.json").write_text(
         json.dumps(retrain_events, indent=2), encoding="utf-8"
     )
@@ -255,7 +266,7 @@ def _persist_simulation_outputs(
         plot_path = _plot_cumulative_cost(predictions_by_day, retrain_events, sim_root, horizon)
 
     report_path = _write_simulation_report(
-        sim_root, cadence_summary, retrain_events, settings, eval_dates
+        sim_root, cadence_summary, cadence_comparison, retrain_events, settings, eval_dates
     )
     return plot_path, report_path
 
@@ -322,19 +333,35 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
         series_cost_profile=series_cost_profile,
     )
     cadence_summary = _summarize_cadences(predictions_by_day, retrain_events, horizon)
+    cadence_comparison = _compare_cadences(
+        predictions_by_day, horizon, random_seed=settings.project.random_seed
+    )
 
     plot_path, report_path = _persist_simulation_outputs(
-        sim_root, predictions_by_day, cadence_summary, retrain_events, settings, eval_dates
+        sim_root,
+        predictions_by_day,
+        cadence_summary,
+        cadence_comparison,
+        retrain_events,
+        settings,
+        eval_dates,
     )
 
     print(
-        f"✅ Operational simulation complete. Outputs in {sim_root} "
+        f"✅ Rolling-origin backtest complete. Outputs in {sim_root} "
         f"({len(retrain_events)} retrain events)"
     )
+    if not cadence_comparison.empty and bool(cadence_comparison["underpowered"].any()):
+        print(
+            "⚠️  Only "
+            f"{int(cadence_comparison['n_origins'].max())} independent origins: the "
+            "cadence comparison is descriptive, not conclusive."
+        )
 
     return OperationalSimulationArtifacts(
         predictions_by_day=predictions_by_day,
         cadence_summary=cadence_summary,
+        cadence_comparison=cadence_comparison,
         retrain_events=retrain_events,
         run_directory=sim_root,
         cumulative_cost_plot=plot_path,
@@ -390,6 +417,78 @@ def _summarize_cadences(
             }
         )
     return pd.DataFrame(rows).sort_values("total_cost").reset_index(drop=True)
+
+
+def _compare_cadences(
+    predictions_by_day: pd.DataFrame,
+    horizon: int,
+    random_seed: int,
+) -> pd.DataFrame:
+    """Compare every cadence against the no-retrain baseline, with uncertainty.
+
+    A raw cost difference over a handful of weeks says nothing on its own, so each
+    cadence is paired with the baseline on the same origins and the same series --
+    the two policies see identical demand, which removes most of the variance --
+    and the uncertainty comes from a bootstrap that resamples whole origins.
+    Origins are the resampling unit because series within one week share the same
+    demand shock and are not independent.
+
+    ``n_origins`` below ``MIN_ORIGINS_FOR_INFERENCE`` is reported as
+    ``underpowered``: the interval is then too wide to rank policies, and the
+    honest reading is "this window cannot tell them apart".
+    """
+    complete = _independent_origins(predictions_by_day, horizon)
+    if complete.empty or BASELINE_CADENCE_LABEL not in set(complete["cadence"]):
+        return pd.DataFrame()
+
+    paired = complete.pivot_table(
+        index=["decision_date", "series_id"],
+        columns="cadence",
+        values="total_cost",
+        aggfunc="sum",
+    ).dropna()
+    if paired.empty or BASELINE_CADENCE_LABEL not in paired.columns:
+        return pd.DataFrame()
+
+    # One row per origin: the decision unit whose costs are exchangeable.
+    by_origin = paired.groupby(level="decision_date").sum()
+    baseline = by_origin[BASELINE_CADENCE_LABEL].to_numpy(dtype=float)
+    n_origins = len(by_origin)
+    rng = np.random.default_rng(random_seed)
+    draws = rng.integers(0, n_origins, size=(N_BOOTSTRAP_RESAMPLES, n_origins))
+
+    rows = []
+    for cadence in by_origin.columns:
+        if cadence == BASELINE_CADENCE_LABEL:
+            continue
+        candidate = by_origin[cadence].to_numpy(dtype=float)
+        delta = candidate - baseline
+        total_baseline = float(baseline.sum())
+        cost_change_pct = (
+            100.0 * float(delta.sum()) / total_baseline if total_baseline else float("nan")
+        )
+        resampled_baseline = baseline[draws].sum(axis=1)
+        resampled_delta = delta[draws].sum(axis=1)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            boot_pct = 100.0 * resampled_delta / resampled_baseline
+        low, high = (float(x) for x in np.percentile(boot_pct[np.isfinite(boot_pct)], [2.5, 97.5]))
+        rows.append(
+            {
+                "cadence": cadence,
+                "baseline": BASELINE_CADENCE_LABEL,
+                "n_origins": n_origins,
+                "n_series": int(paired.index.get_level_values("series_id").nunique()),
+                "cost_change_pct": cost_change_pct,
+                "ci95_low_pct": low,
+                "ci95_high_pct": high,
+                "origins_cheaper_than_baseline": int((delta < 0).sum()),
+                "conclusive": bool(
+                    n_origins >= MIN_ORIGINS_FOR_INFERENCE and (low > 0.0 or high < 0.0)
+                ),
+                "underpowered": bool(n_origins < MIN_ORIGINS_FOR_INFERENCE),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def _plot_cumulative_cost(
@@ -449,34 +548,66 @@ def _plot_cumulative_cost(
 def _write_simulation_report(
     sim_root: Path,
     cadence_summary: pd.DataFrame,
+    cadence_comparison: pd.DataFrame,
     retrain_events: list[dict[str, Any]],
     settings: Settings,
     eval_dates: list[pd.Timestamp],
 ) -> Path:
     horizon = settings.dataset.horizon
-    table = _format_markdown_table(cadence_summary)
+    n_origins = int(cadence_summary["n_origins"].max()) if not cadence_summary.empty else 0
     lines = [
-        "# Operational simulation report",
+        "# Rolling-origin production backtest (OPS plane)",
         "",
         f"- Streaming window: {len(eval_dates)} days "
         f"({eval_dates[0].date()} → {eval_dates[-1].date()})",
         f"- Horizon: {horizon} days",
         f"- Cadences evaluated: {list(cadence_summary['cadence'])}",
         f"- Total retrain events: {len(retrain_events)}",
+        f"- Scored origins used for aggregation: {n_origins} "
+        f"(one every {horizon} days, fully-revealed actuals only)",
         "",
         "## Cadence summary",
         "",
-        table,
+        _format_markdown_table(cadence_summary),
         "",
-        "## Interpretation",
+        "## Cadence vs no-retrain baseline",
         "",
-        "Lower `total_cost` over the same window indicates a better operational",
-        "policy. Compare against the `never` baseline to quantify the value of",
-        "retraining at the listed cadence.",
+        _format_markdown_table(cadence_comparison),
+        "",
+        _comparison_verdict(cadence_comparison),
+        "",
     ]
     report_path = sim_root / "report.md"
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path
+
+
+def _comparison_verdict(cadence_comparison: pd.DataFrame) -> str:
+    """One-line honest reading of the paired comparison."""
+    if cadence_comparison.empty:
+        return "_(no baseline pairing available for this window)_"
+    parts = []
+    for row in cadence_comparison.itertuples(index=False):
+        band = f"{row.cost_change_pct:+.1f}% [{row.ci95_low_pct:+.1f}%, {row.ci95_high_pct:+.1f}%]"
+        if row.underpowered:
+            reading = (
+                f"only {row.n_origins} independent origins — underpowered, "
+                "treat as descriptive, not as evidence one policy wins"
+            )
+        elif row.conclusive:
+            reading = "interval excludes zero — the difference holds on this window"
+        else:
+            reading = "interval spans zero — indistinguishable from the baseline"
+        parts.append(f"- `{row.cadence}` vs `{row.baseline}`: {band} — {reading}")
+    return "\n".join(
+        [
+            "Cost change is paired per origin and series against the baseline; the",
+            "interval is a 95% bootstrap CI resampling whole origins (series inside an",
+            "origin share the same demand shock and are not independent).",
+            "",
+            *parts,
+        ]
+    )
 
 
 def _format_markdown_table(df: pd.DataFrame) -> str:

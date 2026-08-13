@@ -21,6 +21,9 @@ UPPER_COLUMN = "q_0_9"
 HORIZON_DAYS = 7
 
 ARTIFACT_GLOB = "*/simulation/predictions_by_day.parquet"
+# Paired cadence-vs-baseline comparison with its bootstrap interval, written next
+# to the predictions by ``_compare_cadences``. Absent in older runs.
+COMPARISON_FILENAME = "cadence_comparison.csv"
 
 
 class SimulationNotFoundError(Exception):
@@ -35,15 +38,22 @@ class OpsSimulation:
         self._lock = threading.Lock()
         self._frame: pd.DataFrame | None = None
         self._run_name: str | None = None
+        self._comparison: dict[str, dict[str, Any]] = {}
 
     def invalidate(self) -> None:
         with self._lock:
             self._frame = None
             self._run_name = None
+            self._comparison = {}
 
     @property
     def run_name(self) -> str:
         return self._run_name or "ops_sim"
+
+    def comparison(self) -> dict[str, dict[str, Any]]:
+        """Paired cadence-vs-baseline results, keyed by cadence. Empty if absent."""
+        self.frame()
+        return self._comparison
 
     def frame(self) -> pd.DataFrame:
         """Load (and cache) the newest simulation artifact.
@@ -71,7 +81,18 @@ class OpsSimulation:
         with self._lock:
             self._frame = df
             self._run_name = artifact.parent.parent.name
+            self._comparison = _load_comparison(artifact.parent / COMPARISON_FILENAME)
         return df
+
+
+def _load_comparison(path: Path) -> dict[str, dict[str, Any]]:
+    """Read the paired cadence comparison, tolerating runs that predate it."""
+    if not path.exists():
+        return {}
+    table = pd.read_csv(path)
+    if table.empty or "cadence" not in table.columns:
+        return {}
+    return {str(row.pop("cadence")): row for row in table.to_dict(orient="records")}
 
 
 def _cadence_block(group: pd.DataFrame) -> dict[str, Any]:
@@ -130,6 +151,7 @@ def weekly_summary(simulation: OpsSimulation, series_limit: int = 60) -> dict[st
         "cadences": sorted(str(c) for c in df["cadence"].unique()),
         "series": [str(s) for s in volume.head(series_limit).index],
         "weeks": weeks,
+        "comparison": simulation.comparison(),
     }
 
 

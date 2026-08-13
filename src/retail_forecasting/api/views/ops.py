@@ -51,6 +51,34 @@ def _coverage_color(coverage: float | None, target: float) -> str:
     return "#ef4444"
 
 
+def _savings_kpi(comparison: dict[str, Any]) -> tuple[str, str, str]:
+    """Saving of weekly retraining vs the baseline, with its bootstrap interval.
+
+    This used to be the ratio of two costs within the displayed week, which moved
+    wildly from week to week and read as a result. It is now the paired figure over
+    every independent origin, and it says out loud when the window is too short to
+    tell the policies apart.
+    """
+    row = comparison.get("every_7d")
+    if not row:
+        return "—", "sin comparación pareada", "var(--c-conf)"
+
+    # cost_change_pct is signed as a cost delta: negative cost change = saving.
+    saving = -float(row["cost_change_pct"])
+    low, high = -float(row["ci95_high_pct"]), -float(row["ci95_low_pct"])
+    origins = int(row["n_origins"])
+    if row.get("underpowered"):
+        sub = f"{origins} orígenes · no concluyente"
+        color = "var(--c-drift)"
+    elif row.get("conclusive"):
+        sub = f"IC95% [{low:+.1f}%, {high:+.1f}%] · {origins} orígenes"
+        color = "var(--c-conf)"
+    else:
+        sub = f"IC95% [{low:+.1f}%, {high:+.1f}%] · indistinguible"
+        color = "var(--c-drift)"
+    return f"{saving:+.1f}%", sub, color
+
+
 def ops(request: HttpRequest) -> HttpResponse:
     """Week-by-week playback comparing retrain cadences for one series."""
     try:
@@ -88,9 +116,7 @@ def ops(request: HttpRequest) -> HttpResponse:
         except SimulationNotFoundError:
             points = []
 
-    cost_weekly = (current or {}).get("by_cadence", {}).get("every_7d", {}).get("total_cost")
-    cost_never = (current or {}).get("by_cadence", {}).get("never", {}).get("total_cost")
-    savings = _pct(1 - cost_weekly / cost_never) if cost_weekly and cost_never else "—"
+    savings, savings_sub, savings_color = _savings_kpi(summary.get("comparison", {}))
 
     kpis = [
         {
@@ -114,8 +140,8 @@ def ops(request: HttpRequest) -> HttpResponse:
         {
             "label": "Ahorro vs sin reentreno",
             "value": savings,
-            "sub": "coste semanal",
-            "color": "var(--c-conf)",
+            "sub": savings_sub,
+            "color": savings_color,
         },
     ]
 

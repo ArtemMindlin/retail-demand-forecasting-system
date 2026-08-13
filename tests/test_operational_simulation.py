@@ -161,3 +161,22 @@ def test_aggregates_use_non_overlapping_origins(tmp_path: Path, patched_panel_lo
         assert row.total_cost == pytest.approx(float(cadence_grid["total_cost"].sum()))
         # Guard against the old behaviour: every daily origin summed together.
         assert row.total_cost < float(predictions["total_cost"].sum())
+
+
+def test_cadence_comparison_flags_a_short_window_as_underpowered(
+    tmp_path: Path, patched_panel_loader
+) -> None:
+    settings = _fast_settings(tmp_path, simulation_days=8)
+    artifacts = run_operational_simulation(settings)
+
+    comparison = artifacts.cadence_comparison
+    assert list(comparison["cadence"]) == ["every_4d"]
+    assert (artifacts.run_directory / "cadence_comparison.csv").exists()
+
+    row = comparison.iloc[0]
+    assert row["baseline"] == "never"
+    assert row["n_origins"] >= 1
+    assert row["ci95_low_pct"] <= row["ci95_high_pct"]
+    # Three origins can never settle a policy comparison.
+    assert bool(row["underpowered"]) is True
+    assert bool(row["conclusive"]) is False
