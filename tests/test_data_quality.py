@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -71,6 +73,103 @@ def test_latent_demand_imputer_corrects_stockout_rows() -> None:
     assert bool(imputed_df.loc[99, "is_imputed"]) is True
     assert imputed_df.loc[99, "observed_demand"] > 0.0
     assert imputed_df.loc[99, "original_observed_demand"] == 0.0
+
+
+def test_latent_demand_imputer_uses_default_lgbm_params_when_unset() -> None:
+    dates = pd.date_range("2024-01-01", periods=100)
+    df = pd.DataFrame(
+        {
+            "date": dates,
+            "series_id": "test_1",
+            "observed_demand": 10.0,
+            "stockout_hours": 0.0,
+        }
+    )
+    df.loc[99, "observed_demand"] = 0.0
+    df.loc[99, "stockout_hours"] = 24.0
+
+    imputer = LatentDemandImputer(strategy="supervised")
+    imputer.impute(df)
+
+    assert imputer.model is not None
+    assert imputer.model.n_estimators == 200
+    assert imputer.model.learning_rate == 0.05
+    assert imputer.model.max_depth == 6
+
+
+def test_latent_demand_imputer_lgbm_params_override_is_used() -> None:
+    dates = pd.date_range("2024-01-01", periods=100)
+    df = pd.DataFrame(
+        {
+            "date": dates,
+            "series_id": "test_1",
+            "observed_demand": 10.0,
+            "stockout_hours": 0.0,
+        }
+    )
+    df.loc[99, "observed_demand"] = 0.0
+    df.loc[99, "stockout_hours"] = 24.0
+
+    imputer = LatentDemandImputer(
+        strategy="supervised",
+        lgbm_params={"n_estimators": 5, "learning_rate": 0.3, "max_depth": 2},
+    )
+    imputer.impute(df)
+
+    assert imputer.model is not None
+    assert imputer.model.n_estimators == 5
+    assert imputer.model.learning_rate == 0.3
+    assert imputer.model.max_depth == 2
+
+
+def test_latent_demand_imputer_missing_model_path_falls_back_to_defaults(tmp_path) -> None:
+    dates = pd.date_range("2024-01-01", periods=100)
+    df = pd.DataFrame(
+        {
+            "date": dates,
+            "series_id": "test_1",
+            "observed_demand": 10.0,
+            "stockout_hours": 0.0,
+        }
+    )
+    df.loc[99, "observed_demand"] = 0.0
+    df.loc[99, "stockout_hours"] = 24.0
+
+    imputer = LatentDemandImputer(
+        strategy="supervised", model_path=tmp_path / "does_not_exist.json"
+    )
+    imputer.impute(df)
+
+    assert imputer.model is not None
+    assert imputer.model.n_estimators == 200
+
+
+def test_latent_demand_imputer_loads_tuned_params_from_disk(tmp_path) -> None:
+    dates = pd.date_range("2024-01-01", periods=100)
+    df = pd.DataFrame(
+        {
+            "date": dates,
+            "series_id": "test_1",
+            "observed_demand": 10.0,
+            "stockout_hours": 0.0,
+        }
+    )
+    df.loc[99, "observed_demand"] = 0.0
+    df.loc[99, "stockout_hours"] = 24.0
+
+    params_path = tmp_path / "imputation_lgbm_params.json"
+    params_path.write_text(
+        json.dumps({"n_estimators": 7, "learning_rate": 0.2, "max_depth": 3}),
+        encoding="utf-8",
+    )
+
+    imputer = LatentDemandImputer(strategy="supervised", model_path=params_path)
+    imputer.impute(df)
+
+    assert imputer.model is not None
+    assert imputer.model.n_estimators == 7
+    assert imputer.model.learning_rate == 0.2
+    assert imputer.model.max_depth == 3
 
 
 def test_raise_on_blocking_data_quality_raises_error() -> None:

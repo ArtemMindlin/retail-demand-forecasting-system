@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Literal
 
 import lightgbm as lgb
@@ -12,6 +14,18 @@ OPERATIVE_WINDOW_HOURS = 16.0
 
 # Single source of truth for the latent-demand imputation strategies.
 ImputationStrategy = Literal["supervised", "historical_mean", "clipped_scaling", "none"]
+
+# Defaults used by the supervised strategy's LGBM teacher model when no tuned
+# hyperparameters are supplied (never empirically tuned; see imputation_tuning.py).
+DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
+    "n_estimators": 200,
+    "learning_rate": 0.05,
+    "max_depth": 6,
+}
+
+# Filename convention for the tuned hyperparameters written by imputation_tuning.py under
+# settings.models.models_dir; shared so producer and consumers never drift apart.
+IMPUTATION_LGBM_PARAMS_FILENAME = "imputation_lgbm_params.json"
 
 
 class LatentDemandImputer:
@@ -27,11 +41,15 @@ class LatentDemandImputer:
         stockout_col: str = "stockout_hours",
         target_col: str = "observed_demand",
         scaling_factor: float = 1.2,
+        lgbm_params: dict[str, int | float] | None = None,
+        model_path: Path | None = None,
     ):
         self.strategy = strategy
         self.stockout_col = stockout_col
         self.target_col = target_col
         self.scaling_factor = scaling_factor
+        self.lgbm_params = lgbm_params
+        self.model_path = model_path
         self.model: lgb.LGBMRegressor | None = None
 
     def impute(self, panel: pd.DataFrame) -> pd.DataFrame:
@@ -71,6 +89,22 @@ class LatentDemandImputer:
         df[self.target_col] = df["latent_demand_est"]
 
         return df
+
+    def _resolve_lgbm_params(self) -> dict[str, int | float]:
+        """Pick the supervised teacher model's hyperparameters.
+
+        Precedence: a tuned params file on disk (written by imputation_tuning.py) beats
+        an explicit override, which beats the never-tuned defaults. Only the recipe is
+        persisted, not fitted weights, so the model is always re-fit on the current panel's
+        clean days -- this keeps leakage/feature-space properties identical to before tuning
+        existed.
+        """
+        if self.model_path is not None and self.model_path.exists():
+            loaded: dict[str, int | float] = json.loads(self.model_path.read_text(encoding="utf-8"))
+            return loaded
+        if self.lgbm_params is not None:
+            return self.lgbm_params
+        return dict(DEFAULT_SUPERVISED_LGBM_PARAMS)
 
     def _passthrough(self, panel: pd.DataFrame) -> pd.DataFrame:
         """Return the panel unchanged, marking demand as not imputed.
@@ -124,8 +158,13 @@ class LatentDemandImputer:
         X_train = train_df[feature_cols]
         y_train = train_df[self.target_col]
 
+        params = self._resolve_lgbm_params()
         self.model = lgb.LGBMRegressor(
-            n_estimators=200, learning_rate=0.05, max_depth=6, random_state=42, verbosity=-1
+            n_estimators=int(params["n_estimators"]),
+            learning_rate=float(params["learning_rate"]),
+            max_depth=int(params["max_depth"]),
+            random_state=42,
+            verbosity=-1,
         )
         self.model.fit(X_train, y_train)
 
