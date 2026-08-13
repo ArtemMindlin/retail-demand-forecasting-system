@@ -27,7 +27,8 @@ which needs the per-point geometry the server already computed.
 
   <div class="chart-canvas"
        data-chart-points="{{ chart_points_json }}"
-       data-chart-width="{{ chart_width|unlocalize }}">
+       data-chart-width="{{ chart_width|unlocalize }}"
+       data-chart-height="{{ chart_height|unlocalize }}">
     {{ chart_svg }}
     <div class="chart-tooltip" hidden>
       <div class="chart-tooltip-label"></div>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from django.conf import settings
@@ -116,6 +117,7 @@ def ops(request: HttpRequest) -> HttpResponse:
         except SimulationNotFoundError:
             points = []
 
+    chart = ops_trajectory_chart(points, week_index)
     savings, savings_sub, savings_color = _savings_kpi(summary.get("comparison", {}))
 
     kpis = [
@@ -166,7 +168,11 @@ def ops(request: HttpRequest) -> HttpResponse:
             "series_list": series_list,
             "series_id": series_id,
             "target_pct": _pct(target),
-            "chart": ops_trajectory_chart(points, week_index),
+            "chart": chart["svg"],
+            # Serialized for the pointer handler that positions the hover tooltip.
+            "chart_points_json": json.dumps(chart["points"]),
+            "chart_width": chart["width"],
+            "chart_height": chart["height"],
             "has_points": bool(points),
         },
     )

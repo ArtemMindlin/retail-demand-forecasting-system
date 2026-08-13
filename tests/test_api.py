@@ -301,6 +301,65 @@ def test_ops_view_renders_the_backtest_and_qualifies_the_saving(
     assert "no se arrastra stock" in body
 
 
+def test_ops_view_ships_hover_geometry_for_the_tooltip(
+    auth_client: Client, ops_backtest_artifact: Path
+) -> None:
+    """The pointer handler recomputes no scaling, so the view must ship the geometry."""
+    body = auth_client.get("/ops/").content.decode()
+
+    assert 'class="chart-canvas"' in body
+    assert "data-chart-points=" in body
+    assert 'data-chart-width="900"' in body
+    assert 'data-chart-height="230"' in body
+    # Every tooltip field the handler fills must exist in the markup.
+    for field in ("predicted", "interval", "actual", "coverage", "order", "cost"):
+        assert f'data-field="{field}"' in body
+    assert 'class="chart-hover"' in body
+
+
+def test_ops_chart_points_match_the_rendered_origins() -> None:
+    from retail_forecasting.api.charts import ops_trajectory_chart
+
+    points = [
+        {
+            "week_index": 0,
+            "origin_date": "2024-05-16",
+            "y_pred": 100.0,
+            "lower": 90.0,
+            "upper": 120.0,
+            "y_true": 110.0,
+            "covered": True,
+            "order_quantity": 115.0,
+            "total_cost": 40.0,
+        },
+        {
+            "week_index": 1,
+            "origin_date": "2024-05-23",
+            "y_pred": 105.0,
+            "lower": 95.0,
+            "upper": 125.0,
+            "y_true": None,
+            "covered": False,
+            "order_quantity": 118.0,
+            "total_cost": 0.0,
+        },
+    ]
+
+    chart = ops_trajectory_chart(points, selected_week=0)
+
+    assert chart["width"] == 900
+    assert chart["height"] == 230
+    first, second = chart["points"]
+    assert first["label"] == "2024-05-16"
+    assert first["interval"] == "90–120"
+    assert first["coverage"] == "dentro"
+    assert first["actual"] == 110
+    # An origin whose actuals have not landed leaves the crosshair dot hidden.
+    assert second["yActual"] is None
+    assert second["actual"] is None
+    assert second["coverage"] == "—"
+
+
 def test_ops_view_hides_metrics_for_a_partially_revealed_week(
     auth_client: Client, ops_backtest_artifact: Path
 ) -> None:

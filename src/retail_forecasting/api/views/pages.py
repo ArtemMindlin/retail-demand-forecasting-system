@@ -95,6 +95,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         # Serialized for the pointer handler that positions the hover tooltip.
         "chart_points_json": json.dumps(chart["points"]),
         "chart_width": chart["width"],
+        # The tooltip maps user-space y to CSS pixels, so it needs the viewBox height.
+        "chart_height": chart["height"],
         "kpi_cards": [
             _kpi_card(
                 "Coste de Inventario",

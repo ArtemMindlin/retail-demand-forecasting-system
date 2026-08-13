@@ -328,11 +328,19 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
             "predicted": row["predicted"],
             "lower": row["lower"],
             "upper": row["upper"],
+            # Preformatted: the tooltip handler assigns fields verbatim rather than
+            # knowing how any one chart wants its numbers composed.
+            "interval": f"{row['lower']}–{row['upper']}",
         }
         for i, row in enumerate(series)
     ]
 
-    return {"svg": mark_safe(svg), "points": points, "width": FORECAST_WIDTH}  # noqa: S308
+    return {  # noqa: S308
+        "svg": mark_safe(svg),
+        "points": points,
+        "width": FORECAST_WIDTH,
+        "height": FORECAST_HEIGHT,
+    }
 
 
 # ── OPS backtest trajectory ───────────────────────────────────────────────────
@@ -348,14 +356,17 @@ _OPS_PAD = dict(_PAD)
 def ops_trajectory_chart(
     points: Sequence[dict[str, Any]],
     selected_week: int | None = None,
-) -> SafeString:
+) -> dict[str, Any]:
     """Weekly forecast, conformal band and revealed actuals for one series.
 
     Actuals are drawn green inside the band and red outside it, so a glance at
     the dots is a read on realized coverage.
+
+    Returns the markup plus the per-origin geometry, so the shared pointer handler
+    can position the crosshair and tooltip without recomputing any scaling.
     """
     if not points:
-        return mark_safe("")
+        return {"svg": mark_safe(""), "points": [], "width": OPS_WIDTH, "height": OPS_HEIGHT}
 
     values = [
         value
@@ -462,7 +473,45 @@ def ops_trajectory_chart(
             f'fill="{colour}"{weight}>{escape(point["origin_date"][5:])}</text>'
         )
 
-    return mark_safe(  # noqa: S308 - numeric coordinates and escaped labels only
+    # Hover furniture, positioned by the shared pointer handler (static/js/chart.js).
+    parts.append(
+        '<g class="chart-hover" style="display:none">'
+        f'<line class="chart-hover-line" y1="{_OPS_PAD["top"]}" '
+        f'y2="{_num(_OPS_PAD["top"] + inner_h)}" stroke="rgba(148,163,184,0.35)" '
+        'stroke-dasharray="3 3" stroke-width="1"/>'
+        '<circle class="chart-hover-pred" r="4" fill="var(--c-ai)" stroke="#fff" '
+        'stroke-width="1.5"/>'
+        "</g>"
+    )
+
+    svg = (
         f'<svg class="forecast-svg" viewBox="0 0 {OPS_WIDTH} {OPS_HEIGHT}" '
         f'role="img" aria-label="Trayectoria semanal de la serie">{"".join(parts)}</svg>'
     )
+
+    hover_points = [
+        {
+            "x": round(scale_x(index), 2),
+            "yPred": round(scale_y(point["y_pred"]), 2),
+            "yActual": (
+                None if point.get("y_true") is None else round(scale_y(point["y_true"]), 2)
+            ),
+            "label": point["origin_date"],
+            "predicted": round(float(point["y_pred"])),
+            "interval": f"{round(float(point['lower']))}–{round(float(point['upper']))}",
+            "actual": None if point.get("y_true") is None else round(float(point["y_true"])),
+            "coverage": (
+                "—" if point.get("y_true") is None else ("dentro" if point["covered"] else "fuera")
+            ),
+            "order": round(float(point["order_quantity"])),
+            "cost": f"{float(point['total_cost']):,.0f}",
+        }
+        for index, point in enumerate(points)
+    ]
+
+    return {  # noqa: S308 - numeric coordinates and escaped labels only
+        "svg": mark_safe(svg),
+        "points": hover_points,
+        "width": OPS_WIDTH,
+        "height": OPS_HEIGHT,
+    }

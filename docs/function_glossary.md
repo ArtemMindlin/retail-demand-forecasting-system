@@ -590,9 +590,9 @@ y las vistas solo leen parametros, llaman a un servicio y renderizan.
 
 ### `forecast_chart` / `ops_trajectory_chart` / `distribution_chart` / `sparkline`
 - Archivo: `src/retail_forecasting/api/charts.py`
-- Que hace: primitivas SVG renderizadas en servidor. `forecast_chart` devuelve ademas la geometria por punto para que el tooltip no recalcule nada en el navegador.
+- Que hace: primitivas SVG renderizadas en servidor. `forecast_chart` y `ops_trajectory_chart` devuelven ademas la geometria por punto (y los valores ya formateados) para que el tooltip no recalcule nada en el navegador.
 - Recibe: la serie o los puntos ya calculados.
-- Devuelve: `SafeString` (o `dict` con `svg` y `points` en `forecast_chart`).
+- Devuelve: `SafeString` (o `dict` con `svg`, `points`, `width` y `height` en `forecast_chart` y `ops_trajectory_chart`).
 - Se usa en: dashboard, OPS, drift y tabla de SKU.
 
 ### `render`

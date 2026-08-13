@@ -107,9 +107,14 @@ cliente.
   gris-azul = intervalo conformal, punto = valor realizado. Los ejes usan
   `hero_y_domain()`, que da etiquetas redondas sin estirar el dominio hasta el
   primer tick (eso desperdiciaba media altura del panel).
+- El hover es agnostico del grafico: la vista envuelve el SVG en `.chart-canvas`
+  con `data-chart-points` / `data-chart-width` / `data-chart-height`, y el
+  manejador rellena cada `[data-field="x"]` del tooltip con la propiedad `x` del
+  punto, ya formateada en Python. Anadir tooltip a un grafico nuevo no toca el JS.
 
-El unico JavaScript propio son ~130 lineas: el manejador de puntero que mueve el
-tooltip del grafico principal (`static/js/chart.js`) y el inicializador de KaTeX
+El unico JavaScript propio son ~140 lineas: el manejador de puntero que mueve la
+cruz y el tooltip (`static/js/chart.js`, compartido por el grafico del dashboard y
+el del plano OPS) y el inicializador de KaTeX
 (`static/js/latex.js`).
 
 ## Interactividad
