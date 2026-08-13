@@ -183,3 +183,16 @@ See `docs/web_layer.md` for the full description.
     leakage, but it costs a one-day-stale forecast and, under a trend, deflates
     both accuracy and conformal coverage. `simulation/operations.py` slices at
     `<= d`.
+
+36. Aggregates over the backtest use a non-overlapping origin grid.
+
+    Scoring runs daily and the horizon is `h` days, so consecutive origins share
+    `h - 1` days of demand. Summing every daily origin counts the same demand up
+    to `h` times. Both `_summarize_cadences` and the dashboard keep one origin
+    every `h` days.
+
+37. Origins whose actuals have not fully landed are never aggregated.
+
+    Their `y_true` is a partial-window sum, so any cost computed against it
+    understates the shortage half. They are scored and stored, then excluded from
+    every summary, chart and KPI.

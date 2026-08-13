@@ -232,6 +232,55 @@ def test_ops_view_reports_a_missing_simulation(auth_client: Client, reports_dir:
     assert "simulación operacional no se ha ejecutado" in response.content.decode()
 
 
+def test_ops_cadence_block_ignores_partially_revealed_rows() -> None:
+    """Cost is computed against ``y_true``, so a truncated window must not count.
+
+    On a partial week ``y_true`` is a partial-window sum, which makes the shortage
+    half of the cost look artificially small.
+    """
+    from retail_forecasting.api.services.ops import _cadence_block
+
+    group = pd.DataFrame(
+        {
+            "series_id": ["a", "b"],
+            "y_pred": [10.0, 10.0],
+            "y_true": [12.0, 3.0],
+            "total_cost": [4.0, 100.0],
+            "covered": [True, False],
+            "retrained_this_step": [True, True],
+            "actuals_complete": [True, False],
+        }
+    )
+
+    block = _cadence_block(group)
+    assert block["total_cost"] == 4.0
+    assert block["coverage"] == 1.0
+    assert block["n_series"] == 1
+    assert block["actuals_complete"] is False
+
+
+def test_ops_cadence_block_reports_nothing_for_a_fully_partial_week() -> None:
+    from retail_forecasting.api.services.ops import _cadence_block
+
+    group = pd.DataFrame(
+        {
+            "series_id": ["a"],
+            "y_pred": [10.0],
+            "y_true": [3.0],
+            "total_cost": [100.0],
+            "covered": [False],
+            "retrained_this_step": [False],
+            "actuals_complete": [False],
+        }
+    )
+
+    block = _cadence_block(group)
+    assert block["total_cost"] is None
+    assert block["coverage"] is None
+    assert block["mae"] is None
+    assert block["actuals_complete"] is False
+
+
 def test_eda_view_reports_a_missing_run(auth_client: Client, reports_dir: Path) -> None:
     response = auth_client.get("/eda/")
     assert response.status_code == 200

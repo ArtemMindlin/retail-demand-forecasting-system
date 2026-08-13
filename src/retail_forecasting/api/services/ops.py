@@ -77,17 +77,28 @@ class OpsSimulation:
 def _cadence_block(group: pd.DataFrame) -> dict[str, Any]:
     """Aggregate one cadence at one weekly origin.
 
-    Coverage and MAE use only fully-revealed rows: a week whose actuals have not
-    all landed yet would otherwise report a coverage computed on partial data.
-    Cost still sums the whole group, because an order placed is a cost incurred.
+    Every metric -- cost included -- uses only fully-revealed rows. Cost used to be
+    summed over the whole group on the grounds that an order placed is a cost
+    incurred, but the cost of that order is computed *against* ``y_true``: on a
+    partial week ``y_true`` is a truncated window sum, so the shortage half of the
+    cost comes out artificially low. A partial week reports no metrics at all and
+    the view flags it instead.
     """
     complete = group[group["actuals_complete"]]
-    base = complete if not complete.empty else group
+    if complete.empty:
+        return {
+            "coverage": None,
+            "total_cost": None,
+            "mae": None,
+            "n_series": int(group["series_id"].nunique()),
+            "retrained": bool(group["retrained_this_step"].any()),
+            "actuals_complete": False,
+        }
     return {
-        "coverage": float(base["covered"].mean()) if not base.empty else None,
-        "total_cost": float(group["total_cost"].sum()),
-        "mae": float((base["y_pred"] - base["y_true"]).abs().mean()) if not base.empty else None,
-        "n_series": int(group["series_id"].nunique()),
+        "coverage": float(complete["covered"].mean()),
+        "total_cost": float(complete["total_cost"].sum()),
+        "mae": float((complete["y_pred"] - complete["y_true"]).abs().mean()),
+        "n_series": int(complete["series_id"].nunique()),
         "retrained": bool(group["retrained_this_step"].any()),
         "actuals_complete": bool(group["actuals_complete"].all()),
     }

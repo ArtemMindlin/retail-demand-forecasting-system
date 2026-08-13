@@ -43,6 +43,20 @@ def _cadence_label(cadence: int | None) -> str:
     return "never" if cadence is None else f"every_{cadence}d"
 
 
+def _independent_origins(predictions_by_day: pd.DataFrame, horizon: int) -> pd.DataFrame:
+    """Rows on the non-overlapping origin grid whose actuals fully landed.
+
+    Scoring runs every day, so consecutive origins share ``horizon - 1`` days of
+    demand. Keeping one origin every ``horizon`` days makes the summed cost an
+    actual cost over the window instead of a ``horizon``-fold overcount, and it
+    matches the weekly grid the dashboard plays back.
+    """
+    if predictions_by_day.empty:
+        return predictions_by_day
+    on_grid = predictions_by_day["day_index"] % horizon == 0
+    return predictions_by_day[on_grid & predictions_by_day["actuals_complete"]].copy()
+
+
 def _reveal_actuals(
     panel: pd.DataFrame,
     decision_date: pd.Timestamp,
@@ -229,6 +243,7 @@ def _persist_simulation_outputs(
     eval_dates: list[Any],
 ) -> tuple[Path | None, Path]:
     """Write simulation artifacts to disk; return ``(plot_path, report_path)``."""
+    horizon = settings.dataset.horizon
     predictions_by_day.to_parquet(sim_root / "predictions_by_day.parquet", index=False)
     cadence_summary.to_csv(sim_root / "cadence_summary.csv", index=False)
     (sim_root / "retrain_events.json").write_text(
@@ -237,7 +252,7 @@ def _persist_simulation_outputs(
 
     plot_path: Path | None = None
     if settings.simulation.make_plots:
-        plot_path = _plot_cumulative_cost(predictions_by_day, retrain_events, sim_root)
+        plot_path = _plot_cumulative_cost(predictions_by_day, retrain_events, sim_root, horizon)
 
     report_path = _write_simulation_report(
         sim_root, cadence_summary, retrain_events, settings, eval_dates
@@ -306,7 +321,7 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
         settings=settings,
         series_cost_profile=series_cost_profile,
     )
-    cadence_summary = _summarize_cadences(predictions_by_day, retrain_events)
+    cadence_summary = _summarize_cadences(predictions_by_day, retrain_events, horizon)
 
     plot_path, report_path = _persist_simulation_outputs(
         sim_root, predictions_by_day, cadence_summary, retrain_events, settings, eval_dates
@@ -331,9 +346,10 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
 def _summarize_cadences(
     predictions_by_day: pd.DataFrame,
     retrain_events: list[dict[str, Any]],
+    horizon: int,
 ) -> pd.DataFrame:
-    """Aggregate per-cadence performance over the fully-revealed window."""
-    complete = predictions_by_day[predictions_by_day["actuals_complete"]].copy()
+    """Aggregate per-cadence performance over the non-overlapping origin grid."""
+    complete = _independent_origins(predictions_by_day, horizon)
     rows = []
     retrain_counts: dict[str, int] = {}
     retrain_durations: dict[str, list[float]] = {}
@@ -359,6 +375,7 @@ def _summarize_cadences(
         rows.append(
             {
                 "cadence": cadence,
+                "n_origins": int(group["decision_date"].nunique()) if not group.empty else 0,
                 "n_observations": observations,
                 "total_cost": total_cost,
                 "mean_cost_per_observation": (
@@ -379,6 +396,7 @@ def _plot_cumulative_cost(
     predictions_by_day: pd.DataFrame,
     retrain_events: list[dict[str, Any]],
     sim_root: Path,
+    horizon: int,
 ) -> Path | None:
     try:
         import matplotlib
@@ -389,7 +407,7 @@ def _plot_cumulative_cost(
     except ImportError:
         return None
 
-    complete = predictions_by_day[predictions_by_day["actuals_complete"]]
+    complete = _independent_origins(predictions_by_day, horizon)
     if complete.empty:
         return None
 
@@ -413,7 +431,10 @@ def _plot_cumulative_cost(
             linewidth=0.8,
         )
 
-    ax.set_title("Cumulative inventory cost by retrain cadence")
+    ax.set_title(
+        f"Cumulative inventory cost by retrain cadence\n"
+        f"(non-overlapping origins, one every {horizon} days)"
+    )
     ax.set_xlabel("Decision date")
     ax.set_ylabel("Cumulative cost")
     ax.legend()

@@ -142,3 +142,22 @@ def test_inference_origin_is_the_decision_date(
     assert origins == [pd.Timestamp(d) for d in decision_dates]
     # One feature build per decision date, shared by every cadence.
     assert len(origins) == len(decision_dates)
+
+
+def test_aggregates_use_non_overlapping_origins(tmp_path: Path, patched_panel_loader) -> None:
+    """Daily origins overlap by ``horizon - 1`` days, so aggregates subsample them."""
+    settings = _fast_settings(tmp_path, simulation_days=8)
+    artifacts = run_operational_simulation(settings)
+
+    horizon = settings.dataset.horizon
+    predictions = artifacts.predictions_by_day
+    grid = predictions[(predictions["day_index"] % horizon == 0) & predictions["actuals_complete"]]
+    assert not grid.empty
+
+    for row in artifacts.cadence_summary.itertuples(index=False):
+        cadence_grid = grid[grid["cadence"] == row.cadence]
+        assert row.n_origins == cadence_grid["decision_date"].nunique()
+        assert row.n_observations == len(cadence_grid)
+        assert row.total_cost == pytest.approx(float(cadence_grid["total_cost"].sum()))
+        # Guard against the old behaviour: every daily origin summed together.
+        assert row.total_cost < float(predictions["total_cost"].sum())
