@@ -1,17 +1,17 @@
 \begin{table}[h]
 \centering
-\caption{Comparativa de errores predictivos en el backtesting walk-forward ($K=3$ folds, $H=7$ días). Cada estrategia se mide contra su propio target, por lo que los errores no son comparables entre estrategias (véase la discusión en la Sección~\ref{sec:predictivo_walkforward}).}
+\caption{Comparativa de errores predictivos en el backtesting walk-forward ($K=3$ folds, $H=7$ días, panel de 500 series). Cada estrategia se mide contra su propio target, por lo que los errores no son comparables entre estrategias (véase la discusión en la Sección~\ref{sec:predictivo_walkforward}).}
 \label{tab:metrics_predictive}
 \begin{tabular}{@{}llcc@{}}
 \toprule
 Estrategia & Modelo & MAE & RMSE \\
 \midrule
 Latent Supervised & Seasonal Naïve & 4,47 & 6,05 \\
-Latent Supervised & LightGBM & 7,22 & 10,63 \\
-Latent Supervised & CatBoost & 7,89 & 10,78 \\
+Latent Supervised & LightGBM & 5,91 & 8,37 \\
+Latent Supervised & CatBoost & 6,91 & 9,44 \\
 Observed & Seasonal Naïve & 8,73 & 11,82 \\
-Observed & CatBoost & 12,91 & 18,28 \\
-Observed & LightGBM & 13,71 & 19,76 \\
+Observed & CatBoost & 12,26 & 19,98 \\
+Observed & LightGBM & 12,48 & 19,95 \\
 \bottomrule
 \end{tabular}
 \end{table}

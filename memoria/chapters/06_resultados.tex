@@ -245,25 +245,24 @@ Para resolver este sesgo de evaluación, implementamos una metodología de \text
     \item \textbf{Término de seguridad compartido}: la escala $\sigma$ del \textit{safety stock} se estima como la desviación típica de la demanda real del conjunto de evaluación y se comparte entre estrategias. Al ser un valor común, no altera el orden entre ellas ---que es la magnitud de interés---, pero conviene advertir que es una cantidad de tipo oráculo: en producción $\sigma$ tendría que estimarse sobre el histórico disponible, por lo que los niveles absolutos de coste y de \textit{fill rate} de la Tabla~\ref{tab:metrics_cost} deben leerse como una cota optimista.
 \end{itemize}
 
-Los resultados de esta comparativa equitativa, calculada sobre un subconjunto de 30 series muestreadas del panel de 500 y $n = 2\,018$ días censurados sintéticamente, se presentan en la Tabla~\ref{tab:metrics_cost}.
+Los resultados de esta comparativa equitativa, calculada sobre un subconjunto de 30 series muestreadas del panel de 500 y $n = 293$ días censurados sintéticamente, se presentan en la Tabla~\ref{tab:metrics_cost}.
 
 \begin{quote}
 \small
 \textbf{Precisión necesaria sobre el muestreo.} El protocolo extrae 30 series por
 motivos de coste computacional, y el resultado es \emph{sensible al panel del que se
-extraen}. Muestreadas del panel de 500 series se reproduce el orden de la
-Tabla~\ref{tab:metrics_cost}: \textit{Latent Supervised} resulta la estrategia más
-barata (1.774{,}82 frente a 1.843{,}41 u.m.\ de \textit{Observed} en una reejecución
-de control, un $-3{,}7\%$). Muestreadas en cambio del subset base de 50 series de alta
-rotación, el orden \textbf{se invierte} y \textit{Observed} pasa a ser la más barata
-(844{,}01 frente a 927{,}80 u.m.). La causa es que el subset base contiene demasiadas
-pocas series con regímenes de rotura severa para que la corrección emerja por encima
-del ruido de muestreo con $n=30$: precisamente el mecanismo por el que la ventaja se
-diluye a escala, aquí operando en sentido contrario. La conclusión de esta sección debe
-leerse por tanto acotada al panel de 500 series, que es el que declara la columna
-\texttt{source\_panel\_series} del artefacto \texttt{fair\_cost\_backtest.csv}, y no
-como una propiedad independiente del subconjunto evaluado. Ampliar $n$ hasta que el
-signo sea estable frente al remuestreo queda como verificación pendiente.
+extraen}. La Tabla~\ref{tab:metrics_cost} las muestrea del panel de 500 series, que es
+lo que declara la columna \texttt{source\_panel\_series} del artefacto
+\texttt{fair\_cost\_backtest.csv}. Muestreadas en cambio del subset base de 50 series de
+alta rotación, el orden entre las dos estrategias principales \textbf{se invierte} y
+\textit{Observed} pasa a ser la más barata (844{,}01 frente a 927{,}80 u.m.). La causa
+es que el subset base contiene demasiadas pocas series con regímenes de rotura severa
+para que la corrección emerja por encima del ruido de muestreo con $n=30$: precisamente
+el mecanismo por el que la ventaja se diluye a escala, aquí operando en sentido
+contrario. Las conclusiones de esta sección deben leerse por tanto acotadas al panel de
+500 series, y no como una propiedad independiente del subconjunto evaluado. Ampliar $n$
+hasta que el signo sea estable frente al remuestreo queda como verificación pendiente,
+y es la limitación más relevante de esta sección.
 \end{quote}
 
 \input{tables/table_costs}
@@ -271,11 +270,15 @@ signo sea estable frente al remuestreo queda como verificación pendiente.
 Los datos de la Tabla~\ref{tab:metrics_cost} evidencian tres conclusiones cuantificables fundamentales:
 
 \begin{enumerate}
-    \item \textbf{La corrección de censura supervisada es la más eficiente}: La estrategia \textit{Latent Supervised} obtiene el menor coste total operativo con \textbf{12.262,00 u.m.}, lo que representa una reducción del \textbf{4,81\%} en coste frente a la estrategia \textit{Observed} (12.881,98 u.m.).
+    \item \textbf{La corrección de censura supervisada es la más eficiente}: La estrategia \textit{Latent Supervised} obtiene el menor coste total operativo con \textbf{1.774,82 u.m.}, lo que representa una reducción del \textbf{3,72\%} en coste frente a la estrategia \textit{Observed} (1.843,41 u.m.). Es además la única de las cuatro que combina el menor coste con el mayor nivel de servicio.
 
-    \item \textbf{Mejora drástica del nivel de servicio (Fill Rate)}: Al corregir el sesgo a la baja de la demanda histórica, la estrategia supervisada realiza pedidos más realistas (pedido medio de \textbf{15,55} unidades frente a \textbf{11,71} del baseline), elevando la tasa de cobertura de demanda (\textit{fill rate}) del \textbf{91,22\%} al \textbf{99,96\%}, reduciendo casi a cero la penalización por rotura.
+    \item \textbf{Mejora drástica del nivel de servicio (Fill Rate)}: Al corregir el sesgo a la baja de la demanda histórica, la estrategia supervisada realiza pedidos más realistas (pedido medio de \textbf{13,92} unidades frente a \textbf{10,44} del baseline), elevando la tasa de cobertura de demanda (\textit{fill rate}) del \textbf{90,43\%} al \textbf{99,75\%}, reduciendo casi a cero la penalización por rotura.
 
-    \item \textbf{Ventaja sobre imputadores heurísticos}: La estimación basada en Machine Learning supera al estimador de media histórica (\textit{Latent Historical Mean}, con 12.487,26 u.m.) y demuestra la ineficacia de las correcciones proporcionales fijas (\textit{Latent Clipped Scaling}, con 13.206,86 u.m.). Esta última empeora un \textbf{2,52\%} respecto al baseline sin corregir, confirmando que sobredimensionar la demanda sin tener en cuenta la variabilidad diaria de cada SKU destruye valor económico a través de costes de sobrestock.
+    \item \textbf{Ventaja sobre los imputadores heurísticos, pero no por la razón esperable}: la estimación basada en \textit{Machine Learning} bate a ambas heurísticas ---un 7,56\% frente a la media histórica (1.919,92 u.m.) y un 2,83\% frente al \textit{clipped scaling} (1.826,47 u.m.)---, pero el orden de las dos heurísticas entre sí \textbf{no reproduce el de la evaluación directa} de la Tabla~\ref{tab:imputation_reconstruction}. Allí la media histórica era la segunda mejor reconstrucción (MAE 1{,}62 frente a 2{,}95) y aquí resulta la \textbf{más cara de las cuatro}, un 4,15\% por encima del propio baseline sin corregir; el \textit{clipped scaling}, la peor reconstrucción de las tres, sale en cambio un 0,92\% \emph{más barato} que ese baseline.
+
+    El mecanismo es la asimetría de costes. La media histórica imputa el nivel medio de la serie con independencia de la severidad de la rotura, de modo que sobre-imputa los días de rotura corta: es la que emite el pedido medio más alto de las cuatro (14,28 unidades) y paga ese exceso en sobrestock, sin que el nivel de servicio que obtiene (99,40\%) supere al de la estrategia supervisada. El \textit{clipped scaling}, con su sesgo estructural negativo ($-2{,}68$ en la Tabla~\ref{tab:imputation_reconstruction}), pide poco (11,36 unidades) y se ahorra sobrestock, pero lo compra con un \textit{fill rate} del 92,87\%, casi siete puntos por debajo del de la señal supervisada.
+
+    Esta discordancia entre fidelidad de reconstrucción y coste operativo es la misma disociación que la Sección~\ref{sec:resultados_predictivos} documenta entre MAE y coste logístico, reapareciendo ahora un nivel más abajo, en la capa de imputación: minimizar el error de reconstrucción no equivale a minimizar el coste que esa reconstrucción induce. Refuerza el argumento central del trabajo en lugar de debilitarlo, pero obliga a descartar la lectura más simple ---``mejor reconstrucción, mejor coste''--- que una sola de las dos tablas invitaría a hacer.
 \end{enumerate}
 
 A escala de catálogo completo (500 series en simulación dinámica temporal), la ventaja de la corrección de censura se modera debido al fenómeno de no-intercambiabilidad temporal entre los periodos de calibración y test, y el beneficio queda focalizado en series con regímenes de stockout severos. No obstante, bajo una métrica de evaluación justa aislada del sesgo temporal, la recuperación de la señal latente mediante modelos supervisados demuestra de forma consistente su viabilidad económica.
@@ -418,7 +421,7 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definid
         \toprule
         \textbf{Objetivo} & \textbf{Target} & \textbf{Resultado} & \textbf{Estado} \\
         \midrule
-        Corrección de censura mejora el coste vs.\ estrategia Observed & $> 0\%$ & $-4{,}81\%$ (Latent Supervised vs.\ Observed, coste justo) & \checkmark \\
+        Corrección de censura mejora el coste vs.\ estrategia Observed & $> 0\%$ & $-3{,}72\%$ (Latent Supervised vs.\ Observed, coste justo, panel de 500 series) & \checkmark \\
         \midrule
         CatBoost supera al Seasonal Naïve en coste logístico & $> 0\%$ & $-3{,}9\%$ (Latent, coste simulado a escala, 500 series) & \checkmark \\
         \midrule
