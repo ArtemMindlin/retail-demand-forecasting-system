@@ -359,9 +359,14 @@
   .nav-sep { animation: nav-sep 0.3s ease both; }
   @keyframes nav-sep { from { opacity: 0; } to { opacity: 0.45; } }
 
-  /* Soft glow halo on chart container */
+  /* Soft glow halo on chart container. max-width caps how tall the aspect-ratio-locked
+     chart SVGs inside can grow: they scale uniformly with their container's width (see
+     .forecast-svg), so on an ultra-wide viewport an uncapped card renders a chart several
+     screens tall. Left-anchored rather than centered, matching the edge-to-edge cards
+     around it once a card is narrower than its grid track. */
   .chart-card {
     position: relative;
+    max-width: 1200px;
   }
   .chart-card::after {
     content: "";

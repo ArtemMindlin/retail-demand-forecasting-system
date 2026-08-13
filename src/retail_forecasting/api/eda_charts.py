@@ -452,7 +452,7 @@ def latent_compare(data: dict[str, Any], strategy_colors: dict[str, str]) -> Saf
     if not dates:
         return _svg("", "Sin datos")
 
-    height = 380
+    height = 260
     inner_h = height - PAD["top"] - PAD["bottom"]
     values = [v for v in observed if v is not None]
     for series in strategies.values():

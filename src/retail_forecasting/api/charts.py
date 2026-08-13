@@ -170,7 +170,7 @@ def sparkline(
 # straight lines survive that because they carry vector-effect="non-scaling-stroke",
 # but markers and axis labels have no equivalent escape hatch.
 FORECAST_WIDTH = 900
-FORECAST_HEIGHT = 320
+FORECAST_HEIGHT = 230
 _PAD = {"top": 18, "right": 18, "bottom": 30, "left": 48}
 
 
@@ -314,7 +314,7 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
 # ── Operational simulation trajectory ─────────────────────────────────────────
 OPS_WIDTH = 760
-OPS_HEIGHT = 320
+OPS_HEIGHT = 220
 _OPS_PAD = {"left": 48, "right": 16, "top": 16, "bottom": 36}
 
 
