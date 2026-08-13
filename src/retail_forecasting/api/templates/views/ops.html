@@ -64,9 +64,18 @@ playback is a shareable URL.{% endcomment %}
     <div>
       <div class="ops-chart-title">Trayectoria de la serie · pronóstico vs realidad</div>
       <div class="ops-chart-subtitle">
-        banda conformal {{ target_pct }} · línea = predicción · puntos = demanda real
-        (verde dentro de banda, rojo fuera)
+        un origen por semana · demanda de los 7 días siguientes
       </div>
+    </div>
+
+    {% comment %}The same legend component the dashboard's forecast chart uses, so the
+    two charts read as one system: violeta discontinuo = predicción, banda gris-azul =
+    intervalo conformal. Identity never rests on colour alone.{% endcomment %}
+    <div class="chart-legend">
+      <div class="legend-item"><span class="legend-line dashed" style="border-top-color: var(--c-ai)"></span>Predicción</div>
+      <div class="legend-item"><span class="legend-square" style="background: rgba(148,163,184,0.35)"></span>Banda {{ target_pct }}</div>
+      <div class="legend-item"><span class="legend-dot" style="background: var(--c-conf)"></span>Real dentro</div>
+      <div class="legend-item"><span class="legend-dot" style="background: #ef4444"></span>Real fuera</div>
     </div>
 
     <form method="get" action="{% url 'ops' %}"

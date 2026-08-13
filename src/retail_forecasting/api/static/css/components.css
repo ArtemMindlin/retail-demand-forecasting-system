@@ -641,6 +641,7 @@
 .legend-line { width: 14px; height: 2px; }
 .legend-line.dashed { background: transparent; border-top: 2px dashed; }
 .legend-square { width: 12px; height: 8px; border-radius: 2px; }
+.legend-dot { width: 9px; height: 9px; border-radius: 50%; }
 .chart-canvas { margin-top: 14px; position: relative; }
 .forecast-svg { display: block; overflow: visible; width: 100%; height: auto; }
 .chart-tooltip {
@@ -807,14 +808,14 @@
 .ops-kpi-value { font-size: 22px; font-weight: 700; font-family: var(--font-display); }
 .ops-kpi-sub { font-size: 10.5px; color: var(--text-mute); margin-top: 2px; }
 .ops-chart { padding: 20px; }
-.ops-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+.ops-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px 18px; }
 .ops-chart-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
 .ops-chart-subtitle { font-size: 11px; color: var(--text-3); margin-top: 2px; }
 .ops-series-select {
   background: var(--surface); color: var(--text-1); border: 1px solid var(--border-2);
   border-radius: 8px; padding: 7px 10px; font-family: var(--font-mono); font-size: 12px;
 }
-.ops-chart-empty { height: 300px; display: grid; place-items: center; color: var(--text-3); font-size: 12px; }
+.ops-chart-empty { aspect-ratio: 900 / 230; display: grid; place-items: center; color: var(--text-3); font-size: 12px; }
 .ops-footer { margin-top: 14px; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute); }
 
 /* ── EDA gallery ───────────────────────────────────────────────────────────── */
@@ -874,7 +875,10 @@
 .latent-chips { display: flex; gap: 22px; }
 .latent-chip-value { font-family: var(--font-mono); font-size: 17px; font-weight: 700; color: var(--text-1); line-height: 1; }
 .latent-chip-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-3); letter-spacing: 0.04em; text-transform: uppercase; margin-top: 3px; }
-.pareto-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); gap: 16px; align-items: start; }
+/* Same 1200px cap as .chart-card, applied to the grid so the scatter inside keeps its
+   2fr share of it: the front chart is squarer than the hero ratio (a scatter needs to
+   be), and at ~2/3 of the cap it still renders the same height as the hero charts. */
+.pareto-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); gap: 16px; align-items: start; max-width: 1200px; }
 .pareto-grid > .chart-card { padding: 20px; }
 .pareto-best { padding: 18px 20px; }
 .pareto-best-label { color: var(--c-conf); margin-bottom: 12px; }

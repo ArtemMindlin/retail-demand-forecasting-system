@@ -80,6 +80,26 @@ def nice_ticks(low: float, high: float, count: int = 5) -> list[float]:
     return ticks
 
 
+def hero_y_domain(values: Sequence[float], count: int = 5) -> tuple[float, float, list[float]]:
+    """Padded y domain plus the round ticks that fall inside it.
+
+    Snapping the domain out to the first and last tick wastes plot height: a 40-250
+    range snaps down to 0, and the marks then live in the top half of the card with
+    dead space below. Clipping the ticks to the domain instead keeps the labels round
+    and lets the marks use the full height. Falls back to snapping when the range is
+    so narrow that fewer than two ticks land inside it, which would leave no grid.
+    """
+    low, high = float(min(values)), float(max(values))
+    span = (high - low) or 1.0
+    low -= span * 0.08
+    high += span * 0.08
+    ticks = [tick for tick in nice_ticks(low, high, count) if low <= tick <= high]
+    if len(ticks) < 2:
+        ticks = nice_ticks(low, high, count)
+        low, high = min(low, ticks[0]), max(high, ticks[-1])
+    return low, high, ticks
+
+
 def distribution_chart(
     pre: Sequence[float],
     post: Sequence[float],
@@ -161,7 +181,7 @@ def sparkline(
     )
 
 
-# ── Forecast chart ────────────────────────────────────────────────────────────
+# ── Hero chart geometry ───────────────────────────────────────────────────────
 # User-space dimensions for the viewBox; the <svg> scales uniformly to fill its
 # container width (see .forecast-svg in components.css), which is what replaces the
 # browser's ResizeObserver. No layout JavaScript required. Scaling must stay uniform:
@@ -169,9 +189,19 @@ def sparkline(
 # <circle> and <text> into ellipses and squeezed glyphs as the panel is resized — the
 # straight lines survive that because they carry vector-effect="non-scaling-stroke",
 # but markers and axis labels have no equivalent escape hatch.
-FORECAST_WIDTH = 900
-FORECAST_HEIGHT = 230
+#
+# One ratio for every full-width chart card. Because these SVGs are width-driven, the
+# ratio IS the rendered height: at the 1200px `.chart-card` cap this one lands at ~307px,
+# so /dashboard/, /ops/ and /latent/ all show a chart of the same height instead of each
+# picking its own and reading as a different component. See HERO_HEIGHT in eda_charts.py
+# for the charts drawn on the 760-wide grid.
+HERO_WIDTH = 900
+HERO_HEIGHT = 230
+HERO_RATIO = HERO_WIDTH / HERO_HEIGHT
 _PAD = {"top": 18, "right": 18, "bottom": 30, "left": 48}
+
+FORECAST_WIDTH = HERO_WIDTH
+FORECAST_HEIGHT = HERO_HEIGHT
 
 
 def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
@@ -196,14 +226,7 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
         highs.append(
             max(row["upper"], row["predicted"], actual if actual is not None else -math.inf)
         )
-    low, high = min(lows), max(highs)
-
-    span = (high - low) or 1.0
-    low -= span * 0.08
-    high += span * 0.08
-    ticks = nice_ticks(low, high, 5)
-    low = min(low, ticks[0])
-    high = max(high, ticks[-1])
+    low, high, ticks = hero_y_domain([min(lows), max(highs)])
 
     def scale_y(value: float) -> float:
         return _PAD["top"] + (1 - (value - low) / (high - low)) * inner_h
@@ -313,9 +336,13 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
 
 # ── OPS backtest trajectory ───────────────────────────────────────────────────
-OPS_WIDTH = 760
-OPS_HEIGHT = 220
-_OPS_PAD = {"left": 48, "right": 16, "top": 16, "bottom": 36}
+# Same geometry and same visual language as the forecast chart: violet dashed line for
+# what the model predicted, grey-to-blue wash for the conformal band, and the realized
+# value as a dot. A reader moving from /dashboard/ to /ops/ should not have to relearn
+# which colour means what.
+OPS_WIDTH = HERO_WIDTH
+OPS_HEIGHT = HERO_HEIGHT
+_OPS_PAD = dict(_PAD)
 
 
 def ops_trajectory_chart(
@@ -336,10 +363,7 @@ def ops_trajectory_chart(
         for value in (point["lower"], point["upper"], point["y_pred"], point.get("y_true"))
         if value is not None
     ]
-    low, high = float(min(values)), float(max(values))
-    padding = (high - low) * 0.1 or 1.0
-    low -= padding
-    high += padding
+    low, high, ticks = hero_y_domain(values, count=4)
 
     inner_w = OPS_WIDTH - _OPS_PAD["left"] - _OPS_PAD["right"]
     inner_h = OPS_HEIGHT - _OPS_PAD["top"] - _OPS_PAD["bottom"]
@@ -352,60 +376,93 @@ def ops_trajectory_chart(
     def scale_y(value: float) -> float:
         return _OPS_PAD["top"] + (1 - (value - low) / (high - low)) * inner_h
 
-    parts: list[str] = []
+    parts: list[str] = [
+        "<defs>"
+        '<linearGradient id="opsGradInterval" x1="0" y1="0" x2="0" y2="1">'
+        '<stop offset="0%" stop-color="#94a3b8" stop-opacity="0.26"/>'
+        '<stop offset="60%" stop-color="#3b82f6" stop-opacity="0.10"/>'
+        '<stop offset="100%" stop-color="#3b82f6" stop-opacity="0.04"/>'
+        "</linearGradient>"
+        '<linearGradient id="opsGradPred" x1="0" y1="0" x2="1" y2="0">'
+        '<stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.5"/>'
+        '<stop offset="60%" stop-color="#8b5cf6" stop-opacity="1"/>'
+        '<stop offset="100%" stop-color="#a78bfa" stop-opacity="1"/>'
+        "</linearGradient>"
+        "</defs>"
+    ]
 
-    for tick in (low, (low + high) / 2, high):
+    # Round ticks, solid hairline grid: the axis used to label the padded data extremes
+    # (241 / 141 / 42), which are arbitrary numbers the reader cannot anchor to.
+    for tick in ticks:
         y = scale_y(tick)
         parts.append(
             f'<line x1="{_OPS_PAD["left"]}" x2="{OPS_WIDTH - _OPS_PAD["right"]}" '
-            f'y1="{_num(y)}" y2="{_num(y)}" stroke="rgba(148,163,184,0.10)"/>'
+            f'y1="{_num(y)}" y2="{_num(y)}" stroke="rgba(148,163,184,0.07)" stroke-width="1"/>'
             f'<text x="{_OPS_PAD["left"] - 8}" y="{_num(y + 3)}" text-anchor="end" '
-            f'font-family="var(--font-mono)" font-size="10" fill="var(--text-3)">'
-            f"{tick:.0f}</text>"
+            f'fill="var(--text-3)" font-family="var(--font-mono)" font-size="10.5">'
+            f"{round(tick)}</text>"
         )
 
+    marker = None
     if selected_week is not None:
         marker = next((i for i, p in enumerate(points) if p["week_index"] == selected_week), None)
-        if marker is not None:
-            x = scale_x(marker)
-            parts.append(
-                f'<line x1="{_num(x)}" x2="{_num(x)}" y1="{_OPS_PAD["top"]}" '
-                f'y2="{OPS_HEIGHT - _OPS_PAD["bottom"]}" stroke="var(--c-ai)" '
-                f'stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>'
-            )
+    if marker is not None:
+        x = scale_x(marker)
+        parts.append(
+            f'<line x1="{_num(x)}" x2="{_num(x)}" y1="{_OPS_PAD["top"]}" '
+            f'y2="{_num(_OPS_PAD["top"] + inner_h)}" stroke="var(--c-ai)" stroke-width="1" '
+            f'opacity="0.35" vector-effect="non-scaling-stroke"/>'
+        )
 
-    band_top = " ".join(
-        f"{_num(scale_x(i))},{_num(scale_y(p['upper']))}" for i, p in enumerate(points)
+    upper_points = [(scale_x(i), scale_y(p["upper"])) for i, p in enumerate(points)]
+    lower_points = [(scale_x(i), scale_y(p["lower"])) for i, p in enumerate(points)]
+    predicted_points = [(scale_x(i), scale_y(p["y_pred"])) for i, p in enumerate(points)]
+
+    band = (
+        "M "
+        + " L ".join(f"{_num(x)} {_num(y)}" for x, y in upper_points)
+        + " L "
+        + " L ".join(f"{_num(x)} {_num(y)}" for x, y in reversed(lower_points))
+        + " Z"
     )
-    band_bottom = " ".join(
-        f"{_num(scale_x(i))},{_num(scale_y(p['lower']))}"
-        for i, p in reversed(list(enumerate(points)))
-    )
-    prediction = " ".join(
-        f"{_num(scale_x(i))},{_num(scale_y(p['y_pred']))}" for i, p in enumerate(points)
-    )
-    parts.append(f'<polygon points="{band_top} {band_bottom}" fill="rgba(59,130,246,0.14)"/>')
+    parts.append(f'<path d="{band}" fill="url(#opsGradInterval)"/>')
+    for band_points in (upper_points, lower_points):
+        parts.append(
+            f'<path d="{smooth_path(band_points)}" fill="none" stroke="rgba(148,163,184,0.35)" '
+            f'stroke-width="1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>'
+        )
     parts.append(
-        f'<polyline points="{prediction}" fill="none" stroke="var(--c-inv)" stroke-width="2"/>'
+        f'<path d="{smooth_path(predicted_points)}" fill="none" stroke="url(#opsGradPred)" '
+        f'stroke-width="2" stroke-dasharray="6 4" stroke-linecap="round" '
+        f'vector-effect="non-scaling-stroke"/>'
     )
 
     for index, point in enumerate(points):
         if point.get("y_true") is None:
             continue
         fill = "var(--c-conf)" if point["covered"] else "#ef4444"
+        cx, cy = scale_x(index), scale_y(point["y_true"])
+        if index == marker:
+            parts.append(
+                f'<circle cx="{_num(cx)}" cy="{_num(cy)}" r="8" fill="none" '
+                f'stroke="{fill}" stroke-width="1" opacity="0.4"/>'
+            )
+        # 2px ring in the surface colour, so a dot stays legible over the band edge.
         parts.append(
-            f'<circle cx="{_num(scale_x(index))}" cy="{_num(scale_y(point["y_true"]))}" '
-            f'r="4.5" fill="{fill}" stroke="#0b0f15" stroke-width="1.5"/>'
+            f'<circle cx="{_num(cx)}" cy="{_num(cy)}" r="4" fill="{fill}" '
+            f'stroke="var(--bg-1)" stroke-width="2"/>'
         )
 
     for index, point in enumerate(points):
+        weight = ' font-weight="600"' if index == marker else ""
+        colour = "var(--text-2)" if index == marker else "var(--text-3)"
         parts.append(
             f'<text x="{_num(scale_x(index))}" y="{OPS_HEIGHT - _OPS_PAD["bottom"] + 16}" '
-            f'text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" '
-            f'fill="var(--text-3)">{escape(point["origin_date"][5:])}</text>'
+            f'text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" '
+            f'fill="{colour}"{weight}>{escape(point["origin_date"][5:])}</text>'
         )
 
     return mark_safe(  # noqa: S308 - numeric coordinates and escaped labels only
-        f'<svg viewBox="0 0 {OPS_WIDTH} {OPS_HEIGHT}" style="width:100%;height:auto;display:block" '
+        f'<svg class="forecast-svg" viewBox="0 0 {OPS_WIDTH} {OPS_HEIGHT}" '
         f'role="img" aria-label="Trayectoria semanal de la serie">{"".join(parts)}</svg>'
     )

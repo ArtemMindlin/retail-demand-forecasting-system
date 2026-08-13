@@ -18,7 +18,7 @@ from typing import Any
 from django.utils.html import escape
 from django.utils.safestring import SafeString, mark_safe
 
-from retail_forecasting.api.charts import _num, nice_ticks
+from retail_forecasting.api.charts import HERO_RATIO, _num, nice_ticks
 
 WIDTH = 760
 HEIGHT = 300
@@ -26,6 +26,14 @@ PAD = {"left": 54, "right": 18, "top": 18, "bottom": 42}
 
 INNER_W = WIDTH - PAD["left"] - PAD["right"]
 INNER_H = HEIGHT - PAD["top"] - PAD["bottom"]
+
+# Height for the charts that live alone in a full-width `.chart-card` (latent
+# reconstruction, cost sensitivity). WIDTH / HERO_HEIGHT matches charts.HERO_RATIO, so at
+# the 1200px card cap they render the same ~307px tall as the forecast and OPS charts
+# instead of each card setting its own height. HEIGHT stays the taller default for the
+# multi-column EDA grid tiles, which are never full-width.
+HERO_HEIGHT = round(WIDTH / HERO_RATIO)
+HERO_INNER_H = HERO_HEIGHT - PAD["top"] - PAD["bottom"]
 
 GRID_STROKE = "rgba(148,163,184,0.09)"
 AXIS_FONT = 'font-family="var(--font-mono)" font-size="10" fill="var(--text-3)"'
@@ -452,8 +460,8 @@ def latent_compare(data: dict[str, Any], strategy_colors: dict[str, str]) -> Saf
     if not dates:
         return _svg("", "Sin datos")
 
-    height = 260
-    inner_h = height - PAD["top"] - PAD["bottom"]
+    height = HERO_HEIGHT
+    inner_h = HERO_INNER_H
     values = [v for v in observed if v is not None]
     for series in strategies.values():
         values.extend(v for v in series if v is not None)
@@ -605,18 +613,24 @@ def sensitivity_chart(rows: Sequence[dict[str, Any]]) -> SafeString:
         color = SERIES_COLORS[index % len(SERIES_COLORS)]
         line = " ".join(
             f"{_num(PAD['left'] + ((x - x_low) / x_span) * INNER_W)},"
-            f"{_num(PAD['top'] + (1 - (v - low) / span) * INNER_H)}"
+            f"{_num(PAD['top'] + (1 - (v - low) / span) * HERO_INNER_H)}"
             for x, v in zip(xs_raw, values, strict=True)
         )
         parts.append(f'<polyline points="{line}" fill="none" stroke="{color}" stroke-width="2"/>')
         legend.append((key.replace("_", " "), color))
 
     for fraction in (0, 0.25, 0.5, 0.75, 1.0):
-        parts.append(_x_label(PAD["left"] + fraction * INNER_W, f"{x_low + fraction * x_span:.2f}"))
+        parts.append(
+            _x_label(
+                PAD["left"] + fraction * INNER_W,
+                f"{x_low + fraction * x_span:.2f}",
+                HERO_HEIGHT,
+            )
+        )
 
     parts.append(_legend(legend))
     parts.append(
-        f'<text x="{WIDTH / 2}" y="{HEIGHT - 6}" text-anchor="middle" {AXIS_FONT}>'
+        f'<text x="{WIDTH / 2}" y="{HERO_HEIGHT - 6}" text-anchor="middle" {AXIS_FONT}>'
         f"{escape(x_key.replace('_', ' '))} · series normalizadas a su propio rango</text>"
     )
-    return _svg("".join(parts), "Sensibilidad al ratio de costes")
+    return _svg("".join(parts), "Sensibilidad al ratio de costes", HERO_HEIGHT)

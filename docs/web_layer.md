@@ -95,6 +95,18 @@ cliente.
   estira horizontalmente, para que el grosor de linea no se deforme.
 - Los colores son variables CSS (`var(--c-conf)`, `var(--c-inv)`…), asi que la
   paleta vive en la hoja de estilos y no duplicada en Python.
+- **Una sola proporcion para los graficos que ocupan una `.chart-card` entera**:
+  `charts.HERO_WIDTH/HERO_HEIGHT` (900x230) y su equivalente a 760 de ancho,
+  `eda_charts.HERO_HEIGHT`. Como el SVG se escala por el ancho, la proporcion *es*
+  la altura renderizada: con el tope de 1200px de `.chart-card` todos caen en
+  ~307px, en vez de que cada vista elija su propia altura. `eda_charts.HEIGHT`
+  (300) se queda para los mosaicos multicolumna del EDA, que nunca son de ancho
+  completo. El scatter de Pareto es mas cuadrado a proposito (un scatter lo
+  necesita) y se iguala capando `.pareto-grid` al mismo 1200px.
+- El lenguaje visual tambien es unico: violeta discontinuo = prediccion, franja
+  gris-azul = intervalo conformal, punto = valor realizado. Los ejes usan
+  `hero_y_domain()`, que da etiquetas redondas sin estirar el dominio hasta el
+  primer tick (eso desperdiciaba media altura del panel).
 
 El unico JavaScript propio son ~130 lineas: el manejador de puntero que mueve el
 tooltip del grafico principal (`static/js/chart.js`) y el inicializador de KaTeX
