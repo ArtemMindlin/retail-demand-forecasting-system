@@ -295,7 +295,13 @@ def skus(request: HttpRequest) -> HttpResponse:
     if sort_key not in _SKU_SORT_KEYS:
         sort_key = "driftPsi"
     descending = request.GET.get("dir", "desc") != "asc"
-    rows.sort(key=lambda r: r[sort_key], reverse=descending)
+    # driftPsi is None whenever a SKU's sample can't support the PSI statistic (see
+    # per_sku_psi), and `None < None` raises. Sort the rows that have a value and put
+    # the rest at the end, in either sort direction — a missing statistic is not "low".
+    sortable = [r for r in rows if r[sort_key] is not None]
+    unsortable = [r for r in rows if r[sort_key] is None]
+    sortable.sort(key=lambda r: r[sort_key], reverse=descending)
+    rows[:] = sortable + unsortable
 
     for row in rows:
         meta = STATUS_META[row["status"]]

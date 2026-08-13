@@ -166,6 +166,22 @@ def test_sku_table_filters_and_sorts_from_the_query_string(
     assert "SKU-200" not in body
 
 
+def test_sku_table_sorts_by_drift_psi_when_it_is_none_for_every_row(
+    auth_client: Client, run_with_predictions: Path
+) -> None:
+    """driftPsi is None for every SKU here (4 rows each, below MIN_PSI_OBSERVATIONS).
+
+    driftPsi is also the default sort column, so this used to crash `/skus/` outright
+    with `TypeError: '<' not supported between instances of 'NoneType' and 'NoneType'`
+    on the very first unfiltered visit to the page.
+    """
+    response = auth_client.get("/skus/")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "SKU-100" in body
+    assert "SKU-200" in body
+
+
 def test_drift_view_reads_the_real_report(auth_client: Client, run_with_predictions: Path) -> None:
     report = [
         {
