@@ -1,3 +1,27 @@
+"""Rolling-origin production backtest (the OPS plane).
+
+What this module does: replays the eval split one decision date at a time, and at
+every origin it scores the champion, decides a single-period Newsvendor order and
+costs it against the demand that the window later revealed. Retrain cadences are
+compared over the same origins.
+
+What it deliberately does **not** do: it is not an inventory-state simulation.
+There is no stock carried between periods, no order pipeline, no lead time and no
+lost-sales propagation -- each origin is an independent single-period decision.
+Costs are therefore comparable *across cadences* but are not the cost a real
+replenishment policy would accumulate.
+
+Two further scope limits worth remembering when reading the numbers:
+
+- truth is ``observed_demand``, i.e. censored on stockout days. The champion
+  forecasts censored demand and is scored against censored demand, which is
+  self-consistent but understates the true shortage cost. This plane never
+  applies ``LatentDemandImputer``.
+- aggregation uses a non-overlapping origin grid (one origin every ``horizon``
+  days). Scoring runs daily, so summing every daily origin would count each day
+  of demand ``horizon`` times over.
+"""
+
 from __future__ import annotations
 
 import json
@@ -272,14 +296,15 @@ def _persist_simulation_outputs(
 
 
 def run_operational_simulation(settings: Settings) -> OperationalSimulationArtifacts:
-    """Stream the eval split as if it were daily production data.
+    """Replay the eval split origin by origin as if it were daily production data.
 
     Trains an initial champion on the train split, then iterates over eval
     dates. For each day every configured cadence scores its model, the realized
-    cost is computed against the revealed window, and retraining is triggered
-    according to the cadence period.
+    single-period cost is computed against the revealed window, and retraining is
+    triggered according to the cadence period. See the module docstring for what
+    this backtest does and does not model.
     """
-    print("📥 Loading train and eval splits for operational simulation...")
+    print("📥 Loading train and eval splits for the rolling-origin backtest...")
     train_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
@@ -576,6 +601,22 @@ def _write_simulation_report(
         "",
         _comparison_verdict(cadence_comparison),
         "",
+        "## Scope and limitations",
+        "",
+        "- Not an inventory-state simulation: every origin is an independent",
+        "  single-period Newsvendor decision. No stock is carried between periods,",
+        "  there is no order pipeline and no lead time, so these costs compare",
+        "  policies against each other rather than reproducing what a real",
+        "  replenishment policy would accumulate.",
+        f"- Aggregation uses one origin every {horizon} days. Scoring runs daily, so",
+        "  consecutive origins overlap and summing all of them would count each day",
+        f"  of demand up to {horizon} times.",
+        "- Truth is `observed_demand`, censored on stockout days. Forecast and truth",
+        "  are censored alike, which is self-consistent, but the shortage cost is a",
+        "  lower bound on the real one. This plane never applies `LatentDemandImputer`.",
+        "- Origins whose actuals have not fully landed are scored but excluded from",
+        "  every aggregate: their `y_true` is a partial-window sum, which would make",
+        "  shortage cost look artificially low.",
     ]
     report_path = sim_root / "report.md"
     report_path.write_text("\n".join(lines), encoding="utf-8")

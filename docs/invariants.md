@@ -202,3 +202,11 @@ See `docs/web_layer.md` for the full description.
 
     A raw cost difference over a handful of weeks ranks nothing. See
     `_compare_cadences`.
+
+39. The OPS plane is not an inventory-state simulation.
+
+    Each origin is an independent single-period Newsvendor decision: no carried
+    stock, no order pipeline, no lead time, and truth is censored observed demand
+    with no imputation. Its costs rank policies; they are not a replenishment
+    ledger. Naming it a "simulation" in user-facing text is what this invariant
+    exists to prevent.

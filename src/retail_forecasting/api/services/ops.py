@@ -1,9 +1,15 @@
-"""Walk-forward operational simulation (the OPS plane).
+"""Rolling-origin production backtest (the OPS plane).
 
 Reads the artifact written by ``run_operational_simulation``
 (``reports/<run>/simulation/predictions_by_day.parquet``) and indexes it by
-weekly origin, so the dashboard can play the simulation back week by week and
+weekly origin, so the dashboard can play the backtest back week by week and
 compare retrain cadences. Pure artifact reads — no live compute.
+
+Origins are subsampled onto a non-overlapping 7-day grid: the backtest scores
+every day, and consecutive daily origins share ``horizon - 1`` days of demand, so
+aggregating all of them would count the same demand up to seven times. Each origin
+is an independent single-period Newsvendor decision — no stock is carried between
+weeks, so costs rank policies rather than reproducing a replenishment ledger.
 """
 
 from __future__ import annotations
@@ -65,10 +71,10 @@ class OpsSimulation:
             return self._frame
 
         if not self.reports_dir.exists():
-            raise SimulationNotFoundError("No operational simulation artifact found.")
+            raise SimulationNotFoundError("No operational backtest artifact found.")
         candidates = sorted(self.reports_dir.glob(ARTIFACT_GLOB))
         if not candidates:
-            raise SimulationNotFoundError("No operational simulation artifact found.")
+            raise SimulationNotFoundError("No operational backtest artifact found.")
 
         artifact = max(candidates, key=lambda p: p.stat().st_mtime)
         df = pd.read_parquet(artifact)

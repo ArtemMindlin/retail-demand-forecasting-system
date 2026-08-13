@@ -180,3 +180,12 @@ def test_cadence_comparison_flags_a_short_window_as_underpowered(
     # Three origins can never settle a policy comparison.
     assert bool(row["underpowered"]) is True
     assert bool(row["conclusive"]) is False
+
+
+def test_report_states_the_scope_limits(tmp_path: Path, patched_panel_loader) -> None:
+    settings = _fast_settings(tmp_path, simulation_days=8)
+    artifacts = run_operational_simulation(settings)
+
+    report = (artifacts.run_directory / "report.md").read_text(encoding="utf-8")
+    assert "Not an inventory-state simulation" in report
+    assert "underpowered" in report

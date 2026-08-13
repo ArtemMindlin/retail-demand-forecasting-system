@@ -170,6 +170,28 @@ La v2 implementa una capa de decision newsvendor por periodo:
 
 Esta capa es deliberadamente simple, pero ya convierte forecast en accion y permite medir impacto economico.
 
+### Backtest de origen rodante (plano OPS, `simulate_ops`)
+
+`simulation/operations.py` reproduce el split de evaluacion origen a origen: en
+cada fecha de decision puntua el campeon, decide el pedido y lo costea contra la
+demanda que la ventana revela despues. Compara cadencias de reentreno sobre los
+mismos origenes.
+
+Lo que **no** es, y conviene no venderlo como tal: no es una simulacion de estado
+de inventario. Cada origen es una decision newsvendor de un solo periodo, sin
+stock arrastrado, sin pedidos en transito y sin plazo de entrega; la verdad es
+`observed_demand`, censurada en los dias de rotura, y este plano nunca aplica
+`LatentDemandImputer`. Sus costes sirven para ordenar politicas, no como libro de
+costes de un reaprovisionamiento real.
+
+Reglas de lectura de sus numeros: el origen de inferencia de una decision en `d`
+es la fila de fecha `d`; los agregados usan una rejilla de un origen cada
+`horizon` dias porque la puntuacion es diaria y los origenes consecutivos
+comparten `horizon - 1` dias de demanda; los origenes cuyos actuals no han
+cerrado se excluyen de todo agregado; y la comparacion de cadencias se hace
+pareada con intervalo bootstrap sobre origenes, declarandose no concluyente
+cuando hay pocos. Ver invariantes 35-39.
+
 ## 11. Evaluacion economica
 
 Para cada prediccion:
@@ -208,7 +230,7 @@ Cada corrida genera:
 Sobre esos artefactos se sirve un dashboard Django renderizado en servidor, con
 dos planos que reflejan la separacion del propio sistema:
 
-- **operacion**: simulacion OPS, dashboard de decision, analisis por SKU y
+- **operacion**: backtest OPS, dashboard de decision, analisis por SKU y
   monitor de drift;
 - **investigacion**: EDA, demanda latente y tuning multiobjetivo.
 
@@ -245,7 +267,7 @@ pendiente.
 - conformal prediction, incluida la variante Mondrian por categoria;
 - deteccion de drift por PSI, con informe por feature (`drift_report.json`);
 - reentrenamiento como modo de ejecucion (`retrain`) y comparacion de cadencias
-  de reentreno en la simulacion operativa (`simulate_ops`);
+  de reentreno en el backtest de origen rodante (`simulate_ops`);
 - politica Order-Up-To con simulacion dinamica de inventario;
 - cuadro de mandos y API operacional (Django, ver `docs/web_layer.md`).
 

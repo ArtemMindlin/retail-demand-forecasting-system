@@ -557,7 +557,7 @@ y las vistas solo leen parametros, llaman a un servicio y renderizan.
 
 ### `weekly_summary` / `series_trajectory`
 - Archivo: `src/retail_forecasting/api/services/ops.py`
-- Que hace: indexan la simulacion walk-forward por origen semanal. `weekly_summary` agrega metricas por cadencia de reentreno; `series_trajectory` devuelve la trayectoria de una serie.
+- Que hace: indexan el backtest de origen rodante por origen semanal (rejilla no solapada). `weekly_summary` agrega metricas por cadencia de reentreno y adjunta la comparacion pareada de `cadence_comparison.csv`; `series_trajectory` devuelve la trayectoria de una serie. Las semanas cuyos actuals no han cerrado no reportan metricas, coste incluido.
 - Recibe:
   - `simulation` (`OpsSimulation`);
   - `series_id` y `cadence` en el segundo caso.

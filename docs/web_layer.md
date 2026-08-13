@@ -54,7 +54,7 @@ del operador, que viaja en una cookie firmada.
 | --- | --- |
 | `services/runs.py` | `ArtifactStore`: descubrimiento de runs, cache de predicciones, validacion anti-traversal |
 | `services/forecast.py` | Conformal empirico, Newsvendor, PSI por SKU, tabla de SKUs, drift, alertas |
-| `services/ops.py` | Lectura e indexado semanal de la simulacion walk-forward |
+| `services/ops.py` | Lectura e indexado semanal del backtest de origen rodante (rejilla no solapada; excluye semanas parciales) |
 | `services/eda.py` | Catalogo de figuras y datos listos para graficar desde los CSV del EDA |
 | `services/experiments.py` | Imputacion latente, ranking de calidad, frente de Pareto, coste justo |
 | `services/pipeline.py` | Ejecucion en background del pipeline, con lock y rate limit |
@@ -65,7 +65,7 @@ Dos planos, como en el resto del sistema: operacion e investigacion.
 
 | Ruta | Vista | Contenido |
 | --- | --- | --- |
-| `/ops/` | Simulacion OPS | Reproduccion semana a semana del backtest walk-forward; compara cadencias de reentreno |
+| `/ops/` | Backtest OPS | Reproduccion semana a semana del backtest de origen rodante; compara cadencias de reentreno con intervalo bootstrap |
 | `/dashboard/` | Dashboard | KPIs, grafico demanda real vs predicha con banda conformal, modulos matematicos |
 | `/skus/` | Analisis SKU | Tabla por SKU con busqueda, filtro por estado, orden y ajustes manuales de pedido |
 | `/drift/` | Monitor de drift | PSI por feature con histogramas referencia vs actual |

@@ -312,7 +312,7 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return {"svg": mark_safe(svg), "points": points, "width": FORECAST_WIDTH}  # noqa: S308
 
 
-# ── Operational simulation trajectory ─────────────────────────────────────────
+# ── OPS backtest trajectory ───────────────────────────────────────────────────
 OPS_WIDTH = 760
 OPS_HEIGHT = 220
 _OPS_PAD = {"left": 48, "right": 16, "top": 16, "bottom": 36}

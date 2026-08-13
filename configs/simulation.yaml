@@ -1,4 +1,10 @@
-# Operational simulation (OPS plane) — walk-forward week-by-week playback.
+# Rolling-origin production backtest (OPS plane) — week-by-week playback.
+#
+# Not an inventory-state simulation: each origin is an independent single-period
+# Newsvendor decision (no carried stock, no order pipeline, no lead time), and truth
+# is censored observed demand. `preprocessing.imputation_strategy` is deliberately
+# absent: this plane never runs LatentDemandImputer, so setting it here would only
+# suggest an imputation that never happens.
 #
 # Balanced profile: rich features (incl. monthly memory) + a longer initial train
 # so the conformal coverage stays defensible (~target). An earlier minimum-warmup
@@ -32,7 +38,6 @@ dataset:
 preprocessing:
   drop_negative_sales: true
   fill_missing_values: true
-  imputation_strategy: supervised
 
 features:
   lags: [1, 7, 14, 28]

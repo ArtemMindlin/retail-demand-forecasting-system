@@ -20,7 +20,7 @@ MODES: list[dict[str, Any]] = [
         "label": "Operación",
         "icon": "zap",
         "tabs": [
-            {"id": "ops", "label": "Simulación OPS", "icon": "activity", "url_name": "ops"},
+            {"id": "ops", "label": "Backtest OPS", "icon": "activity", "url_name": "ops"},
             {"id": "dashboard", "label": "Dashboard", "icon": "cpu", "url_name": "dashboard"},
             {"id": "skus", "label": "Análisis SKU", "icon": "package", "url_name": "skus"},
             {

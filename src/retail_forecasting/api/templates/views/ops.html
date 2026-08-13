@@ -1,18 +1,20 @@
 {% extends "base.html" %}
 {% load l10n %}
 
-{% block title %}Simulación OPS · Forecast.ai{% endblock %}
+{% block title %}Backtest de producción · Forecast.ai{% endblock %}
 
 {% block content %}
 {% comment %}Cadence, week and series are query parameters. Every control
 re-requests this view and swaps the content region, so any frame of the
 playback is a shareable URL.{% endcomment %}
 <div class="view-header">
-  <div class="label-mono">plano de operación · backtest walk-forward</div>
-  <div class="h-display view-title">Simulación de producción semana a semana</div>
+  <div class="label-mono">plano de operación · backtest de origen rodante</div>
+  <div class="h-display view-title">Backtest de producción semana a semana</div>
   <div class="view-subtitle">
     El modelo elegido corre en el tiempo: cada semana pronostica con banda conformal, decide el
-    pedido (Newsvendor) y se revela la demanda real.
+    pedido (Newsvendor) y se revela la demanda real. Cada semana es una decisión de un solo
+    periodo — no se arrastra stock ni se modela plazo de entrega — y la demanda real está
+    censurada en los días de rotura.
   </div>
 </div>
 

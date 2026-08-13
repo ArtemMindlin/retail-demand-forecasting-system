@@ -6,7 +6,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 
 ## Repo Map
 
-- `configs/`: experiment configuration. `configs/experiment.yaml` is the canonical v1 config; `configs/experiment_large.yaml`/`experiment_daily.yaml` cover the scale/daily variants, `configs/imputation_compare.yaml` the imputation study, `configs/simulation.yaml` the operational simulation.
+- `configs/`: experiment configuration. `configs/experiment.yaml` is the canonical v1 config; `configs/experiment_large.yaml`/`experiment_daily.yaml` cover the scale/daily variants, `configs/imputation_compare.yaml` the imputation study, `configs/simulation.yaml` the OPS-plane rolling-origin backtest.
 - `data/`: local raw/interim/processed caches. Do not commit generated datasets.
 - `docs/`: system of record for architecture, contracts, invariants, and decisions.
 - `notebooks/`: lightweight exploration only. Production pipeline logic belongs in `src/`.
@@ -19,7 +19,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 - `src/retail_forecasting/forecasting/`: walk-forward validation, conformal calibration, imputation comparison, fair-cost backtesting, and experiment/retrain/scoring orchestration (`pipeline.py`).
 - `src/retail_forecasting/models/`: forecast models only (`naive.py`, `boosting.py` for LightGBM, `catboosting.py` for CatBoost — the current champion).
 - `src/retail_forecasting/inventory/`: newsvendor order quantity, cost profiles, optimization, and dynamic simulation logic.
-- `src/retail_forecasting/simulation/`: operational (OPS-plane) walk-forward simulation, reused by the dashboard's `/ops/` view.
+- `src/retail_forecasting/simulation/`: OPS-plane rolling-origin production backtest, reused by the dashboard's `/ops/` view. Independent single-period Newsvendor decisions — no inventory state, no lead time — so its costs rank policies rather than reproduce a replenishment ledger.
 - `src/retail_forecasting/evaluation/`: metrics, run reporting, post-mortem analysis, and XAI/explainability.
 - `src/retail_forecasting/drift/`: regime/drift analysis hooks.
 - `src/retail_forecasting/eda/`: exploratory analysis and figure generation, surfaced in the dashboard's `/eda/` tab.

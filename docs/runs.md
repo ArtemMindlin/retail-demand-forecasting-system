@@ -65,6 +65,18 @@ fair-cost backtest isolates the imputation signal under a common ground truth. D
 average metrics across them or quote a figure from one beside a figure from another
 without saying so.
 
+**OPS-plane numbers are not walk-forward numbers.** The `simulate_ops` run answers a
+different question (does the champion decay in production, does retraining pay off) with
+a different costing model: one independent single-period Newsvendor decision per origin,
+no carried stock, no lead time, and truth censored on stockout days. Read them under
+three rules. Its costs come from one origin every `horizon` days — scoring is daily and
+consecutive origins overlap, so any figure summed over all daily origins is a
+`horizon`-fold overcount and must not be quoted. Origins whose actuals had not fully
+landed are excluded from every aggregate. And the retrain-cadence comparison is only
+citable when `cadence_comparison.csv` says `conclusive`; with `underpowered` true the
+window has too few independent origins to rank the policies, and the honest sentence is
+that it cannot tell them apart.
+
 ## Reproducing
 
 ```bash

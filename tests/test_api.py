@@ -280,6 +280,12 @@ def test_unknown_academic_module_is_404(auth_client: Client, reports_dir: Path) 
     assert auth_client.get("/dashboard/modulo/nope/").status_code == 404
 
 
+def test_ops_view_reports_a_missing_simulation(auth_client: Client, reports_dir: Path) -> None:
+    response = auth_client.get("/ops/")
+    assert response.status_code == 200
+    assert "backtest de producción no se ha ejecutado" in response.content.decode()
+
+
 def test_ops_view_renders_the_backtest_and_qualifies_the_saving(
     auth_client: Client, ops_backtest_artifact: Path
 ) -> None:
@@ -288,8 +294,11 @@ def test_ops_view_renders_the_backtest_and_qualifies_the_saving(
     assert response.status_code == 200
     body = response.content.decode()
 
+    assert "Backtest de producción semana a semana" in body
     assert "+17.0%" in body  # saving is the negated cost change
     assert "no concluyente" in body
+    # The scope caveat is on the page, not only in the docs.
+    assert "no se arrastra stock" in body
 
 
 def test_ops_view_hides_metrics_for_a_partially_revealed_week(
@@ -299,12 +308,6 @@ def test_ops_view_hides_metrics_for_a_partially_revealed_week(
     body = response.content.decode()
     assert response.status_code == 200
     assert "semana parcial" in body
-
-
-def test_ops_view_reports_a_missing_simulation(auth_client: Client, reports_dir: Path) -> None:
-    response = auth_client.get("/ops/")
-    assert response.status_code == 200
-    assert "simulación operacional no se ha ejecutado" in response.content.decode()
 
 
 def test_ops_cadence_block_ignores_partially_revealed_rows() -> None:

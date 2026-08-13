@@ -1,4 +1,4 @@
-"""The OPS plane: walk-forward playback of the operational simulation."""
+"""The OPS plane: week-by-week playback of the rolling-origin production backtest."""
 
 from __future__ import annotations
 
