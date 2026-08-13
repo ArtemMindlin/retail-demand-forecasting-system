@@ -126,7 +126,7 @@ def distribution_chart(
     parts: list[str] = []
 
     for values, fill, opacity in (
-        (pre, "rgba(148, 163, 184, 0.25)", "1"),
+        (pre, "var(--c-slate)", "0.25"),
         (post, color, "0.6"),
     ):
         for index, value in enumerate(values):
@@ -251,14 +251,14 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
     parts: list[str] = [
         "<defs>"
         '<linearGradient id="gradInterval" x1="0" y1="0" x2="0" y2="1">'
-        '<stop offset="0%" stop-color="#94a3b8" stop-opacity="0.26"/>'
-        '<stop offset="60%" stop-color="#3b82f6" stop-opacity="0.10"/>'
-        '<stop offset="100%" stop-color="#3b82f6" stop-opacity="0.04"/>'
+        '<stop offset="0%" stop-color="var(--c-slate)" stop-opacity="0.26"/>'
+        '<stop offset="60%" stop-color="var(--c-inv)" stop-opacity="0.10"/>'
+        '<stop offset="100%" stop-color="var(--c-inv)" stop-opacity="0.04"/>'
         "</linearGradient>"
         '<linearGradient id="gradPred" x1="0" y1="0" x2="1" y2="0">'
-        '<stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.5"/>'
-        '<stop offset="60%" stop-color="#8b5cf6" stop-opacity="1"/>'
-        '<stop offset="100%" stop-color="#a78bfa" stop-opacity="1"/>'
+        '<stop offset="0%" stop-color="var(--c-ai)" stop-opacity="0.5"/>'
+        '<stop offset="60%" stop-color="var(--c-ai)" stop-opacity="1"/>'
+        '<stop offset="100%" stop-color="var(--c-ai-bright)" stop-opacity="1"/>'
         "</linearGradient>"
         "</defs>"
     ]
@@ -268,7 +268,7 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
         y = scale_y(tick)
         parts.append(
             f'<line x1="{_PAD["left"]}" x2="{FORECAST_WIDTH - _PAD["right"]}" '
-            f'y1="{_num(y)}" y2="{_num(y)}" stroke="rgba(148,163,184,0.07)" stroke-width="1"/>'
+            f'y1="{_num(y)}" y2="{_num(y)}" stroke="var(--border)" stroke-width="1"/>'
             f'<text x="{_PAD["left"] - 8}" y="{_num(y + 3)}" text-anchor="end" '
             f'fill="var(--text-3)" font-family="var(--font-mono)" font-size="10.5">'
             f"{round(tick)}</text>"
@@ -287,7 +287,7 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
     parts.append(f'<path d="{band}" fill="url(#gradInterval)"/>')
     for band_points in (upper_points, lower_points):
         parts.append(
-            f'<path d="{smooth_path(band_points)}" fill="none" stroke="rgba(148,163,184,0.35)" '
+            f'<path d="{smooth_path(band_points)}" fill="none" stroke="var(--c-slate)" stroke-opacity="0.35" '
             f'stroke-width="1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>'
         )
     parts.append(
@@ -304,10 +304,10 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
     parts.append(
         '<g class="chart-hover" style="display:none">'
         f'<line class="chart-hover-line" y1="{_PAD["top"]}" y2="{_PAD["top"] + inner_h}" '
-        'stroke="rgba(148,163,184,0.35)" stroke-dasharray="3 3" stroke-width="1"/>'
-        '<circle class="chart-hover-actual" r="4" fill="var(--c-inv)" stroke="#fff" '
+        'stroke="var(--c-slate)" stroke-opacity="0.35" stroke-dasharray="3 3" stroke-width="1"/>'
+        '<circle class="chart-hover-actual" r="4" fill="var(--c-inv)" stroke="var(--text-1)" '
         'stroke-width="1.5"/>'
-        '<circle class="chart-hover-pred" r="4" fill="var(--c-ai)" stroke="#fff" '
+        '<circle class="chart-hover-pred" r="4" fill="var(--c-ai)" stroke="var(--text-1)" '
         'stroke-width="1.5"/>'
         "</g>"
     )
@@ -390,14 +390,14 @@ def ops_trajectory_chart(
     parts: list[str] = [
         "<defs>"
         '<linearGradient id="opsGradInterval" x1="0" y1="0" x2="0" y2="1">'
-        '<stop offset="0%" stop-color="#94a3b8" stop-opacity="0.26"/>'
-        '<stop offset="60%" stop-color="#3b82f6" stop-opacity="0.10"/>'
-        '<stop offset="100%" stop-color="#3b82f6" stop-opacity="0.04"/>'
+        '<stop offset="0%" stop-color="var(--c-slate)" stop-opacity="0.26"/>'
+        '<stop offset="60%" stop-color="var(--c-inv)" stop-opacity="0.10"/>'
+        '<stop offset="100%" stop-color="var(--c-inv)" stop-opacity="0.04"/>'
         "</linearGradient>"
         '<linearGradient id="opsGradPred" x1="0" y1="0" x2="1" y2="0">'
-        '<stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.5"/>'
-        '<stop offset="60%" stop-color="#8b5cf6" stop-opacity="1"/>'
-        '<stop offset="100%" stop-color="#a78bfa" stop-opacity="1"/>'
+        '<stop offset="0%" stop-color="var(--c-ai)" stop-opacity="0.5"/>'
+        '<stop offset="60%" stop-color="var(--c-ai)" stop-opacity="1"/>'
+        '<stop offset="100%" stop-color="var(--c-ai-bright)" stop-opacity="1"/>'
         "</linearGradient>"
         "</defs>"
     ]
@@ -408,7 +408,7 @@ def ops_trajectory_chart(
         y = scale_y(tick)
         parts.append(
             f'<line x1="{_OPS_PAD["left"]}" x2="{OPS_WIDTH - _OPS_PAD["right"]}" '
-            f'y1="{_num(y)}" y2="{_num(y)}" stroke="rgba(148,163,184,0.07)" stroke-width="1"/>'
+            f'y1="{_num(y)}" y2="{_num(y)}" stroke="var(--border)" stroke-width="1"/>'
             f'<text x="{_OPS_PAD["left"] - 8}" y="{_num(y + 3)}" text-anchor="end" '
             f'fill="var(--text-3)" font-family="var(--font-mono)" font-size="10.5">'
             f"{round(tick)}</text>"
@@ -439,7 +439,7 @@ def ops_trajectory_chart(
     parts.append(f'<path d="{band}" fill="url(#opsGradInterval)"/>')
     for band_points in (upper_points, lower_points):
         parts.append(
-            f'<path d="{smooth_path(band_points)}" fill="none" stroke="rgba(148,163,184,0.35)" '
+            f'<path d="{smooth_path(band_points)}" fill="none" stroke="var(--c-slate)" stroke-opacity="0.35" '
             f'stroke-width="1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>'
         )
     parts.append(
@@ -451,7 +451,7 @@ def ops_trajectory_chart(
     for index, point in enumerate(points):
         if point.get("y_true") is None:
             continue
-        fill = "var(--c-conf)" if point["covered"] else "#ef4444"
+        fill = "var(--c-conf)" if point["covered"] else "var(--c-crit)"
         cx, cy = scale_x(index), scale_y(point["y_true"])
         if index == marker:
             parts.append(
@@ -477,9 +477,9 @@ def ops_trajectory_chart(
     parts.append(
         '<g class="chart-hover" style="display:none">'
         f'<line class="chart-hover-line" y1="{_OPS_PAD["top"]}" '
-        f'y2="{_num(_OPS_PAD["top"] + inner_h)}" stroke="rgba(148,163,184,0.35)" '
+        f'y2="{_num(_OPS_PAD["top"] + inner_h)}" stroke="var(--c-slate)" stroke-opacity="0.35" '
         'stroke-dasharray="3 3" stroke-width="1"/>'
-        '<circle class="chart-hover-pred" r="4" fill="var(--c-ai)" stroke="#fff" '
+        '<circle class="chart-hover-pred" r="4" fill="var(--c-ai)" stroke="var(--text-1)" '
         'stroke-width="1.5"/>'
         "</g>"
     )

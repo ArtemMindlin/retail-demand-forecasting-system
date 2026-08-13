@@ -35,7 +35,8 @@ INNER_H = HEIGHT - PAD["top"] - PAD["bottom"]
 HERO_HEIGHT = round(WIDTH / HERO_RATIO)
 HERO_INNER_H = HERO_HEIGHT - PAD["top"] - PAD["bottom"]
 
-GRID_STROKE = "rgba(148,163,184,0.09)"
+# Same weight as a CSS border, and the same value the other chart module uses.
+GRID_STROKE = "var(--border)"
 AXIS_FONT = 'font-family="var(--font-mono)" font-size="10" fill="var(--text-3)"'
 
 SERIES_COLORS = ("var(--c-conf)", "var(--c-inv)", "var(--c-ai)", "var(--c-drift)")
@@ -251,7 +252,7 @@ def bar_horizontal(data: dict[str, Any]) -> SafeString:
 
     parts = [
         f'<line x1="{_num(zero_x)}" x2="{_num(zero_x)}" y1="{PAD["top"] - 6}" '
-        f'y2="{height - 20}" stroke="rgba(148,163,184,0.25)"/>'
+        f'y2="{height - 20}" stroke="var(--c-slate)"/>'
     ]
     for index, row in enumerate(rows):
         value = float(row[value_key])
@@ -369,7 +370,7 @@ def boxplot(data: dict[str, Any]) -> SafeString:
         y_q1 = scale_y(box["q1"])
         parts.append(
             f'<line x1="{_num(center)}" x2="{_num(center)}" y1="{_num(scale_y(box["max"]))}" '
-            f'y2="{_num(scale_y(box["min"]))}" stroke="rgba(148,163,184,0.45)"/>'
+            f'y2="{_num(scale_y(box["min"]))}" stroke="var(--c-slate)"/>'
             f'<rect x="{_num(left)}" y="{_num(y_q3)}" width="{_num(box_width)}" '
             f'height="{_num(max(1.0, y_q1 - y_q3))}" fill="var(--c-inv)" fill-opacity="0.35" '
             f'stroke="var(--c-inv)" rx="2"/>'
@@ -409,7 +410,7 @@ def series_grid(data: dict[str, Any]) -> SafeString:
             parts.append(
                 f'<rect x="{PAD["left"] - 10}" y="{_num(y - 14)}" '
                 f'width="{WIDTH - PAD["left"] - PAD["right"] + 10}" height="{row_height - 4}" '
-                f'fill="rgba(255,255,255,0.02)" rx="4"/>'
+                f'fill="rgba(var(--rgb-white), 0.02)" rx="4"/>'
             )
         parts.append(
             f'<text x="{PAD["left"] - 6}" y="{_num(y)}" font-family="var(--font-mono)" '
@@ -482,7 +483,7 @@ def latent_compare(data: dict[str, Any], strategy_colors: dict[str, str]) -> Saf
             parts.append(
                 f'<rect x="{_num(xs[index] - band_width / 2)}" y="{PAD["top"]}" '
                 f'width="{_num(band_width)}" height="{_num(inner_h)}" '
-                f'fill="rgba(245,158,11,0.10)"/>'
+                f'fill="rgba(var(--rgb-drift), 0.1)"/>'
             )
 
     parts.append(grid)
@@ -500,14 +501,16 @@ def latent_compare(data: dict[str, Any], strategy_colors: dict[str, str]) -> Saf
         )
 
     for name, series in strategies.items():
-        parts.append(polyline(series, strategy_colors.get(name, "#94a3b8")))
+        parts.append(polyline(series, strategy_colors.get(name, "var(--c-slate)")))
     parts.append(polyline(observed, "var(--text-2)", dashed=True))
 
     step = max(1, len(dates) // 8)
     for index in range(0, len(dates), step):
         parts.append(_x_label(xs[index], str(dates[index])[5:], height))
 
-    legend = [(strategy_meta_label(n), strategy_colors.get(n, "#94a3b8")) for n in strategies]
+    legend = [
+        (strategy_meta_label(n), strategy_colors.get(n, "var(--c-slate)")) for n in strategies
+    ]
     legend.append(("observado", "var(--text-2)"))
     parts.append(_legend(legend))
 
