@@ -14,7 +14,7 @@ from retail_forecasting.config import (
     SimulationConfig,
     ValidationConfig,
 )
-from retail_forecasting.simulation import run_operational_simulation
+from retail_forecasting.simulation import operations, run_operational_simulation
 from tests import make_synthetic_panel
 
 
@@ -114,3 +114,31 @@ def test_cadence_summary_reports_one_row_per_cadence(tmp_path: Path, patched_pan
     summary = artifacts.cadence_summary
     assert set(summary["cadence"]) == {"never", "every_4d"}
     assert summary["n_observations"].gt(0).all()
+
+
+def test_inference_origin_is_the_decision_date(
+    tmp_path: Path, patched_panel_loader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The scored origin must be the decision date, not the day before it.
+
+    A row dated ``d`` targets the demand of ``[d, d + horizon - 1]``, which is the
+    window whose actuals get revealed. Scoring the row dated ``d - 1`` instead would
+    compare a forecast for ``[d-1, d+horizon-2]`` against the actuals of
+    ``[d, d+horizon-1]``.
+    """
+    origins: list[pd.Timestamp] = []
+    original = operations._build_origin_frame
+
+    def spy(panel, settings):
+        origins.append(panel["date"].max())
+        return original(panel, settings)
+
+    monkeypatch.setattr(operations, "_build_origin_frame", spy)
+
+    settings = _fast_settings(tmp_path, simulation_days=8)
+    artifacts = run_operational_simulation(settings)
+
+    decision_dates = sorted(artifacts.predictions_by_day["decision_date"].unique())
+    assert origins == [pd.Timestamp(d) for d in decision_dates]
+    # One feature build per decision date, shared by every cadence.
+    assert len(origins) == len(decision_dates)

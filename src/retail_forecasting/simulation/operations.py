@@ -60,23 +60,36 @@ def _reveal_actuals(
     return grouped
 
 
-def _score_one_step(
+def _build_origin_frame(
     panel: pd.DataFrame,
-    model_path: Path,
     settings: Settings,
-    series_cost_profile: pd.DataFrame | None,
-) -> pd.DataFrame:
-    """Reproduce the run_scoring inference path on an in-memory panel slice."""
+) -> tuple[pd.DataFrame, list[str]]:
+    """Build the one-row-per-series inference origin for a decision date.
+
+    Feature construction does not depend on the model, so this runs once per
+    decision date and is reused by every cadence.
+    """
     prepared = label_all_regimes(panel)
     inference_frame, inference_metadata = build_inference_frame_with_fallback(
         prepared,
         settings.features,
         horizon=settings.dataset.horizon,
     )
+    return inference_frame, inference_metadata.feature_columns
+
+
+def _score_one_step(
+    inference_frame: pd.DataFrame,
+    feature_columns: list[str],
+    model_path: Path,
+    settings: Settings,
+    series_cost_profile: pd.DataFrame | None,
+) -> pd.DataFrame:
+    """Reproduce the run_scoring inference path for one model at one origin."""
     model = ConformalForecaster.load(model_path)
     return _build_scoring_predictions(
         inference_frame=inference_frame,
-        feature_columns=inference_metadata.feature_columns,
+        feature_columns=feature_columns,
         model=model,
         settings=settings,
         series_cost_profile=series_cost_profile,
@@ -135,11 +148,24 @@ def _run_streaming_loop(
     )
 
     for day_index, current_date in enumerate(eval_dates):
-        available_history = combined_panel[combined_panel["date"] < current_date]
+        # Origin convention (features/engineering.py): a row dated ``d`` carries the
+        # demand of ``[d, d + horizon - 1]`` as its target and only lagged (>= 1 day)
+        # features, so the inference origin for a decision taken on ``current_date``
+        # is the row dated ``current_date`` itself -- exactly what ``run_scoring``
+        # does with the newest day of history. Slicing at ``< current_date`` instead
+        # produced a forecast for ``[t-1, t+horizon-2]`` and costed it against the
+        # actuals of ``[t, t+horizon-1]``: a one-day-stale forecast scored against a
+        # window shifted forward, which under a rising trend biases every cadence low
+        # and deflates conformal coverage. Including the row of ``current_date`` leaks
+        # nothing: its own demand only ever feeds later rows, which do not exist yet,
+        # and every training target it could support needs demand up to
+        # ``d + horizon - 1`` and is dropped as missing.
+        available_history = combined_panel[combined_panel["date"] <= current_date]
         actuals = _reveal_actuals(eval_panel, current_date, horizon)
         actuals_complete = not actuals.empty and bool(
             (actuals["actuals_days_observed"] >= horizon).all()
         )
+        inference_frame, feature_columns = _build_origin_frame(available_history, settings)
 
         for label, model_path in cadence_paths.items():
             cadence_k = cadence_int[label]
@@ -159,7 +185,8 @@ def _run_streaming_loop(
                 retrained_this_step = True
 
             preds = _score_one_step(
-                panel=available_history,
+                inference_frame=inference_frame,
+                feature_columns=feature_columns,
                 model_path=model_path,
                 settings=settings,
                 series_cost_profile=series_cost_profile,

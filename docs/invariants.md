@@ -172,3 +172,14 @@ See `docs/web_layer.md` for the full description.
 
     No client-side charting library. The scenario parameters live in the query
     string so every dashboard state is a shareable, reloadable URL.
+
+## Rolling-Origin Backtest (OPS plane)
+
+35. The inference origin for a decision taken on date `d` is the row dated `d`.
+
+    A row dated `d` targets demand over `[d, d + h - 1]` (invariant 6) and only
+    carries lagged features, so slicing history at `< d` scores a forecast for
+    `[d - 1, d + h - 2]` against the actuals of `[d, d + h - 1]`. This is not
+    leakage, but it costs a one-day-stale forecast and, under a trend, deflates
+    both accuracy and conformal coverage. `simulation/operations.py` slices at
+    `<= d`.
