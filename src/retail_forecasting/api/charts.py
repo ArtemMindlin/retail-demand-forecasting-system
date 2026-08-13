@@ -162,8 +162,13 @@ def sparkline(
 
 
 # ── Forecast chart ────────────────────────────────────────────────────────────
-# Fixed user-space dimensions; the <svg> scales via viewBox, which is what
-# replaces the browser's ResizeObserver. No layout JavaScript required.
+# User-space dimensions for the viewBox; the <svg> scales uniformly to fill its
+# container width (see .forecast-svg in components.css), which is what replaces the
+# browser's ResizeObserver. No layout JavaScript required. Scaling must stay uniform:
+# stretching the viewBox non-uniformly (independent x/y factors) distorts every native
+# <circle> and <text> into ellipses and squeezed glyphs as the panel is resized — the
+# straight lines survive that because they carry vector-effect="non-scaling-stroke",
+# but markers and axis labels have no equivalent escape hatch.
 FORECAST_WIDTH = 900
 FORECAST_HEIGHT = 320
 _PAD = {"top": 18, "right": 18, "bottom": 30, "left": 48}
@@ -286,7 +291,6 @@ def forecast_chart(series: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
     svg = (
         f'<svg class="forecast-svg" viewBox="0 0 {FORECAST_WIDTH} {FORECAST_HEIGHT}" '
-        f'preserveAspectRatio="none" width="100%" height="{FORECAST_HEIGHT}" '
         f'role="img" aria-label="Demanda real frente a predicha con intervalo conformal">'
         f"{''.join(parts)}</svg>"
     )

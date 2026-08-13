@@ -642,7 +642,7 @@
 .legend-line.dashed { background: transparent; border-top: 2px dashed; }
 .legend-square { width: 12px; height: 8px; border-radius: 2px; }
 .chart-canvas { margin-top: 14px; position: relative; }
-.forecast-svg { display: block; overflow: visible; }
+.forecast-svg { display: block; overflow: visible; width: 100%; height: auto; }
 .chart-tooltip {
   position: absolute; pointer-events: none;
   background: rgba(11, 15, 21, 0.96); border: 1px solid var(--border-2);
