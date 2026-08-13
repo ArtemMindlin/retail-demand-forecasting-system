@@ -12,10 +12,17 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: root
+          # Root SSH login is disabled on the host (`PermitRootLogin no`), so the deploy
+          # runs as the unprivileged `artem` user, from a checkout under its own home.
+          # It must stay sudo-free: sudo prompts for a password here and the action would
+          # hang until the job times out.
+          username: artem
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /root/retail-demand-forecasting-system
+            # Abort if the checkout is missing: without this a failed `cd` would leave the
+            # shell in $HOME and run `git reset --hard` against whatever is there.
+            set -euo pipefail
+            cd /home/artem/retail-demand-forecasting-system
             # Hard-reset to origin so machine-local edits to tracked files can
             # never block the deploy (a failed `git pull` used to leave the VPS
             # on a stale commit while the build cache served old code). All
