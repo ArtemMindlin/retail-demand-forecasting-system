@@ -210,3 +210,10 @@ See `docs/web_layer.md` for the full description.
     with no imputation. Its costs rank policies; they are not a replenishment
     ledger. Naming it a "simulation" in user-facing text is what this invariant
     exists to prevent.
+
+40. `tune_imputation_lgbm()` (the `tune_imputation` run mode, `forecasting/imputation_tuning.py`)
+    must load only `split="train"`, never `split="eval"` -- the same rule as invariant 14,
+    applied to the supervised imputer's own hyperparameter search. It also persists only the
+    winning hyperparameters, never fitted model weights: `LatentDemandImputer` always re-fits
+    on the current panel's own clean days, so tuning cannot change the leakage or
+    feature-space properties of imputation, only which 3 numbers the fit uses.

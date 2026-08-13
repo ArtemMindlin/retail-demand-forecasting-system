@@ -77,6 +77,10 @@ Semantica:
   ciclo de reentrenamiento gobernado operacionalmente;
 - `score_daily`: escribe solo artefactos operativos de negocio y metadata
   ligera, sin `report.md`, sin `predictions.csv` y sin `backtest_metadata.json`.
+- `tune_imputation`: no entrena el modelo de forecasting. Busca (via Optuna,
+  `forecasting/imputation_tuning.py`) los mejores hiperparametros de LGBM para
+  el imputador supervisado y los persiste en
+  `models.models_dir/imputation_lgbm_params.json`. Usa solo `split="train"`.
 
 ## `DatasetConfig`
 
@@ -314,7 +318,13 @@ Opciones implementadas:
 - `none`
 
 Con `supervised`, se entrena un LightGBM sobre dias sin stockout y se predice
-demanda latente para dias censurados por stockout.
+demanda latente para dias censurados por stockout. Los hiperparametros de ese
+LightGBM son fijos (`n_estimators=200, learning_rate=0.05, max_depth=6`) salvo
+que exista `models.models_dir/imputation_lgbm_params.json`, escrito por
+`--run-mode tune_imputation` (`make tune-imputation`) -- ver `imputation_strategy`
+mas arriba y el modo `tune_imputation` de `run_mode`. Solo se persisten los
+hiperparametros ganadores, nunca un modelo entrenado: el imputador siempre
+reentrena sobre los dias limpios del panel que reciba en cada llamada.
 
 ## `FeatureConfig`
 

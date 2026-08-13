@@ -16,7 +16,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 - `src/retail_forecasting/config.py`: typed settings loaded from YAML.
 - `src/retail_forecasting/data/`: raw dataset loading, raw-to-panel preparation, and `censorship.py` (`LatentDemandImputer` — stockout/censored-demand reconstruction strategies).
 - `src/retail_forecasting/features/`: supervised frame creation, temporal features, and target construction.
-- `src/retail_forecasting/forecasting/`: walk-forward validation, conformal calibration, imputation comparison, fair-cost backtesting, and experiment/retrain/scoring orchestration (`pipeline.py`).
+- `src/retail_forecasting/forecasting/`: walk-forward validation, conformal calibration, imputation comparison, fair-cost backtesting, and experiment/retrain/scoring orchestration (`pipeline.py`); `imputation_tuning.py` runs a separate Optuna search over the supervised imputer's LGBM hyperparameters and persists the winner (never fitted weights) to `models.models_dir/imputation_lgbm_params.json`.
 - `src/retail_forecasting/models/`: forecast models only (`naive.py`, `boosting.py` for LightGBM, `catboosting.py` for CatBoost — the current champion).
 - `src/retail_forecasting/inventory/`: newsvendor order quantity, cost profiles, optimization, and dynamic simulation logic.
 - `src/retail_forecasting/simulation/`: OPS-plane rolling-origin production backtest, reused by the dashboard's `/ops/` view. Independent single-period Newsvendor decisions — no inventory state, no lead time — so its costs rank policies rather than reproduce a replenishment ledger.
@@ -56,7 +56,7 @@ run.py
  -> write_run_artifacts()
 ```
 
-Related entry points in `forecasting/pipeline.py`: `run_imputation_comparison()`, `run_fair_cost_backtest()`, `train_and_save_champion()` / `run_retrain()`, `run_scoring()`.
+Related entry points in `forecasting/pipeline.py`: `run_imputation_comparison()`, `run_fair_cost_backtest()`, `train_and_save_champion()` / `run_retrain()`, `run_scoring()`. `tune_imputation_lgbm()` (in `forecasting/imputation_tuning.py`, `run_mode = tune_imputation`) is a separate, upstream entry point: it tunes the supervised imputer's LGBM hyperparameters, not the forecasting model.
 
 The dashboard's what-if simulator does not go through the pipeline: it recomputes a
 single-period Newsvendor quantity in `api/services/forecast.py` from the run's

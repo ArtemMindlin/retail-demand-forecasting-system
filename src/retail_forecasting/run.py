@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from retail_forecasting.config import load_config
 from retail_forecasting.contracts.contracts_config import RunMode
+from retail_forecasting.forecasting.imputation_tuning import tune_imputation_lgbm
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
     run_fair_cost_backtest,
@@ -101,6 +102,10 @@ def main() -> None:
     if mode == "fair_cost_backtest":
         run_dir = run_fair_cost_backtest(settings)
         print(f"Fair-cost backtest written to: {run_dir / 'fair_cost_backtest.csv'}")
+        return
+    if mode == "tune_imputation":
+        params_path = tune_imputation_lgbm(settings)
+        print(f"Imputation tuning written to: {params_path}")
         return
     if mode == "score_daily":
         artifacts = run_scoring(settings)

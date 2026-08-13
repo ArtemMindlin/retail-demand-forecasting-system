@@ -58,3 +58,19 @@ class TuningResult(BaseModel):
     best_params: BoostingParams
     metadata: TuningMetadata
     pareto_front: list[ParetoTrial] = Field(default_factory=list)
+
+
+class ImputationTuningMetadata(BaseModel):
+    """Metadata for a single-objective Optuna search over the supervised imputer's LGBM."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    strategy: Literal["optuna_imputation_lgbm"] = "optuna_imputation_lgbm"
+    n_trials_requested: int = Field(gt=0)
+    best_mae: float = Field(ge=0)
+    train_rows: int = Field(ge=0)
+    eval_rows: int = Field(ge=0)
+    seed: int
+    created_at: str
+    git_commit: str | None
+    best_params: BoostingParams

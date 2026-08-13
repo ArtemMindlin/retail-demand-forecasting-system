@@ -14,6 +14,7 @@ from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_tuning import BoostingParams
 from retail_forecasting.data.censorship import (
+    IMPUTATION_LGBM_PARAMS_FILENAME,
     OPERATIVE_WINDOW_HOURS,
     ImputationStrategy,
     LatentDemandImputer,
@@ -144,17 +145,19 @@ IMPUTATION_COMPARISON_STRATEGIES: tuple[
 SYNTHETIC_CENSORING_EVAL_FRACTION = 0.30
 
 
-def _evaluate_imputation_quality(panel: pd.DataFrame, seed: int) -> pd.DataFrame:
-    """Score each imputation strategy by direct reconstruction error.
+def _synthetic_censor_holdout(
+    panel: pd.DataFrame, seed: int, eval_fraction: float = SYNTHETIC_CENSORING_EVAL_FRACTION
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+    """Hold out a sample of CLEAN days and synthetically censor them.
 
-    Latent demand on real stockouts is an unobserved counterfactual, so we evaluate on
-    a held-out set of CLEAN days (true demand known) that we synthetically censor:
-    each held-out day is assigned a stockout ratio sampled from the empirical distribution
-    of real stockouts, and its sale is reduced proportionally. Each strategy then
-    reconstructs those days; we compare the estimate against the known true demand.
+    Latent demand on real stockouts is an unobserved counterfactual, so imputation quality
+    can only be scored on days where the true demand is actually known: clean days. Each
+    held-out clean day is assigned a stockout ratio sampled from the empirical distribution
+    of real stockouts, and its sale is reduced proportionally -- giving a synthetic stand-in
+    for a censored day with a known ground truth, reusable by any strategy-scoring function.
 
-    Returns a DataFrame: strategy, mae, rmse, bias, mape, n_eval (lower MAE/RMSE = better,
-    bias near 0 = unbiased).
+    Returns (censored_panel, eval_idx, true_demand); eval_idx/true_demand are empty when the
+    panel has no clean or no censored rows to draw the synthetic ratio from.
     """
     rng = np.random.default_rng(seed)
     clean_mask = panel["stockout_hours"] == 0
@@ -165,9 +168,9 @@ def _evaluate_imputation_quality(panel: pd.DataFrame, seed: int) -> pd.DataFrame
     )
     clean_idx = panel.index[clean_mask].to_numpy()
     if len(clean_idx) == 0 or len(real_ratios) == 0:
-        return pd.DataFrame(columns=["strategy", "mae", "rmse", "bias", "mape", "n_eval"])
+        return panel.copy(), np.array([], dtype=int), np.array([], dtype=float)
 
-    n_eval = max(1, int(len(clean_idx) * SYNTHETIC_CENSORING_EVAL_FRACTION))
+    n_eval = max(1, int(len(clean_idx) * eval_fraction))
     eval_idx = rng.choice(clean_idx, size=n_eval, replace=False)
     sampled_ratios = rng.choice(real_ratios, size=n_eval, replace=True)
 
@@ -176,6 +179,21 @@ def _evaluate_imputation_quality(panel: pd.DataFrame, seed: int) -> pd.DataFrame
     censored = panel.copy()
     censored.loc[eval_idx, "stockout_hours"] = sampled_ratios * OPERATIVE_WINDOW_HOURS
     censored.loc[eval_idx, "observed_demand"] = true_demand * (1.0 - sampled_ratios)
+    return censored, eval_idx, true_demand
+
+
+def _evaluate_imputation_quality(panel: pd.DataFrame, seed: int) -> pd.DataFrame:
+    """Score each imputation strategy by direct reconstruction error.
+
+    See ``_synthetic_censor_holdout`` for how the ground-truth evaluation set is built.
+
+    Returns a DataFrame: strategy, mae, rmse, bias, mape, n_eval (lower MAE/RMSE = better,
+    bias near 0 = unbiased).
+    """
+    censored, eval_idx, true_demand = _synthetic_censor_holdout(panel, seed)
+    if len(eval_idx) == 0:
+        return pd.DataFrame(columns=["strategy", "mae", "rmse", "bias", "mape", "n_eval"])
+    n_eval = len(eval_idx)
 
     records: list[dict[str, Any]] = []
     for strategy in IMPUTATION_COMPARISON_STRATEGIES:
@@ -204,11 +222,7 @@ def _evaluate_imputation_quality(panel: pd.DataFrame, seed: int) -> pd.DataFrame
 def run_imputation_comparison(settings: Settings) -> Path:
     """Run only the latent-demand imputation strategies side by side (no forecasting).
 
-    This is a lightweight pre-model pass: it loads the daily panel and applies each
-    imputation strategy to reconstruct latent demand, then writes a long-format
-    ``latent_strategies.csv`` plus an ``imputation_metadata.json`` marker. The dashboard
-    uses this to compare strategies in the Demanda Latente tab. No models are trained
-    and no walk-forward folds are run.
+    This is a lightweight pre-model pass: it loads the daily panel and applies each imputation strategy to reconstruct latent demand, then writes a long-format ``latent_strategies.csv`` plus an ``imputation_metadata.json`` marker. The dashboard uses this to compare strategies in the Demanda Latente tab. No models are trained and no walk-forward folds are run.
 
     Returns:
         The created run directory path.
@@ -461,7 +475,10 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     print("\n" + "-" * 40)
     print(f"📊 Strategy B: Latent Demand (Imputation: {strategy_name})")
     print("-" * 40)
-    imputer = LatentDemandImputer(strategy=strategy_name)
+    imputer = LatentDemandImputer(
+        strategy=strategy_name,
+        model_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
+    )
     imputed_panel = imputer.impute(raw_panel)
 
     imputed_holdout = None

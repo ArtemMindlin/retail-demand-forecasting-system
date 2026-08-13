@@ -4,7 +4,7 @@ PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
 SIM_CONFIG = configs/simulation.yaml
 OPS_SPLIT = data/processed/ops_sim/.built
-.PHONY: help install run retrain score simulate backtest-fair-cost eda api dev collectstatic up test test-harness lint format clean pdf
+.PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness lint format clean pdf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -31,6 +31,9 @@ $(OPS_SPLIT):
 
 backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common ground truth (no training)
 	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode fair_cost_backtest
+
+tune-imputation: ## Tune LGBM hyperparameters for the supervised imputer, persist to disk
+	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode tune_imputation
 
 eda: ## Run the reproducible EDA module on the prepared panel
 	$(PYTHON) -m retail_forecasting.eda.run --config $(CONFIG)

@@ -14,7 +14,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Single source of truth for the execution modes; reused by the CLI parser
 # (run.py) and the run metadata schema (evaluation.reporting).
-RunMode = Literal["experiment", "retrain", "score_daily", "simulate_ops", "fair_cost_backtest"]
+RunMode = Literal[
+    "experiment", "retrain", "score_daily", "simulate_ops", "fair_cost_backtest", "tune_imputation"
+]
 
 
 class ProjectConfig(BaseModel):
