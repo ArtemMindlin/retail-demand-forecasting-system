@@ -585,30 +585,6 @@
   font-weight: 600;
 }
 
-/* ── Pending-migration notice ──────────────────────────────────────────────── */
-.pending-view {
-  padding: 48px 32px;
-  text-align: center;
-}
-
-.pending-title {
-  font-size: 20px;
-  color: var(--text-1);
-  margin: 6px 0 14px;
-}
-
-.pending-body {
-  font-size: 13px;
-  color: var(--text-3);
-  line-height: 1.65;
-  max-width: 620px;
-  margin: 0 auto 10px;
-}
-
-.pending-body a {
-  color: var(--c-ai);
-}
-
 /* ── KPI cards ─────────────────────────────────────────────────────────────── */
 .kpi-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
 .kpi-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }

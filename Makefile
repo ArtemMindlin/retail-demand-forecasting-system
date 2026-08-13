@@ -4,7 +4,8 @@ PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
 SIM_CONFIG = configs/simulation.yaml
 OPS_SPLIT = data/processed/ops_sim/.built
-.PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness lint format clean pdf
+SNAPSHOT = current
+.PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -55,6 +56,9 @@ test: ## Run the full test suite
 
 test-harness: ## Run only contract and architecture tests (fast)
 	$(PYTEST) tests/test_architecture_imports.py tests/test_temporal_leakage_contract.py tests/test_quantile_contract.py tests/test_dataframe_contracts.py tests/test_raw_column_boundaries.py tests/test_config_contract.py tests/test_generated_artifact_boundaries.py
+
+render-snapshots: ## Dump every dashboard view to tmp/render/<name> (safety net for CSS/template refactors)
+	$(PYTHON) scripts/render_snapshots.py --out tmp/render/$(SNAPSHOT)
 
 lint: ## Run the linter (ruff)
 	uv run ruff check .

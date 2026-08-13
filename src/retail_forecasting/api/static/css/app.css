@@ -227,47 +227,6 @@
   /* Tabular numbers */
   .tnum { font-variant-numeric: tabular-nums; }
 
-  /* Loading skeleton shimmer */
-  .shimmer {
-    background: linear-gradient(90deg, rgba(148,163,184,0.06) 0%, rgba(148,163,184,0.14) 50%, rgba(148,163,184,0.06) 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.4s ease-in-out infinite;
-    border-radius: 6px;
-  }
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-
-  /* Recharts overrides */
-  .recharts-cartesian-axis-tick-value {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    fill: var(--text-3) !important;
-  }
-  .recharts-default-tooltip {
-    background: rgba(11, 15, 21, 0.96) !important;
-    border: 1px solid var(--border-2) !important;
-    border-radius: 10px !important;
-    backdrop-filter: blur(8px);
-    font-family: var(--font-body) !important;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5) !important;
-  }
-  .recharts-tooltip-label {
-    color: var(--text-2) !important;
-    font-family: var(--font-mono) !important;
-    font-size: 11px !important;
-    margin-bottom: 6px !important;
-  }
-  .recharts-tooltip-item {
-    color: var(--text-1) !important;
-    font-size: 12px !important;
-  }
-  .recharts-cartesian-grid-horizontal line,
-  .recharts-cartesian-grid-vertical line {
-    stroke: rgba(148, 163, 184, 0.06) !important;
-  }
-
   /* Title and section labels */
   .label-mono {
     font-family: var(--font-mono);
@@ -349,15 +308,6 @@
     animation: blink 1s steps(2) infinite;
   }
   @keyframes blink { 50% { opacity: 0; } }
-
-  /* Hierarchical cascade nav — each revealed level slides in from the left */
-  .nav-cascade { animation: nav-cascade 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
-  @keyframes nav-cascade {
-    from { opacity: 0; transform: translateX(-10px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  .nav-sep { animation: nav-sep 0.3s ease both; }
-  @keyframes nav-sep { from { opacity: 0; } to { opacity: 0.45; } }
 
   /* Soft glow halo on chart container. max-width caps how tall the aspect-ratio-locked
      chart SVGs inside can grow: they scale uniformly with their container's width (see
@@ -572,9 +522,6 @@
     background: rgba(19, 25, 35, 0.55);
     transition: all 0.15s ease;
   }
-  .alert-item.unread {
-    background: rgba(19, 25, 35, 0.85);
-  }
   .alert-item:hover { border-color: var(--border-2); }
   .alert-item::before {
     content: "";
@@ -608,12 +555,6 @@
     border: 1px solid var(--alert-color, var(--c-drift));
     border-color: color-mix(in oklab, var(--alert-color, var(--c-drift)) 35%, transparent);
   }
-  .alert-time {
-    margin-left: auto;
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--text-mute);
-  }
   .alert-title {
     font-family: var(--font-display);
     font-weight: 600;
@@ -631,12 +572,6 @@
     display: flex; flex-wrap: wrap; gap: 6px;
   }
   .alert-meta .pill { font-size: 10px; padding: 3px 8px; }
-  .alert-actions {
-    display: flex; gap: 6px;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px dashed var(--border);
-  }
   .alert-btn {
     flex: 1;
     padding: 6px 10px;
@@ -651,15 +586,6 @@
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   }
   .alert-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-1); border-color: var(--border-2); }
-  .alert-btn.primary {
-    background: var(--alert-soft, rgba(245, 158, 11, 0.14));
-    color: var(--alert-color, var(--c-drift));
-    border-color: color-mix(in oklab, var(--alert-color, var(--c-drift)) 40%, transparent);
-  }
-  .alert-btn.primary:hover {
-    background: color-mix(in oklab, var(--alert-color, var(--c-drift)) 22%, transparent);
-    color: #fff;
-  }
 
   .filter-tab {
     padding: 6px 10px;
@@ -801,10 +727,6 @@
     from { transform: translateY(20px) scale(0.95); opacity: 0; }
     to { transform: translateY(0) scale(1); opacity: 1; }
   }
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
 
   /* Console Terminal overlay styles */
   .terminal-overlay {
@@ -879,41 +801,4 @@
     transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
                 filter 0.25s cubic-bezier(0.4, 0, 0.2, 1),
                 transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .canvas-transitioning {
-    opacity: 0.15;
-    filter: blur(6px);
-    transform: translateY(8px);
-    pointer-events: none;
-  }
-
-  /* Giga-premium custom loading bar at the top of the canvas */
-  .premium-loading-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 3px;
-    background: linear-gradient(
-      90deg,
-      var(--c-ai),
-      var(--c-inv),
-      var(--c-conf),
-      var(--c-ai)
-    );
-    background-size: 200% 100%;
-    z-index: 999;
-    animation: loadingBarGlow 1.2s infinite linear;
-    opacity: 0;
-    transition: opacity 0.15s ease-in-out;
-  }
-  .premium-loading-bar.active {
-    opacity: 1;
-  }
-  @keyframes loadingBarGlow {
-    0% { background-position: 0% 50%; }
-    100% { background-position: 200% 50%; }
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
   }
