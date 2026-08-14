@@ -61,13 +61,28 @@ class TuningResult(BaseModel):
 
 
 class ImputationTuningMetadata(BaseModel):
-    """Metadata for a single-objective Optuna search over the supervised imputer's LGBM."""
+    """Metadata for a single-objective Optuna search over the supervised imputer's LGBM.
+
+    Scores are split in two because they answer different questions: ``best_mae_selection`` is
+    the objective the search minimized (averaged over the selection holdouts, so it is in-sample
+    for the search and cannot evidence a gain), while ``best_mae_validation`` and
+    ``default_mae_validation`` come from holdouts the search never saw and are what
+    ``improvement_pct`` and ``persisted`` are decided on.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     strategy: Literal["optuna_imputation_lgbm"] = "optuna_imputation_lgbm"
     n_trials_requested: int = Field(gt=0)
-    best_mae: float = Field(ge=0)
+    best_mae_selection: float = Field(ge=0)
+    best_mae_validation: float = Field(ge=0)
+    default_mae_validation: float = Field(ge=0)
+    improvement_pct: float
+    persisted: bool
+    n_selection_holdouts: int = Field(gt=0)
+    n_validation_holdouts: int = Field(gt=0)
+    selection_seeds: list[int]
+    validation_seeds: list[int]
     train_rows: int = Field(ge=0)
     eval_rows: int = Field(ge=0)
     seed: int

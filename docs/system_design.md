@@ -265,8 +265,9 @@ pendiente.
 
 - reconstruccion de demanda latente o censurada (`data/censorship.py`);
 - busqueda de hiperparametros del imputador supervisado como modo de ejecucion
-  aparte (`tune_imputation`, `forecasting/imputation_tuning.py`), persistidos y
-  reusados por el imputador sin reentrenar sus pesos;
+  aparte (`tune_imputation`, `forecasting/imputation_tuning.py`), con objetivo
+  promediado sobre varios sorteos de censura sintetica y revalidacion en sorteos
+  disjuntos antes de persistir; solo se reusan los hiperparametros, nunca pesos;
 - conformal prediction, incluida la variante Mondrian por categoria;
 - deteccion de drift por PSI, con informe por feature (`drift_report.json`);
 - reentrenamiento como modo de ejecucion (`retrain`) y comparacion de cadencias

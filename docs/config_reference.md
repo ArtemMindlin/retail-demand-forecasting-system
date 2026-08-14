@@ -79,8 +79,14 @@ Semantica:
   ligera, sin `report.md`, sin `predictions.csv` y sin `backtest_metadata.json`.
 - `tune_imputation`: no entrena el modelo de forecasting. Busca (via Optuna,
   `forecasting/imputation_tuning.py`) los mejores hiperparametros de LGBM para
-  el imputador supervisado y los persiste en
-  `models.models_dir/imputation_lgbm_params.json`. Usa solo `split="train"`.
+  el imputador supervisado. Usa solo `split="train"`. El objetivo promedia el MAE
+  de reconstruccion sobre varios sorteos de censura sintetica, y el ganador se
+  revalida despues contra los defaults sin afinar en sorteos disjuntos: solo se
+  escribe `models.models_dir/imputation_lgbm_params.json` si gana en esa
+  revalidacion. El metadata (`imputation_lgbm_tuning_metadata.json`) se escribe
+  siempre y registra ambas puntuaciones, `improvement_pct` y `persisted`.
+  La mejora es `improvement_pct`; `best_mae_selection` es in-sample de la
+  busqueda y no evidencia ganancia alguna.
 
 ## `DatasetConfig`
 
@@ -321,7 +327,9 @@ Con `supervised`, se entrena un LightGBM sobre dias sin stockout y se predice
 demanda latente para dias censurados por stockout. Los hiperparametros de ese
 LightGBM son fijos (`n_estimators=200, learning_rate=0.05, max_depth=6`) salvo
 que exista `models.models_dir/imputation_lgbm_params.json`, escrito por
-`--run-mode tune_imputation` (`make tune-imputation`) -- ver `imputation_strategy`
+`--run-mode tune_imputation` (`make tune-imputation`) cuando -- y solo cuando --
+los hiperparametros afinados baten a esos defaults en sorteos de validacion
+disjuntos de los de la busqueda; ver `imputation_strategy`
 mas arriba y el modo `tune_imputation` de `run_mode`. Solo se persisten los
 hiperparametros ganadores, nunca un modelo entrenado: el imputador siempre
 reentrena sobre los dias limpios del panel que reciba en cada llamada.

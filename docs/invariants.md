@@ -217,3 +217,15 @@ See `docs/web_layer.md` for the full description.
     winning hyperparameters, never fitted model weights: `LatentDemandImputer` always re-fits
     on the current panel's own clean days, so tuning cannot change the leakage or
     feature-space properties of imputation, only which 3 numbers the fit uses.
+
+41. The imputation search must select and validate on disjoint synthetic-censoring draws, and
+    must not persist a winner that loses to the untuned defaults on the validation draws.
+
+    On a single draw the MAE spread between trials (12-40% measured) is an order of magnitude
+    larger than the differences between hyperparameter sets (~1%), so a single-draw search
+    selects the lucky trial and its own objective value is not evidence of a gain -- a run that
+    reported -1.4% in-sample measured -0.32% (CI95 crossing zero) on fresh draws. Hence the
+    objective averages over `N_SELECTION_HOLDOUTS` draws, `improvement_pct` is computed only on
+    the disjoint `N_VALIDATION_HOLDOUTS` draws, and `imputation_lgbm_params.json` is written
+    only when that number is negative. `best_mae_selection` in the metadata is in-sample for
+    the search and must never be quoted as the improvement.
