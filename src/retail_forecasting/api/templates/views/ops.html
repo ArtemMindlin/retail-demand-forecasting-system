@@ -20,8 +20,6 @@ playback is a shareable URL.{% endcomment %}
 
 <form class="ops-controls" method="get" action="{% url 'ops' %}"
       hx-get="{% url 'ops' %}"
-      hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML"
-      hx-push-url="true"
       hx-trigger="change, input changed delay:200ms from:input[type='range']">
 
   <div class="ops-cadence" role="group" aria-label="Cadencia de reentreno">
@@ -72,8 +70,7 @@ playback is a shareable URL.{% endcomment %}
 
     <form method="get" action="{% url 'ops' %}"
           hx-get="{% url 'ops' %}"
-          hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML"
-          hx-push-url="true" hx-trigger="change">
+          hx-trigger="change">
       <input type="hidden" name="cadence" value="{{ cadence }}">
       <input type="hidden" name="week" value="{{ week_index|unlocalize }}">
       <select name="series" class="ops-series-select" aria-label="Serie a inspeccionar">

@@ -33,9 +33,20 @@
       {% include "partials/topbar.html" %}
       {% include "partials/nav.html" %}
 
-      {% comment %}The sidebar re-renders this region via hx-select, so every
-      view's markup must live inside it.{% endcomment %}
-      <div id="view-content">
+      {% comment %}The sidebar re-renders this region via hx-select, so every view's
+      markup must live inside it.
+
+      The four hx-* attributes are the swap contract of every control *inside* a view:
+      re-request, take this region out of the response, replace it, push the URL. htmx
+      inherits them, so the seven controls that used to repeat all four verbatim now
+      declare only what is specific to them (hx-get, hx-trigger). Two caveats, both
+      handled: the sidebar lives outside this region and keeps its own copy, and a
+      control in here that opens an overlay instead must unset hx-select and
+      hx-push-url, or it would try to pull #view-content out of a modal fragment.
+      {% endcomment %}
+      <div id="view-content"
+           hx-target="#view-content" hx-select="#view-content"
+           hx-swap="outerHTML" hx-push-url="true">
         {% block content %}{% endblock %}
       </div>
 

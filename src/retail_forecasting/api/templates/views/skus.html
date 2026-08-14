@@ -25,8 +25,6 @@ localStorage, as they always have, and never reach the backend.{% endcomment %}
 
       <form class="sku-search" method="get" action="{% url 'skus' %}"
             hx-get="{% url 'skus' %}"
-            hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML"
-            hx-push-url="true"
             hx-trigger="input changed delay:300ms from:input[name='q'], submit">
         {% include "partials/whatif_hidden.html" %}
         <input type="hidden" name="status" value="{{ status_filter }}">
@@ -67,9 +65,9 @@ localStorage, as they always have, and never reach the backend.{% endcomment %}
     {% for tab in filter_tabs %}
       <a class="filter-tab{% if tab.id == status_filter %} active{% endif %}"
          {% if tab.id == status_filter %}style="color: {{ tab.color }}; border-color: {{ tab.color }}"{% endif %}
-         href="?{% querystring status=tab.id %}"
-         hx-get="?{% querystring status=tab.id %}"
-         hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML" hx-push-url="true">
+         href="{% querystring status=tab.id %}"
+         hx-get="{% querystring status=tab.id %}"
+        >
         {{ tab.label }} <span class="filter-tab-count">{{ tab.count }}</span>
       </a>
     {% endfor %}
@@ -80,10 +78,9 @@ localStorage, as they always have, and never reach the backend.{% endcomment %}
       {% for column in columns %}
         {% if column.key %}
           <a class="sku-th sortable"
-             href="?{% querystring sort=column.key dir=column.next_dir %}"
-             hx-get="?{% querystring sort=column.key dir=column.next_dir %}"
-             hx-target="#view-content" hx-select="#view-content" hx-swap="outerHTML"
-             hx-push-url="true">
+             href="{% querystring sort=column.key dir=column.next_dir %}"
+             hx-get="{% querystring sort=column.key dir=column.next_dir %}"
+             >
             {{ column.label }}{% if column.arrow %} <span class="sku-sort-arrow">{{ column.arrow }}</span>{% endif %}
           </a>
         {% else %}
@@ -126,7 +123,7 @@ localStorage, as they always have, and never reach the backend.{% endcomment %}
           </div>
           <div class="sku-cell">
             <span class="sku-status" style="color: {{ row.status_color }}">{{ row.status_label }}</span>
-            <a class="sku-inspect" href="{% url 'dashboard' %}?{% querystring sku=row.id %}"
+            <a class="sku-inspect" href="{% url 'dashboard' %}{% querystring sku=row.id %}"
                title="Ver en el dashboard">{% icon "chevronRight" 13 %}</a>
           </div>
         </div>

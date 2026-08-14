@@ -99,8 +99,7 @@
 
       {% if series_list %}
         <form method="get" action="{% url 'latent' %}"
-              hx-get="{% url 'latent' %}" hx-target="#view-content" hx-select="#view-content"
-              hx-swap="outerHTML" hx-push-url="true" hx-trigger="change">
+              hx-get="{% url 'latent' %}" hx-trigger="change">
           <input type="hidden" name="run" value="{{ run }}">
           <select name="series" class="ops-series-select" aria-label="Serie / SKU">
             {% for s in series_list %}

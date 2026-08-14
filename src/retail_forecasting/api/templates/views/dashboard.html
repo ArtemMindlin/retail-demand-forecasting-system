@@ -20,6 +20,8 @@
             hx-get="{% url 'academic-modal' card.id %}"
             hx-include="closest form, .sidebar form"
             hx-target="#overlay-slot"
+            {% comment %}Opts out of the inherited swap contract; see base.html.{% endcomment %}
+            hx-select="unset" hx-push-url="false"
             hx-swap="innerHTML">
       <div class="academic-head">
         <div class="academic-icon"

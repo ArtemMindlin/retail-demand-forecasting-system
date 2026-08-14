@@ -7,7 +7,11 @@
      x-on:click.self="close()"
      role="dialog" aria-modal="true" aria-labelledby="academic-modal-title">
   <div class="modal-window">
-    <div class="modal-glow" style="background: {{ module.color }}"></div>
+    {% comment %}The glow is a radial tint the CSS builds from `--modal-glow`; setting
+    `background` here instead (as this did since the Django port) overrode the gradient
+    with a solid block of the module colour, which covered the whole modal.{% endcomment %}
+    <div class="modal-glow"
+         style="--modal-glow: color-mix(in oklab, {{ module.color }} 16%, transparent)"></div>
 
     <div class="modal-header">
       <div class="modal-header-main">

@@ -19,7 +19,10 @@ place. `command` renders the run-the-pipeline button; `hint` renders a second li
     <button type="button" class="btn-run empty-state-action"
             hx-post="{% url 'pipeline-run' %}"
             hx-target="#overlay-slot"
-            hx-swap="innerHTML">
+            hx-swap="innerHTML"
+            {% comment %}Opts out of #view-content's inherited swap contract: this
+            response is a modal, not a view.{% endcomment %}
+            hx-select="unset" hx-push-url="false">
       {% icon "play" 14 %} Ejecutar pipeline
     </button>
   {% endif %}
