@@ -235,3 +235,15 @@ See `docs/web_layer.md` for the full description.
     the disjoint `N_VALIDATION_HOLDOUTS` draws, and `imputation_lgbm_params.json` is written
     only when that number is negative. `best_mae_selection` in the metadata is in-sample for
     the search and must never be quoted as the improvement.
+
+42. The synthetic-censoring holdout cannot rank imputation RECONCILIATION rules -- only
+    hyperparameters and teacher models.
+
+    `_synthetic_censor_holdout()` builds its ground truth as `observed = truth * (1 - r)`.
+    Any rule that inverts that relation scores near-zero error by construction, not by
+    merit: `observed / (1 - r)` measures MAE 0.02 against 0.74 for the rule it replaces.
+    Hyperparameter comparisons stay valid because every candidate shares one reconciliation
+    rule, so the assumption cancels. Reconciliation changes must be argued on modelling
+    grounds and must never quote a reconstruction-MAE gain from this holdout -- including in
+    `imputation_quality.csv`, which measures agreement with the generator rather than
+    imputation quality in the field.

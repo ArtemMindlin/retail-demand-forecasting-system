@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -181,3 +182,51 @@ def test_raise_on_blocking_data_quality_raises_error() -> None:
 
     with pytest.raises(DataQualityError, match="Blocking data-quality checks failed"):
         raise_on_blocking_data_quality(report)
+
+
+def test_supervised_imputer_keeps_observed_sales_and_fills_only_the_unstocked_slice() -> None:
+    """A lightly-censored day must not have its real sales discarded.
+
+    The old max(observed, predicted) rule returned the prediction whenever it exceeded the
+    observed sale, throwing away the strongest evidence available on days that were mostly
+    sellable. The reconciliation must instead add only the missing slice.
+    """
+    observed = np.array([9.0, 2.0])
+    predicted_full_day = np.array([10.0, 10.0])
+    # 1.6h of a 16h window = 10% censored; 12.8h = 80% censored.
+    stockout_hours = np.array([1.6, 12.8])
+
+    estimate = LatentDemandImputer._reconcile_with_severity(
+        observed=observed,
+        predicted_full_day=predicted_full_day,
+        stockout_hours=stockout_hours,
+    )
+
+    assert estimate == pytest.approx([9.0 + 0.1 * 10.0, 2.0 + 0.8 * 10.0])
+    # Never below what actually sold, on any severity.
+    assert (estimate >= observed).all()
+
+
+def test_supervised_imputer_does_not_feed_stockout_severity_to_the_teacher() -> None:
+    """Severity is a reconciliation input, not a feature.
+
+    Training rows are clean days, where the ratio is identically 0, so the feature carried
+    exactly 0 importance while implying the teacher knew about severity. It does not.
+    """
+    dates = pd.date_range("2024-01-01", periods=100)
+    df = pd.DataFrame(
+        {
+            "date": dates,
+            "series_id": "test_1",
+            "observed_demand": 10.0,
+            "stockout_hours": 0.0,
+        }
+    )
+    df.loc[99, "observed_demand"] = 2.0
+    df.loc[99, "stockout_hours"] = 8.0
+
+    imputer = LatentDemandImputer(strategy="supervised")
+    imputer.impute(df)
+
+    assert imputer.model is not None
+    assert "stockout_ratio" not in imputer.model.feature_name_

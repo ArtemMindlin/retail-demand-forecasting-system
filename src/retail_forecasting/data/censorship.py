@@ -119,15 +119,20 @@ class LatentDemandImputer:
     def _impute_supervised(
         self, df: pd.DataFrame, is_clean: pd.Series, is_censored: pd.Series
     ) -> pd.DataFrame:
-        """LGBM teacher-model with rich covariates."""
+        """LGBM teacher-model with rich covariates, reconciled by stockout severity.
+
+        The teacher is fitted on clean days only, so it predicts FULL-DAY demand -- a
+        quantity that does not depend on how many hours the day was out of stock. Severity
+        therefore has no place among its features (it was one until it was measured at
+        exactly 0 importance: every training row is a clean day, where the ratio is
+        identically 0, and LightGBM cannot split on a constant). It belongs in the
+        reconciliation instead, see ``_reconcile_with_severity``.
+        """
         df_feat = df.copy()
         df_feat["month"] = df_feat["date"].dt.month
         df_feat["day_of_week"] = df_feat["date"].dt.dayofweek
         df_feat["day_of_month"] = df_feat["date"].dt.day
         df_feat["series_cat"] = df_feat["series_id"].astype("category")
-
-        # Stockout severity: fraction of operative window without stock
-        df_feat["stockout_ratio"] = df_feat[self.stockout_col] / OPERATIVE_WINDOW_HOURS
 
         # Series-level clean-day mean as a prior (mirrors historical_mean but as a feature)
         series_means = df_feat[is_clean].groupby("series_id")[self.target_col].mean()
@@ -150,7 +155,6 @@ class LatentDemandImputer:
             "day_of_week",
             "day_of_month",
             "series_cat",
-            "stockout_ratio",
             "series_mean_demand",
         ] + extra_features
 
@@ -173,11 +177,37 @@ class LatentDemandImputer:
 
         predicted_latent = np.asarray(self.model.predict(X_censored), dtype=float)
 
-        df.loc[is_censored, "latent_demand_est"] = np.maximum(
-            df.loc[is_censored, self.target_col], predicted_latent
+        df.loc[is_censored, "latent_demand_est"] = self._reconcile_with_severity(
+            observed=df.loc[is_censored, self.target_col].astype(float).to_numpy(),
+            predicted_full_day=predicted_latent,
+            stockout_hours=df.loc[is_censored, self.stockout_col].astype(float).to_numpy(),
         )
         df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, self.target_col]
         return df
+
+    @staticmethod
+    def _reconcile_with_severity(
+        observed: np.ndarray, predicted_full_day: np.ndarray, stockout_hours: np.ndarray
+    ) -> np.ndarray:
+        """Keep the sales that did happen, and estimate only the unstocked slice of the day.
+
+        With ``r`` the fraction of the operative window without stock, the day was sellable
+        for ``1 - r`` of it: the observed sale already covers that part, and only ``r`` of a
+        full day of demand is missing. So the estimate is ``observed + r * predicted``.
+
+        This replaces a ``max(observed, predicted)`` that treated the two as rival estimates
+        of the same quantity and discarded whichever was smaller -- throwing away real sales
+        on lightly-censored days, where the observed value is by far the better evidence.
+
+        NOTE: this rule cannot be ranked against the old one on the synthetic-censoring
+        holdout. That holdout is built as ``observed = truth * (1 - r)``, which is the very
+        assumption this formula encodes, so it scores near-zero error there by construction
+        (measured MAE 0.02 vs 0.74) and the comparison is circular. It is adopted on the
+        modelling argument above, not on that number. See invariant 42.
+        """
+        ratio = np.clip(stockout_hours / OPERATIVE_WINDOW_HOURS, 0.0, 1.0)
+        estimate: np.ndarray = observed + ratio * np.clip(predicted_full_day, 0.0, None)
+        return estimate
 
     def _impute_historical_mean(
         self, df: pd.DataFrame, is_clean: pd.Series, is_censored: pd.Series

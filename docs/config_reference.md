@@ -324,7 +324,12 @@ Opciones implementadas:
 - `none`
 
 Con `supervised`, se entrena un LightGBM sobre dias sin stockout y se predice
-demanda latente para dias censurados por stockout. Los hiperparametros de ese
+demanda latente para dias censurados por stockout. Como se entrena solo con dias
+limpios, el maestro predice demanda de dia completo y no recibe la severidad del
+stockout como feature; esta entra en la reconciliacion final, que conserva la
+venta observada y estima solo el tramo sin stock (`observado + r * predicho`,
+con `r` la fraccion del horario operativo sin stock). Los baselines
+`historical_mean` y `clipped_scaling` mantienen su regla anterior a proposito. Los hiperparametros de ese
 LightGBM son fijos (`n_estimators=200, learning_rate=0.05, max_depth=6`) salvo
 que exista `models.models_dir/imputation_lgbm_params.json`, escrito por
 `--run-mode tune_imputation` (`make tune-imputation`) cuando -- y solo cuando --
