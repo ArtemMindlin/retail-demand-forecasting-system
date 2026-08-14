@@ -603,11 +603,7 @@
 
 /* ── Forecast chart ────────────────────────────────────────────────────────── */
 .dashboard-chart { margin-top: 16px; }
-.chart-block { padding: 22px; }
-.chart-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 6px; }
-.chart-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
-.chart-title { font-size: 18px; }
-.chart-subtitle { font-size: 12px; color: var(--text-3); }
+.card-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
 .chip-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
 .chart-legend { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 .legend-item {
@@ -783,15 +779,20 @@
 }
 .ops-kpi-value { font-size: 22px; font-weight: 700; font-family: var(--font-display); }
 .ops-kpi-sub { font-size: 10.5px; color: var(--text-mute); margin-top: 2px; }
-.ops-chart { padding: 20px; }
-.ops-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px 18px; }
-.ops-chart-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
-.ops-chart-subtitle { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+/* Card chrome, shared by every card in every view. These used to be two divergent sets:
+   `.chart-head/.chart-title/.chart-subtitle` on the dashboard, and
+   `.ops-chart-head/.ops-chart-title/.ops-chart-subtitle/.ops-chart-empty`, which despite
+   the prefix were used by /ops/, /pareto/ (three times) and /latent/. */
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 10px 18px; }
+.card-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
+.card-title-hero { font-size: 18px; }
+.card-subtitle { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.card-empty { aspect-ratio: 900 / 230; display: grid; place-items: center; color: var(--text-3); font-size: 12px; }
 .ops-series-select {
   background: var(--surface); color: var(--text-1); border: 1px solid var(--border-2);
   border-radius: 8px; padding: 7px 10px; font-family: var(--font-mono); font-size: 12px;
 }
-.ops-chart-empty { aspect-ratio: 900 / 230; display: grid; place-items: center; color: var(--text-3); font-size: 12px; }
+
 .ops-footer { margin-top: 14px; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute); }
 
 /* ── EDA gallery ───────────────────────────────────────────────────────────── */
@@ -846,7 +847,6 @@
 .verdict-bar { height: 4px; border-radius: 999px; background: rgba(var(--rgb-slate), 0.1); margin: 10px 0 8px; overflow: hidden; }
 .verdict-bar-fill { height: 100%; border-radius: 999px; opacity: 0.7; }
 .verdict-card-stats { display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
-.latent-chart { padding: 20px; }
 .latent-controls { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
 .latent-chips { display: flex; gap: 22px; }
 .latent-chip-value { font-family: var(--font-mono); font-size: 17px; font-weight: 700; color: var(--text-1); line-height: 1; }
@@ -855,14 +855,13 @@
    2fr share of it: the front chart is squarer than the hero ratio (a scatter needs to
    be), and at ~2/3 of the cap it still renders the same height as the hero charts. */
 .pareto-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); gap: 16px; align-items: start; max-width: 1200px; }
-.pareto-grid > .chart-card { padding: 20px; }
 .pareto-best { padding: 18px 20px; }
 .pareto-best-label { color: var(--c-conf); margin-bottom: 12px; }
 .pareto-best-list { margin: 0; display: grid; gap: 8px; }
 .pareto-best-list > div { display: flex; justify-content: space-between; gap: 12px; font-family: var(--font-mono); font-size: 11px; }
 .pareto-best-list dt { color: var(--text-3); }
 .pareto-best-list dd { margin: 0; color: var(--text-1); }
-.pareto-sensitivity, .pareto-fair { padding: 20px; margin-top: 16px; }
+.pareto-sensitivity, .pareto-fair { margin-top: 16px; }
 .table-scroll { overflow-x: auto; margin-top: 14px; }
 .data-table { border-collapse: collapse; width: 100%; font-family: var(--font-mono); font-size: 11.5px; }
 .data-table th {

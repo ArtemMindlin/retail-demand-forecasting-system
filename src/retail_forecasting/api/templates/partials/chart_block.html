@@ -3,17 +3,17 @@ Forecast chart. The SVG arrives fully rendered from the server; the only
 JavaScript is the pointer handler that moves the crosshair and the tooltip,
 which needs the per-point geometry the server already computed.
 {% endcomment %}
-<div class="glass chart-card chart-block">
-  <div class="chart-head">
+<div class="glass chart-card">
+  <div class="card-head">
     <div>
-      <div class="chart-title-row">
-        <div class="h-display chart-title">Demanda · Real vs Predicha</div>
+      <div class="card-title-row">
+        <div class="h-display card-title card-title-hero">Demanda · Real vs Predicha</div>
         <div class="chip">
           <span class="chip-dot" style="background: var(--c-conf)"></span>
           CONFORMAL {{ params.service_level|floatformat:"1u" }}%
         </div>
       </div>
-      <div class="chart-subtitle">
+      <div class="card-subtitle">
         Predicción puntual + intervalo conformal calibrado · SKU {{ sku }}
       </div>
     </div>
@@ -21,7 +21,7 @@ which needs the per-point geometry the server already computed.
     <div class="chart-legend">
       <div class="legend-item"><span class="legend-line" style="background: var(--c-inv)"></span>Real</div>
       <div class="legend-item"><span class="legend-line dashed" style="border-top-color: var(--c-ai)"></span>Predicción</div>
-      <div class="legend-item"><span class="legend-square" style="background: rgba(148,163,184,0.35)"></span>Intervalo</div>
+      <div class="legend-item"><span class="legend-square" style="background: rgba(var(--rgb-slate), 0.35)"></span>Intervalo</div>
     </div>
   </div>
 

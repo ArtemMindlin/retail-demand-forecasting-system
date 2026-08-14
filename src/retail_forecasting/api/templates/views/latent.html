@@ -75,11 +75,11 @@
   </div>
 {% endif %}
 
-<div class="glass chart-card latent-chart">
-  <div class="ops-chart-head">
+<div class="glass chart-card">
+  <div class="card-head">
     <div>
-      <div class="ops-chart-title">Serie · observado frente a cada reconstrucción</div>
-      <div class="ops-chart-subtitle">
+      <div class="card-title">Serie · observado frente a cada reconstrucción</div>
+      <div class="card-subtitle">
         franja ámbar = día con rotura · discontinua = venta observada (censurada)
       </div>
     </div>
@@ -92,7 +92,7 @@
         </div>
         <div>
           <div class="tnum latent-chip-value"
-               style="{% if censored_days %}color: #f59e0b{% endif %}">{{ censored_days }}</div>
+               style="{% if censored_days %}color: var(--c-drift){% endif %}">{{ censored_days }}</div>
           <div class="latent-chip-label">c/ rotura</div>
         </div>
       </div>
@@ -115,7 +115,7 @@
   {% if has_data %}
     {{ chart }}
   {% else %}
-    <div class="ops-chart-empty">Sin datos de comparación de imputación para esta ejecución.</div>
+    <div class="card-empty">Sin datos de comparación de imputación para esta ejecución.</div>
   {% endif %}
 </div>
 

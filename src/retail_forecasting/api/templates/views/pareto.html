@@ -17,11 +17,11 @@
 
 <div class="pareto-grid">
   <div class="glass chart-card">
-    <div class="ops-chart-title">Frente · {{ front_count }} configuraciones</div>
+    <div class="card-title">Frente · {{ front_count }} configuraciones</div>
     {% if front %}
       {{ pareto_chart }}
     {% else %}
-      <div class="ops-chart-empty">
+      <div class="card-empty">
         Este run no contiene <code>tuning_pareto.csv</code>.
       </div>
     {% endif %}
@@ -43,20 +43,20 @@
 </div>
 
 <div class="glass chart-card pareto-sensitivity">
-  <div class="ops-chart-title">Sensibilidad al ratio Cs/Co</div>
-  <div class="ops-chart-subtitle">
+  <div class="card-title">Sensibilidad al ratio Cs/Co</div>
+  <div class="card-subtitle">
     Cómo se mueven coste y nivel de servicio al variar la asimetría de costes.
   </div>
   {% if has_sensitivity %}
     {{ sensitivity_chart }}
   {% else %}
-    <div class="ops-chart-empty">Este run no contiene <code>sensitivity_summary.csv</code>.</div>
+    <div class="card-empty">Este run no contiene <code>sensitivity_summary.csv</code>.</div>
   {% endif %}
 </div>
 
 <div class="glass pareto-fair">
-  <div class="ops-chart-title">Backtest de coste justo</div>
-  <div class="ops-chart-subtitle">
+  <div class="card-title">Backtest de coste justo</div>
+  <div class="card-subtitle">
     Cada estrategia cargada contra la <strong>misma</strong> demanda real censurada
     sintéticamente. Es la comparación válida: el coste por estrategia del titular está
     sesgado por la propia censura.
@@ -81,7 +81,7 @@
     </div>
     <div class="ops-footer">reports/{{ fair_run }}/fair_cost_backtest.csv</div>
   {% else %}
-    <div class="ops-chart-empty">
+    <div class="card-empty">
       Sin backtest de coste justo. Genéralo con:
       <code>make backtest-fair-cost</code>
     </div>

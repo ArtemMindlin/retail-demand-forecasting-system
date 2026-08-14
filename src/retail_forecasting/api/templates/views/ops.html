@@ -59,11 +59,11 @@ playback is a shareable URL.{% endcomment %}
   {% endfor %}
 </div>
 
-<div class="glass chart-card ops-chart">
-  <div class="ops-chart-head">
+<div class="glass chart-card">
+  <div class="card-head">
     <div>
-      <div class="ops-chart-title">Trayectoria de la serie · pronóstico vs realidad</div>
-      <div class="ops-chart-subtitle">
+      <div class="card-title">Trayectoria de la serie · pronóstico vs realidad</div>
+      <div class="card-subtitle">
         un origen por semana · demanda de los 7 días siguientes
       </div>
     </div>
@@ -73,9 +73,9 @@ playback is a shareable URL.{% endcomment %}
     intervalo conformal. Identity never rests on colour alone.{% endcomment %}
     <div class="chart-legend">
       <div class="legend-item"><span class="legend-line dashed" style="border-top-color: var(--c-ai)"></span>Predicción</div>
-      <div class="legend-item"><span class="legend-square" style="background: rgba(148,163,184,0.35)"></span>Banda {{ target_pct }}</div>
+      <div class="legend-item"><span class="legend-square" style="background: rgba(var(--rgb-slate), 0.35)"></span>Banda {{ target_pct }}</div>
       <div class="legend-item"><span class="legend-dot" style="background: var(--c-conf)"></span>Real dentro</div>
-      <div class="legend-item"><span class="legend-dot" style="background: #ef4444"></span>Real fuera</div>
+      <div class="legend-item"><span class="legend-dot" style="background: var(--c-crit)"></span>Real fuera</div>
     </div>
 
     <form method="get" action="{% url 'ops' %}"
@@ -108,7 +108,7 @@ playback is a shareable URL.{% endcomment %}
           <span class="tnum" data-field="predicted"></span>
         </div>
         <div class="chart-tooltip-row">
-          <span><span class="chart-tooltip-dot" style="background: rgba(148,163,184,0.55)"></span>banda {{ target_pct }}</span>
+          <span><span class="chart-tooltip-dot" style="background: rgba(var(--rgb-slate), 0.5)"></span>banda {{ target_pct }}</span>
           <span class="tnum" data-field="interval"></span>
         </div>
         <div class="chart-tooltip-row">
@@ -126,7 +126,7 @@ playback is a shareable URL.{% endcomment %}
       </div>
     </div>
   {% else %}
-    <div class="ops-chart-empty">Sin datos para esta serie</div>
+    <div class="card-empty">Sin datos para esta serie</div>
   {% endif %}
 </div>
 

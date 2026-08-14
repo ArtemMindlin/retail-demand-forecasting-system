@@ -353,6 +353,7 @@
   .chart-card {
     position: relative;
     max-width: 1200px;
+    padding: 20px;
   }
   .chart-card::after {
     content: "";
