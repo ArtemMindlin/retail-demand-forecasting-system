@@ -24,7 +24,7 @@
   <script src="{% static 'js/latex.js' %}" defer></script>
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-<div class="app"{% if not show_sidebar %} style="grid-template-columns: 1fr"{% endif %}>
+<div class="app{% if not show_sidebar %} app-solo{% endif %}">
 
   {% if show_sidebar %}{% include "partials/sidebar.html" %}{% endif %}
 

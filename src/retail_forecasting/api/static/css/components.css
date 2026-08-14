@@ -913,6 +913,34 @@ input[type="range"]:focus { outline: none; }
 .dashboard-chart { margin-top: 16px; }
 .card-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
 .chip-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+
+/* Small coloured marks — legend keys, tooltip dots, chips, KPI dots, the terminal's
+   traffic lights — take their colour from `--swatch`, set by one `paint-*` class. This
+   replaces thirty inline `style="background: var(--c-…)"` attributes that hardcoded the
+   palette in the markup, where no stylesheet could find them. */
+.legend-line,
+.legend-square,
+.legend-dot,
+.legend-swatch,
+.chart-tooltip-dot,
+.chip-dot,
+.terminal-dot { background: var(--swatch, var(--c-slate)); }
+.legend-line.dashed { background: transparent; border-top-color: var(--swatch, var(--c-slate)); }
+.kpi-inline-dot { background: var(--swatch, var(--c-inv)); box-shadow: 0 0 8px var(--swatch, var(--c-inv)); }
+/* Text that carries the same identity: a slider's value, a formula's symbol. */
+.paint-text { color: var(--swatch, inherit); }
+
+.paint-inv   { --swatch: var(--c-inv); }
+.paint-conf  { --swatch: var(--c-conf); }
+.paint-ai    { --swatch: var(--c-ai); }
+.paint-drift { --swatch: var(--c-drift); }
+.paint-crit  { --swatch: var(--c-crit); }
+.paint-mute  { --swatch: var(--text-2); }
+/* The conformal band's fill, so a legend key matches what the chart draws. */
+.paint-band  { --swatch: rgba(var(--rgb-slate), 0.35); }
+
+/* The config modal reuses the academic icon tile without a module colour. */
+.academic-icon-plain { border: 1px solid var(--border-2); }
 .chart-legend { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 .legend-item {
   display: flex; align-items: center; gap: 7px;

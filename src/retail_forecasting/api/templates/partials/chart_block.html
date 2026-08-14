@@ -9,7 +9,7 @@ which needs the per-point geometry the server already computed.
       <div class="card-title-row">
         <div class="h-display card-title card-title-hero">Demanda · Real vs Predicha</div>
         <div class="chip">
-          <span class="chip-dot" style="background: var(--c-conf)"></span>
+          <span class="chip-dot paint-conf"></span>
           CONFORMAL {{ params.service_level|floatformat:"1u" }}%
         </div>
       </div>
@@ -19,9 +19,9 @@ which needs the per-point geometry the server already computed.
     </div>
 
     <div class="chart-legend">
-      <div class="legend-item"><span class="legend-line" style="background: var(--c-inv)"></span>Real</div>
-      <div class="legend-item"><span class="legend-line dashed" style="border-top-color: var(--c-ai)"></span>Predicción</div>
-      <div class="legend-item"><span class="legend-square" style="background: rgba(var(--rgb-slate), 0.35)"></span>Intervalo</div>
+      <div class="legend-item"><span class="legend-line paint-inv"></span>Real</div>
+      <div class="legend-item"><span class="legend-line dashed paint-ai"></span>Predicción</div>
+      <div class="legend-item"><span class="legend-square paint-band"></span>Intervalo</div>
     </div>
   </div>
 
@@ -33,15 +33,15 @@ which needs the per-point geometry the server already computed.
     <div class="chart-tooltip" hidden>
       <div class="chart-tooltip-label"></div>
       <div class="chart-tooltip-row">
-        <span><span class="chart-tooltip-dot" style="background: var(--c-inv)"></span>actual</span>
+        <span><span class="chart-tooltip-dot paint-inv"></span>actual</span>
         <span class="tnum" data-field="actual"></span>
       </div>
       <div class="chart-tooltip-row">
-        <span><span class="chart-tooltip-dot" style="background: var(--c-ai)"></span>predicted</span>
+        <span><span class="chart-tooltip-dot paint-ai"></span>predicted</span>
         <span class="tnum" data-field="predicted"></span>
       </div>
       <div class="chart-tooltip-row">
-        <span><span class="chart-tooltip-dot" style="background: var(--text-2)"></span>interval</span>
+        <span><span class="chart-tooltip-dot paint-mute"></span>interval</span>
         <span class="tnum" data-field="interval"></span>
       </div>
     </div>

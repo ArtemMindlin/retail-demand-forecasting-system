@@ -70,7 +70,7 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
           <div class="slider-label">Target Service Level</div>
           <div class="slider-hint">Probabilidad objetivo de no rotura</div>
         </div>
-        <div class="tnum slider-value" style="color: var(--c-conf)"
+        <div class="tnum slider-value paint-text paint-conf"
              x-text="serviceLevel.toFixed(1) + '%'"></div>
       </div>
       <input type="range" name="service_level" min="80" max="99.5" step="0.5"
@@ -84,7 +84,7 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
           <div class="slider-label">Coste de Rotura</div>
           <div class="slider-hint">Penalización por unidad faltante · c_s</div>
         </div>
-        <div class="tnum slider-value" style="color: var(--c-drift)"
+        <div class="tnum slider-value paint-text paint-drift"
              x-text="shortageCost + ' u.m.'"></div>
       </div>
       <input type="range" name="shortage_cost" min="5" max="60" step="1"
@@ -98,7 +98,7 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
           <div class="slider-label">Coste de Almacenamiento</div>
           <div class="slider-hint">Holding cost por unidad/día · c_h</div>
         </div>
-        <div class="tnum slider-value" style="color: var(--c-inv)"
+        <div class="tnum slider-value paint-text paint-inv"
              x-text="holdingCost.toFixed(1) + ' u.m.'"></div>
       </div>
       <input type="range" name="holding_cost" min="1" max="20" step="0.5"
@@ -112,7 +112,7 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
           <div class="slider-label">Capacidad de Almacén</div>
           <div class="slider-hint">Máximo de unidades almacenables</div>
         </div>
-        <div class="tnum slider-value" style="color: var(--c-ai)"
+        <div class="tnum slider-value paint-text paint-ai"
              x-text="(capacity / 1000).toFixed(1) + 'k u'"></div>
       </div>
       <input type="range" name="capacity" min="5000" max="25000" step="500"
@@ -123,11 +123,11 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
     <div class="derived-box">
       <div class="derived-label">derived</div>
       <div class="derived-line">
-        <span style="color: var(--c-ai)">CR*</span> = c_s / (c_s + c_h) =
+        <span class="paint-text paint-ai">CR*</span> = c_s / (c_s + c_h) =
         <span class="tnum derived-value" x-text="criticalRatio"></span>
       </div>
       <div class="derived-line">
-        <span style="color: var(--c-conf)">α</span> = 1 − SL =
+        <span class="paint-text paint-conf">α</span> = 1 − SL =
         <span class="tnum derived-value" x-text="alpha"></span>
       </div>
     </div>

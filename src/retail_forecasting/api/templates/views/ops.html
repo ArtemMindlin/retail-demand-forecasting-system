@@ -62,10 +62,10 @@ playback is a shareable URL.{% endcomment %}
     two charts read as one system: violeta discontinuo = predicción, banda gris-azul =
     intervalo conformal. Identity never rests on colour alone.{% endcomment %}
     <div class="chart-legend">
-      <div class="legend-item"><span class="legend-line dashed" style="border-top-color: var(--c-ai)"></span>Predicción</div>
-      <div class="legend-item"><span class="legend-square" style="background: rgba(var(--rgb-slate), 0.35)"></span>Banda {{ target_pct }}</div>
-      <div class="legend-item"><span class="legend-dot" style="background: var(--c-conf)"></span>Real dentro</div>
-      <div class="legend-item"><span class="legend-dot" style="background: var(--c-crit)"></span>Real fuera</div>
+      <div class="legend-item"><span class="legend-line dashed paint-ai"></span>Predicción</div>
+      <div class="legend-item"><span class="legend-square paint-band"></span>Banda {{ target_pct }}</div>
+      <div class="legend-item"><span class="legend-dot paint-conf"></span>Real dentro</div>
+      <div class="legend-item"><span class="legend-dot paint-crit"></span>Real fuera</div>
     </div>
 
     <form method="get" action="{% url 'ops' %}"
@@ -93,23 +93,23 @@ playback is a shareable URL.{% endcomment %}
       <div class="chart-tooltip" hidden>
         <div class="chart-tooltip-label"></div>
         <div class="chart-tooltip-row">
-          <span><span class="chart-tooltip-dot" style="background: var(--c-ai)"></span>predicción</span>
+          <span><span class="chart-tooltip-dot paint-ai"></span>predicción</span>
           <span class="tnum" data-field="predicted"></span>
         </div>
         <div class="chart-tooltip-row">
-          <span><span class="chart-tooltip-dot" style="background: rgba(var(--rgb-slate), 0.5)"></span>banda {{ target_pct }}</span>
+          <span><span class="chart-tooltip-dot paint-band"></span>banda {{ target_pct }}</span>
           <span class="tnum" data-field="interval"></span>
         </div>
         <div class="chart-tooltip-row">
-          <span><span class="chart-tooltip-dot" style="background: var(--c-conf)"></span>demanda real</span>
+          <span><span class="chart-tooltip-dot paint-conf"></span>demanda real</span>
           <span class="tnum" data-field="actual"></span>
         </div>
         <div class="chart-tooltip-row">
-          <span><span class="chart-tooltip-dot" style="background: var(--text-2)"></span>cobertura</span>
+          <span><span class="chart-tooltip-dot paint-mute"></span>cobertura</span>
           <span data-field="coverage"></span>
         </div>
         <div class="chart-tooltip-row">
-          <span><span class="chart-tooltip-dot" style="background: var(--c-inv)"></span>pedido · coste</span>
+          <span><span class="chart-tooltip-dot paint-inv"></span>pedido · coste</span>
           <span class="tnum"><span data-field="order"></span> · <span data-field="cost"></span></span>
         </div>
       </div>

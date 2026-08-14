@@ -11,6 +11,9 @@
   .app { grid-template-columns: 1fr; }
   .sidebar { position: static !important; height: auto !important; border-right: 0 !important; border-bottom: 1px solid var(--border); }
 }
+/* Views that render without the what-if sidebar. Declared after `.app` so it wins on
+   source order rather than with an `!important`; was an inline style on the element. */
+.app-solo { grid-template-columns: 1fr; }
 
 .sidebar {
   position: sticky;

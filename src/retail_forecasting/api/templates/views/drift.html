@@ -18,28 +18,28 @@
     <div class="kpi-inline-value">
       <span class="tnum h-display">{{ critical_count }}</span>
       <span class="kpi-inline-suffix">/ {{ feature_count }}</span>
-      <span class="kpi-inline-dot" style="background: var(--c-drift); box-shadow: 0 0 8px var(--c-drift)"></span>
+      <span class="kpi-inline-dot paint-drift"></span>
     </div>
   </div>
   <div class="glass kpi-inline">
     <div class="label-mono">PSI promedio</div>
     <div class="kpi-inline-value">
       <span class="tnum h-display">{% if average_psi is not None %}{{ average_psi|floatformat:"3u" }}{% else %}—{% endif %}</span>
-      <span class="kpi-inline-dot" style="background: var(--c-ai); box-shadow: 0 0 8px var(--c-ai)"></span>
+      <span class="kpi-inline-dot paint-ai"></span>
     </div>
   </div>
   <div class="glass kpi-inline">
     <div class="label-mono">Umbral crítico</div>
     <div class="kpi-inline-value">
       <span class="tnum h-display">0.20</span>
-      <span class="kpi-inline-dot" style="background: var(--c-conf); box-shadow: 0 0 8px var(--c-conf)"></span>
+      <span class="kpi-inline-dot paint-conf"></span>
     </div>
   </div>
   <div class="glass kpi-inline">
     <div class="label-mono">Run analizado</div>
     <div class="kpi-inline-value">
       <span class="tnum kpi-inline-run">{{ run_name|default:"—" }}</span>
-      <span class="kpi-inline-dot" style="background: var(--c-inv); box-shadow: 0 0 8px var(--c-inv)"></span>
+      <span class="kpi-inline-dot paint-inv"></span>
     </div>
   </div>
 </div>
@@ -49,7 +49,7 @@
     <div class="h-display drift-panel-title">Features · ordenadas por PSI</div>
     <div class="drift-legend">
       <span><span class="legend-swatch legend-swatch-ref"></span> referencia</span>
-      <span><span class="legend-swatch" style="background: var(--c-drift)"></span> actual</span>
+      <span><span class="legend-swatch paint-drift"></span> actual</span>
     </div>
   </div>
 
