@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -35,18 +36,27 @@ def _settings(tmp_path: Path) -> Settings:
     return Settings(models=ModelConfig(models_dir=tmp_path, tuning_trials=2))
 
 
-def _stub_mean_mae(
-    monkeypatch: pytest.MonkeyPatch, *, default_mae: float, other_mae: float
+def _stub_holdout_maes(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    default_maes: list[float],
+    other_maes: list[float],
 ) -> None:
-    """Score the untuned defaults and everything else at fixed MAEs, to drive the persist gate."""
+    """Score the untuned defaults and everything else at fixed per-draw MAEs.
 
-    def fake_mean_mae(holdouts, params) -> float:
+    One value per validation draw, so the tests drive the bootstrap interval the persist
+    gate decides on -- not just its mean.
+    """
+
+    def fake_holdout_maes(holdouts, params) -> np.ndarray:
         is_default = {k: params[k] for k in DEFAULT_SUPERVISED_LGBM_PARAMS} == dict(
             DEFAULT_SUPERVISED_LGBM_PARAMS
         )
-        return default_mae if is_default else other_mae
+        return np.asarray(default_maes if is_default else other_maes, dtype=float)
 
-    monkeypatch.setattr("retail_forecasting.forecasting.imputation_tuning._mean_mae", fake_mean_mae)
+    monkeypatch.setattr(
+        "retail_forecasting.forecasting.imputation_tuning._holdout_maes", fake_holdout_maes
+    )
 
 
 def test_tune_imputation_lgbm_scores_on_disjoint_holdouts(
@@ -77,7 +87,7 @@ def test_tune_imputation_lgbm_scores_on_disjoint_holdouts(
 def test_tune_imputation_lgbm_persists_params_when_winner_beats_defaults(
     tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _stub_mean_mae(monkeypatch, default_mae=1.0, other_mae=0.5)
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0], other_maes=[0.5, 0.5])
 
     params_path = tune_imputation_lgbm(
         _settings(tmp_path),
@@ -94,12 +104,42 @@ def test_tune_imputation_lgbm_persists_params_when_winner_beats_defaults(
     metadata = json.loads((tmp_path / METADATA_FILENAME).read_text(encoding="utf-8"))
     assert metadata["persisted"] is True
     assert metadata["improvement_pct"] == pytest.approx(-50.0)
+    assert metadata["improvement_ci95"][1] < 0
+
+
+def test_tune_imputation_lgbm_skips_persisting_when_the_gain_could_be_a_coin_flip(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A negative mean is not enough: the interval has to clear zero.
+
+    The gate used to compare point estimates, and passed a winner at -1.14% that measured
+    -0.45% with a straddling interval on fresh draws.
+    """
+    _stub_holdout_maes(
+        monkeypatch,
+        default_maes=[1.0, 1.0, 1.0, 1.0, 1.0],
+        other_maes=[0.5, 1.5, 0.9, 1.1, 0.95],
+    )
+
+    returned = tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=5,
+    )
+
+    metadata = json.loads(returned.read_text(encoding="utf-8"))
+    assert metadata["improvement_pct"] < 0, "the mean improvement is negative..."
+    assert metadata["improvement_ci95"][1] > 0, "...but the interval straddles zero"
+    assert metadata["persisted"] is False
+    assert not (tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME).exists()
 
 
 def test_tune_imputation_lgbm_skips_persisting_when_winner_loses_to_defaults(
     tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _stub_mean_mae(monkeypatch, default_mae=0.5, other_mae=1.0)
+    _stub_holdout_maes(monkeypatch, default_maes=[0.5, 0.5], other_maes=[1.0, 1.0])
 
     returned = tune_imputation_lgbm(
         _settings(tmp_path),
@@ -117,3 +157,25 @@ def test_tune_imputation_lgbm_skips_persisting_when_winner_loses_to_defaults(
     metadata = json.loads(returned.read_text(encoding="utf-8"))
     assert metadata["persisted"] is False
     assert metadata["improvement_pct"] == pytest.approx(100.0)
+
+
+def test_tune_imputation_lgbm_removes_a_superseded_params_file_when_the_gate_fails(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rejected search must not leave an earlier winner in charge of the pipeline."""
+    stale = tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
+    stale.write_text(
+        json.dumps({"n_estimators": 999, "learning_rate": 0.01, "max_depth": 9}), encoding="utf-8"
+    )
+
+    _stub_holdout_maes(monkeypatch, default_maes=[0.5, 0.5], other_maes=[1.0, 1.0])
+
+    tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+    )
+
+    assert not stale.exists()

@@ -233,8 +233,14 @@ See `docs/web_layer.md` for the full description.
     reported -1.4% in-sample measured -0.32% (CI95 crossing zero) on fresh draws. Hence the
     objective averages over `N_SELECTION_HOLDOUTS` draws, `improvement_pct` is computed only on
     the disjoint `N_VALIDATION_HOLDOUTS` draws, and `imputation_lgbm_params.json` is written
-    only when that number is negative. `best_mae_selection` in the metadata is in-sample for
-    the search and must never be quoted as the improvement.
+    only when the bootstrap `improvement_ci95` over those draws lies entirely below zero.
+    `best_mae_selection` in the metadata is in-sample for the search and must never be quoted
+    as the improvement.
+
+    The decision is the interval, not the sign of the mean: a point comparison passed a winner
+    at -1.14% that then measured -0.45% with a straddling interval on fresh draws. The same
+    rule applies to anything read out of this run for the thesis -- an improvement whose
+    interval includes zero is a null result and must be reported as one.
 
 42. The synthetic-censoring holdout cannot rank imputation RECONCILIATION rules -- only
     hyperparameters and teacher models.

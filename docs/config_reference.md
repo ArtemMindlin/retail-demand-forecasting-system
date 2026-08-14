@@ -82,9 +82,11 @@ Semantica:
   el imputador supervisado. Usa solo `split="train"`. El objetivo promedia el MAE
   de reconstruccion sobre varios sorteos de censura sintetica, y el ganador se
   revalida despues contra los defaults sin afinar en sorteos disjuntos: solo se
-  escribe `models.models_dir/imputation_lgbm_params.json` si gana en esa
-  revalidacion. El metadata (`imputation_lgbm_tuning_metadata.json`) se escribe
-  siempre y registra ambas puntuaciones, `improvement_pct` y `persisted`.
+  escribe `models.models_dir/imputation_lgbm_params.json` si el intervalo
+  bootstrap de la mejora (`improvement_ci95`) queda entero por debajo de cero, no
+  basta con que la media sea negativa. El metadata
+  (`imputation_lgbm_tuning_metadata.json`) se escribe siempre y registra ambas
+  puntuaciones, `improvement_pct`, el intervalo y `persisted`.
   La mejora es `improvement_pct`; `best_mae_selection` es in-sample de la
   busqueda y no evidencia ganancia alguna.
 

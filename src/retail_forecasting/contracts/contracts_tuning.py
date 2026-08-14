@@ -66,8 +66,10 @@ class ImputationTuningMetadata(BaseModel):
     Scores are split in two because they answer different questions: ``best_mae_selection`` is
     the objective the search minimized (averaged over the selection holdouts, so it is in-sample
     for the search and cannot evidence a gain), while ``best_mae_validation`` and
-    ``default_mae_validation`` come from holdouts the search never saw and are what
-    ``improvement_pct`` and ``persisted`` are decided on.
+    ``default_mae_validation`` come from holdouts the search never saw. ``persisted`` is
+    decided on ``improvement_ci95`` -- the bootstrap interval of the per-draw difference --
+    rather than on ``improvement_pct``, whose sign alone does not distinguish a real gain
+    from a coin flip.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -78,6 +80,7 @@ class ImputationTuningMetadata(BaseModel):
     best_mae_validation: float = Field(ge=0)
     default_mae_validation: float = Field(ge=0)
     improvement_pct: float
+    improvement_ci95: list[float] = Field(min_length=2, max_length=2)
     persisted: bool
     n_selection_holdouts: int = Field(gt=0)
     n_validation_holdouts: int = Field(gt=0)

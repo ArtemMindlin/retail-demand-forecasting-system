@@ -23,13 +23,16 @@ from retail_forecasting.forecasting.pipeline import _synthetic_censor_holdout
 # over several independent draws shrinks that selection noise by ~sqrt(N).
 N_SELECTION_HOLDOUTS = 5
 
-# Holdouts the search never sees, used only to report whether the winner actually beats the
+# Holdouts the search never sees, used only to decide whether the winner actually beats the
 # untuned defaults. Scoring the winner on the draws that chose it is what made an earlier run
-# report a 1.4% gain that did not replicate.
-N_VALIDATION_HOLDOUTS = 5
+# report a 1.4% gain that did not replicate. Ten rather than five because the decision is a
+# confidence interval over these draws, and five points make a uselessly wide one.
+N_VALIDATION_HOLDOUTS = 10
 
 # Offset keeping validation seeds disjoint from selection seeds derived from the same base seed.
 _VALIDATION_SEED_OFFSET = 10_000
+
+_BOOTSTRAP_RESAMPLES = 10_000
 
 Holdout = tuple[pd.DataFrame, np.ndarray, np.ndarray]
 
@@ -52,14 +55,26 @@ def _build_holdouts(panel: pd.DataFrame, seeds: list[int]) -> list[Holdout]:
     return holdouts
 
 
-def _mean_mae(holdouts: list[Holdout], params: dict[str, int | float]) -> float:
-    """Mean reconstruction MAE of one hyperparameter set across every holdout."""
+def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np.ndarray:
+    """Reconstruction MAE of one hyperparameter set on each holdout, one value per draw."""
     maes = []
     for censored, eval_idx, true_demand in holdouts:
         imputed = LatentDemandImputer(strategy="supervised", lgbm_params=params).impute(censored)
         pred = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
         maes.append(float(np.mean(np.abs(pred - true_demand))))
-    return float(np.mean(maes))
+    return np.asarray(maes, dtype=float)
+
+
+def _mean_mae(holdouts: list[Holdout], params: dict[str, int | float]) -> float:
+    """Mean reconstruction MAE of one hyperparameter set across every holdout."""
+    return float(np.mean(_holdout_maes(holdouts, params)))
+
+
+def _bootstrap_ci95(deltas: np.ndarray, seed: int) -> tuple[float, float]:
+    """Percentile bootstrap CI for the mean of the paired per-holdout MAE differences."""
+    rng = np.random.default_rng(seed)
+    means = rng.choice(deltas, size=(_BOOTSTRAP_RESAMPLES, len(deltas)), replace=True).mean(axis=1)
+    return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
 
 
 def tune_imputation_lgbm(
@@ -83,9 +98,11 @@ def tune_imputation_lgbm(
     trials is an order of magnitude larger than the difference between hyperparameter sets, so
     a single-draw search selects the lucky trial and reports its in-sample score as a gain.
 
-    The winning params are persisted ONLY if they beat the defaults on the validation draws --
-    otherwise the pipeline would silently switch to hyperparameters chosen by noise. The
-    metadata file is written either way, recording both scores and the decision.
+    The winning params are persisted ONLY if the bootstrap CI95 of their per-draw improvement
+    over the defaults lies entirely below zero -- a mean that merely happens to be negative is
+    what a coin flip looks like, and persisting it would silently switch the pipeline to
+    hyperparameters chosen by noise. The metadata file is written either way, recording both
+    scores, the interval and the decision.
 
     Only the winning hyperparameters are persisted (not fitted weights), so
     ``LatentDemandImputer`` still re-fits on each panel's own clean days -- this run only
@@ -140,12 +157,19 @@ def tune_imputation_lgbm(
     )
 
     print("🧪 Scoring the winner and the untuned defaults on the validation holdouts...")
-    best_mae_validation = _mean_mae(validation, best_params.model_dump())
-    default_mae_validation = _mean_mae(validation, dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
+    tuned_maes = _holdout_maes(validation, best_params.model_dump())
+    default_maes = _holdout_maes(validation, dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
+    best_mae_validation = float(np.mean(tuned_maes))
+    default_mae_validation = float(np.mean(default_maes))
     improvement_pct = float(
         (best_mae_validation - default_mae_validation) / default_mae_validation * 100
     )
-    beats_default = best_mae_validation < default_mae_validation
+
+    # Decide on the interval, not the point estimate. A mean that happens to land below zero
+    # is exactly what a coin-flip result looks like: one winner cleared this gate at -1.14%
+    # and then measured -0.45% with a CI straddling zero on fresh draws.
+    ci_lo, ci_hi = _bootstrap_ci95(tuned_maes - default_maes, seed=seed)
+    beats_default = ci_hi < 0.0
 
     metadata = ImputationTuningMetadata(
         n_trials_requested=n_trials,
@@ -153,6 +177,7 @@ def tune_imputation_lgbm(
         best_mae_validation=best_mae_validation,
         default_mae_validation=default_mae_validation,
         improvement_pct=improvement_pct,
+        improvement_ci95=[ci_lo, ci_hi],
         persisted=beats_default,
         n_selection_holdouts=len(selection),
         n_validation_holdouts=len(validation),
@@ -173,17 +198,24 @@ def tune_imputation_lgbm(
 
     print(
         f"\n📏 Validation: tuned={best_mae_validation:.4f} vs "
-        f"default={default_mae_validation:.4f} ({improvement_pct:+.2f}%)"
+        f"default={default_mae_validation:.4f} ({improvement_pct:+.2f}%), "
+        f"CI95 of the difference [{ci_lo:+.4f}, {ci_hi:+.4f}]"
     )
+    params_path = models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
     if not beats_default:
         print(
-            "⚠️  The tuned hyperparameters do NOT beat the untuned defaults out of sample, so "
-            "they were NOT persisted -- the pipeline keeps using the defaults.\n"
+            "⚠️  The tuned hyperparameters do NOT beat the untuned defaults by a margin the "
+            "validation draws can distinguish from zero, so they were NOT persisted -- the "
+            "pipeline keeps using the defaults.\n"
             f"    Decision recorded in: {metadata_path}\n"
         )
+        # A params file from an earlier run would otherwise survive a search that just
+        # failed revalidation, and the pipeline would go on using a winner this run rejected.
+        if params_path.exists():
+            params_path.unlink()
+            print(f"🧹 Removed the superseded params file: {params_path}\n")
         return metadata_path
 
-    params_path = models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
     params_path.write_text(json.dumps(best_params.model_dump(), indent=2), encoding="utf-8")
     print(f"\n✅ Tuned imputation hyperparameters written to: {params_path}\n")
     return params_path
