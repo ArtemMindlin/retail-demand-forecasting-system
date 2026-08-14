@@ -119,3 +119,29 @@ def _first_party_layer(module_name: str | None) -> str | None:
 
     remainder = module_name.removeprefix(prefix)
     return remainder.split(".", maxsplit=1)[0]
+
+
+def test_pipeline_imputers_all_read_the_tuned_params_file() -> None:
+    """Every supervised imputer in the pipeline must resolve the same hyperparameters.
+
+    ``LatentDemandImputer`` silently falls back to the untuned defaults when no
+    ``model_path`` is given, so a call site that omits it runs a DIFFERENT ``supervised``
+    model from the rest of the pipeline -- and the imputation study would then compare a
+    strategy the champion run never uses.
+    """
+    pipeline_path = PACKAGE_ROOT / "forecasting" / "pipeline.py"
+    tree = ast.parse(pipeline_path.read_text(encoding="utf-8"))
+
+    missing = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "LatentDemandImputer"
+        and not any(kw.arg == "model_path" for kw in node.keywords)
+    ]
+
+    assert not missing, (
+        "LatentDemandImputer built without model_path in forecasting/pipeline.py at lines "
+        f"{missing}; pass the tuned-params path so every strategy resolves the same model."
+    )

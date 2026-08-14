@@ -182,10 +182,16 @@ def _synthetic_censor_holdout(
     return censored, eval_idx, true_demand
 
 
-def _evaluate_imputation_quality(panel: pd.DataFrame, seed: int) -> pd.DataFrame:
+def _evaluate_imputation_quality(
+    panel: pd.DataFrame, seed: int, imputer_params_path: Path | None = None
+) -> pd.DataFrame:
     """Score each imputation strategy by direct reconstruction error.
 
     See ``_synthetic_censor_holdout`` for how the ground-truth evaluation set is built.
+
+    ``imputer_params_path`` must be the same tuned-params file the rest of the pipeline
+    uses, or ``supervised`` here would be a different model from the one that runs in
+    production and the comparison would not answer the question it appears to.
 
     Returns a DataFrame: strategy, mae, rmse, bias, mape, n_eval (lower MAE/RMSE = better,
     bias near 0 = unbiased).
@@ -197,7 +203,9 @@ def _evaluate_imputation_quality(panel: pd.DataFrame, seed: int) -> pd.DataFrame
 
     records: list[dict[str, Any]] = []
     for strategy in IMPUTATION_COMPARISON_STRATEGIES:
-        imputed = LatentDemandImputer(strategy=strategy).impute(censored)
+        imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
+            censored
+        )
         pred = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
         err = pred - true_demand
         nonzero = true_demand > 0
@@ -239,10 +247,14 @@ def run_imputation_comparison(settings: Settings) -> Path:
     n_series = panel["series_id"].nunique() if "series_id" in panel.columns else 0
     print(f"✅ Train panel loaded: {len(panel):,} rows, {n_series} series")
 
+    imputer_params_path = settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
+
     frames: list[pd.DataFrame] = []
     for strategy in IMPUTATION_COMPARISON_STRATEGIES:
         print(f"  🧮 Imputing latent demand with strategy: {strategy}...")
-        imputed = LatentDemandImputer(strategy=strategy).impute(panel)
+        imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
+            panel
+        )
         frame = pd.DataFrame(
             {
                 "series_id": imputed["series_id"].astype(str),
@@ -259,7 +271,11 @@ def run_imputation_comparison(settings: Settings) -> Path:
     long_df = pd.concat(frames, ignore_index=True).sort_values(["series_id", "date", "strategy"])
 
     print("  📐 Evaluating reconstruction quality via synthetic censoring of clean days...")
-    quality_df = _evaluate_imputation_quality(panel, seed=settings.project.random_seed)
+    quality_df = _evaluate_imputation_quality(
+        panel,
+        seed=settings.project.random_seed,
+        imputer_params_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
+    )
 
     run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -289,6 +305,7 @@ def evaluate_fair_inventory_cost(
     inventory_config: InventoryConfig,
     seed: int,
     eval_fraction: float = SYNTHETIC_CENSORING_EVAL_FRACTION,
+    imputer_params_path: Path | None = None,
 ) -> pd.DataFrame:
     """Compare strategies on inventory cost against a COMMON ground truth.
 
@@ -349,7 +366,9 @@ def evaluate_fair_inventory_cost(
         ("clipped_scaling", "Latent_clipped_scaling"),
     )
     for strategy, label in strategies:
-        imputed = LatentDemandImputer(strategy=strategy).impute(censored)
+        imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
+            censored
+        )
         signal = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
         q_star = np.maximum(signal + z * sigma, 0.0)
 
@@ -414,7 +433,10 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
     print(f"✅ Panel: {len(panel):,} rows · {n_kept} of {source_series} series (sample)")
 
     result = evaluate_fair_inventory_cost(
-        panel, settings.inventory, seed=settings.project.random_seed
+        panel,
+        settings.inventory,
+        seed=settings.project.random_seed,
+        imputer_params_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
     )
     # Provenance: the ranking flips with the source panel, so the artifact must say
     # which one it came from rather than leaving it to the reader's memory.

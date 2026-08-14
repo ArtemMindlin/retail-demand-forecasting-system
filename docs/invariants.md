@@ -218,6 +218,12 @@ See `docs/web_layer.md` for the full description.
     on the current panel's own clean days, so tuning cannot change the leakage or
     feature-space properties of imputation, only which 3 numbers the fit uses.
 
+    Every `LatentDemandImputer` built in `forecasting/pipeline.py` must be given that
+    params file via `model_path`. The constructor falls back to the untuned defaults when
+    it is omitted, so a call site that forgets it runs a different `supervised` model from
+    the rest of the pipeline -- and the imputation study would be comparing a strategy the
+    champion run never uses. Enforced by `test_pipeline_imputers_all_read_the_tuned_params_file`.
+
 41. The imputation search must select and validate on disjoint synthetic-censoring draws, and
     must not persist a winner that loses to the untuned defaults on the validation draws.
 
