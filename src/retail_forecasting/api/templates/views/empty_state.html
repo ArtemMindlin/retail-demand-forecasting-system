@@ -1,22 +1,27 @@
 {% extends "base.html" %}
+{% comment %}The one empty state. Four near-identical templates used to differ only in
+icon, label, title, body and whether they offered a button — so those are parameters, and
+invariant 32 (name the command that produces the missing artifact) is enforced in one
+place. `command` renders the run-the-pipeline button; `hint` renders a second line.
+{% endcomment %}
 
-{% block title %}Sin predicciones · Forecast.ai{% endblock %}
+{% block title %}{{ page_title|default:"Sin datos" }} · Forecast.ai{% endblock %}
 
 {% block content %}
 <div class="glass empty-state">
-  <div class="empty-state-icon">{% icon "boxes" 28 "var(--c-ai)" 1.5 %}</div>
-  <div class="label-mono">SIN ARTEFACTOS</div>
-  <div class="h-display empty-state-title">Todavía no hay predicciones que mostrar</div>
-  <p class="empty-state-body">
-    No se ha encontrado ningún run con <code>predictions.csv</code> bajo <code>reports/</code>.
-    Lanza el pipeline para generar el primer conjunto de recomendaciones.
-  </p>
+  <div class="empty-state-icon">{% icon icon|default:"boxes" 28 "var(--c-ai)" 1.5 %}</div>
+  <div class="label-mono">{{ label }}</div>
+  <div class="h-display empty-state-title">{{ title }}</div>
+  <p class="empty-state-body">{{ detail }}</p>
+  {% if hint %}<p class="empty-state-body">{{ hint }}</p>{% endif %}
 
-  <button type="button" class="btn-run empty-state-action"
-          hx-post="{% url 'pipeline-run' %}"
-          hx-target="#overlay-slot"
-          hx-swap="innerHTML">
-    {% icon "play" 14 %} Ejecutar pipeline
-  </button>
+  {% if show_run_button %}
+    <button type="button" class="btn-run empty-state-action"
+            hx-post="{% url 'pipeline-run' %}"
+            hx-target="#overlay-slot"
+            hx-swap="innerHTML">
+      {% icon "play" 14 %} Ejecutar pipeline
+    </button>
+  {% endif %}
 </div>
 {% endblock %}

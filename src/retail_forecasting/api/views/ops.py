@@ -16,6 +16,7 @@ from retail_forecasting.api.services.ops import (
     series_trajectory,
     weekly_summary,
 )
+from retail_forecasting.api.views.empty import empty_state
 
 _simulation: OpsSimulation | None = None
 
@@ -90,7 +91,19 @@ def ops(request: HttpRequest) -> HttpResponse:
     try:
         summary = weekly_summary(get_simulation())
     except SimulationNotFoundError as exc:
-        return render(request, "views/ops_missing.html", {"detail": str(exc)}, status=200)
+        return empty_state(
+            request,
+            icon="activity",
+            label="SIN BACKTEST",
+            title="El backtest de producción no se ha ejecutado",
+            detail=(
+                f"{exc} El plano OPS lee "
+                "reports/<run>/simulation/predictions_by_day.parquet, que produce el modo "
+                "simulate_ops del pipeline."
+            ),
+            hint="Genéralo con: make simulate",
+            page_title="Backtest de producción",
+        )
 
     weeks: list[dict[str, Any]] = summary["weeks"]
     cadences: list[str] = summary["cadences"]

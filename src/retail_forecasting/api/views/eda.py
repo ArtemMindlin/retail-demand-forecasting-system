@@ -13,6 +13,7 @@ from retail_forecasting.api import eda_charts
 from retail_forecasting.api.services import eda as eda_service
 from retail_forecasting.api.services.runs import RunNotFoundError
 from retail_forecasting.api.store import get_store
+from retail_forecasting.api.views.empty import empty_state
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,15 @@ def eda(request: HttpRequest) -> HttpResponse:
     try:
         eda_path = store.resolve_eda_run(request.GET.get("run"))
     except RunNotFoundError as exc:
-        return render(request, "views/eda_missing.html", {"detail": str(exc)})
+        return empty_state(
+            request,
+            icon="layers",
+            label="SIN ANÁLISIS EXPLORATORIO",
+            title="No hay ningún run de EDA",
+            detail=str(exc),
+            hint="Genéralo con: make eda",
+            page_title="EDA",
+        )
 
     summary = eda_service.dataset_summary(eda_path)
     stats = [

@@ -17,6 +17,7 @@ from retail_forecasting.api.charts import distribution_chart, forecast_chart, sp
 from retail_forecasting.api.services import forecast as forecast_service
 from retail_forecasting.api.services.runs import ArtifactError
 from retail_forecasting.api.store import get_store
+from retail_forecasting.api.views.empty import empty_state
 
 # Severity colour per PSI status, matching the stylesheet's semantic palette.
 _PSI_STATUS_COLORS = {
@@ -79,7 +80,17 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     data = forecast_service.compute_forecast(grouped, params, selected_sku)
     if data.get("status") == "no_predictions":
-        return render(request, "views/empty_state.html", {"reason": "no_predictions"})
+        return empty_state(
+            request,
+            label="SIN ARTEFACTOS",
+            title="Todavía no hay predicciones que mostrar",
+            detail=(
+                "No se ha encontrado ningún run con predictions.csv bajo reports/. "
+                "Lanza el pipeline para generar el primer conjunto de recomendaciones."
+            ),
+            show_run_button=True,
+            page_title="Sin predicciones",
+        )
 
     chart = forecast_chart(data["forecast"])
     kpis = data["kpis"]
@@ -276,7 +287,17 @@ def skus(request: HttpRequest) -> HttpResponse:
 
     rows = forecast_service.compute_sku_table(grouped, params)
     if not rows:
-        return render(request, "views/empty_state.html", {"reason": "no_predictions"})
+        return empty_state(
+            request,
+            label="SIN ARTEFACTOS",
+            title="Todavía no hay predicciones que mostrar",
+            detail=(
+                "No se ha encontrado ningún run con predictions.csv bajo reports/. "
+                "Lanza el pipeline para generar el primer conjunto de recomendaciones."
+            ),
+            show_run_button=True,
+            page_title="Sin predicciones",
+        )
 
     counts = {
         "all": len(rows),

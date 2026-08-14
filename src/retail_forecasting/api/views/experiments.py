@@ -11,6 +11,7 @@ from retail_forecasting.api import eda_charts
 from retail_forecasting.api.services import experiments as service
 from retail_forecasting.api.services.runs import RunNotFoundError
 from retail_forecasting.api.store import get_store
+from retail_forecasting.api.views.empty import empty_state
 
 
 def _pick_run(available: list[str], requested: str | None) -> str | None:
@@ -27,25 +28,30 @@ def latent(request: HttpRequest) -> HttpResponse:
     run_name = _pick_run(runs, request.GET.get("run"))
 
     if run_name is None:
-        return render(
+        return empty_state(
             request,
-            "views/experiments_missing.html",
-            {
-                "title": "Sin comparación de imputación",
-                "detail": (
-                    "Ningún run contiene latent_strategies.csv. Ese artefacto lo produce el "
-                    "modo de comparación de estrategias de imputación."
-                ),
-            },
+            icon="sigma",
+            label="PLANO DE ANÁLISIS",
+            title="Sin comparación de imputación",
+            detail=(
+                "Ningún run contiene latent_strategies.csv. Ese artefacto lo produce el "
+                "modo de comparación de estrategias de imputación."
+            ),
+            hint=(
+                "Genérala con: uv run python -m retail_forecasting.run "
+                "--config configs/imputation_compare.yaml"
+            ),
         )
 
     try:
         run_path = store.resolve_run(run_name, requires="latent_strategies.csv")
     except RunNotFoundError as exc:
-        return render(
+        return empty_state(
             request,
-            "views/experiments_missing.html",
-            {"title": "Run no encontrado", "detail": str(exc)},
+            icon="sigma",
+            label="PLANO DE ANÁLISIS",
+            title="Run no encontrado",
+            detail=str(exc),
         )
 
     data = service.imputation_strategies(run_path, request.GET.get("series"))
@@ -86,25 +92,27 @@ def pareto(request: HttpRequest) -> HttpResponse:
     run_name = _pick_run(runs, request.GET.get("run"))
 
     if run_name is None:
-        return render(
+        return empty_state(
             request,
-            "views/experiments_missing.html",
-            {
-                "title": "Sin runs de experimento",
-                "detail": (
-                    "Ningún run contiene predictions.csv, metrics_summary.csv y "
-                    "cost_summary.csv a la vez."
-                ),
-            },
+            icon="sigma",
+            label="PLANO DE ANÁLISIS",
+            title="Sin runs de experimento",
+            detail=(
+                "Ningún run contiene predictions.csv, metrics_summary.csv y "
+                "cost_summary.csv a la vez."
+            ),
+            hint="Genéralos con: make run",
         )
 
     try:
         run_path = store.resolve_run(run_name)
     except RunNotFoundError as exc:
-        return render(
+        return empty_state(
             request,
-            "views/experiments_missing.html",
-            {"title": "Run no encontrado", "detail": str(exc)},
+            icon="sigma",
+            label="PLANO DE ANÁLISIS",
+            title="Run no encontrado",
+            detail=str(exc),
         )
 
     front = service.pareto_front(run_path)
