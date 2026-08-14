@@ -1,0 +1,63 @@
+/* Page skeleton: the app grid, the sidebar column, the canvas, the shared grid
+   utilities and the canvas transition. Where things sit, never how they look. */
+
+/* Layout container */
+.app {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 100vh;
+}
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: static !important; height: auto !important; border-right: 0 !important; border-bottom: 1px solid var(--border); }
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.canvas {
+  position: relative;
+  padding: 28px 32px 56px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 720px) {
+  .canvas { padding: 20px 16px 40px; }
+}
+
+/* Grid utilities */
+.grid-kpi {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 1280px) { .grid-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px)  { .grid-kpi { grid-template-columns: 1fr; } }
+
+.grid-academic {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 1100px) { .grid-academic { grid-template-columns: 1fr; } }
+
+/* Transition effect for tabs / SKU changes */
+.canvas-content {
+  opacity: 1;
+  /* `none` (not blur(0)/translateY(0)) so this element does NOT become the
+     containing block for position:fixed children — otherwise modals anchor to
+     this tall panel instead of the viewport and render off-centre (Safari). */
+  filter: none;
+  transform: none;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              filter 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}

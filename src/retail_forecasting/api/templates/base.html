@@ -5,9 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Forecast.ai · Retail Demand Forecasting System{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
+  {% comment %}Load order is the cascade: tokens, then defaults, then layout, then
+  components, then the view-specific rules that may override them.{% endcomment %}
   <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
-  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'css/layout.css' %}">
   <link rel="stylesheet" href="{% static 'css/components.css' %}">
+  <link rel="stylesheet" href="{% static 'css/views.css' %}">
   {% comment %}KaTeX is still loaded from a CDN, exactly as the single-file
   dashboard did. Self-hosting it means vendoring the stylesheet and ~20 font
   files.{% endcomment %}

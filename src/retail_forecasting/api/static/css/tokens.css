@@ -1,0 +1,69 @@
+/* Design tokens: the only place a colour, a font or an alpha is chosen.
+   Eleven channels plus a twelve-step alpha ladder (see the comments inside). No other
+   stylesheet may introduce a raw colour value. */
+
+:root {
+  /* Channels for the alpha ladder below. These eight colours were being retyped as raw
+     rgb() 134 times across the stylesheets, one hue with 17 different alphas, and the
+     same value written two ways (`rgba(255,255,255,0.02)` and `rgba(255, 255, 255,
+     0.02)`) so no search could find both. */
+  --rgb-white:   255, 255, 255;
+  --rgb-black:   0, 0, 0;
+  --rgb-slate:   148, 163, 184;
+  --rgb-inv:     59, 130, 246;
+  --rgb-conf:    16, 185, 129;
+  --rgb-ai:      139, 92, 246;
+  --rgb-drift:   245, 158, 11;
+  --rgb-crit:    239, 68, 68;
+  --rgb-bg-0:    7, 9, 13;
+  --rgb-bg-1:    11, 15, 21;
+  --rgb-surface: 19, 25, 35;
+
+  /* Alpha ladder — every translucent colour uses one of these twelve steps:
+     0.01 0.02 0.04 0.06 0.10 0.16 0.25 0.35 0.5 0.7 0.85 0.96
+     Steps are far enough apart to be visible and close enough to cover every need, so
+     "a slightly stronger tint" means the next step, not a new hand-picked decimal. */
+
+  /* Base — Slate/Zinc dark */
+  --bg-0:        #07090d;
+  --bg-1:        #0b0f15;
+  --bg-2:        #0f141c;
+  --surface:     #131923;
+  --surface-2:   #1a2230;
+  --border:      rgba(var(--rgb-slate), 0.1);
+  --border-2:    rgba(var(--rgb-slate), 0.16);
+  --text-1:      #e7ecf3;
+  --text-2:      #aab4c5;
+  --text-3:      #6b7689;
+  --text-mute:   #4b5468;
+
+  /* Semantic palette */
+  --c-inv:       #3b82f6;  /* Coste de Inventario — azul cobalto */
+  --c-conf:      #10b981;  /* Cobertura Conformal — verde esmeralda */
+  --c-ai:        #8b5cf6;  /* Precisión IA MAE — púrpura neón */
+  --c-drift:     #f59e0b;  /* Alertas Drift — naranja */
+  --c-crit:      #ef4444;  /* Fuera de banda / error — rojo */
+  --c-slate:     #94a3b8;  /* Gris de ejes y rejillas */
+
+  /* Bright ramp (the 400 weights of the same hues). For text and syntax on near-black,
+     where the 500 weight loses contrast. Used to be five anonymous hexes scattered
+     across the code block and the terminal. */
+  --c-inv-bright:   #60a5fa;
+  --c-conf-bright:  #34d399;
+  --c-ai-bright:    #a78bfa;
+  --c-drift-bright: #fbbf24;
+  --c-crit-bright:  #f87171;
+
+  /* Deepest surface: the code block and the terminal body. Was #060810 in one and
+     #030712 in the other — three channel points apart, invisibly different. */
+  --bg-deep:     #050710;
+
+  --c-inv-soft:  rgba(var(--rgb-inv), 0.16);
+  --c-conf-soft: rgba(var(--rgb-conf), 0.16);
+  --c-ai-soft:   rgba(var(--rgb-ai), 0.16);
+  --c-drift-soft:rgba(var(--rgb-drift), 0.16);
+
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+}

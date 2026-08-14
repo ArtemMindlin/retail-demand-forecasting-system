@@ -83,6 +83,30 @@ que lo genera. **No se fabrican datos de relleno.** Un run sin
 `drift_report.json` muestra "sin informe de drift", no un panel vacio que se
 confunda con "cero deriva".
 
+## Hojas de estilo
+
+Cinco ficheros, repartidos **por rol** y cargados en ese orden, que es la cascada:
+
+| Fichero | Que contiene |
+| --- | --- |
+| `tokens.css` | El unico sitio donde se elige un color, una fuente o un alfa: 11 canales `--rgb-*` y la escalera de 12 alfas. Ninguna otra hoja introduce un valor de color crudo |
+| `base.css` | Reset, tipografia, fondo del canvas, `.glass`, `.tnum`, `.label-mono`, scrollbar. Nada con nombre de pieza de UI |
+| `layout.css` | Rejilla de la app, columna del sidebar, canvas, utilidades de rejilla. Donde van las cosas, nunca como se ven |
+| `components.css` | Piezas reutilizables: tarjetas, KPI, cromo de graficos, leyendas, modales, cajones, sliders, botones, consola |
+| `views.css` | Lo especifico de una vista: tabla SKU, drift, OPS, EDA, plano de investigacion, login, referencia de API |
+
+Antes eran dos, `app.css` (heredado del `index.html` monolitico) y `components.css`
+(era Django), **repartidos por tema**: 15 familias de componentes tenian reglas en los
+dos ficheros, asi que cambiar una tarjeta KPI obligaba a editar dos sitios y confiar en
+la cascada. Regla de oro del reparto nuevo: una regla vive en `views.css` solo mientras
+la usa exactamente una vista; cuando la necesita una segunda, se muda a
+`components.css` (asi paso `ops-chart-*` a `card-*`).
+
+Para comprobar un refactor de estilos: `make render-snapshots SNAPSHOT=antes`, cambiar,
+`make render-snapshots SNAPSHOT=despues` y `diff -r`. Un cambio solo-CSS debe dejar los
+12 snapshots identicos byte a byte. Para la cascada, que el HTML no ve, se compara el
+estilo computado de cada elemento en el navegador entre las dos versiones de la hoja.
+
 ## Graficos renderizados en servidor
 
 Todos los graficos son SVG generado en Python. No hay libreria de graficos en el

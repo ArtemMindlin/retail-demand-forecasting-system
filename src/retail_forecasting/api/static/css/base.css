@@ -1,0 +1,64 @@
+/* Element defaults, surfaces and the few genuine utilities: the reset, typography,
+   the canvas backdrop, `.glass`, `.tnum`, `.label-mono`, the scrollbar. Nothing named
+   after a piece of UI belongs here — that is components.css or views.css. */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Subtle dot grid backdrop on canvas */
+.canvas-bg {
+  background-color: var(--bg-1);
+  background-image:
+    radial-gradient(rgba(var(--rgb-slate), 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -8px -8px;
+}
+
+/* Glass surface */
+.glass {
+  background:
+    linear-gradient(180deg, rgba(var(--rgb-white), 0.02), rgba(var(--rgb-white), 0.01)),
+    rgba(var(--rgb-surface), 0.7);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-radius: 14px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(var(--rgb-slate), 0.1); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(var(--rgb-slate), 0.25); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Tabular numbers */
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Title and section labels */
+.label-mono {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.h-display { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.01em; }
+
+/* Subtle terminal cursor */
+.blink-cursor::after {
+  content: "▍";
+  color: var(--c-conf);
+  margin-left: 2px;
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
