@@ -62,3 +62,24 @@ def _tracked_files() -> list[str]:
 
 def _is_generated_artifact(path: str) -> bool:
     return path.endswith(".DS_Store") or path.startswith(GENERATED_PREFIXES)
+
+
+def test_the_suite_cannot_overwrite_the_operational_models() -> None:
+    """No test may write into the repo's own ``models/`` directory.
+
+    ``ModelConfig.models_dir`` defaults to a relative ``Path("models")`` and
+    ``run_experiment_from_frame`` persists every model it trains there unconditionally, so
+    a test that builds Settings without naming a directory silently replaced the served
+    champions with models fitted on a 3-series synthetic panel. Nothing failed when it
+    happened: the files are gitignored and the assertions still passed. The autouse
+    ``_models_dir_never_points_at_the_repo`` fixture redirects the default; this asserts
+    the redirect is actually in force.
+    """
+    from retail_forecasting.contracts.contracts_config import ModelConfig
+
+    default_dir = ModelConfig().models_dir.resolve()
+
+    assert default_dir != (REPO_ROOT / "models").resolve(), (
+        "The default models_dir still points at the repo's operational models directory; "
+        "a training test would overwrite the served champions."
+    )

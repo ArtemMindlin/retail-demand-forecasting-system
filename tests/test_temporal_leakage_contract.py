@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -162,7 +164,7 @@ def test_calibration_split_embargoes_the_horizon() -> None:
     assert latest_training_target_end < calib["date"].min()
 
 
-def test_forecast_metrics_cover_every_validation_origin() -> None:
+def test_forecast_metrics_cover_every_validation_origin(tmp_path: Path) -> None:
     """Forecast metrics must summarize all validation origins, not the decision subset.
 
     The dynamic Order-Up-To simulation narrows the frame to one order per series and
@@ -172,7 +174,7 @@ def test_forecast_metrics_cover_every_validation_origin() -> None:
     panel = make_synthetic_panel(num_series=3, num_days=90)
     settings = Settings(
         dataset=DatasetConfig(top_n_series=3, min_history_days=70, horizon=7),
-        models=ModelConfig(use_tuning=False),
+        models=ModelConfig(use_tuning=False, models_dir=tmp_path / "models"),
         reporting=ReportingConfig(make_plots=False),
     )
 

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import django
 import numpy as np
 import pandas as pd
+import pytest
+
+from retail_forecasting.contracts.contracts_config import ModelConfig
 
 # Configure Django before any test imports a view or the ORM-free settings.
 # Values here are test-only: a throwaway password and non-secure cookies so the
@@ -16,6 +20,28 @@ os.environ.setdefault("AUTH_USERNAME", "test-operator")
 os.environ.setdefault("AUTH_PASSWORD", "test-password")
 os.environ.setdefault("COOKIE_SECURE", "false")
 django.setup()
+
+REPO_MODELS_DIR = Path(__file__).resolve().parents[1] / "models"
+
+
+@pytest.fixture(autouse=True)
+def _models_dir_never_points_at_the_repo(tmp_path_factory, monkeypatch) -> None:
+    """Redirect the default models directory away from the repo's own ``models/``.
+
+    ``ModelConfig.models_dir`` defaults to a RELATIVE ``Path("models")`` and
+    ``run_experiment_from_frame`` persists every model it trains there unconditionally.
+    Any test that builds Settings without naming a directory therefore overwrote the
+    operational champions with models fitted on a 3-series synthetic panel -- silently,
+    since the files are gitignored and the suite still passed. This backstop makes that
+    impossible for tests that forget; tests that train should still pass models_dir
+    explicitly so the intent is visible at the call site.
+    """
+    sandbox = tmp_path_factory.mktemp("models_dir_default")
+    field = ModelConfig.model_fields["models_dir"]
+    monkeypatch.setattr(field, "default", sandbox)
+    ModelConfig.model_rebuild(force=True)
+    yield
+    ModelConfig.model_rebuild(force=True)
 
 
 def make_synthetic_panel(num_series: int = 3, num_days: int = 70) -> pd.DataFrame:

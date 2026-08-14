@@ -23,7 +23,7 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
             horizon=7,
         ),
         # Keep the smoke run fast and deterministic: no Optuna tuning.
-        models=ModelConfig(use_tuning=False),
+        models=ModelConfig(use_tuning=False, models_dir=tmp_path / "models"),
         reporting=ReportingConfig(
             output_dir=tmp_path,
             run_name="smoke_test",
@@ -124,6 +124,7 @@ def test_smoke_run_serializes_tuning_metadata(tmp_path: Path) -> None:
         models=ModelConfig(
             use_tuning=True,
             tuning_trials=2,
+            models_dir=tmp_path / "models",
         ),
         reporting=ReportingConfig(
             output_dir=tmp_path,
