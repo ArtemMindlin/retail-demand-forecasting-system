@@ -49,15 +49,7 @@ playback is a shareable URL.{% endcomment %}
   <input type="hidden" name="series" value="{{ series_id|default:'' }}">
 </form>
 
-<div class="ops-kpis">
-  {% for kpi in kpis %}
-    <div class="glass ops-kpi">
-      <div class="ops-kpi-label">{{ kpi.label }}</div>
-      <div class="tnum ops-kpi-value" style="color: {{ kpi.color }}">{{ kpi.value }}</div>
-      <div class="ops-kpi-sub">{{ kpi.sub }}</div>
-    </div>
-  {% endfor %}
-</div>
+{% include "partials/kpi_grid.html" with kpi_cards=kpis kpi_grid_class="view-kpis" %}
 
 <div class="glass chart-card">
   <div class="card-head">

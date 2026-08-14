@@ -771,14 +771,6 @@
 .ops-week input[type="range"] { flex: 1; }
 .ops-week-label { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); white-space: nowrap; }
 .ops-partial { font-size: 10px; color: var(--c-drift); font-family: var(--font-mono); }
-.ops-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 22px; }
-.ops-kpi { padding: 14px 18px; }
-.ops-kpi-label {
-  font-size: 10px; color: var(--text-3); font-family: var(--font-mono);
-  margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em;
-}
-.ops-kpi-value { font-size: 22px; font-weight: 700; font-family: var(--font-display); }
-.ops-kpi-sub { font-size: 10.5px; color: var(--text-mute); margin-top: 2px; }
 /* Card chrome, shared by every card in every view. These used to be two divergent sets:
    `.chart-head/.chart-title/.chart-subtitle` on the dashboard, and
    `.ops-chart-head/.ops-chart-title/.ops-chart-subtitle/.ops-chart-empty`, which despite

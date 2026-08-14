@@ -49,7 +49,12 @@ def _coverage_color(coverage: float | None, target: float) -> str:
         return "var(--c-conf)"
     if realized >= target - 0.25:
         return "var(--c-drift)"
-    return "#ef4444"
+    return "var(--c-crit)"
+
+
+def _ops_kpi(label: str, value: str, sub: str, color: str) -> dict[str, Any]:
+    """One card for the shared KPI grid: colour on the accent bar and on the value."""
+    return {"label": label, "value": value, "sub": sub, "color": color, "value_color": color}
 
 
 def _savings_kpi(comparison: dict[str, Any]) -> tuple[str, str, str]:
@@ -120,31 +125,29 @@ def ops(request: HttpRequest) -> HttpResponse:
     chart = ops_trajectory_chart(points, week_index)
     savings, savings_sub, savings_color = _savings_kpi(summary.get("comparison", {}))
 
+    # Same card component as the dashboard (partials/kpi_grid.html). These carry no delta:
+    # a backtest origin has no previous period to compare itself against, which is why this
+    # view used to own a third KPI implementation.
     kpis = [
-        {
-            "label": "Cobertura realizada",
-            "value": _pct(block.get("coverage")),
-            "sub": f"objetivo {_pct(target)}",
-            "color": _coverage_color(block.get("coverage"), target),
-        },
-        {
-            "label": "Coste de inventario (sem.)",
-            "value": f"{_num(block.get('total_cost'))} u.m.",
-            "sub": "política producción" if cadence == "every_7d" else "sin reentreno",
-            "color": "var(--c-inv)",
-        },
-        {
-            "label": "MAE demanda lead-time",
-            "value": _num(block.get("mae")),
-            "sub": f"{block.get('n_series', 0)} series",
-            "color": "var(--c-ai)",
-        },
-        {
-            "label": "Ahorro vs sin reentreno",
-            "value": savings,
-            "sub": savings_sub,
-            "color": savings_color,
-        },
+        _ops_kpi(
+            "Cobertura realizada",
+            _pct(block.get("coverage")),
+            f"objetivo {_pct(target)}",
+            _coverage_color(block.get("coverage"), target),
+        ),
+        _ops_kpi(
+            "Coste de inventario (sem.)",
+            f"{_num(block.get('total_cost'))} u.m.",
+            "política producción" if cadence == "every_7d" else "sin reentreno",
+            "var(--c-inv)",
+        ),
+        _ops_kpi(
+            "MAE demanda lead-time",
+            _num(block.get("mae")),
+            f"{block.get('n_series', 0)} series",
+            "var(--c-ai)",
+        ),
+        _ops_kpi("Ahorro vs sin reentreno", savings, savings_sub, savings_color),
     ]
 
     return render(

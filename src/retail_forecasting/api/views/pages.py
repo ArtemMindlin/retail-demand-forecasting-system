@@ -54,6 +54,7 @@ def _kpi_card(
         "suffix": suffix,
         "color": color,
         "sub": sub,
+        "dot": True,
         "delta_icon": "arrowUp" if is_up else "arrowDown",
         "delta_good": good,
         "delta_text": f"{abs(delta):.{delta_decimals}f}{delta_unit}",
