@@ -13,10 +13,10 @@ from retail_forecasting.data.censorship import (
     DEFAULT_SUPERVISED_LGBM_PARAMS,
     IMPUTATION_LGBM_PARAMS_FILENAME,
     LatentDemandImputer,
+    _synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.evaluation.reporting import get_git_commit, utc_timestamp
-from retail_forecasting.forecasting.pipeline import _synthetic_censor_holdout
 
 # A single synthetic-censoring draw scores ~650 rows, and the trial-to-trial MAE spread on one
 # draw (12-40%) dwarfs the ~1% differences between hyperparameter sets. Averaging the objective
@@ -85,12 +85,6 @@ def tune_imputation_lgbm(
     n_validation_holdouts: int = N_VALIDATION_HOLDOUTS,
 ) -> Path:
     """Search LGBM hyperparameters for the supervised imputer and persist the winner.
-
-    Uses only the ``train`` split (never ``eval``, per the eval-holdout invariant in
-    docs/invariants.md) and scores each trial with the same synthetic-censoring
-    reconstruction error used by ``_evaluate_imputation_quality``: held-out clean days are
-    synthetically censored so the true demand is known, and each trial's MAE against that
-    ground truth is what Optuna minimizes.
 
     The objective averages that MAE over ``n_selection_holdouts`` independent draws, and the
     winner is then re-scored against the untuned defaults on ``n_validation_holdouts`` further

@@ -27,6 +27,45 @@ DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
 # settings.models.models_dir; shared so producer and consumers never drift apart.
 IMPUTATION_LGBM_PARAMS_FILENAME = "imputation_lgbm_params.json"
 
+SYNTHETIC_CENSORING_EVAL_FRACTION = 0.30
+
+
+def _synthetic_censor_holdout(
+    panel: pd.DataFrame, seed: int, eval_fraction: float = SYNTHETIC_CENSORING_EVAL_FRACTION
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+    """Hold out a sample of CLEAN days and synthetically censor them.
+
+    Latent demand on real stockouts is an unobserved counterfactual, so imputation quality
+    can only be scored on days where the true demand is actually known: clean days. Each
+    held-out clean day is assigned a stockout ratio sampled from the empirical distribution
+    of real stockouts, and its sale is reduced proportionally -- giving a synthetic stand-in
+    for a censored day with a known ground truth, reusable by any strategy-scoring function.
+
+    Returns (censored_panel, eval_idx, true_demand); eval_idx/true_demand are empty when the
+    panel has no clean or no censored rows to draw the synthetic ratio from.
+    """
+    rng = np.random.default_rng(seed)
+    clean_mask = panel["stockout_hours"] == 0
+    real_ratios = (
+        (panel.loc[panel["stockout_hours"] > 0, "stockout_hours"] / OPERATIVE_WINDOW_HOURS)
+        .clip(0, 1)
+        .to_numpy()
+    )
+    clean_idx = panel.index[clean_mask].to_numpy()
+    if len(clean_idx) == 0 or len(real_ratios) == 0:
+        return panel.copy(), np.array([], dtype=int), np.array([], dtype=float)
+
+    n_eval = max(1, int(len(clean_idx) * eval_fraction))
+    eval_idx = rng.choice(clean_idx, size=n_eval, replace=False)
+    sampled_ratios = rng.choice(real_ratios, size=n_eval, replace=True)
+
+    true_demand = panel.loc[eval_idx, "observed_demand"].astype(float).to_numpy()
+
+    censored = panel.copy()
+    censored.loc[eval_idx, "stockout_hours"] = sampled_ratios * OPERATIVE_WINDOW_HOURS
+    censored.loc[eval_idx, "observed_demand"] = true_demand * (1.0 - sampled_ratios)
+    return censored, eval_idx, true_demand
+
 
 class LatentDemandImputer:
     """Imputes latent demand for periods with stockouts using various strategies.
