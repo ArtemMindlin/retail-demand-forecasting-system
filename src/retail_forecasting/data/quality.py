@@ -78,6 +78,22 @@ def validate_prepared_panel(panel: pd.DataFrame, settings: Settings) -> DataQual
             )
         )
 
+    if "stockout_hours" in panel.columns:
+        invalid_stockouts = int(
+            ((panel["stockout_hours"] < 0) | (panel["stockout_hours"] > 16.0)).sum()
+        )
+        if invalid_stockouts > 0:
+            blocking_errors.append(
+                DataQualityIssue(
+                    severity="blocking",
+                    code="invalid_stockout_hours",
+                    message=(
+                        f"Prepared panel contains {invalid_stockouts} rows with stockout_hours "
+                        "outside the valid range [0, 16]."
+                    ),
+                )
+            )
+
     missing_fractions = panel.isna().mean(numeric_only=False)
     warned_columns = [
         f"{column}={fraction:.3f}"

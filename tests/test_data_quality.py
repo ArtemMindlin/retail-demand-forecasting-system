@@ -29,6 +29,17 @@ def test_validate_prepared_panel_blocks_duplicate_series_dates() -> None:
     assert report.blocking_errors[0].code == "duplicate_series_date_rows"
 
 
+def test_validate_prepared_panel_blocks_invalid_stockout_hours() -> None:
+    panel = make_synthetic_panel(num_series=2, num_days=80)
+    panel.loc[0, "stockout_hours"] = 20.0
+    settings = Settings()
+
+    report = validate_prepared_panel(panel, settings)
+
+    assert report.passed is False
+    assert any(issue.code == "invalid_stockout_hours" for issue in report.blocking_errors)
+
+
 def test_validate_prepared_panel_warns_on_high_missingness() -> None:
     panel = make_synthetic_panel(num_series=2, num_days=80)
     panel["discount"] = pd.NA

@@ -5,6 +5,7 @@ import hashlib
 import pandas as pd
 
 from retail_forecasting.config import DatasetConfig, PreprocessingConfig
+from retail_forecasting.data.censorship import OPERATIVE_WINDOW_HOURS
 
 STATIC_ID_COLUMNS = [
     "city_id",
@@ -124,6 +125,9 @@ def prepare_daily_panel(
         for column in zero_fill_columns:
             if column in panel.columns:
                 panel[column] = panel[column].fillna(0.0)
+
+        if "stockout_hours" in panel.columns:
+            panel["stockout_hours"] = panel["stockout_hours"].clip(0.0, OPERATIVE_WINDOW_HOURS)
 
         if "discount" in panel.columns:
             panel["discount"] = panel["discount"].fillna(1.0)

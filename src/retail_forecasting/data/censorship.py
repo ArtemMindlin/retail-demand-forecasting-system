@@ -44,10 +44,8 @@ def _synthetic_censor_holdout(
     rng = np.random.default_rng(seed)
     clean_mask = panel["stockout_hours"] == 0
     real_ratios = (
-        (panel.loc[panel["stockout_hours"] > 0, "stockout_hours"] / OPERATIVE_WINDOW_HOURS)
-        .clip(0, 1)
-        .to_numpy()
-    )
+        panel.loc[panel["stockout_hours"] > 0, "stockout_hours"] / OPERATIVE_WINDOW_HOURS
+    ).to_numpy()
     clean_idx = panel.index[clean_mask].to_numpy()
     if len(clean_idx) == 0 or len(real_ratios) == 0:
         return panel.copy(), np.array([], dtype=int), np.array([], dtype=float)
