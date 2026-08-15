@@ -43,10 +43,8 @@ def _synthetic_censor_holdout(
     """
     rng = np.random.default_rng(seed)
     clean_mask = panel["stockout_hours"] == 0
-    real_ratios = (
-        panel.loc[panel["stockout_hours"] > 0, "stockout_hours"] / OPERATIVE_WINDOW_HOURS
-    ).to_numpy()
-    clean_idx = panel.index[clean_mask].to_numpy()
+    real_ratios = panel.loc[panel["stockout_hours"] > 0, "stockout_hours"] / OPERATIVE_WINDOW_HOURS
+    clean_idx = panel.index[clean_mask]
     if len(clean_idx) == 0 or len(real_ratios) == 0:
         return panel.copy(), np.array([], dtype=int), np.array([], dtype=float)
 
@@ -54,7 +52,7 @@ def _synthetic_censor_holdout(
     eval_idx = rng.choice(clean_idx, size=n_eval, replace=False)
     sampled_ratios = rng.choice(real_ratios, size=n_eval, replace=True)
 
-    true_demand = panel.loc[eval_idx, "observed_demand"].astype(float).to_numpy()
+    true_demand = panel.loc[eval_idx, "observed_demand"].to_numpy()
 
     censored = panel.copy()
     censored.loc[eval_idx, "stockout_hours"] = sampled_ratios * OPERATIVE_WINDOW_HOURS
@@ -212,9 +210,9 @@ class LatentDemandImputer:
         predicted_latent = np.asarray(self.model.predict(X_censored), dtype=float)
 
         df.loc[is_censored, "latent_demand_est"] = self._reconcile_with_severity(
-            observed=df.loc[is_censored, self.target_col].astype(float).to_numpy(),
+            observed=df.loc[is_censored, self.target_col].to_numpy(),
             predicted_full_day=predicted_latent,
-            stockout_hours=df.loc[is_censored, self.stockout_col].astype(float).to_numpy(),
+            stockout_hours=df.loc[is_censored, self.stockout_col].to_numpy(),
         )
         df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, self.target_col]
         return df
