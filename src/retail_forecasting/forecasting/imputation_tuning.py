@@ -18,18 +18,13 @@ from retail_forecasting.data.censorship import (
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.evaluation.reporting import get_git_commit, utc_timestamp
 
-# A single synthetic-censoring draw scores ~650 rows, and the trial-to-trial MAE spread on one
-# draw (12-40%) dwarfs the ~1% differences between hyperparameter sets. Averaging the objective
-# over several independent draws shrinks that selection noise by ~sqrt(N).
+# Number of selection holdouts used to average trial MAE and shrink selection noise.
 N_SELECTION_HOLDOUTS = 5
 
-# Holdouts the search never sees, used only to decide whether the winner actually beats the
-# untuned defaults. Scoring the winner on the draws that chose it is what made an earlier run
-# report a 1.4% gain that did not replicate. Ten rather than five because the decision is a
-# confidence interval over these draws, and five points make a uselessly wide one.
+# Validation holdouts unseen by Optuna used for statistical decision against defaults.
 N_VALIDATION_HOLDOUTS = 10
 
-# Offset keeping validation seeds disjoint from selection seeds derived from the same base seed.
+# Offset ensuring validation seeds remain disjoint from selection seeds.
 _VALIDATION_SEED_OFFSET = 10_000
 
 _BOOTSTRAP_RESAMPLES = 10_000

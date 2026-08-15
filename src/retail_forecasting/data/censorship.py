@@ -8,23 +8,20 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
-# The dataset records stock availability over the 6:00–22:00 operative window (16 hours).
-# stockout_hours is counted within that window, so this is its normalizing denominator.
+# Normalizing denominator for 16-hour operative window (6:00-22:00).
 OPERATIVE_WINDOW_HOURS = 16.0
 
 # Single source of truth for the latent-demand imputation strategies.
 ImputationStrategy = Literal["supervised", "historical_mean", "clipped_scaling", "none"]
 
-# Defaults used by the supervised strategy's LGBM teacher model when no tuned
-# hyperparameters are supplied (never empirically tuned; see imputation_tuning.py).
+# Untuned default LGBM hyperparameters for supervised imputation.
 DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
     "n_estimators": 200,
     "learning_rate": 0.05,
     "max_depth": 6,
 }
 
-# Filename convention for the tuned hyperparameters written by imputation_tuning.py under
-# settings.models.models_dir; shared so producer and consumers never drift apart.
+# Shared filename convention for persisted tuned imputation hyperparameters.
 IMPUTATION_LGBM_PARAMS_FILENAME = "imputation_lgbm_params.json"
 
 SYNTHETIC_CENSORING_EVAL_FRACTION = 0.30
