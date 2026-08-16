@@ -60,11 +60,6 @@ def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np
     return np.asarray(maes, dtype=float)
 
 
-def _mean_mae(holdouts: list[Holdout], params: dict[str, int | float]) -> float:
-    """Mean reconstruction MAE of one hyperparameter set across every holdout."""
-    return float(np.mean(_holdout_maes(holdouts, params)))
-
-
 def _bootstrap_ci95(deltas: np.ndarray, seed: int) -> tuple[float, float]:
     """Percentile bootstrap CI for the mean of the paired per-holdout MAE differences."""
     rng = np.random.default_rng(seed)
@@ -129,7 +124,7 @@ def tune_imputation_lgbm(
             "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.2, log=True),
             "max_depth": trial.suggest_int("max_depth", 3, 12),
         }
-        return _mean_mae(selection, params)
+        return float(np.mean(_holdout_maes(selection, params)))
 
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=seed))
     study.optimize(objective, n_trials=n_trials)
