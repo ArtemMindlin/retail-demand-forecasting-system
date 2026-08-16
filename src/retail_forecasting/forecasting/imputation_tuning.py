@@ -55,8 +55,8 @@ def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np
     maes = []
     for censored, eval_idx, true_demand in holdouts:
         imputed = LatentDemandImputer(strategy="supervised", lgbm_params=params).impute(censored)
-        pred = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
-        maes.append(float(np.mean(np.abs(pred - true_demand))))
+        pred = imputed.loc[eval_idx, "latent_demand_est"].to_numpy(dtype=float)
+        maes.append(np.mean(np.abs(pred - true_demand)))
     return np.asarray(maes, dtype=float)
 
 
