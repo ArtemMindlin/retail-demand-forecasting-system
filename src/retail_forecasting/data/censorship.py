@@ -195,12 +195,18 @@ class LatentDemandImputer:
         y_train = train_df[self.target_col]
 
         params = self._resolve_lgbm_params()
+        # Single-threaded on purpose: the teacher trains on one panel's clean days, and at
+        # that width LightGBM spends more time synchronising threads than splitting nodes.
+        # Measured 18x faster at 1.5k train rows and still 4.4x at 46k (the 500-series
+        # panel), with bit-identical predictions. Revisit above ~200k rows, where the two
+        # converge.
         self.model = lgb.LGBMRegressor(
             n_estimators=int(params["n_estimators"]),
             learning_rate=float(params["learning_rate"]),
             max_depth=int(params["max_depth"]),
             random_state=42,
             verbosity=-1,
+            n_jobs=1,
         )
         self.model.fit(X_train, y_train)
 
