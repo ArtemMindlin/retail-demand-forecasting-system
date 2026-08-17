@@ -76,6 +76,7 @@ ml = [
   "xgboost>=2.1.0",
   # Optuna's GPSampler backend, used only by the offline imputation tuning entry point.
   "torch>=2.2.0",
+  "greenlet>=3.0.0",
 ]
 
 [project.scripts]
