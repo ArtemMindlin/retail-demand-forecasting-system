@@ -36,34 +36,6 @@ _N_STARTUP_TRIALS = 5
 Holdout = tuple[pd.DataFrame, np.ndarray, np.ndarray]
 
 
-def _build_sampler(seed: int) -> optuna.samplers.BaseSampler:
-    """GP sampler for the search.
-
-    GP over TPE: 3 low-dimensional params and a costly objective (one LGBM fit per selection
-    holdout per trial) under a budget of tens of trials, where TPE would still be in its random
-    startup phase. GP also models the n_estimators/learning_rate correlation, which TPE ignores
-    by default.
-
-    ``deterministic_objective`` is left at its default False: the objective averages several
-    holdouts but stays noisy, and declaring it deterministic would make the GP interpolate that
-    noise instead of smoothing it.
-    """
-    try:
-        import torch
-    except ModuleNotFoundError as exc:  # pragma: no cover - depends on the installed extras
-        raise ModuleNotFoundError(
-            "Imputation tuning uses Optuna's GPSampler, which needs PyTorch. Install the "
-            "optional ML backends with: uv sync --extra dev --extra ml"
-        ) from exc
-
-    # LightGBM and torch each bring their own OpenMP runtime, and on macOS the two loaded in one
-    # process segfault the moment the GP fits (KMP_DUPLICATE_LIB_OK does not help). Confining
-    # torch to one thread avoids it, and costs nothing here: the GP fit is milliseconds next to
-    # the LGBM fits it is choosing between, which are themselves single-threaded.
-    torch.set_num_threads(1)
-    return optuna.samplers.GPSampler(seed=seed, n_startup_trials=_N_STARTUP_TRIALS)
-
-
 def _build_holdouts(panel: pd.DataFrame, seeds: list[int]) -> list[Holdout]:
     """Draw one synthetic-censoring holdout per seed.
 
@@ -158,7 +130,30 @@ def tune_imputation_lgbm(
         }
         return float(np.mean(_holdout_maes(selection, params)))
 
-    study = optuna.create_study(direction="minimize", sampler=_build_sampler(seed))
+    try:
+        import torch
+    except ModuleNotFoundError as exc:  # pragma: no cover - depends on the installed extras
+        raise ModuleNotFoundError(
+            "Imputation tuning uses Optuna's GPSampler, which needs PyTorch. Install the "
+            "optional ML backends with: uv sync --extra dev --extra ml"
+        ) from exc
+
+    # LightGBM and torch each bring their own OpenMP runtime, and on macOS the two loaded in one
+    # process segfault the moment the GP fits (KMP_DUPLICATE_LIB_OK does not help). Confining
+    # torch to one thread avoids it, and costs nothing here: the GP fit is milliseconds next to
+    # the LGBM fits it is choosing between, which are themselves single-threaded.
+    torch.set_num_threads(1)
+
+    # GP over TPE: 3 low-dimensional params and a costly objective (one LGBM fit per selection
+    # holdout per trial) under a budget of tens of trials, where TPE would still be in its random
+    # startup phase. GP also models the n_estimators/learning_rate correlation, which TPE ignores
+    # by default. deterministic_objective stays at its default False: the objective averages
+    # several holdouts but stays noisy, and calling it deterministic would make the GP interpolate
+    # that noise instead of smoothing it.
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=optuna.samplers.GPSampler(seed=seed, n_startup_trials=_N_STARTUP_TRIALS),
+    )
     study.optimize(objective, n_trials=n_trials)
 
     best_params = BoostingParams(
