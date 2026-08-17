@@ -139,7 +139,7 @@ def tune_imputation_lgbm(
             "n_estimators": trial.suggest_int("n_estimators", 50, 8000),
             "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
             "max_depth": trial.suggest_int("max_depth", 2, 8),
-            "num_leaves": trial.suggest_int("num_leaves", 8, 256, log=True),
+            "num_leaves": trial.suggest_int("num_leaves", 4, 256, log=True),
             "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
             "colsample_bytree": trial.suggest_float("colsample_bytree", 0.4, 1.0),
             "subsample": subsample,
