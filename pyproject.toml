@@ -67,6 +67,10 @@ Changelog = "https://github.com/ArtemMindlin/retail-demand-forecasting-system/bl
 dev = [
   "pytest>=8.3.0",
   "pytest-cov>=5.0.0",
+  # Kernel backing the notebooks/ walkthroughs. Declared here rather than in its own extra so
+  # that every documented sync command installs it: `uv sync` prunes whatever the lock does not
+  # carry, and an ad-hoc install would be silently removed the next time anyone syncs.
+  "ipykernel>=6.29.0",
 ]
 ml = [
   "xgboost>=2.1.0",
