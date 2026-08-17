@@ -134,12 +134,21 @@ def tune_imputation_lgbm(
     # ranges from the widened run: that run's winner sat deep in the interior on both (2659,
     # 0.0043), away from either edge.
     def objective(trial: optuna.Trial) -> float:
+        subsample = trial.suggest_float("subsample", 0.4, 1.0)
         params = {
             "n_estimators": trial.suggest_int("n_estimators", 50, 3000),
             "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
             "max_depth": trial.suggest_int("max_depth", 2, 8),
             "num_leaves": trial.suggest_int("num_leaves", 8, 256, log=True),
             "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.4, 1.0),
+            "subsample": subsample,
+            "subsample_freq": 1 if subsample < 1.0 else 0,
+            "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+            "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+            "min_data_per_group": trial.suggest_int("min_data_per_group", 5, 100),
+            "cat_smooth": trial.suggest_float("cat_smooth", 1.0, 50.0),
+            "max_bin": trial.suggest_int("max_bin", 31, 255),
         }
         return float(np.mean(_holdout_maes(selection, params)))
 
@@ -157,30 +166,40 @@ def tune_imputation_lgbm(
     # the LGBM fits it is choosing between, which are themselves single-threaded.
     torch.set_num_threads(1)
 
-    # GP over TPE: 3 low-dimensional params and a costly objective (one LGBM fit per selection
+    # GP over TPE: low-dimensional params and a costly objective (one LGBM fit per selection
     # holdout per trial) under a budget of tens of trials, where TPE would still be in its random
-    # startup phase. GP also models the n_estimators/learning_rate correlation, which TPE ignores
-    # by default. deterministic_objective stays at its default False: the objective averages
-    # several holdouts but stays noisy, and calling it deterministic would make the GP interpolate
-    # that noise instead of smoothing it.
+    # startup phase. GP also models correlations between hyperparameters.
     study = optuna.create_study(
         direction="minimize",
         sampler=optuna.samplers.GPSampler(seed=seed, n_startup_trials=_N_STARTUP_TRIALS),
     )
     study.optimize(objective, n_trials=n_trials)
 
+    subsample_best = float(study.best_params["subsample"])
     best_params = ImputationBoostingParams(
         n_estimators=int(study.best_params["n_estimators"]),
         learning_rate=float(study.best_params["learning_rate"]),
         max_depth=int(study.best_params["max_depth"]),
         num_leaves=int(study.best_params["num_leaves"]),
         min_child_samples=int(study.best_params["min_child_samples"]),
+        colsample_bytree=float(study.best_params["colsample_bytree"]),
+        subsample=subsample_best,
+        subsample_freq=1 if subsample_best < 1.0 else 0,
+        reg_alpha=float(study.best_params["reg_alpha"]),
+        reg_lambda=float(study.best_params["reg_lambda"]),
+        min_data_per_group=int(study.best_params["min_data_per_group"]),
+        cat_smooth=float(study.best_params["cat_smooth"]),
+        max_bin=int(study.best_params["max_bin"]),
     )
     print(
         f"✅ Best trial: selection MAE={study.best_value:.4f} "
         f"(n_estimators={best_params.n_estimators}, "
         f"learning_rate={best_params.learning_rate:.4f}, max_depth={best_params.max_depth}, "
-        f"num_leaves={best_params.num_leaves}, min_child_samples={best_params.min_child_samples})"
+        f"num_leaves={best_params.num_leaves}, min_child_samples={best_params.min_child_samples}, "
+        f"colsample_bytree={best_params.colsample_bytree:.3f}, subsample={best_params.subsample:.3f}, "
+        f"reg_alpha={best_params.reg_alpha:.4e}, reg_lambda={best_params.reg_lambda:.4e}, "
+        f"min_data_per_group={best_params.min_data_per_group}, cat_smooth={best_params.cat_smooth:.2f}, "
+        f"max_bin={best_params.max_bin})"
     )
 
     print("🧪 Scoring the winner and the untuned defaults on the validation holdouts...")

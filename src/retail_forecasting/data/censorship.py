@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import lightgbm as lgb
 import numpy as np
@@ -21,6 +21,14 @@ DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
     "max_depth": 6,
     "num_leaves": 31,
     "min_child_samples": 20,
+    "colsample_bytree": 1.0,
+    "subsample": 1.0,
+    "subsample_freq": 0,
+    "reg_alpha": 0.0,
+    "reg_lambda": 0.0,
+    "min_data_per_group": 100,
+    "cat_smooth": 10.0,
+    "max_bin": 255,
 }
 
 # Shared filename convention for persisted tuned imputation hyperparameters.
@@ -202,14 +210,27 @@ class LatentDemandImputer:
         # Measured 18x faster at 1.5k train rows and still 4.4x at 46k (the 500-series
         # panel), with bit-identical predictions. Revisit above ~200k rows, where the two
         # converge.
-        self.model = lgb.LGBMRegressor(
-            n_estimators=int(params["n_estimators"]),
-            learning_rate=float(params["learning_rate"]),
-            max_depth=int(params["max_depth"]),
-            random_state=42,
-            verbosity=-1,
-            n_jobs=1,
+        lgbm_kwargs: dict[str, Any] = dict(params)
+        lgbm_kwargs["n_estimators"] = int(lgbm_kwargs["n_estimators"])
+        lgbm_kwargs["max_depth"] = int(lgbm_kwargs["max_depth"])
+        if "num_leaves" in lgbm_kwargs:
+            lgbm_kwargs["num_leaves"] = int(lgbm_kwargs["num_leaves"])
+        if "min_child_samples" in lgbm_kwargs:
+            lgbm_kwargs["min_child_samples"] = int(lgbm_kwargs["min_child_samples"])
+        if "subsample_freq" in lgbm_kwargs:
+            lgbm_kwargs["subsample_freq"] = int(lgbm_kwargs["subsample_freq"])
+        if "min_data_per_group" in lgbm_kwargs:
+            lgbm_kwargs["min_data_per_group"] = int(lgbm_kwargs["min_data_per_group"])
+        if "max_bin" in lgbm_kwargs:
+            lgbm_kwargs["max_bin"] = int(lgbm_kwargs["max_bin"])
+        lgbm_kwargs.update(
+            {
+                "random_state": 42,
+                "verbosity": -1,
+                "n_jobs": 1,
+            }
         )
+        self.model = lgb.LGBMRegressor(**lgbm_kwargs)
         self.model.fit(X_train, y_train)
 
         censored_df = df_feat[is_censored].copy()

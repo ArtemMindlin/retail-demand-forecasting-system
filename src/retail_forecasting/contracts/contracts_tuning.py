@@ -26,6 +26,14 @@ class ImputationBoostingParams(BaseModel):
     max_depth: int = Field(gt=0)
     num_leaves: int = Field(gt=0)
     min_child_samples: int = Field(gt=0)
+    colsample_bytree: float = Field(gt=0.0, le=1.0)
+    subsample: float = Field(gt=0.0, le=1.0)
+    subsample_freq: int = Field(ge=0)
+    reg_alpha: float = Field(ge=0.0)
+    reg_lambda: float = Field(ge=0.0)
+    min_data_per_group: int = Field(gt=0)
+    cat_smooth: float = Field(gt=0.0)
+    max_bin: int = Field(gt=0)
 
 
 class TuningMetadata(BaseModel):
