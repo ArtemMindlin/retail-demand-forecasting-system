@@ -100,7 +100,8 @@ Install dependencies:
 uv sync --extra dev
 ```
 
-Install optional ML backends:
+Install optional ML backends (required by `run_mode = tune_imputation`, whose Optuna GPSampler
+needs the `torch` backend):
 
 ```bash
 uv sync --extra dev --extra ml
