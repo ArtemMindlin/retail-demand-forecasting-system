@@ -71,6 +71,7 @@ dev = [
   # that every documented sync command installs it: `uv sync` prunes whatever the lock does not
   # carry, and an ad-hoc install would be silently removed the next time anyone syncs.
   "ipykernel>=6.29.0",
+  "ipywidgets>=8.0.0",
 ]
 ml = [
   "xgboost>=2.1.0",
