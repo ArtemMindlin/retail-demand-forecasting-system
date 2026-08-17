@@ -99,7 +99,13 @@ def test_tune_imputation_lgbm_persists_params_when_winner_beats_defaults(
 
     assert params_path == tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
     params = json.loads(params_path.read_text(encoding="utf-8"))
-    assert set(params) == {"n_estimators", "learning_rate", "max_depth"}
+    assert set(params) == {
+        "n_estimators",
+        "learning_rate",
+        "max_depth",
+        "num_leaves",
+        "min_child_samples",
+    }
 
     metadata = json.loads((tmp_path / METADATA_FILENAME).read_text(encoding="utf-8"))
     assert metadata["persisted"] is True
@@ -165,7 +171,16 @@ def test_tune_imputation_lgbm_removes_a_superseded_params_file_when_the_gate_fai
     """A rejected search must not leave an earlier winner in charge of the pipeline."""
     stale = tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
     stale.write_text(
-        json.dumps({"n_estimators": 999, "learning_rate": 0.01, "max_depth": 9}), encoding="utf-8"
+        json.dumps(
+            {
+                "n_estimators": 999,
+                "learning_rate": 0.01,
+                "max_depth": 9,
+                "num_leaves": 31,
+                "min_child_samples": 20,
+            }
+        ),
+        encoding="utf-8",
     )
 
     _stub_holdout_maes(monkeypatch, default_maes=[0.5, 0.5], other_maes=[1.0, 1.0])

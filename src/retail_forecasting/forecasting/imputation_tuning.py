@@ -8,7 +8,10 @@ import optuna
 import pandas as pd
 
 from retail_forecasting.config import Settings
-from retail_forecasting.contracts.contracts_tuning import BoostingParams, ImputationTuningMetadata
+from retail_forecasting.contracts.contracts_tuning import (
+    ImputationBoostingParams,
+    ImputationTuningMetadata,
+)
 from retail_forecasting.data.censorship import (
     DEFAULT_SUPERVISED_LGBM_PARAMS,
     IMPUTATION_LGBM_PARAMS_FILENAME,
@@ -122,11 +125,21 @@ def tune_imputation_lgbm(
         f"{len(validation)} validation holdouts (seeds {validation_seeds})"
     )
 
+    # max_depth pulled back to 2-8 after a widened 2-16 run showed no signal past ~5: LightGBM
+    # grows leaf-wise, so with num_leaves left at its default of 31 every depth >= 5 already
+    # admits 2**5 = 32 >= 31 leaves and is capacity-equivalent -- the real capacity knob is
+    # num_leaves, not max_depth, so it now enters the search directly. min_child_samples also
+    # joins since the teacher trains on only ~3-4k clean-day rows, well under LGBM's default of
+    # 20 per leaf being a meaningfully binding constraint. n_estimators/learning_rate keep the
+    # ranges from the widened run: that run's winner sat deep in the interior on both (2659,
+    # 0.0043), away from either edge.
     def objective(trial: optuna.Trial) -> float:
         params = {
-            "n_estimators": trial.suggest_int("n_estimators", 50, 800),
-            "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.2, log=True),
-            "max_depth": trial.suggest_int("max_depth", 3, 12),
+            "n_estimators": trial.suggest_int("n_estimators", 50, 3000),
+            "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
+            "max_depth": trial.suggest_int("max_depth", 2, 8),
+            "num_leaves": trial.suggest_int("num_leaves", 8, 256, log=True),
+            "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
         }
         return float(np.mean(_holdout_maes(selection, params)))
 
@@ -156,15 +169,18 @@ def tune_imputation_lgbm(
     )
     study.optimize(objective, n_trials=n_trials)
 
-    best_params = BoostingParams(
+    best_params = ImputationBoostingParams(
         n_estimators=int(study.best_params["n_estimators"]),
         learning_rate=float(study.best_params["learning_rate"]),
         max_depth=int(study.best_params["max_depth"]),
+        num_leaves=int(study.best_params["num_leaves"]),
+        min_child_samples=int(study.best_params["min_child_samples"]),
     )
     print(
         f"✅ Best trial: selection MAE={study.best_value:.4f} "
         f"(n_estimators={best_params.n_estimators}, "
-        f"learning_rate={best_params.learning_rate:.4f}, max_depth={best_params.max_depth})"
+        f"learning_rate={best_params.learning_rate:.4f}, max_depth={best_params.max_depth}, "
+        f"num_leaves={best_params.num_leaves}, min_child_samples={best_params.min_child_samples})"
     )
 
     print("🧪 Scoring the winner and the untuned defaults on the validation holdouts...")

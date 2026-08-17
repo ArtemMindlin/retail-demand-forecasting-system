@@ -14,6 +14,20 @@ class BoostingParams(BaseModel):
     max_depth: int = Field(gt=0)
 
 
+class ImputationBoostingParams(BaseModel):
+    """LGBM hyperparameters for the supervised imputer's teacher, kept separate from
+    ``BoostingParams`` (the forecasting model's own tuning contract) since the two searches
+    tune different hyperparameter sets."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    n_estimators: int = Field(gt=0)
+    learning_rate: float = Field(gt=0)
+    max_depth: int = Field(gt=0)
+    num_leaves: int = Field(gt=0)
+    min_child_samples: int = Field(gt=0)
+
+
 class TuningMetadata(BaseModel):
     model_config = ConfigDict(
         frozen=True,
@@ -91,4 +105,4 @@ class ImputationTuningMetadata(BaseModel):
     seed: int
     created_at: str
     git_commit: str | None
-    best_params: BoostingParams
+    best_params: ImputationBoostingParams

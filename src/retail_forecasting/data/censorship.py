@@ -19,6 +19,8 @@ DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
     "n_estimators": 200,
     "learning_rate": 0.05,
     "max_depth": 6,
+    "num_leaves": 31,
+    "min_child_samples": 20,
 }
 
 # Shared filename convention for persisted tuned imputation hyperparameters.
