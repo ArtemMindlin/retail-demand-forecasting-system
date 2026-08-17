@@ -23,7 +23,6 @@ from retail_forecasting.utils.io import (
     dataframe_to_markdown,
     make_run_directory,
 )
-from retail_forecasting.visualization.plots import render_standard_plots
 
 
 class DatasetMetadata(BaseModel):
@@ -152,6 +151,12 @@ class RunArtifacts:
 
 def _render_experiment_plots(run_dir: Path, artifacts: RunArtifacts) -> None:
     """Render the standard plots plus, when SHAP is available, the SHAP summary and drift report."""
+    # Imported here, like render_shap_summary below, because visualization.plots forces the Agg
+    # backend at import time. At module scope that reached every importer of this module -- most
+    # of which only want get_git_commit/utc_timestamp -- and silently killed inline figures in
+    # the notebooks.
+    from retail_forecasting.visualization.plots import render_standard_plots
+
     render_standard_plots(
         metrics_summary=artifacts.metrics_summary,
         cost_summary=artifacts.cost_summary,
