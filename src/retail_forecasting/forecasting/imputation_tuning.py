@@ -136,7 +136,7 @@ def tune_imputation_lgbm(
     def objective(trial: optuna.Trial) -> float:
         subsample = trial.suggest_float("subsample", 0.4, 1.0)
         params = {
-            "n_estimators": trial.suggest_int("n_estimators", 50, 3000),
+            "n_estimators": trial.suggest_int("n_estimators", 50, 8000),
             "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
             "max_depth": trial.suggest_int("max_depth", 2, 8),
             "num_leaves": trial.suggest_int("num_leaves", 8, 256, log=True),
