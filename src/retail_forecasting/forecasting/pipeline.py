@@ -797,10 +797,22 @@ def _evaluate_on_holdout(
 ) -> tuple[list[pd.DataFrame], ConformalForecaster | None, ConformalForecaster | None]:
     """Retrain both models on all training data and evaluate on the holdout split.
 
+    ``None`` means no holdout was requested and skipping is correct (the synthetic-panel
+    tests and the fair-cost backtest run this way). An EMPTY frame is a different thing: a
+    holdout was requested and vanished during preparation or feature engineering, which is a
+    defect, so it raises rather than returning a result that reads as a completed run without
+    a holdout in it. Returning empty here is what hid the missing eval evaluation.
+
     Returns ``(holdout_predictions, holdout_boosting_model, holdout_cat_model)``.
     """
-    if holdout_supervised_frame is None or holdout_supervised_frame.empty:
+    if holdout_supervised_frame is None:
         return [], None, None
+    if holdout_supervised_frame.empty:
+        raise ValueError(
+            f"[{data_strategy}] A holdout panel was supplied but its supervised frame is empty, "
+            "so holdout evaluation would be skipped silently. Check that the holdout dates "
+            "survive feature engineering and that its series overlap the training panel."
+        )
 
     print(f"📊 Retraining on full train set before holdout evaluation ({data_strategy})...")
     full_sub_train, full_calib, full_calib_group_ids = _split_train_calibration(

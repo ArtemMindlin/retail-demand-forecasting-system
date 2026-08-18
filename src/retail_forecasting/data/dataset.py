@@ -69,6 +69,7 @@ def prepare_daily_panel(
     frame: pd.DataFrame,
     dataset_config: DatasetConfig,
     preprocessing_config: PreprocessingConfig,
+    restrict_to_series: set[str] | None = None,
 ) -> pd.DataFrame:
     """Clean and filter the raw split into the daily modeling panel.
 
@@ -76,12 +77,21 @@ def prepare_daily_panel(
         frame: Raw split loaded from parquet.
         dataset_config: Dataset-level configuration values.
         preprocessing_config: Preprocessing controls for filtering and filling.
+        restrict_to_series: When given, keep exactly these ``series_id`` values and skip
+            both series-selection filters. Required for any split other than ``train``,
+            whose series universe must be inherited rather than recomputed -- see the
+            comment at the filters below.
 
     Returns:
         A cleaned daily panel ready for feature engineering.
     """
 
-    if dataset_config.max_rows:
+    # `max_rows` truncates by raw row order, so it cuts whole series off the tail. That is an
+    # acceptable way to shrink train (it defines the universe, and the cut lands before the
+    # series filters), but destructive on an inherited split: it would drop rows of series the
+    # holdout is supposed to cover, leaving some with fewer days than others. The series
+    # restriction already bounds the size there (50 series x 7 days), so the cap is not needed.
+    if dataset_config.max_rows and restrict_to_series is None:
         panel = frame.head(dataset_config.max_rows).copy()
     else:
         panel = frame.copy()
@@ -102,18 +112,31 @@ def prepare_daily_panel(
     panel["series_id"] = panel["store_id"].astype(str) + "_" + panel["product_id"].astype(str)
     panel = panel.sort_values(["series_id", "date"]).reset_index(drop=True)
 
-    history_lengths = panel.groupby("series_id")["date"].count()
-    valid_series = history_lengths[history_lengths >= dataset_config.min_history_days].index
-    panel = panel[panel["series_id"].isin(valid_series)].copy()
+    # Both filters below define the series UNIVERSE from the split's own rows, which is only
+    # meaningful for train. Applied to a short forward split such as the official 7-day eval
+    # they are actively wrong, in two different ways:
+    #   * `min_history_days` (70) counts days within the split, so a 7-day split loses every
+    #     series and the panel comes out empty. The history those series need lives in train.
+    #   * `top_n_series` ranks by demand summed over the split, so the top 50 of a 7 days
+    #     window is a DIFFERENT set of series than the top 50 of train's 90 days -- the more
+    #     insidious failure, since it yields a populated panel of the wrong series and the
+    #     holdout would score a model on series it never trained on.
+    # A non-train split therefore inherits train's series set instead of recomputing one.
+    if restrict_to_series is not None:
+        panel = panel[panel["series_id"].isin(restrict_to_series)].copy()
+    else:
+        history_lengths = panel.groupby("series_id")["date"].count()
+        valid_series = history_lengths[history_lengths >= dataset_config.min_history_days].index
+        panel = panel[panel["series_id"].isin(valid_series)].copy()
 
-    if dataset_config.top_n_series:
-        top_series = (
-            panel.groupby("series_id")["observed_demand"]
-            .sum()
-            .nlargest(dataset_config.top_n_series)
-            .index
-        )
-        panel = panel[panel["series_id"].isin(top_series)].copy()
+        if dataset_config.top_n_series:
+            top_series = (
+                panel.groupby("series_id")["observed_demand"]
+                .sum()
+                .nlargest(dataset_config.top_n_series)
+                .index
+            )
+            panel = panel[panel["series_id"].isin(top_series)].copy()
 
     if preprocessing_config.fill_missing_values:
         zero_fill_columns = [
@@ -183,6 +206,11 @@ def load_prepared_panel(
 ) -> pd.DataFrame:
     """Load or build the processed panel for a dataset split.
 
+    A split other than ``train`` inherits train's series universe, which means loading the
+    train panel first (recursion bottoms out immediately, since train inherits nothing).
+    Pre-built panels written under ``panel_cache_filename`` -- the OPS backtest split -- are
+    returned from cache before any of that, so this path never touches them.
+
     Args:
         dataset_config: Dataset-level configuration values.
         preprocessing_config: Preprocessing controls for panel preparation.
@@ -190,19 +218,48 @@ def load_prepared_panel(
 
     Returns:
         The processed panel as a DataFrame.
+
+    Raises:
+        ValueError: If a non-train split prepares to zero rows. Silently returning an empty
+            holdout is what let the eval evaluation go missing from every run to date.
     """
 
     target_path = dataset_config.processed_panel_dir / panel_cache_filename(dataset_config, split)
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
     if dataset_config.use_cache and target_path.exists():
-        return pd.read_parquet(target_path)
+        cached = pd.read_parquet(target_path)
+        # An empty cached non-train panel is never a legitimate cache entry: it is the artifact
+        # of the universe filters this function now bypasses. Rebuild rather than serve it, so
+        # the fix applies without invalidating the cache key -- bumping the key would orphan the
+        # pre-built OPS split, whose `.built` sentinel would stop `make simulate` regenerating it.
+        if split == "train" or not cached.empty:
+            return cached
+
+    restrict_to_series: set[str] | None = None
+    if split != "train":
+        train_panel = load_prepared_panel(
+            dataset_config=dataset_config,
+            preprocessing_config=preprocessing_config,
+            split="train",
+        )
+        restrict_to_series = set(train_panel["series_id"].unique())
 
     raw_frame = load_raw_split(dataset_config=dataset_config, split=split)
     panel = prepare_daily_panel(
         frame=raw_frame,
         dataset_config=dataset_config,
         preprocessing_config=preprocessing_config,
+        restrict_to_series=restrict_to_series,
     )
+
+    if split != "train" and panel.empty:
+        raise ValueError(
+            f"The prepared '{split}' panel is empty: none of the {len(restrict_to_series or ())} "
+            f"series selected from train appear in the raw '{split}' split "
+            f"({len(raw_frame):,} raw rows). A holdout that silently evaluates nothing is worse "
+            "than a failed run, so this raises instead of returning an empty frame."
+        )
+
     panel.to_parquet(target_path, index=False)
     return panel
