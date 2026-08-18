@@ -24,7 +24,9 @@ class ImputationBoostingParams(BaseModel):
     n_estimators: int = Field(gt=0)
     learning_rate: float = Field(gt=0)
     max_depth: int = Field(gt=0)
-    num_leaves: int = Field(gt=0)
+    # LightGBM's own hard floor is num_leaves > 1 (config_auto.cpp), so 2 is the true minimum --
+    # confirmed empirically against the installed lightgbm==4.6.0, not assumed from docs.
+    num_leaves: int = Field(gt=1)
     min_child_samples: int = Field(gt=0)
     colsample_bytree: float = Field(gt=0.0, le=1.0)
     subsample: float = Field(gt=0.0, le=1.0)
@@ -32,7 +34,10 @@ class ImputationBoostingParams(BaseModel):
     reg_alpha: float = Field(ge=0.0)
     reg_lambda: float = Field(ge=0.0)
     min_data_per_group: int = Field(gt=0)
-    cat_smooth: float = Field(gt=0.0)
+    # LightGBM's own floor is cat_smooth >= 0.0 (docs + empirical check), not > 0 -- an earlier
+    # search bound of 1.0 was an unverified assumption, not a real LightGBM constraint, and it
+    # pinned the winner to that edge until this was checked.
+    cat_smooth: float = Field(ge=0.0)
     max_bin: int = Field(gt=0)
 
 
@@ -92,6 +97,11 @@ class ImputationTuningMetadata(BaseModel):
     decided on ``improvement_ci95`` -- the bootstrap interval of the per-draw difference --
     rather than on ``improvement_pct``, whose sign alone does not distinguish a real gain
     from a coin flip.
+
+    ``persisted`` needs BOTH gates to pass: ``improvement_ci95`` below zero (tuning beats the
+    untuned defaults, the number the thesis cites) AND ``beats_incumbent`` (this search beats
+    the winner already on disk). The second exists because the first cannot see the incumbent
+    at all, so a worse search silently replaced a better one -- observed twice.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -103,6 +113,11 @@ class ImputationTuningMetadata(BaseModel):
     default_mae_validation: float = Field(ge=0)
     improvement_pct: float
     improvement_ci95: list[float] = Field(min_length=2, max_length=2)
+    # Second gate, guarding the OVERWRITE rather than the claim: the run above answers "does
+    # tuning beat no tuning", which says nothing about whether this particular search beat the
+    # winner already on disk. Both None on the first run, when there is no incumbent to beat.
+    incumbent_mae_validation: float | None = Field(default=None, ge=0)
+    beats_incumbent: bool | None = None
     persisted: bool
     n_selection_holdouts: int = Field(gt=0)
     n_validation_holdouts: int = Field(gt=0)

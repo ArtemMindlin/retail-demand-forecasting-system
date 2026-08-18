@@ -225,7 +225,7 @@ See `docs/web_layer.md` for the full description.
     champion run never uses. Enforced by `test_pipeline_imputers_all_read_the_tuned_params_file`.
 
 41. The imputation search must select and validate on disjoint SERIES, and must not persist a
-    winner that loses to the untuned defaults on the validation series.
+    winner that loses either to the untuned defaults or to the incumbent already on disk.
 
     On a single draw the MAE spread between trials (12-40% measured) is an order of magnitude
     larger than the differences between hyperparameter sets (~1%), so a single-draw search
@@ -250,6 +250,21 @@ See `docs/web_layer.md` for the full description.
     This also upgrades what the number means: `LatentDemandImputer` re-fits its teacher on
     whatever panel it is handed, so `improvement_pct` is now measured by a model fitted on
     series the search never saw. `n_selection_series`/`n_validation_series` record the split.
+
+    Beating the defaults is necessary but NOT sufficient to write the file, because that
+    comparison cannot see the incumbent: a run measuring -4.65% overwrote a -5.33% winner,
+    having scored BETTER on the selection draws it was optimizing (0.2821 vs 0.2836) and worse
+    on the held-out series (0.2872 vs 0.2851) -- textbook selection-set overfitting, and the
+    defaults-only gate had no way to notice. So `_load_incumbent_params()` reads the file
+    BEFORE the search (by decision time it may be overwritten or deleted), both configs are
+    scored on the same validation draws so the difference is paired, and `beats_incumbent`
+    requires the challenger's interval against the incumbent to clear zero too. When the two
+    are statistically indistinguishable the incumbent stays: churning the file the pipeline
+    depends on, on a difference the draws cannot resolve, buys nothing. Note the asymmetry in
+    the failure branches -- failing the DEFAULTS gate deletes any params file (the pipeline
+    should fall back to defaults rather than trust a winner this run rejected), while failing
+    only the INCUMBENT gate leaves it untouched, since it is still a validated winner.
+    `incumbent_mae_validation`/`beats_incumbent` record the comparison, both null on a first run.
 
     The decision is the interval, not the sign of the mean: a point comparison passed a winner
     at -1.14% that then measured -0.45% with a straddling interval on fresh draws. The same

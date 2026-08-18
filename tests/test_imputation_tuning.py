@@ -55,19 +55,37 @@ def _settings(tmp_path: Path) -> Settings:
     return Settings(models=ModelConfig(models_dir=tmp_path, tuning_trials=2))
 
 
+INCUMBENT_MARKER_ESTIMATORS = 999
+
+
+def _write_incumbent(tmp_path: Path, params_path: Path | None = None) -> Path:
+    """Plant a params file on disk so the run under test has an incumbent to be judged against.
+
+    Marked by a sentinel ``n_estimators`` so ``_stub_holdout_maes`` can tell it apart from both
+    the untuned defaults and the challenger the search produces.
+    """
+    target = params_path if params_path is not None else tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
+    incumbent = dict(DEFAULT_SUPERVISED_LGBM_PARAMS) | {"n_estimators": INCUMBENT_MARKER_ESTIMATORS}
+    target.write_text(json.dumps(incumbent), encoding="utf-8")
+    return target
+
+
 def _stub_holdout_maes(
     monkeypatch: pytest.MonkeyPatch,
     *,
     default_maes: list[float],
     other_maes: list[float],
+    incumbent_maes: list[float] | None = None,
 ) -> None:
-    """Score the untuned defaults and everything else at fixed per-draw MAEs.
+    """Score the untuned defaults, the planted incumbent, and everything else at fixed MAEs.
 
     One value per validation draw, so the tests drive the bootstrap interval the persist
     gate decides on -- not just its mean.
     """
 
     def fake_holdout_maes(holdouts, params) -> np.ndarray:
+        if incumbent_maes is not None and params.get("n_estimators") == INCUMBENT_MARKER_ESTIMATORS:
+            return np.asarray(incumbent_maes, dtype=float)
         is_default = {k: params[k] for k in DEFAULT_SUPERVISED_LGBM_PARAMS} == dict(
             DEFAULT_SUPERVISED_LGBM_PARAMS
         )
@@ -254,3 +272,95 @@ def test_tune_imputation_lgbm_removes_a_superseded_params_file_when_the_gate_fai
     )
 
     assert not stale.exists()
+
+
+def test_tune_imputation_lgbm_keeps_an_incumbent_the_new_winner_cannot_beat(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Beating the defaults is not enough to overwrite: the incumbent has to lose too.
+
+    The defaults comparison is blind to whatever is on disk, so without this second gate a run
+    measuring -4.65% replaced a -5.33% winner -- it scored better on the selection draws it was
+    optimizing and worse on the held-out series, and nothing checked.
+    """
+    incumbent = _write_incumbent(tmp_path)
+    before = incumbent.read_text(encoding="utf-8")
+
+    # Challenger beats the defaults (0.8 < 1.0) but loses to the incumbent (0.8 > 0.5).
+    _stub_holdout_maes(
+        monkeypatch,
+        default_maes=[1.0, 1.0, 1.0, 1.0],
+        other_maes=[0.8, 0.8, 0.8, 0.8],
+        incumbent_maes=[0.5, 0.5, 0.5, 0.5],
+    )
+
+    returned = tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=4,
+    )
+
+    # The incumbent survives byte-for-byte, and the run reports why it was not replaced.
+    assert incumbent.read_text(encoding="utf-8") == before
+    assert returned == tmp_path / METADATA_FILENAME
+
+    metadata = json.loads(returned.read_text(encoding="utf-8"))
+    assert metadata["improvement_ci95"][1] < 0, "it did beat the defaults..."
+    assert metadata["beats_incumbent"] is False, "...but not the incumbent"
+    assert metadata["persisted"] is False
+    assert metadata["incumbent_mae_validation"] == pytest.approx(0.5)
+
+
+def test_tune_imputation_lgbm_replaces_an_incumbent_the_new_winner_beats(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The gate must not be so sticky that a genuinely better search cannot land."""
+    incumbent = _write_incumbent(tmp_path)
+
+    # Challenger beats both the defaults (0.4 < 1.0) and the incumbent (0.4 < 0.8).
+    _stub_holdout_maes(
+        monkeypatch,
+        default_maes=[1.0, 1.0, 1.0, 1.0],
+        other_maes=[0.4, 0.4, 0.4, 0.4],
+        incumbent_maes=[0.8, 0.8, 0.8, 0.8],
+    )
+
+    returned = tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=4,
+    )
+
+    assert returned == incumbent
+    metadata = json.loads((tmp_path / METADATA_FILENAME).read_text(encoding="utf-8"))
+    assert metadata["beats_incumbent"] is True
+    assert metadata["persisted"] is True
+    # Overwritten, so the sentinel marking the planted incumbent is gone.
+    assert json.loads(incumbent.read_text(encoding="utf-8"))["n_estimators"] != (
+        INCUMBENT_MARKER_ESTIMATORS
+    )
+
+
+def test_tune_imputation_lgbm_has_no_incumbent_to_beat_on_a_first_run(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With nothing on disk the second gate must not block the first ever winner."""
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0], other_maes=[0.5, 0.5])
+
+    returned = tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+    )
+
+    assert returned == tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
+    metadata = json.loads((tmp_path / METADATA_FILENAME).read_text(encoding="utf-8"))
+    assert metadata["beats_incumbent"] is None
+    assert metadata["incumbent_mae_validation"] is None
+    assert metadata["persisted"] is True

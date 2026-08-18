@@ -107,6 +107,18 @@ def _bootstrap_ci95(deltas: np.ndarray, seed: int) -> tuple[float, float]:
     return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
 
 
+def _load_incumbent_params(params_path: Path) -> dict[str, int | float] | None:
+    """Read the tuned params already on disk, or None on the first ever run.
+
+    Must be called BEFORE the persist decision, since that decision may overwrite or delete
+    the very file this reads.
+    """
+    if not params_path.exists():
+        return None
+    loaded: dict[str, int | float] = json.loads(params_path.read_text(encoding="utf-8"))
+    return loaded
+
+
 def _configure_mlflow() -> None:
     """Point MLflow at its tracking store and select the imputation-tuning experiment.
 
@@ -192,19 +204,27 @@ def tune_imputation_lgbm(
 ) -> Path:
     """Search LGBM hyperparameters for the supervised imputer and persist the winner.
 
-    The winning params are persisted ONLY if the bootstrap CI95 of their per-draw improvement
-    over the defaults lies entirely below zero -- a mean that merely happens to be negative is
-    what a coin flip looks like, and persisting it would silently switch the pipeline to
-    hyperparameters chosen by noise. The metadata file is written either way, recording both
-    scores, the interval and the decision.
+    The winning params are persisted only if they clear TWO gates, both judged on the paired
+    per-draw bootstrap interval rather than the point estimate (a mean that merely happens to
+    land below zero is what a coin flip looks like):
+
+    * vs the untuned defaults -- does tuning buy anything at all? This is the number the thesis
+      cites, and failing it deletes any params file an earlier run left behind, since the
+      pipeline should fall back to defaults rather than use a winner this run rejected.
+    * vs the incumbent already on disk -- is THIS search better than the last one that passed?
+      The defaults comparison is blind to the incumbent, so without this a worse search
+      overwrote a better one (observed: a -4.65% run replaced a -5.33% winner, scoring better on
+      selection and worse on validation). Failing this keeps the incumbent untouched.
+
+    The metadata file is written either way, recording both comparisons and the decision.
 
     Only the winning hyperparameters are persisted (not fitted weights), so
     ``LatentDemandImputer`` still re-fits on each panel's own clean days -- this run only
     changes which 3 numbers that fit uses.
 
     Returns:
-        The path of the written ``imputation_lgbm_params.json`` when the winner beat the
-        defaults, otherwise the path of the metadata file recording why it did not.
+        The path of the written ``imputation_lgbm_params.json`` when the winner cleared both
+        gates, otherwise the path of the metadata file recording why it did not.
     """
     n_trials = n_trials if n_trials is not None else settings.models.tuning_trials
     seed = seed if seed is not None else settings.project.random_seed
@@ -242,7 +262,7 @@ def tune_imputation_lgbm(
             "n_estimators": trial.suggest_int("n_estimators", 50, 8000),
             "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
             "max_depth": trial.suggest_int("max_depth", 2, 12),
-            "num_leaves": trial.suggest_int("num_leaves", 4, 1024, log=True),
+            "num_leaves": trial.suggest_int("num_leaves", 2, 1024, log=True),
             "min_child_samples": trial.suggest_int("min_child_samples", 2, 100),
             "colsample_bytree": trial.suggest_float("colsample_bytree", 0.3, 1.0),
             "subsample": subsample,
@@ -250,7 +270,7 @@ def tune_imputation_lgbm(
             "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 100.0, log=True),
             "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 100.0, log=True),
             "min_data_per_group": trial.suggest_int("min_data_per_group", 1, 100),
-            "cat_smooth": trial.suggest_float("cat_smooth", 1.0, 50.0),
+            "cat_smooth": trial.suggest_float("cat_smooth", 0.0, 50.0),
             "max_bin": trial.suggest_int("max_bin", 8, 255),
         }
         return float(np.mean(_holdout_maes(selection, params)))
@@ -267,6 +287,12 @@ def tune_imputation_lgbm(
 
     models_dir = settings.models.models_dir
     models_dir.mkdir(parents=True, exist_ok=True)
+
+    # Read the incumbent before the search, not after: the persist decision below either
+    # overwrites or deletes this exact file, so by then there is nothing left to compare against.
+    params_path = models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
+    incumbent_params = _load_incumbent_params(params_path)
+
     study_name = f"imputation_lgbm_seed{seed}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
 
     study = optuna.create_study(
@@ -319,6 +345,29 @@ def tune_imputation_lgbm(
     ci_lo, ci_hi = _bootstrap_ci95(tuned_maes - default_maes, seed=seed)
     beats_default = ci_hi < 0.0
 
+    # Second gate. The comparison above is blind to whatever is already on disk, so a search
+    # that beats the defaults by less than the incumbent did still overwrote it: a run measuring
+    # -4.65% replaced a -5.33% winner, having scored BETTER on selection and worse on validation
+    # -- overfitting the selection set, invisible to a defaults-only gate. Both configs are
+    # scored on the same draws so the difference is paired, and the incumbent stays unless the
+    # challenger beats it by a margin those draws can distinguish: when the two are
+    # indistinguishable, churning the file the pipeline depends on buys nothing.
+    incumbent_mae_validation: float | None = None
+    beats_incumbent: bool | None = None
+    if incumbent_params is not None:
+        print("🥊 Scoring the incumbent params already on disk on the same draws...")
+        incumbent_maes = _holdout_maes(validation, incumbent_params)
+        incumbent_mae_validation = float(np.mean(incumbent_maes))
+        inc_lo, inc_hi = _bootstrap_ci95(tuned_maes - incumbent_maes, seed=seed)
+        beats_incumbent = inc_hi < 0.0
+        print(
+            f"   challenger={best_mae_validation:.4f} vs incumbent="
+            f"{incumbent_mae_validation:.4f}, CI95 [{inc_lo:+.4f}, {inc_hi:+.4f}] -> "
+            f"{'replaces it' if beats_incumbent else 'does NOT replace it'}"
+        )
+
+    should_persist = beats_default and beats_incumbent is not False
+
     metadata = ImputationTuningMetadata(
         n_trials_requested=n_trials,
         best_mae_selection=float(study.best_value),
@@ -326,7 +375,9 @@ def tune_imputation_lgbm(
         default_mae_validation=default_mae_validation,
         improvement_pct=improvement_pct,
         improvement_ci95=[ci_lo, ci_hi],
-        persisted=beats_default,
+        incumbent_mae_validation=incumbent_mae_validation,
+        beats_incumbent=beats_incumbent,
+        persisted=should_persist,
         n_selection_holdouts=len(selection),
         n_validation_holdouts=len(validation),
         n_selection_series=n_selection_series,
@@ -349,7 +400,6 @@ def tune_imputation_lgbm(
         f"default={default_mae_validation:.4f} ({improvement_pct:+.2f}%), "
         f"CI95 of the difference [{ci_lo:+.4f}, {ci_hi:+.4f}]"
     )
-    params_path = models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
     if not beats_default:
         print(
             "⚠️  The tuned hyperparameters do NOT beat the untuned defaults by a margin the "
@@ -362,24 +412,25 @@ def tune_imputation_lgbm(
         if params_path.exists():
             params_path.unlink()
             print(f"🧹 Removed the superseded params file: {params_path}\n")
-        _configure_mlflow()
-        _log_study_to_mlflow(
-            study=study,
-            metadata=metadata,
-            metadata_path=metadata_path,
-            params_path=params_path,
-            beats_default=beats_default,
+    elif beats_incumbent is False:
+        # Deliberately NOT deleted: unlike the branch above, tuning did beat the defaults here,
+        # so the incumbent on disk is still a validated winner -- and a better one than this
+        # run produced. Leaving it in place is the whole point of this gate.
+        print(
+            "⚖️  The tuned hyperparameters beat the untuned defaults but NOT the incumbent "
+            "already on disk, so the incumbent was KEPT and this run's winner discarded.\n"
+            f"    Decision recorded in: {metadata_path}\n"
         )
-        return metadata_path
+    else:
+        params_path.write_text(json.dumps(best_params.model_dump(), indent=2), encoding="utf-8")
+        print(f"\n✅ Tuned imputation hyperparameters written to: {params_path}\n")
 
-    params_path.write_text(json.dumps(best_params.model_dump(), indent=2), encoding="utf-8")
-    print(f"\n✅ Tuned imputation hyperparameters written to: {params_path}\n")
     _configure_mlflow()
     _log_study_to_mlflow(
         study=study,
         metadata=metadata,
         metadata_path=metadata_path,
         params_path=params_path,
-        beats_default=beats_default,
+        beats_default=should_persist,
     )
-    return params_path
+    return params_path if should_persist else metadata_path
