@@ -224,18 +224,32 @@ See `docs/web_layer.md` for the full description.
     the rest of the pipeline -- and the imputation study would be comparing a strategy the
     champion run never uses. Enforced by `test_pipeline_imputers_all_read_the_tuned_params_file`.
 
-41. The imputation search must select and validate on disjoint synthetic-censoring draws, and
-    must not persist a winner that loses to the untuned defaults on the validation draws.
+41. The imputation search must select and validate on disjoint SERIES, and must not persist a
+    winner that loses to the untuned defaults on the validation series.
 
     On a single draw the MAE spread between trials (12-40% measured) is an order of magnitude
     larger than the differences between hyperparameter sets (~1%), so a single-draw search
     selects the lucky trial and its own objective value is not evidence of a gain -- a run that
     reported -1.4% in-sample measured -0.32% (CI95 crossing zero) on fresh draws. Hence the
     objective averages over `N_SELECTION_HOLDOUTS` draws, `improvement_pct` is computed only on
-    the disjoint `N_VALIDATION_HOLDOUTS` draws, and `imputation_lgbm_params.json` is written
-    only when the bootstrap `improvement_ci95` over those draws lies entirely below zero.
+    the `N_VALIDATION_HOLDOUTS` draws, and `imputation_lgbm_params.json` is written only when
+    the bootstrap `improvement_ci95` over those draws lies entirely below zero.
     `best_mae_selection` in the metadata is in-sample for the search and must never be quoted
     as the improvement.
+
+    Disjoint censoring SEEDS are not sufficient, which is why the split is by series.
+    Every draw censors `SYNTHETIC_CENSORING_EVAL_FRACTION` (0.30) of the same clean-row pool,
+    so after n draws the pool is `1 - 0.7**n` covered and the two sets converge on the same
+    rows: measured 82.4% overlap at 5/10 draws and 99.7% (7 fresh rows of 2185) at 15/25. That
+    is a property of the fraction and the draw count, NOT of the panel size, so adding series
+    cannot reduce it -- a 10x panel gives 10x draws of the same 30%. Under seed-only splitting
+    the gate therefore controlled draw noise but not overfitting to the panel, because a winner
+    exploiting this panel's quirks was rewarded by both sets alike.
+    `_split_series_panels()` partitions by `series_id` before any draw is built, so the two
+    sides share no rows at all (verified: 0 overlap, 35 series against 15 on the v1 panel).
+    This also upgrades what the number means: `LatentDemandImputer` re-fits its teacher on
+    whatever panel it is handed, so `improvement_pct` is now measured by a model fitted on
+    series the search never saw. `n_selection_series`/`n_validation_series` record the split.
 
     The decision is the interval, not the sign of the mean: a point comparison passed a winner
     at -1.14% that then measured -0.45% with a straddling interval on fresh draws. The same

@@ -12,7 +12,10 @@ from retail_forecasting.data.censorship import (
     DEFAULT_SUPERVISED_LGBM_PARAMS,
     IMPUTATION_LGBM_PARAMS_FILENAME,
 )
-from retail_forecasting.forecasting.imputation_tuning import tune_imputation_lgbm
+from retail_forecasting.forecasting.imputation_tuning import (
+    _split_series_panels,
+    tune_imputation_lgbm,
+)
 from tests import make_synthetic_panel
 
 METADATA_FILENAME = "imputation_lgbm_tuning_metadata.json"
@@ -57,6 +60,64 @@ def _stub_holdout_maes(
     monkeypatch.setattr(
         "retail_forecasting.forecasting.imputation_tuning._holdout_maes", fake_holdout_maes
     )
+
+
+def test_split_series_panels_shares_no_series_or_rows() -> None:
+    """The validation score is a generalization claim only while the two sides share no data.
+
+    Disjoint censoring seeds are NOT disjoint data: every draw re-censors 30% of the same clean
+    rows, so the two sets converged on identical rows (82.4% overlap at 5/10 draws, 99.7% at
+    15/25) and a winner tuned to the panel's quirks was rewarded by both alike. Partitioning by
+    series is what makes them independent.
+    """
+    panel = make_synthetic_panel(num_series=10, num_days=40)
+
+    selection_panel, validation_panel = _split_series_panels(panel, seed=42)
+
+    selection_series = set(selection_panel["series_id"])
+    validation_series = set(validation_panel["series_id"])
+    assert not selection_series & validation_series
+    assert selection_series | validation_series == set(panel["series_id"])
+    assert not set(selection_panel.index) & set(validation_panel.index)
+    # Both sides must be non-empty, or one of the two scores is undefined.
+    assert selection_series and validation_series
+
+
+def test_split_series_panels_is_seed_stable_and_order_independent() -> None:
+    """Same seed and same series must give the same split, whatever order the rows arrive in."""
+    panel = make_synthetic_panel(num_series=10, num_days=40)
+    shuffled = panel.sample(frac=1.0, random_state=0)
+
+    baseline, _ = _split_series_panels(panel, seed=42)
+    repeated, _ = _split_series_panels(panel, seed=42)
+    reordered, _ = _split_series_panels(shuffled, seed=42)
+
+    assert set(baseline["series_id"]) == set(repeated["series_id"])
+    assert set(baseline["series_id"]) == set(reordered["series_id"])
+
+
+def test_split_series_panels_rejects_a_panel_it_cannot_partition() -> None:
+    single_series = make_synthetic_panel(num_series=1, num_days=40)
+
+    with pytest.raises(ValueError, match="at least 2"):
+        _split_series_panels(single_series, seed=42)
+
+
+def test_tune_imputation_lgbm_records_the_series_split_in_its_metadata(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame
+) -> None:
+    tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+    )
+
+    metadata = json.loads((tmp_path / METADATA_FILENAME).read_text(encoding="utf-8"))
+    # The synthetic panel has 3 series, so the 30% validation share rounds to 1 against 2.
+    assert metadata["n_selection_series"] == 2
+    assert metadata["n_validation_series"] == 1
 
 
 def test_tune_imputation_lgbm_scores_on_disjoint_holdouts(

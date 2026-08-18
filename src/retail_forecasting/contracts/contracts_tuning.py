@@ -106,6 +106,11 @@ class ImputationTuningMetadata(BaseModel):
     persisted: bool
     n_selection_holdouts: int = Field(gt=0)
     n_validation_holdouts: int = Field(gt=0)
+    # Series counts either side of the partition. Recorded because the seeds alone no longer
+    # describe the split: disjoint seeds once meant "same rows, different censoring", and the
+    # validation score is only a generalization claim while these two sets share no series.
+    n_selection_series: int = Field(gt=0)
+    n_validation_series: int = Field(gt=0)
     selection_seeds: list[int]
     validation_seeds: list[int]
     train_rows: int = Field(ge=0)

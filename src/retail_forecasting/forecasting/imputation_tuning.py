@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -21,14 +22,14 @@ from retail_forecasting.data.censorship import (
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.evaluation.reporting import get_git_commit, utc_timestamp
 
-# Number of selection holdouts used to average trial MAE and shrink selection noise.
-N_SELECTION_HOLDOUTS = 5
+N_SELECTION_HOLDOUTS = 15
 
-# Validation holdouts unseen by Optuna used for statistical decision against defaults.
-N_VALIDATION_HOLDOUTS = 10
+N_VALIDATION_HOLDOUTS = 25
 
 # Offset ensuring validation seeds remain disjoint from selection seeds.
 _VALIDATION_SEED_OFFSET = 10_000
+
+_VALIDATION_SERIES_FRACTION = 0.30
 
 _BOOTSTRAP_RESAMPLES = 10_000
 
@@ -37,6 +38,32 @@ _BOOTSTRAP_RESAMPLES = 10_000
 _N_STARTUP_TRIALS = 5
 
 Holdout = tuple[pd.DataFrame, np.ndarray, np.ndarray]
+
+
+def _split_series_panels(
+    panel: pd.DataFrame, seed: int, validation_fraction: float = _VALIDATION_SERIES_FRACTION
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Partition the panel by ``series_id`` into a selection panel and a validation panel.
+
+    Series are sorted before shuffling so the split depends only on ``seed`` and the set of
+    series present, not on the panel's row order. Both sides are guaranteed at least one
+    series, which is what lets the synthetic-panel tests run this path with 3 series.
+
+    Returns:
+        ``(selection_panel, validation_panel)`` sharing no series and therefore no rows.
+    """
+    series = np.sort(panel["series_id"].unique())
+    if len(series) < 2:
+        raise ValueError(
+            "Cannot split the imputation tuning panel by series: it holds "
+            f"{len(series)} series, and a disjoint validation set needs at least 2."
+        )
+    shuffled = np.random.default_rng(seed).permutation(series)
+    n_validation = min(len(series) - 1, max(1, round(len(series) * validation_fraction)))
+    validation_series = set(shuffled[:n_validation])
+
+    is_validation = panel["series_id"].isin(validation_series)
+    return panel.loc[~is_validation].copy(), panel.loc[is_validation].copy()
 
 
 def _build_holdouts(panel: pd.DataFrame, seeds: list[int]) -> list[Holdout]:
@@ -83,12 +110,6 @@ def tune_imputation_lgbm(
 ) -> Path:
     """Search LGBM hyperparameters for the supervised imputer and persist the winner.
 
-    The objective averages that MAE over ``n_selection_holdouts`` independent draws, and the
-    winner is then re-scored against the untuned defaults on ``n_validation_holdouts`` further
-    draws the search never saw. Both guard the same failure: on a single draw the noise between
-    trials is an order of magnitude larger than the difference between hyperparameter sets, so
-    a single-draw search selects the lucky trial and reports its in-sample score as a gain.
-
     The winning params are persisted ONLY if the bootstrap CI95 of their per-draw improvement
     over the defaults lies entirely below zero -- a mean that merely happens to be negative is
     what a coin flip looks like, and persisting it would silently switch the pipeline to
@@ -116,39 +137,39 @@ def tune_imputation_lgbm(
         split="train",
     )
 
+    selection_panel, validation_panel = _split_series_panels(panel, seed)
+    n_selection_series = int(selection_panel["series_id"].nunique())
+    n_validation_series = int(validation_panel["series_id"].nunique())
+
     selection_seeds = [seed + i for i in range(n_selection_holdouts)]
     validation_seeds = [seed + _VALIDATION_SEED_OFFSET + i for i in range(n_validation_holdouts)]
-    selection = _build_holdouts(panel, selection_seeds)
-    validation = _build_holdouts(panel, validation_seeds)
+    selection = _build_holdouts(selection_panel, selection_seeds)
+    validation = _build_holdouts(validation_panel, validation_seeds)
+    print(
+        f"🧬 Series split: {n_selection_series} for selection, {n_validation_series} for "
+        f"validation (disjoint — no shared rows)"
+    )
     print(
         f"🎲 {len(selection)} selection holdouts (seeds {selection_seeds}), "
         f"{len(validation)} validation holdouts (seeds {validation_seeds})"
     )
 
-    # max_depth pulled back to 2-8 after a widened 2-16 run showed no signal past ~5: LightGBM
-    # grows leaf-wise, so with num_leaves left at its default of 31 every depth >= 5 already
-    # admits 2**5 = 32 >= 31 leaves and is capacity-equivalent -- the real capacity knob is
-    # num_leaves, not max_depth, so it now enters the search directly. min_child_samples also
-    # joins since the teacher trains on only ~3-4k clean-day rows, well under LGBM's default of
-    # 20 per leaf being a meaningfully binding constraint. n_estimators/learning_rate keep the
-    # ranges from the widened run: that run's winner sat deep in the interior on both (2659,
-    # 0.0043), away from either edge.
     def objective(trial: optuna.Trial) -> float:
         subsample = trial.suggest_float("subsample", 0.4, 1.0)
         params = {
             "n_estimators": trial.suggest_int("n_estimators", 50, 8000),
             "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
-            "max_depth": trial.suggest_int("max_depth", 2, 8),
-            "num_leaves": trial.suggest_int("num_leaves", 4, 256, log=True),
-            "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
-            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.4, 1.0),
+            "max_depth": trial.suggest_int("max_depth", 2, 12),
+            "num_leaves": trial.suggest_int("num_leaves", 4, 1024, log=True),
+            "min_child_samples": trial.suggest_int("min_child_samples", 2, 100),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.3, 1.0),
             "subsample": subsample,
             "subsample_freq": 1 if subsample < 1.0 else 0,
-            "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-            "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
-            "min_data_per_group": trial.suggest_int("min_data_per_group", 5, 100),
+            "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 100.0, log=True),
+            "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 100.0, log=True),
+            "min_data_per_group": trial.suggest_int("min_data_per_group", 1, 100),
             "cat_smooth": trial.suggest_float("cat_smooth", 1.0, 50.0),
-            "max_bin": trial.suggest_int("max_bin", 31, 255),
+            "max_bin": trial.suggest_int("max_bin", 8, 255),
         }
         return float(np.mean(_holdout_maes(selection, params)))
 
@@ -160,18 +181,17 @@ def tune_imputation_lgbm(
             "optional ML backends with: uv sync --extra dev --extra ml"
         ) from exc
 
-    # LightGBM and torch each bring their own OpenMP runtime, and on macOS the two loaded in one
-    # process segfault the moment the GP fits (KMP_DUPLICATE_LIB_OK does not help). Confining
-    # torch to one thread avoids it, and costs nothing here: the GP fit is milliseconds next to
-    # the LGBM fits it is choosing between, which are themselves single-threaded.
     torch.set_num_threads(1)
 
-    # GP over TPE: low-dimensional params and a costly objective (one LGBM fit per selection
-    # holdout per trial) under a budget of tens of trials, where TPE would still be in its random
-    # startup phase. GP also models correlations between hyperparameters.
+    models_dir = settings.models.models_dir
+    models_dir.mkdir(parents=True, exist_ok=True)
+    study_name = f"imputation_lgbm_seed{seed}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
+
     study = optuna.create_study(
         direction="minimize",
         sampler=optuna.samplers.GPSampler(seed=seed, n_startup_trials=_N_STARTUP_TRIALS),
+        storage=f"sqlite:///{models_dir / 'imputation_tuning_studies.db'}",
+        study_name=study_name,
     )
     study.optimize(objective, n_trials=n_trials)
 
@@ -227,6 +247,8 @@ def tune_imputation_lgbm(
         persisted=beats_default,
         n_selection_holdouts=len(selection),
         n_validation_holdouts=len(validation),
+        n_selection_series=n_selection_series,
+        n_validation_series=n_validation_series,
         selection_seeds=selection_seeds,
         validation_seeds=validation_seeds,
         train_rows=int(len(selection[0][0]) - len(selection[0][1])),
@@ -237,8 +259,6 @@ def tune_imputation_lgbm(
         best_params=best_params,
     )
 
-    models_dir = settings.models.models_dir
-    models_dir.mkdir(parents=True, exist_ok=True)
     metadata_path = models_dir / "imputation_lgbm_tuning_metadata.json"
     metadata_path.write_text(json.dumps(metadata.model_dump(), indent=2), encoding="utf-8")
 
