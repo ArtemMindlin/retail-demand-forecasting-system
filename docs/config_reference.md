@@ -281,17 +281,18 @@ target_lead_time_demand(t, h) = demand[t] + ... + demand[t + h - 1]
 Tambien afecta a la validacion: el entrenamiento debe terminar al menos
 `horizon` dias antes de la validacion para evitar leakage.
 
-### `use_eval_as_holdout`
+### Split `eval` (no hay flag que lo controle)
 
-Indica si se usa el split oficial `eval` como holdout.
+No existe ninguna opcion de configuracion para el holdout externo. `run_experiment` carga
+siempre el split oficial `eval` y lo pasa como `holdout_panel`; el plano OPS lo consume
+origen a origen. Una version anterior de este documento describia un flag
+`use_eval_as_holdout` que no existe en `src/` y que `validate_settings()` nunca valido.
 
-Actualmente debe ser:
-
-```yaml
-use_eval_as_holdout: false
-```
-
-Esta bloqueado hasta verificar la semantica temporal del split `eval`.
+`top_n_series`, `min_history_days` y `max_rows` definen el universo de series y se
+aplican SOLO al split `train`. Los splits restantes heredan ese universo, porque
+recalcularlo sobre un split corto vacia el panel (`min_history_days: 70` contra 7 dias
+por serie) o selecciona series distintas de las entrenadas (`top_n_series`). Ver
+invariante 14.
 
 ## `PreprocessingConfig`
 
@@ -819,7 +820,6 @@ Si es `false`, solo escribe artefactos tabulares y Markdown.
 experimento, por ejemplo:
 
 - dataset no soportado;
-- `use_eval_as_holdout=true`;
 - horizonte, folds, lags, ventanas, costes o trials no positivos;
 - cuantiles vacios, duplicados, desordenados o fuera de `(0, 1)`;
 - `reporting.output_dir` dentro de `data/`.

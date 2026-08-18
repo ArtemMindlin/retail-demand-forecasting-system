@@ -35,7 +35,7 @@ Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/c
 
 CatBoost is the current champion model, selected by simulated logistic cost (Order-Up-To), not by MAE or Winkler Score alone — point-error and logistic-cost rankings can (and do) invert.
 
-The official `eval` split is intentionally not wired as a holdout until its temporal semantics are verified.
+The official `eval` split is wired as an external holdout and its temporal semantics are verified: the 7 days immediately after the train split. A non-train split inherits train's series universe rather than recomputing one — applying `min_history_days`/`top_n_series` to a 7-day split emptied it entirely (and, had it not, would have selected 50 series the model never trained on). A holdout that prepares to zero rows now raises instead of being skipped. Note the scope: horizon 7 over a 7-day split leaves ONE origin per series (50 rows, all 2024-06-26), so it corroborates the walk-forward and cannot rank models by itself. Every number currently in the thesis predates this and comes from the walk-forward. See invariant 14.
 
 ## Core Pipeline
 

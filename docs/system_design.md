@@ -277,8 +277,13 @@ pendiente.
 
 ### Pendiente
 
-- **Split `eval` oficial como holdout.** Deliberadamente no cableado hasta
-  verificar su semantica temporal; hoy la evaluacion sale del walk-forward.
+- **Split `eval` oficial como holdout: un solo origen.** Ya funciona: un split que no
+  sea train hereda el universo de series del train en vez de recalcularlo, y un holdout
+  vacio falla el run en vez de saltarse. Pero con horizonte 7 sobre un split de 7 dias
+  solo sobrevive UN origen por serie (50 filas, todas del 2024-06-26): es una
+  comprobacion transversal a una sola fecha, sin replicacion temporal, asi que corrobora
+  al walk-forward y no puede rankear modelos por si sola. Las cifras actuales del TFG son
+  anteriores a esto y salen del walk-forward. Ver invariante 14.
 - **Mas de un dataset.** La v1 solo soporta `FreshRetailNet-50K` a traves de
   `dataset.source = fresh_retailnet`.
 - **Conformal ponderado ante covariate shift.** La garantia actual asume

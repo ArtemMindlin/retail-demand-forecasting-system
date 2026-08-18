@@ -83,7 +83,60 @@ These rules protect the experimental validity and architecture of the project.
     analysis, and the wrong one for `summarize_predictions()`: MAE, Winkler and
     coverage must not be computed on it.
 
-14. `dataset.use_eval_as_holdout = true` must remain unsupported until the temporal meaning of the official eval split is documented and tested.
+14. The official `eval` split is wired as an external holdout, and its rows must never
+    reach a training target.
+
+    Its temporal semantics are verified: the raw split covers 2024-06-26 to 2024-07-02, the
+    7 days immediately following the train split's last date (2024-06-25), 7 days per series.
+    A clean forward holdout, so `run_experiment` loads it unconditionally
+    (`forecasting/pipeline.py`) and the OPS plane streams it origin by origin.
+
+    What this invariant protects is the frame construction, not the loading.
+    `_build_supervised_frames` concatenates `panel + holdout_panel` before calling
+    `build_supervised_frame` so the holdout rows get correct lag history, then keeps ONLY
+    holdout-date rows. Both halves are load-bearing: without the concatenation the holdout's
+    lags are null, and without the date filter the last `horizon - 1` train rows get targets
+    covering holdout days via `shift(-horizon)` -- the same embargo as invariants 11 and 12,
+    applied across the split boundary.
+
+    A split other than `train` must INHERIT train's series universe, never recompute one.
+    `prepare_daily_panel` takes `restrict_to_series` for this, and `load_prepared_panel` loads
+    the train panel first to supply it. Both universe filters are wrong on a short forward
+    split, in different ways:
+
+    - `min_history_days` (70) counts days inside the split, so a 7-day split loses every
+      series and the panel prepares EMPTY. This is what actually happened: holdout evaluation
+      silently did not run in any experiment to date, and every number in the thesis comes
+      from the walk-forward.
+    - `top_n_series` ranks by demand summed over the split, so the top 50 of 7 days is a
+      different set than the top 50 of train's 90 days -- measured on the real data: ZERO
+      overlap, i.e. a populated holdout of 50 series the model never trained on. This is the
+      more dangerous half, because it fails without looking empty.
+
+    `max_rows` is excluded for the same reason: it truncates by raw row order, so on an
+    inherited split it would cut days off some series and not others.
+
+    A holdout that vanishes must fail the run, never be skipped. Two silent drops are now
+    loud: `load_prepared_panel` raises when a non-train split prepares to zero rows, and
+    `_evaluate_on_holdout` raises on an EMPTY frame while still accepting `None` (which
+    legitimately means no holdout was requested -- the synthetic-panel tests and the
+    fair-cost backtest run that way). This mirrors invariant 32's rule for the web layer: an
+    empty state must never read as a result. An empty CACHED non-train panel is rebuilt rather
+    than served, since it is an artifact of the old filters; the cache key is deliberately NOT
+    bumped, as that would orphan the pre-built OPS split whose `.built` sentinel stops
+    `make simulate` from regenerating it.
+
+    Scope of what the holdout can support: with horizon 7 and a 7-day split, exactly ONE
+    origin per series survives target construction -- 50 rows, all dated 2024-06-26. It is a
+    single-date, cross-sectional check with no temporal replication, so it corroborates the
+    walk-forward; it cannot rank models on its own and its metrics carry no time-series
+    uncertainty. The OPS plane is unaffected by all of this: `scripts/build_ops_sim_split.py`
+    writes its own pre-built split under the cache filename, returned from cache before any
+    of this logic runs.
+
+    Covered by `tests/test_holdout_split.py`. The `dataset.use_eval_as_holdout` flag this
+    invariant once named no longer exists anywhere in `src/`, and `validate_settings()` does
+    not mention `eval`.
 
 ## Models
 
