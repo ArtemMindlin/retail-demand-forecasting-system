@@ -1,6 +1,11 @@
 # Generated model artifacts (written to ./models at runtime)
 /models/
 
+# MLflow tracking store for the imputation tuning entry point. Local-only, like reports/: a
+# record of past searches, not a source input.
+/mlflow.db
+/mlruns/
+
 # Byte-compiled Python
 __pycache__/
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -36,6 +37,11 @@ _BOOTSTRAP_RESAMPLES = 10_000
 # Random trials before the GP starts guiding the search. Kept below Optuna's default of 10 so a
 # 40-trial budget does not spend a quarter of itself sampling at random.
 _N_STARTUP_TRIALS = 5
+
+# MLflow experiment collecting every imputation search, so runs stay comparable across time.
+_MLFLOW_EXPERIMENT = "imputation_lgbm_tuning"
+
+_MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 
 Holdout = tuple[pd.DataFrame, np.ndarray, np.ndarray]
 
@@ -99,6 +105,82 @@ def _bootstrap_ci95(deltas: np.ndarray, seed: int) -> tuple[float, float]:
     rng = np.random.default_rng(seed)
     means = rng.choice(deltas, size=(_BOOTSTRAP_RESAMPLES, len(deltas)), replace=True).mean(axis=1)
     return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
+
+
+def _configure_mlflow() -> None:
+    """Point MLflow at its tracking store and select the imputation-tuning experiment.
+
+    Imported locally, like torch elsewhere in this module, so importing this module does not
+    require the ``ml`` extra -- the contract tests exercise the persist gate without it.
+    """
+    import mlflow
+
+    if not os.environ.get("MLFLOW_TRACKING_URI"):
+        mlflow.set_tracking_uri(_MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(_MLFLOW_EXPERIMENT)
+
+
+def _log_study_to_mlflow(
+    study: optuna.Study,
+    metadata: ImputationTuningMetadata,
+    metadata_path: Path,
+    params_path: Path,
+    beats_default: bool,
+) -> None:
+    """Record one completed search in MLflow: winner, validation verdict, and its artifacts.
+
+    Called once, after the search and the persist decision are already final -- this only
+    translates what ``tune_imputation_lgbm`` already computed and already wrote to disk, so a
+    tracking failure here cannot cost the run its actual output.
+
+    Also logs the per-trial convergence curve from ``study`` (persisted in step 1's Optuna
+    storage), as two metric series sharing the trial number as their step: ``trial_mae``, the
+    raw value the GP explored trial by trial, and ``trial_mae_best_so_far``, its running
+    minimum -- the one that actually answers "is this still improving or has it stalled".
+
+    Imported locally, like torch and in ``_configure_mlflow``, so importing this module does not
+    require the ``ml`` extra.
+    """
+    import mlflow
+
+    with mlflow.start_run(run_name=study.study_name):
+        mlflow.log_params(metadata.best_params.model_dump())
+        mlflow.log_params(
+            {
+                "n_trials": metadata.n_trials_requested,
+                "seed": metadata.seed,
+                "n_selection_series": metadata.n_selection_series,
+                "n_validation_series": metadata.n_validation_series,
+            }
+        )
+        mlflow.log_metrics(
+            {
+                "mae_selection_best": metadata.best_mae_selection,
+                "mae_validation_tuned": metadata.best_mae_validation,
+                "mae_validation_default": metadata.default_mae_validation,
+                "improvement_pct": metadata.improvement_pct,
+                "improvement_ci95_low": metadata.improvement_ci95[0],
+                "improvement_ci95_high": metadata.improvement_ci95[1],
+            }
+        )
+        mlflow.set_tags(
+            {
+                "persisted": str(metadata.persisted),
+                "git_commit": metadata.git_commit or "unknown",
+            }
+        )
+
+        best_so_far = float("inf")
+        for trial in study.trials:
+            if trial.value is None:
+                continue
+            best_so_far = min(best_so_far, trial.value)
+            mlflow.log_metric("trial_mae", trial.value, step=trial.number)
+            mlflow.log_metric("trial_mae_best_so_far", best_so_far, step=trial.number)
+
+        mlflow.log_artifact(str(metadata_path))
+        if beats_default:
+            mlflow.log_artifact(str(params_path))
 
 
 def tune_imputation_lgbm(
@@ -280,8 +362,24 @@ def tune_imputation_lgbm(
         if params_path.exists():
             params_path.unlink()
             print(f"🧹 Removed the superseded params file: {params_path}\n")
+        _configure_mlflow()
+        _log_study_to_mlflow(
+            study=study,
+            metadata=metadata,
+            metadata_path=metadata_path,
+            params_path=params_path,
+            beats_default=beats_default,
+        )
         return metadata_path
 
     params_path.write_text(json.dumps(best_params.model_dump(), indent=2), encoding="utf-8")
     print(f"\n✅ Tuned imputation hyperparameters written to: {params_path}\n")
+    _configure_mlflow()
+    _log_study_to_mlflow(
+        study=study,
+        metadata=metadata,
+        metadata_path=metadata_path,
+        params_path=params_path,
+        beats_default=beats_default,
+    )
     return params_path

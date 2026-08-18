@@ -16,7 +16,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 - `src/retail_forecasting/config.py`: typed settings loaded from YAML.
 - `src/retail_forecasting/data/`: raw dataset loading, raw-to-panel preparation, and `censorship.py` (`LatentDemandImputer` — stockout/censored-demand reconstruction strategies).
 - `src/retail_forecasting/features/`: supervised frame creation, temporal features, and target construction.
-- `src/retail_forecasting/forecasting/`: walk-forward validation, conformal calibration, imputation comparison, fair-cost backtesting, and experiment/retrain/scoring orchestration (`pipeline.py`); `imputation_tuning.py` runs a separate Optuna search over the supervised imputer's LGBM hyperparameters and persists the winner (never fitted weights) to `models.models_dir/imputation_lgbm_params.json`.
+- `src/retail_forecasting/forecasting/`: walk-forward validation, conformal calibration, imputation comparison, fair-cost backtesting, and experiment/retrain/scoring orchestration (`pipeline.py`); `imputation_tuning.py` runs a separate Optuna search over the supervised imputer's LGBM hyperparameters and persists the winner (never fitted weights) to `models.models_dir/imputation_lgbm_params.json`. It is the only entry point that logs to MLflow (`mlflow.db`, browsable via `make mlflow-ui`); every other run mode still writes its artifacts under `reports/`, which the dashboard and `utils/latex_exporter.py` read.
 - `src/retail_forecasting/models/`: forecast models only (`naive.py`, `boosting.py` for LightGBM, `catboosting.py` for CatBoost — the current champion).
 - `src/retail_forecasting/inventory/`: newsvendor order quantity, cost profiles, optimization, and dynamic simulation logic.
 - `src/retail_forecasting/simulation/`: OPS-plane rolling-origin production backtest, reused by the dashboard's `/ops/` view. Independent single-period Newsvendor decisions — no inventory state, no lead time — so its costs rank policies rather than reproduce a replenishment ledger.
@@ -101,10 +101,16 @@ uv sync --extra dev
 ```
 
 Install optional ML backends (required by `run_mode = tune_imputation`, whose Optuna GPSampler
-needs the `torch` backend):
+needs the `torch` backend and whose experiment tracking needs `mlflow`):
 
 ```bash
 uv sync --extra dev --extra ml
+```
+
+Browse past imputation tuning searches (MLflow UI at `http://localhost:5000`):
+
+```bash
+make mlflow-ui
 ```
 
 Run tests:

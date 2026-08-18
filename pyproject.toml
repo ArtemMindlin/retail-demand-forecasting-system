@@ -78,6 +78,10 @@ ml = [
   # Optuna's GPSampler backend, used only by the offline imputation tuning entry point.
   "torch>=2.2.0",
   "greenlet>=3.0.0",
+  # Experiment tracking for the imputation tuning entry point. Declared here, not as a core
+  # dependency, because only that entry point logs to it -- the forecasting pipeline still
+  # writes its artifacts to reports/, which the dashboard and utils/latex_exporter.py read.
+  "mlflow>=2.16.0",
 ]
 
 [project.scripts]
