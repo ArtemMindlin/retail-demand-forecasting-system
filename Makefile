@@ -3,6 +3,10 @@ PYTHON = uv run python
 PYTEST = uv run pytest
 CONFIG = configs/experiment.yaml
 SIM_CONFIG = configs/simulation.yaml
+# The imputation search has its own config on purpose: it must be tuned at the scale the
+# imputation study runs at (500 series), not at experiment.yaml's 50. A winner tuned on 50
+# series measured 12.4% WORSE than the untuned defaults at 500. See docs/invariants.md 41.
+TUNE_CONFIG = configs/imputation_tuning.yaml
 OPS_SPLIT = data/processed/ops_sim/.built
 SNAPSHOT = current
 REPORTS = reports
@@ -35,7 +39,7 @@ backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common gro
 	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode fair_cost_backtest
 
 tune-imputation: ## Tune LGBM hyperparameters for the supervised imputer, persist to disk
-	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode tune_imputation
+	$(PYTHON) -m retail_forecasting.run --config $(TUNE_CONFIG) --run-mode tune_imputation
 
 mlflow-ui: ## Browse past imputation tuning searches at http://localhost:5000
 	uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
