@@ -37,8 +37,11 @@ IMPUTATION_LGBM_PARAMS_FILENAME = "imputation_lgbm_params.json"
 SYNTHETIC_CENSORING_EVAL_FRACTION = 0.30
 
 
-def _synthetic_censor_holdout(
-    panel: pd.DataFrame, seed: int, eval_fraction: float = SYNTHETIC_CENSORING_EVAL_FRACTION
+def synthetic_censor_holdout(
+    panel: pd.DataFrame,
+    seed: int,
+    eval_fraction: float = SYNTHETIC_CENSORING_EVAL_FRACTION,
+    censorable_mask: pd.Series | None = None,
 ) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     """Hold out a sample of CLEAN days and synthetically censor them.
 
@@ -48,12 +51,30 @@ def _synthetic_censor_holdout(
     of real stockouts, and its sale is reduced proportionally -- giving a synthetic stand-in
     for a censored day with a known ground truth, reusable by any strategy-scoring function.
 
+    Args:
+        panel: The panel to censor. The imputer is later fitted on THIS panel's remaining
+            clean days, so its width sets the teacher's training size.
+        seed: Draw seed.
+        eval_fraction: Share of eligible clean rows to censor.
+        censorable_mask: Restricts which rows participate, without shrinking the panel. This is
+            the difference between "score a smaller panel" and "score one window of a full
+            panel": the teacher keeps its whole training set either way, and only the evaluation
+            targets move. The imputation search uses it to hold out a time window while the
+            teacher still sees the deployment-sized panel. Note it restricts BOTH the rows that
+            may be censored AND the real stockouts the severity ratios are drawn from -- see the
+            comment at the intersection below for why the second one is not optional. Defaults
+            to all rows.
+
     Returns (censored_panel, eval_idx, true_demand); eval_idx/true_demand are empty when the
-    panel has no clean or no censored rows to draw the synthetic ratio from.
+    panel has no eligible clean rows, or no censored rows to draw the synthetic ratio from.
     """
     rng = np.random.default_rng(seed)
     clean_mask = panel["stockout_hours"] == 0
-    real_ratios = panel.loc[panel["stockout_hours"] > 0, "stockout_hours"] / OPERATIVE_WINDOW_HOURS
+    stockout_mask = panel["stockout_hours"] > 0
+    if censorable_mask is not None:
+        clean_mask = clean_mask & censorable_mask
+        stockout_mask = stockout_mask & censorable_mask
+    real_ratios = panel.loc[stockout_mask, "stockout_hours"] / OPERATIVE_WINDOW_HOURS
     clean_idx = panel.index[clean_mask]
     if len(clean_idx) == 0 or len(real_ratios) == 0:
         return panel.copy(), np.array([], dtype=int), np.array([], dtype=float)

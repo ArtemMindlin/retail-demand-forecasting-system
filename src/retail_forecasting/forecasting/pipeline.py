@@ -19,7 +19,7 @@ from retail_forecasting.data.censorship import (
     SYNTHETIC_CENSORING_EVAL_FRACTION,
     ImputationStrategy,
     LatentDemandImputer,
-    _synthetic_censor_holdout,
+    synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.data.quality import (
@@ -149,7 +149,7 @@ def _evaluate_imputation_quality(
 ) -> pd.DataFrame:
     """Score each imputation strategy by direct reconstruction error.
 
-    See ``_synthetic_censor_holdout`` for how the ground-truth evaluation set is built.
+    See ``synthetic_censor_holdout`` for how the ground-truth evaluation set is built.
 
     ``imputer_params_path`` must be the same tuned-params file the rest of the pipeline
     uses, or ``supervised`` here would be a different model from the one that runs in
@@ -158,7 +158,7 @@ def _evaluate_imputation_quality(
     Returns a DataFrame: strategy, mae, rmse, bias, mape, n_eval (lower MAE/RMSE = better,
     bias near 0 = unbiased).
     """
-    censored, eval_idx, true_demand = _synthetic_censor_holdout(panel, seed)
+    censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed)
     if len(eval_idx) == 0:
         return pd.DataFrame(columns=["strategy", "mae", "rmse", "bias", "mape", "n_eval"])
     n_eval = len(eval_idx)

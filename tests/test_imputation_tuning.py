@@ -11,9 +11,11 @@ from retail_forecasting.config import ModelConfig, Settings
 from retail_forecasting.data.censorship import (
     DEFAULT_SUPERVISED_LGBM_PARAMS,
     IMPUTATION_LGBM_PARAMS_FILENAME,
+    synthetic_censor_holdout,
 )
 from retail_forecasting.forecasting.imputation_tuning import (
-    _split_series_panels,
+    _build_holdout_set,
+    _split_temporal_windows,
     tune_imputation_lgbm,
 )
 from tests import make_synthetic_panel
@@ -79,8 +81,8 @@ def _stub_holdout_maes(
 ) -> None:
     """Score the untuned defaults, the planted incumbent, and everything else at fixed MAEs.
 
-    One value per validation draw, so the tests drive the bootstrap interval the persist
-    gate decides on -- not just its mean.
+    One value per validation draw, so the tests drive the confidence interval the persist gate
+    decides on -- not just its mean.
     """
 
     def fake_holdout_maes(holdouts, params) -> np.ndarray:
@@ -96,50 +98,50 @@ def _stub_holdout_maes(
     )
 
 
-def test_split_series_panels_shares_no_series_or_rows() -> None:
-    """The validation score is a generalization claim only while the two sides share no data.
+def test_split_temporal_windows_are_disjoint_and_cover_the_panel() -> None:
+    """The two windows must partition the calendar, and neither may be empty.
 
-    Disjoint censoring seeds are NOT disjoint data: every draw re-censors 30% of the same clean
-    rows, so the two sets converged on identical rows (82.4% overlap at 5/10 draws, 99.7% at
-    15/25) and a winner tuned to the panel's quirks was rewarded by both alike. Partitioning by
-    series is what makes them independent.
+    The axis is TIME, not series: both windows hold every series, and the teacher is fitted on
+    the whole panel. Disjoint censoring seeds alone were never enough (every draw re-censors 30%
+    of the same clean rows, so the two sets converged -- 99.7% overlap at 15/25 draws), and the
+    earlier fix of partitioning by series shrank the teacher to a third of deployment size,
+    which measurably changed the answer instead of merely adding noise.
     """
-    panel = make_synthetic_panel(num_series=10, num_days=40)
+    panel = make_synthetic_panel(num_series=10, num_days=90)
 
-    selection_panel, validation_panel = _split_series_panels(panel, seed=42)
+    selection_mask, validation_mask = _split_temporal_windows(panel)
 
-    selection_series = set(selection_panel["series_id"])
-    validation_series = set(validation_panel["series_id"])
-    assert not selection_series & validation_series
-    assert selection_series | validation_series == set(panel["series_id"])
-    assert not set(selection_panel.index) & set(validation_panel.index)
-    # Both sides must be non-empty, or one of the two scores is undefined.
-    assert selection_series and validation_series
-
-
-def test_split_series_panels_is_seed_stable_and_order_independent() -> None:
-    """Same seed and same series must give the same split, whatever order the rows arrive in."""
-    panel = make_synthetic_panel(num_series=10, num_days=40)
-    shuffled = panel.sample(frac=1.0, random_state=0)
-
-    baseline, _ = _split_series_panels(panel, seed=42)
-    repeated, _ = _split_series_panels(panel, seed=42)
-    reordered, _ = _split_series_panels(shuffled, seed=42)
-
-    assert set(baseline["series_id"]) == set(repeated["series_id"])
-    assert set(baseline["series_id"]) == set(reordered["series_id"])
+    assert not (selection_mask & validation_mask).any(), "a row cannot be in both windows"
+    assert (selection_mask | validation_mask).all(), "every row belongs to one window"
+    assert selection_mask.any() and validation_mask.any()
+    assert panel.loc[selection_mask, "date"].max() < panel.loc[validation_mask, "date"].min()
+    # Every series is present on BOTH sides -- that is what keeps the teacher at full size.
+    assert set(panel.loc[selection_mask, "series_id"]) == set(
+        panel.loc[validation_mask, "series_id"]
+    )
 
 
-def test_split_series_panels_rejects_a_panel_it_cannot_partition() -> None:
-    single_series = make_synthetic_panel(num_series=1, num_days=40)
+def test_split_temporal_windows_holds_back_the_last_third_of_the_calendar() -> None:
+    panel = make_synthetic_panel(num_series=3, num_days=90)
+
+    _, validation_mask = _split_temporal_windows(panel)
+
+    validation_days = panel.loc[validation_mask, "date"].nunique()
+    assert validation_days == 30
+    assert panel.loc[validation_mask, "date"].min() == sorted(panel["date"].unique())[60]
+
+
+def test_split_temporal_windows_rejects_a_panel_it_cannot_partition() -> None:
+    single_day = make_synthetic_panel(num_series=3, num_days=1)
 
     with pytest.raises(ValueError, match="at least 2"):
-        _split_series_panels(single_series, seed=42)
+        _split_temporal_windows(single_day)
 
 
-def test_tune_imputation_lgbm_records_the_series_split_in_its_metadata(
+def test_tune_imputation_lgbm_records_the_temporal_split_in_its_metadata(
     tmp_path: Path, patched_train_only_loader: pd.DataFrame
 ) -> None:
+    panel = patched_train_only_loader
     tune_imputation_lgbm(
         _settings(tmp_path),
         n_trials=2,
@@ -149,9 +151,13 @@ def test_tune_imputation_lgbm_records_the_series_split_in_its_metadata(
     )
 
     metadata = json.loads((tmp_path / METADATA_FILENAME).read_text(encoding="utf-8"))
-    # The synthetic panel has 3 series, so the 30% validation share rounds to 1 against 2.
-    assert metadata["n_selection_series"] == 2
-    assert metadata["n_validation_series"] == 1
+    assert metadata["n_series"] == panel["series_id"].nunique()
+    assert metadata["selection_window_end"] < metadata["validation_window_start"]
+    assert metadata["n_selection_eval_rows"] > 0
+    assert metadata["n_validation_eval_rows"] > 0
+    # The teacher must see far more clean rows than any single window can score: it is fitted
+    # on the WHOLE panel, which is the entire point of masking instead of splitting.
+    assert metadata["teacher_fit_rows"] > metadata["n_validation_eval_rows"]
 
 
 def test_tune_imputation_lgbm_scores_on_disjoint_holdouts(
@@ -364,3 +370,72 @@ def test_tune_imputation_lgbm_has_no_incumbent_to_beat_on_a_first_run(
     assert metadata["beats_incumbent"] is None
     assert metadata["incumbent_mae_validation"] is None
     assert metadata["persisted"] is True
+
+
+def test_censoring_draws_its_severity_from_the_same_window_it_censors() -> None:
+    """A faked stockout must borrow its severity from a REAL stockout of its own window.
+
+    The severity pool is what makes a synthetic stockout resemble a real one, so drawing it
+    from outside the window imports that period's severity. Measured on the v1 panel: the early
+    window's real stockouts hide 43.4% of a day against the late window's 30.5%, and 76% of all
+    stockout rows sit in the early window -- so an unrestricted pool was effectively the early
+    window's, and late-window rows got censored ~32% harder than they ever are. That erases, on
+    the severity axis, the very regime shift a temporal holdout exists to measure.
+
+    Pinned with disjoint severities per window so a leak is unambiguous rather than statistical.
+    """
+    early_hours, late_hours = 4.0, 12.0
+    rows = []
+    for series in (1, 2):
+        for day in range(12):
+            date = pd.Timestamp("2024-01-01") + pd.Timedelta(days=day)
+            # Alternate clean / stockout so both windows hold some of each.
+            hours = 0.0 if day % 2 == 0 else (early_hours if day < 8 else late_hours)
+            rows.append(
+                {
+                    "date": date,
+                    "series_id": f"{series}_10{series}",
+                    "observed_demand": 10.0 + day,
+                    "stockout_hours": hours,
+                }
+            )
+    panel = pd.DataFrame(rows)
+
+    selection_mask, validation_mask = _split_temporal_windows(panel)
+    assert set(panel.loc[selection_mask & (panel["stockout_hours"] > 0), "stockout_hours"]) == {
+        early_hours
+    }
+    assert set(panel.loc[validation_mask & (panel["stockout_hours"] > 0), "stockout_hours"]) == {
+        late_hours
+    }
+
+    for window_name, mask, own, foreign in (
+        ("selection", selection_mask, early_hours, late_hours),
+        ("validation", validation_mask, late_hours, early_hours),
+    ):
+        for seed in range(6):
+            censored, eval_idx, _ = synthetic_censor_holdout(panel, seed=seed, censorable_mask=mask)
+            stamped = set(censored.loc[eval_idx, "stockout_hours"])
+            assert stamped == {own}, (
+                f"{window_name} draw (seed {seed}) stamped {stamped}, expected only {own} -- "
+                f"{foreign} would mean the severity pool leaked across the window boundary"
+            )
+
+
+def test_holdout_set_owns_its_window_dates_and_derived_counts() -> None:
+    panel = make_synthetic_panel(num_series=3, num_days=90)
+    selection_mask, validation_mask = _split_temporal_windows(panel)
+
+    selection = _build_holdout_set(panel, [1, 2, 3], selection_mask)
+    validation = _build_holdout_set(panel, [9001, 9002], validation_mask)
+
+    # Dates come from the masks themselves, never from arithmetic around a cut date.
+    assert selection.window_start == panel.loc[selection_mask, "date"].min()
+    assert selection.window_end == panel.loc[selection_mask, "date"].max()
+    assert selection.window_end < validation.window_start
+    assert selection.n_eval_rows > 0 and validation.n_eval_rows > 0
+    # The teacher sees the whole panel, so its training set dwarfs either window's scored rows.
+    assert selection.teacher_fit_rows > selection.n_eval_rows
+    assert selection.teacher_fit_rows == validation.teacher_fit_rows + (
+        validation.n_eval_rows - selection.n_eval_rows
+    )

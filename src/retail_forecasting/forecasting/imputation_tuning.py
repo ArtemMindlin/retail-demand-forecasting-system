@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import optuna
 import pandas as pd
+from scipy import stats
 
 from retail_forecasting.config import Settings
 from retail_forecasting.contracts.contracts_tuning import (
@@ -18,7 +21,7 @@ from retail_forecasting.data.censorship import (
     DEFAULT_SUPERVISED_LGBM_PARAMS,
     IMPUTATION_LGBM_PARAMS_FILENAME,
     LatentDemandImputer,
-    _synthetic_censor_holdout,
+    synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.evaluation.reporting import get_git_commit, utc_timestamp
@@ -27,15 +30,10 @@ N_SELECTION_HOLDOUTS = 15
 
 N_VALIDATION_HOLDOUTS = 25
 
-# Offset ensuring validation seeds remain disjoint from selection seeds.
 _VALIDATION_SEED_OFFSET = 10_000
 
-_VALIDATION_SERIES_FRACTION = 0.30
+_VALIDATION_WINDOW_FRACTION = 1.0 / 3.0
 
-_BOOTSTRAP_RESAMPLES = 10_000
-
-# Random trials before the GP starts guiding the search. Kept below Optuna's default of 10 so a
-# 40-trial budget does not spend a quarter of itself sampling at random.
 _N_STARTUP_TRIALS = 5
 
 # MLflow experiment collecting every imputation search, so runs stay comparable across time.
@@ -43,51 +41,116 @@ _MLFLOW_EXPERIMENT = "imputation_lgbm_tuning"
 
 _MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 
-Holdout = tuple[pd.DataFrame, np.ndarray, np.ndarray]
+
+class Holdout(NamedTuple):
+    """One synthetic-censoring draw: a panel with some clean days faked, plus the answer key."""
+
+    censored: pd.DataFrame
+    """The full panel with ``eval_idx`` rows disguised as stockouts. Full-size on purpose: the
+    imputer re-fits on whatever panel it is handed, so shrinking it would shrink the teacher."""
+
+    eval_idx: np.ndarray
+    """Index labels of the faked rows -- which rows to score."""
+
+    true_demand: np.ndarray
+    """Demand those rows really had, aligned with ``eval_idx``."""
 
 
-def _split_series_panels(
-    panel: pd.DataFrame, seed: int, validation_fraction: float = _VALIDATION_SERIES_FRACTION
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Partition the panel by ``series_id`` into a selection panel and a validation panel.
+def _split_temporal_windows(
+    panel: pd.DataFrame, validation_fraction: float = _VALIDATION_WINDOW_FRACTION
+) -> tuple[pd.Series, pd.Series]:
+    """Cut the panel's calendar into an early selection window and a late validation window.
 
-    Series are sorted before shuffling so the split depends only on ``seed`` and the set of
-    series present, not on the panel's row order. Both sides are guaranteed at least one
-    series, which is what lets the synthetic-panel tests run this path with 3 series.
+    Nothing is removed from the panel: these are MASKS over the full panel, restricting which
+    rows a draw may censor. The teacher is still fitted on the whole panel either way, which is
+    the point -- an earlier design partitioned the panel itself (by series), shrinking the
+    teacher to a third of deployment size, and that turned out to decide the answer rather than
+    merely add noise. See invariant 41.
 
     Returns:
-        ``(selection_panel, validation_panel)`` sharing no series and therefore no rows.
+        ``(selection_mask, validation_mask)``, disjoint and covering the panel. The boundary
+        dates are deliberately NOT returned: both are one ``.max()``/``.min()`` away from the
+        masks, and returning a third derivable value invited exactly one bug -- the caller
+        recovered the selection window's last day as ``cut_date - 1 day``, which names a date
+        absent from the panel wherever the calendar has a gap at the boundary. Derive boundary
+        dates FROM the masks, never by arithmetic around them.
     """
-    series = np.sort(panel["series_id"].unique())
-    if len(series) < 2:
+    days = np.sort(panel["date"].unique())
+    if len(days) < 2:
         raise ValueError(
-            "Cannot split the imputation tuning panel by series: it holds "
-            f"{len(series)} series, and a disjoint validation set needs at least 2."
+            "Cannot split the imputation tuning panel by time: it spans "
+            f"{len(days)} distinct dates, and a disjoint validation window needs at least 2."
         )
-    shuffled = np.random.default_rng(seed).permutation(series)
-    n_validation = min(len(series) - 1, max(1, round(len(series) * validation_fraction)))
-    validation_series = set(shuffled[:n_validation])
-
-    is_validation = panel["series_id"].isin(validation_series)
-    return panel.loc[~is_validation].copy(), panel.loc[is_validation].copy()
+    n_validation_days = min(len(days) - 1, max(1, round(len(days) * validation_fraction)))
+    is_validation = panel["date"] >= pd.Timestamp(days[len(days) - n_validation_days])
+    return ~is_validation, is_validation
 
 
-def _build_holdouts(panel: pd.DataFrame, seeds: list[int]) -> list[Holdout]:
-    """Draw one synthetic-censoring holdout per seed.
+@dataclass(frozen=True)
+class HoldoutSet:
+    """Every draw over one window, together with the facts that describe the window as a whole.
+
+    One class for both roles, with no marker saying which: nothing here behaves differently for
+    selection than for validation, so a role field would be dead weight. The role lives in the
+    variable name and in what the caller does with it.
+
+    The boundary dates are owned HERE rather than derived by the caller, because that derivation
+    is where a bug lived: recovering the selection window's last day as ``cut_date - 1 day``
+    names a date absent from the panel wherever the calendar has a gap at the boundary. Born
+    beside the mask they come from, there is nowhere left to derive them wrongly.
+    """
+
+    draws: list[Holdout]
+    seeds: list[int]
+    window_start: pd.Timestamp
+    window_end: pd.Timestamp
+
+    @property
+    def n_eval_rows(self) -> int:
+        """Scorable rows per draw. Identical across draws by construction: the count is the
+        window's clean-row pool times a fixed fraction, so draw 0 stands for all of them."""
+        return len(self.draws[0].eval_idx)
+
+    @property
+    def teacher_fit_rows(self) -> int:
+        """Clean rows the LGBM teacher actually fits on.
+
+        The variable that decides whether tuning helps at all: measured against the untuned
+        defaults, the gain shrinks monotonically as this grows and reverses at scale. See
+        invariant 41.
+        """
+        return int((self.draws[0].censored["stockout_hours"] == 0).sum())
+
+
+def _build_holdout_set(
+    panel: pd.DataFrame, seeds: list[int], censorable_mask: pd.Series
+) -> HoldoutSet:
+    """Draw one synthetic-censoring holdout per seed, censoring only within ``censorable_mask``.
 
     Built once and reused by every trial, so all candidates are scored on identical data and
-    differences between them are hyperparameters rather than resampling luck.
+    differences between them are hyperparameters rather than resampling luck. Every draw keeps
+    the FULL panel -- only the eligible evaluation rows differ between the two windows.
     """
-    holdouts = []
+    draws = []
     for seed in seeds:
-        censored, eval_idx, true_demand = _synthetic_censor_holdout(panel, seed=seed)
+        censored, eval_idx, true_demand = synthetic_censor_holdout(
+            panel, seed=seed, censorable_mask=censorable_mask
+        )
         if len(eval_idx) == 0:
             raise ValueError(
-                "Cannot tune the imputer: the train panel has no clean/censored rows to build "
-                "a synthetic evaluation set from."
+                "Cannot tune the imputer: the requested window of the train panel has no "
+                "clean rows to censor, or the panel has no real stockouts to draw a "
+                "severity ratio from."
             )
-        holdouts.append((censored, eval_idx, true_demand))
-    return holdouts
+        draws.append(Holdout(censored, eval_idx, true_demand))
+
+    window_dates = panel.loc[censorable_mask, "date"]
+    return HoldoutSet(
+        draws=draws,
+        seeds=list(seeds),
+        window_start=pd.Timestamp(window_dates.min()),
+        window_end=pd.Timestamp(window_dates.max()),
+    )
 
 
 def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np.ndarray:
@@ -100,11 +163,22 @@ def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np
     return np.asarray(maes, dtype=float)
 
 
-def _bootstrap_ci95(deltas: np.ndarray, seed: int) -> tuple[float, float]:
-    """Percentile bootstrap CI for the mean of the paired per-holdout MAE differences."""
-    rng = np.random.default_rng(seed)
-    means = rng.choice(deltas, size=(_BOOTSTRAP_RESAMPLES, len(deltas)), replace=True).mean(axis=1)
-    return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
+def _mean_ci95(deltas: np.ndarray) -> tuple[float, float]:
+    """Two-sided 95% CI for the mean of the paired per-holdout MAE differences.
+
+    Student-t, not the normal's 1.96: at ``N_VALIDATION_HOLDOUTS`` draws the correct multiplier
+    is ``t(0.975, n-1) = 2.064``, and 1.96 would quote a ~93% interval as 95% -- permissive in
+    the one direction a gate must not be.
+
+    ``simulation/operations.py`` keeps its own bootstrap on purpose: that one resamples whole
+    ORIGINS as clusters, which no closed form covers.
+    """
+    n = len(deltas)
+    if n < 2:
+        raise ValueError(f"A 95% CI for the mean needs at least 2 draws, got {n}.")
+    mean = float(np.mean(deltas))
+    half_width = float(stats.t.ppf(0.975, n - 1) * np.std(deltas, ddof=1) / np.sqrt(n))
+    return mean - half_width, mean + half_width
 
 
 def _load_incumbent_params(params_path: Path) -> dict[str, int | float] | None:
@@ -161,8 +235,9 @@ def _log_study_to_mlflow(
             {
                 "n_trials": metadata.n_trials_requested,
                 "seed": metadata.seed,
-                "n_selection_series": metadata.n_selection_series,
-                "n_validation_series": metadata.n_validation_series,
+                "n_series": metadata.n_series,
+                "teacher_fit_rows": metadata.teacher_fit_rows,
+                "validation_window_start": metadata.validation_window_start,
             }
         )
         mlflow.log_metrics(
@@ -205,7 +280,7 @@ def tune_imputation_lgbm(
     """Search LGBM hyperparameters for the supervised imputer and persist the winner.
 
     The winning params are persisted only if they clear TWO gates, both judged on the paired
-    per-draw bootstrap interval rather than the point estimate (a mean that merely happens to
+    per-draw confidence interval rather than the point estimate (a mean that merely happens to
     land below zero is what a coin flip looks like):
 
     * vs the untuned defaults -- does tuning buy anything at all? This is the number the thesis
@@ -220,7 +295,7 @@ def tune_imputation_lgbm(
 
     Only the winning hyperparameters are persisted (not fitted weights), so
     ``LatentDemandImputer`` still re-fits on each panel's own clean days -- this run only
-    changes which 3 numbers that fit uses.
+    changes which 13 hyperparameters that fit uses.
 
     Returns:
         The path of the written ``imputation_lgbm_params.json`` when the winner cleared both
@@ -239,28 +314,33 @@ def tune_imputation_lgbm(
         split="train",
     )
 
-    selection_panel, validation_panel = _split_series_panels(panel, seed)
-    n_selection_series = int(selection_panel["series_id"].nunique())
-    n_validation_series = int(validation_panel["series_id"].nunique())
+    selection_mask, validation_mask = _split_temporal_windows(panel)
+    n_series = int(panel["series_id"].nunique())
 
     selection_seeds = [seed + i for i in range(n_selection_holdouts)]
     validation_seeds = [seed + _VALIDATION_SEED_OFFSET + i for i in range(n_validation_holdouts)]
-    selection = _build_holdouts(selection_panel, selection_seeds)
-    validation = _build_holdouts(validation_panel, validation_seeds)
+    selection = _build_holdout_set(panel, selection_seeds, selection_mask)
+    validation = _build_holdout_set(panel, validation_seeds, validation_mask)
     print(
-        f"🧬 Series split: {n_selection_series} for selection, {n_validation_series} for "
-        f"validation (disjoint — no shared rows)"
+        f"📅 Temporal split of {n_series} series over {len(panel):,} rows: selection through "
+        f"{selection.window_end.date().isoformat()}, validation from "
+        f"{validation.window_start.date().isoformat()} ({selection.n_eval_rows:,} vs "
+        f"{validation.n_eval_rows:,} scorable rows per draw)"
     )
     print(
-        f"🎲 {len(selection)} selection holdouts (seeds {selection_seeds}), "
-        f"{len(validation)} validation holdouts (seeds {validation_seeds})"
+        "🧑‍🏫 The teacher fits on the FULL panel either way: "
+        f"~{selection.teacher_fit_rows:,} clean rows"
+    )
+    print(
+        f"🎲 {len(selection.draws)} selection holdouts (seeds {selection.seeds}), "
+        f"{len(validation.draws)} validation holdouts (seeds {validation.seeds})"
     )
 
     def objective(trial: optuna.Trial) -> float:
         subsample = trial.suggest_float("subsample", 0.4, 1.0)
         params = {
-            "n_estimators": trial.suggest_int("n_estimators", 50, 8000),
-            "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.3, log=True),
+            "n_estimators": trial.suggest_int("n_estimators", 50, 3000),
+            "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.3, log=True),
             "max_depth": trial.suggest_int("max_depth", 2, 12),
             "num_leaves": trial.suggest_int("num_leaves", 2, 1024, log=True),
             "min_child_samples": trial.suggest_int("min_child_samples", 2, 100),
@@ -273,7 +353,7 @@ def tune_imputation_lgbm(
             "cat_smooth": trial.suggest_float("cat_smooth", 0.0, 50.0),
             "max_bin": trial.suggest_int("max_bin", 8, 255),
         }
-        return float(np.mean(_holdout_maes(selection, params)))
+        return float(np.mean(_holdout_maes(selection.draws, params)))
 
     try:
         import torch
@@ -331,8 +411,8 @@ def tune_imputation_lgbm(
     )
 
     print("🧪 Scoring the winner and the untuned defaults on the validation holdouts...")
-    tuned_maes = _holdout_maes(validation, best_params.model_dump())
-    default_maes = _holdout_maes(validation, dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
+    tuned_maes = _holdout_maes(validation.draws, best_params.model_dump())
+    default_maes = _holdout_maes(validation.draws, dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
     best_mae_validation = float(np.mean(tuned_maes))
     default_mae_validation = float(np.mean(default_maes))
     improvement_pct = float(
@@ -342,23 +422,16 @@ def tune_imputation_lgbm(
     # Decide on the interval, not the point estimate. A mean that happens to land below zero
     # is exactly what a coin-flip result looks like: one winner cleared this gate at -1.14%
     # and then measured -0.45% with a CI straddling zero on fresh draws.
-    ci_lo, ci_hi = _bootstrap_ci95(tuned_maes - default_maes, seed=seed)
+    ci_lo, ci_hi = _mean_ci95(tuned_maes - default_maes)
     beats_default = ci_hi < 0.0
 
-    # Second gate. The comparison above is blind to whatever is already on disk, so a search
-    # that beats the defaults by less than the incumbent did still overwrote it: a run measuring
-    # -4.65% replaced a -5.33% winner, having scored BETTER on selection and worse on validation
-    # -- overfitting the selection set, invisible to a defaults-only gate. Both configs are
-    # scored on the same draws so the difference is paired, and the incumbent stays unless the
-    # challenger beats it by a margin those draws can distinguish: when the two are
-    # indistinguishable, churning the file the pipeline depends on buys nothing.
     incumbent_mae_validation: float | None = None
     beats_incumbent: bool | None = None
     if incumbent_params is not None:
         print("🥊 Scoring the incumbent params already on disk on the same draws...")
-        incumbent_maes = _holdout_maes(validation, incumbent_params)
+        incumbent_maes = _holdout_maes(validation.draws, incumbent_params)
         incumbent_mae_validation = float(np.mean(incumbent_maes))
-        inc_lo, inc_hi = _bootstrap_ci95(tuned_maes - incumbent_maes, seed=seed)
+        inc_lo, inc_hi = _mean_ci95(tuned_maes - incumbent_maes)
         beats_incumbent = inc_hi < 0.0
         print(
             f"   challenger={best_mae_validation:.4f} vs incumbent="
@@ -378,14 +451,16 @@ def tune_imputation_lgbm(
         incumbent_mae_validation=incumbent_mae_validation,
         beats_incumbent=beats_incumbent,
         persisted=should_persist,
-        n_selection_holdouts=len(selection),
-        n_validation_holdouts=len(validation),
-        n_selection_series=n_selection_series,
-        n_validation_series=n_validation_series,
-        selection_seeds=selection_seeds,
-        validation_seeds=validation_seeds,
-        train_rows=int(len(selection[0][0]) - len(selection[0][1])),
-        eval_rows=int(len(selection[0][1])),
+        n_selection_holdouts=len(selection.draws),
+        n_validation_holdouts=len(validation.draws),
+        n_series=n_series,
+        selection_window_end=selection.window_end.date().isoformat(),
+        validation_window_start=validation.window_start.date().isoformat(),
+        n_selection_eval_rows=selection.n_eval_rows,
+        n_validation_eval_rows=validation.n_eval_rows,
+        selection_seeds=selection.seeds,
+        validation_seeds=validation.seeds,
+        teacher_fit_rows=selection.teacher_fit_rows,
         seed=seed,
         created_at=utc_timestamp(),
         git_commit=get_git_commit(),

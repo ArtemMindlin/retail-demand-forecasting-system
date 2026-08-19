@@ -94,7 +94,7 @@ class ImputationTuningMetadata(BaseModel):
     the objective the search minimized (averaged over the selection holdouts, so it is in-sample
     for the search and cannot evidence a gain), while ``best_mae_validation`` and
     ``default_mae_validation`` come from holdouts the search never saw. ``persisted`` is
-    decided on ``improvement_ci95`` -- the bootstrap interval of the per-draw difference --
+    decided on ``improvement_ci95`` -- the Student-t interval of the per-draw difference --
     rather than on ``improvement_pct``, whose sign alone does not distinguish a real gain
     from a coin flip.
 
@@ -121,15 +121,23 @@ class ImputationTuningMetadata(BaseModel):
     persisted: bool
     n_selection_holdouts: int = Field(gt=0)
     n_validation_holdouts: int = Field(gt=0)
-    # Series counts either side of the partition. Recorded because the seeds alone no longer
-    # describe the split: disjoint seeds once meant "same rows, different censoring", and the
-    # validation score is only a generalization claim while these two sets share no series.
-    n_selection_series: int = Field(gt=0)
-    n_validation_series: int = Field(gt=0)
+    # The split is TEMPORAL: both windows cover every series of one full panel, and the
+    # teacher is fitted on that whole panel while only one window's rows are censored. So the
+    # split is described by the cut date and by how many rows each window can score, not by
+    # series counts -- an earlier design partitioned by series and recorded those instead.
+    n_series: int = Field(gt=0)
+    selection_window_end: str
+    validation_window_start: str
+    n_selection_eval_rows: int = Field(gt=0)
+    n_validation_eval_rows: int = Field(gt=0)
     selection_seeds: list[int]
     validation_seeds: list[int]
-    train_rows: int = Field(ge=0)
-    eval_rows: int = Field(ge=0)
+    # Clean rows the LGBM teacher actually fits on. Recorded because it turned out to be the
+    # variable that decides whether tuning helps at all: measured against the untuned defaults,
+    # the gain shrinks monotonically as this grows (-5.3% at 467 rows, -1.7% at 1930) and
+    # REVERSES at scale (+12.4% worse at 14243). A tuned params file is therefore only valid
+    # near the teacher size it was tuned at, which the file itself cannot express.
+    teacher_fit_rows: int = Field(ge=0)
     seed: int
     created_at: str
     git_commit: str | None
