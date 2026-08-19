@@ -269,7 +269,7 @@ See `docs/web_layer.md` for the full description.
     applied to the supervised imputer's own hyperparameter search. It also persists only the
     winning hyperparameters, never fitted model weights: `LatentDemandImputer` always re-fits
     on the current panel's own clean days, so tuning cannot change the leakage or
-    feature-space properties of imputation, only which 3 numbers the fit uses.
+    feature-space properties of imputation, only which 13 hyperparameters the fit uses.
 
     Every `LatentDemandImputer` built in `forecasting/pipeline.py` must be given that
     params file via `model_path`. The constructor falls back to the untuned defaults when
@@ -286,23 +286,90 @@ See `docs/web_layer.md` for the full description.
     reported -1.4% in-sample measured -0.32% (CI95 crossing zero) on fresh draws. Hence the
     objective averages over `N_SELECTION_HOLDOUTS` draws, `improvement_pct` is computed only on
     the `N_VALIDATION_HOLDOUTS` draws, and `imputation_lgbm_params.json` is written only when
-    the bootstrap `improvement_ci95` over those draws lies entirely below zero.
+    the `improvement_ci95` over those draws lies entirely below zero. That interval is a
+    Student-t CI for the mean of the paired per-draw differences, not a bootstrap: measured, the
+    two agree to 0.0004 and give identical verdicts on every gate case, and where they diverge
+    (a single outlying draw) the t interval is the WIDER one, so the gate errs strict. The OPS
+    plane keeps a real bootstrap because it resamples whole origins as clusters.
     `best_mae_selection` in the metadata is in-sample for the search and must never be quoted
     as the improvement.
 
-    Disjoint censoring SEEDS are not sufficient, which is why the split is by series.
-    Every draw censors `SYNTHETIC_CENSORING_EVAL_FRACTION` (0.30) of the same clean-row pool,
-    so after n draws the pool is `1 - 0.7**n` covered and the two sets converge on the same
-    rows: measured 82.4% overlap at 5/10 draws and 99.7% (7 fresh rows of 2185) at 15/25. That
-    is a property of the fraction and the draw count, NOT of the panel size, so adding series
-    cannot reduce it -- a 10x panel gives 10x draws of the same 30%. Under seed-only splitting
-    the gate therefore controlled draw noise but not overfitting to the panel, because a winner
-    exploiting this panel's quirks was rewarded by both sets alike.
-    `_split_series_panels()` partitions by `series_id` before any draw is built, so the two
-    sides share no rows at all (verified: 0 overlap, 35 series against 15 on the v1 panel).
-    This also upgrades what the number means: `LatentDemandImputer` re-fits its teacher on
-    whatever panel it is handed, so `improvement_pct` is now measured by a model fitted on
-    series the search never saw. `n_selection_series`/`n_validation_series` record the split.
+    Disjoint censoring SEEDS are not sufficient. Every draw censors
+    `SYNTHETIC_CENSORING_EVAL_FRACTION` (0.30) of the same clean-row pool, so after n draws the
+    pool is `1 - 0.7**n` covered and the two sets converge on the same rows: measured 82.4%
+    overlap at 5/10 draws and 99.7% (7 fresh rows of 2185) at 15/25. That is a property of the
+    fraction and the draw count, NOT of the panel size, so adding series cannot reduce it.
+
+    The split is TEMPORAL, and it is applied as a MASK rather than a partition.
+    `_split_temporal_windows()` holds back the last third of the calendar; `_build_holdouts`
+    passes that mask to `synthetic_censor_holdout` as `censorable_mask`, so both windows keep
+    the FULL panel and only the eligible evaluation rows differ. This matters more than the
+    choice of axis, because the teacher's training size is not a detail of the measurement --
+    it is the variable that decides the answer. Measured against the untuned defaults on the
+    same imputer, the gain shrinks monotonically as the teacher grows and then REVERSES:
+
+    | teacher clean rows | scored on | gain vs defaults |
+    | --- | --- | --- |
+    | 467 (15 held-out series) | series-disjoint | -5.33% |
+    | 595 (last 30d of 50 series) | time-disjoint | -4.34% |
+    | 1930 (all 50 series) | time-disjoint | -1.72% |
+    | 14243 (500 series) | time-disjoint | **+12.44%** |
+    | 18310 (500 series + eval) | eval week | **+13.20%** |
+
+    The last two agree across different scoring periods, so this is scale, not calendar. An
+    earlier design partitioned the panel by series, which shrank the teacher to a third of
+    deployment size and produced the -5.33% headline; at the 500-series scale where
+    `configs/imputation_compare.yaml` actually runs, those same params are 12% WORSE than not
+    tuning. Hence `teacher_fit_rows` in the metadata: a tuned params file is only valid near the
+    teacher size it was tuned at, and the file cannot express that on its own. Tune at the scale
+    you deploy.
+
+    The mask restricts BOTH populations: the rows that may be censored AND the real stockouts
+    the severity ratios are drawn from. Restricting only the first was a live defect. Severity is
+    what makes a synthetic stockout resemble a real one, and the two windows differ sharply on
+    it -- the early window's real stockouts hide 43.4% of a day against the late window's 30.5%,
+    with 76% of all stockout rows sitting early -- so an unrestricted pool was effectively the
+    early window's, and late-window rows were censored ~32% harder than they ever are. That
+    erased, on the severity axis, the regime shift a temporal holdout exists to measure, and it
+    favoured whichever candidate handled harsh censoring in both windows alike. A window with no
+    real stockouts of its own must fail loudly rather than fall back to the panel: the fallback
+    reintroduces the defect silently, which is the failure mode invariants 14 and 32 both target.
+    Pinned by `test_censoring_draws_its_severity_from_the_same_window_it_censors`, which uses
+    disjoint per-window severities so a leak is unambiguous rather than statistical.
+
+    `n_estimators` is capped below LightGBM's practical range for COMPUTE, and the cap must be
+    justified by measurement rather than assumed harmless. At 500 series an 8000-tree fit costs
+    ~34s, putting a 300x15 search near 43h. Measured on identical draws, holding every other
+    hyperparameter fixed:
+
+    | `n_estimators` | reconstruction MAE |
+    | --- | --- |
+    | 1500 | 0.46173 |
+    | 3000 | 0.45354 |
+    | 6000 | 0.44989 |
+    | 8000 | 0.44985 |
+
+    Returns die out entirely past 6000 (a further 0.00004), so the optimum sits there and not
+    beyond. A 3000 cap costs 0.0037 of MAE -- smaller than the 0.0059 width of the validation
+    interval that decides both gates, so it cannot change either verdict. That is the argument
+    a cap needs: not "it seemed enough", but "what it forfeits is below what the measurement can
+    resolve". Check the winner is not pinned AT the cap regardless, the same boundary check that
+    caught the earlier `cat_smooth` and `num_leaves` floors.
+
+    Two blind spots this design accepts, neither of them fixable by a different fraction. First,
+    the two windows share the panel, so unlike the series partition it cannot detect
+    hyperparameters overfitted to the PANEL, only to the window -- mitigated by the imputer
+    refitting per panel, which makes panel-overfitting a weaker threat for hyperparameters than
+    for weights. Second, the cut is deterministic (the last third, no seed), so exactly ONE
+    window is ever tested: if the late calendar is peculiar, the verdict inherits that and
+    nothing reveals it. Validating over several windows instead of one would fix the second and
+    costs almost nothing, since validation runs three times per search rather than 300.
+
+    `n_series`, `selection_window_end`, `validation_window_start` and the two `n_*_eval_rows`
+    counts record the split; the two windows share every series by construction. The boundary
+    dates are read off the masks, never derived by arithmetic around a cut date -- `cut_date - 1
+    day` names a date absent from the panel wherever the calendar has a gap at the boundary, and
+    `prepare_daily_panel` never reindexes to a complete calendar.
 
     Beating the defaults is necessary but NOT sufficient to write the file, because that
     comparison cannot see the incumbent: a run measuring -4.65% overwrote a -5.33% winner,
@@ -327,7 +394,7 @@ See `docs/web_layer.md` for the full description.
 42. The synthetic-censoring holdout cannot rank imputation RECONCILIATION rules -- only
     hyperparameters and teacher models.
 
-    `_synthetic_censor_holdout()` builds its ground truth as `observed = truth * (1 - r)`.
+    `synthetic_censor_holdout()` builds its ground truth as `observed = truth * (1 - r)`.
     Any rule that inverts that relation scores near-zero error by construction, not by
     merit: `observed / (1 - r)` measures MAE 0.02 against 0.74 for the rule it replaces.
     Hyperparameter comparisons stay valid because every candidate shares one reconciliation
