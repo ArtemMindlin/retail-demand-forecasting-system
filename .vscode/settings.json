@@ -21,5 +21,21 @@
     }
   ],
   "latex-workshop.latex.autoBuild.run": "onSave",
-  "latex-workshop.view.pdf.viewer": "tab"
+  "latex-workshop.view.pdf.viewer": "tab",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.analysis.exclude": [
+    "**/.claude/**",
+    "**/.codex/**",
+    "**/.venv/**",
+    "**/node_modules/**"
+  ],
+  "python.analysis.typeCheckingMode": "basic",
+  "files.watcherExclude": {
+    "**/.claude/**": true,
+    "**/.venv/**": true
+  },
+  "search.exclude": {
+    "**/.claude/**": true,
+    "**/.venv/**": true
+  }
 }
