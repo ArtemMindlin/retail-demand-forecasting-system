@@ -4,20 +4,19 @@ import json
 import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from retail_forecasting.config import InventoryConfig, Settings
 from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
+from retail_forecasting.contracts.contracts_config import ImputationStrategy
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_tuning import BoostingParams
 from retail_forecasting.data.censorship import (
     IMPUTATION_LGBM_PARAMS_FILENAME,
-    OPERATIVE_WINDOW_HOURS,
     SYNTHETIC_CENSORING_EVAL_FRACTION,
-    ImputationStrategy,
     LatentDemandImputer,
     synthetic_censor_holdout,
 )
@@ -139,9 +138,12 @@ def _train_conformal_model(
     return model
 
 
-IMPUTATION_COMPARISON_STRATEGIES: tuple[
-    Literal["supervised", "historical_mean", "clipped_scaling"], ...
-] = ("supervised", "historical_mean", "clipped_scaling")
+# Every strategy except "none", which is the uncorrected baseline rather than a candidate.
+IMPUTATION_COMPARISON_STRATEGIES: tuple[ImputationStrategy, ...] = (
+    "supervised",
+    "historical_mean",
+    "clipped_scaling",
+)
 
 
 def _evaluate_imputation_quality(
@@ -159,8 +161,6 @@ def _evaluate_imputation_quality(
     bias near 0 = unbiased).
     """
     censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed)
-    if len(eval_idx) == 0:
-        return pd.DataFrame(columns=["strategy", "mae", "rmse", "bias", "mape", "n_eval"])
     n_eval = len(eval_idx)
 
     records: list[dict[str, Any]] = []
@@ -285,27 +285,13 @@ def evaluate_fair_inventory_cost(
 
     Returns one row per strategy: signal_mae, total_cost, fill_rate, mean_order, n_eval.
     """
-    rng = np.random.default_rng(seed)
-    clean_mask = panel["stockout_hours"] == 0
-    real_ratios = (
-        (panel.loc[panel["stockout_hours"] > 0, "stockout_hours"] / OPERATIVE_WINDOW_HOURS)
-        .clip(0, 1)
-        .to_numpy()
-    )
-    clean_idx = panel.index[clean_mask].to_numpy()
-    columns = ["strategy", "signal_mae", "total_cost", "fill_rate", "mean_order", "n_eval"]
-    if len(clean_idx) == 0 or len(real_ratios) == 0:
-        return pd.DataFrame(columns=columns)
-
-    n_eval = max(1, int(len(clean_idx) * eval_fraction))
-    eval_idx = rng.choice(clean_idx, size=n_eval, replace=False)
-    sampled_ratios = rng.choice(real_ratios, size=n_eval, replace=True)
-
-    true_demand = panel.loc[eval_idx, "observed_demand"].astype(float).to_numpy()
-
-    censored = panel.copy()
-    censored.loc[eval_idx, "stockout_hours"] = sampled_ratios * OPERATIVE_WINDOW_HOURS
-    censored.loc[eval_idx, "observed_demand"] = true_demand * (1.0 - sampled_ratios)
+    # The same holdout `_evaluate_imputation_quality` scores, from the same function rather than
+    # a second copy of it. This was reimplemented here, and the docstring above already claimed
+    # it was reused -- two implementations of "the common ground truth" is the one thing this
+    # backtest cannot afford, since its whole claim is that every strategy faces an identical
+    # truth. Verified bit-identical to the copy it replaces on the v1 panel, down to draw order.
+    censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed, eval_fraction)
+    n_eval = len(eval_idx)
 
     # Flat cost coefficients so every strategy is charged identically (isolates the signal).
     flat_config = inventory_config.model_copy(update={"use_series_costs": False})

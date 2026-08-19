@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
+from retail_forecasting.contracts.contracts_config import ImputationStrategy
+
 # Normalizing denominator for 16-hour operative window (6:00-22:00).
 OPERATIVE_WINDOW_HOURS = 16.0
-
-# Single source of truth for the latent-demand imputation strategies.
-ImputationStrategy = Literal["supervised", "historical_mean", "clipped_scaling", "none"]
 
 # Untuned default LGBM hyperparameters for supervised imputation.
 DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
@@ -65,8 +64,16 @@ def synthetic_censor_holdout(
             comment at the intersection below for why the second one is not optional. Defaults
             to all rows.
 
-    Returns (censored_panel, eval_idx, true_demand); eval_idx/true_demand are empty when the
-    panel has no eligible clean rows, or no censored rows to draw the synthetic ratio from.
+    Returns:
+        ``(censored_panel, eval_idx, true_demand)``, always non-empty.
+
+    Raises:
+        ValueError: If the panel (within ``censorable_mask``) has no clean rows to censor, or no
+            real stockouts to draw a severity from. This used to return empty and let each
+            caller decide, which meant the imputation study wrote an `imputation_quality.csv`
+            holding headers and no rows -- an empty artifact that reads as "no result" rather
+            than "this failed", the exact pattern invariants 14 and 32 exist to prevent. There
+            is no caller for whom scoring zero rows is a legitimate outcome.
     """
     rng = np.random.default_rng(seed)
     clean_mask = panel["stockout_hours"] == 0
@@ -77,7 +84,13 @@ def synthetic_censor_holdout(
     real_ratios = panel.loc[stockout_mask, "stockout_hours"] / OPERATIVE_WINDOW_HOURS
     clean_idx = panel.index[clean_mask]
     if len(clean_idx) == 0 or len(real_ratios) == 0:
-        return panel.copy(), np.array([], dtype=int), np.array([], dtype=float)
+        scope = "the requested window of the panel" if censorable_mask is not None else "the panel"
+        raise ValueError(
+            f"Cannot build a synthetic-censoring holdout: {scope} holds {len(clean_idx)} clean "
+            f"rows to censor and {len(real_ratios)} real stockouts to draw a severity from, and "
+            "both are needed. Reconstruction can only be scored where the true demand is known, "
+            "so a clean day must be faked -- and it must be faked at a realistic severity."
+        )
 
     n_eval = max(1, int(len(clean_idx) * eval_fraction))
     eval_idx = rng.choice(clean_idx, size=n_eval, replace=False)
@@ -101,15 +114,11 @@ class LatentDemandImputer:
     def __init__(
         self,
         strategy: ImputationStrategy = "supervised",
-        stockout_col: str = "stockout_hours",
-        target_col: str = "observed_demand",
         scaling_factor: float = 1.2,
         lgbm_params: dict[str, int | float] | None = None,
         model_path: Path | None = None,
     ):
         self.strategy = strategy
-        self.stockout_col = stockout_col
-        self.target_col = target_col
         self.scaling_factor = scaling_factor
         self.lgbm_params = lgbm_params
         self.model_path = model_path
@@ -128,7 +137,7 @@ class LatentDemandImputer:
             return self._passthrough(panel)
 
         df = panel.copy()
-        is_clean = df[self.stockout_col] == 0
+        is_clean = df["stockout_hours"] == 0
         is_censored = ~is_clean
 
         if not is_censored.any():
@@ -140,16 +149,14 @@ class LatentDemandImputer:
             df = self._impute_historical_mean(df, is_clean, is_censored)
         elif self.strategy == "clipped_scaling":
             df = self._impute_clipped_scaling(df, is_clean, is_censored)
-        else:
-            raise ValueError(f"Unknown imputation strategy: {self.strategy!r}")
 
         # Ensure we don't have NaNs in the estimate
-        df["latent_demand_est"] = df["latent_demand_est"].fillna(df[self.target_col])
+        df["latent_demand_est"] = df["latent_demand_est"].fillna(df["observed_demand"])
         df["is_imputed"] = is_censored
 
         # Backup original and swap
-        df["original_observed_demand"] = df[self.target_col]
-        df[self.target_col] = df["latent_demand_est"]
+        df["original_observed_demand"] = df["observed_demand"]
+        df["observed_demand"] = df["latent_demand_est"]
 
         return df
 
@@ -175,7 +182,7 @@ class LatentDemandImputer:
         Used when no correction applies (strategy ``none`` or no censored rows).
         """
         df = panel.copy()
-        df["latent_demand_est"] = df[self.target_col]
+        df["latent_demand_est"] = df["observed_demand"]
         df["is_imputed"] = False
         return df
 
@@ -198,9 +205,9 @@ class LatentDemandImputer:
         df_feat["series_cat"] = df_feat["series_id"].astype("category")
 
         # Series-level clean-day mean as a prior (mirrors historical_mean but as a feature)
-        series_means = df_feat[is_clean].groupby("series_id")[self.target_col].mean()
+        series_means = df_feat[is_clean].groupby("series_id")["observed_demand"].mean()
         df_feat["series_mean_demand"] = df_feat["series_id"].map(series_means)
-        global_mean = float(df_feat[is_clean][self.target_col].mean())
+        global_mean = float(df_feat[is_clean]["observed_demand"].mean())
         df_feat["series_mean_demand"] = df_feat["series_mean_demand"].fillna(global_mean)
 
         optional_cols = [
@@ -223,7 +230,7 @@ class LatentDemandImputer:
 
         train_df = df_feat[is_clean].copy()
         X_train = train_df[feature_cols]
-        y_train = train_df[self.target_col]
+        y_train = train_df["observed_demand"]
 
         params = self._resolve_lgbm_params()
         # Single-threaded on purpose: the teacher trains on one panel's clean days, and at
@@ -260,11 +267,11 @@ class LatentDemandImputer:
         predicted_latent = np.asarray(self.model.predict(X_censored), dtype=float)
 
         df.loc[is_censored, "latent_demand_est"] = self._reconcile_with_severity(
-            observed=df.loc[is_censored, self.target_col].to_numpy(),
+            observed=df.loc[is_censored, "observed_demand"].to_numpy(),
             predicted_full_day=predicted_latent,
-            stockout_hours=df.loc[is_censored, self.stockout_col].to_numpy(),
+            stockout_hours=df.loc[is_censored, "stockout_hours"].to_numpy(),
         )
-        df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, self.target_col]
+        df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, "observed_demand"]
         return df
 
     @staticmethod
@@ -295,16 +302,16 @@ class LatentDemandImputer:
         self, df: pd.DataFrame, is_clean: pd.Series, is_censored: pd.Series
     ) -> pd.DataFrame:
         """Baseline: Impute using the historical mean of clean days for each series."""
-        series_means = df[is_clean].groupby("series_id")[self.target_col].mean()
-        global_mean = float(df[is_clean][self.target_col].mean())
+        series_means = df[is_clean].groupby("series_id")["observed_demand"].mean()
+        global_mean = float(df[is_clean]["observed_demand"].mean())
 
         fallback_means = df.loc[is_censored, "series_id"].map(series_means).fillna(global_mean)
 
         df.loc[is_censored, "latent_demand_est"] = np.maximum(
-            df.loc[is_censored, self.target_col],
+            df.loc[is_censored, "observed_demand"],
             fallback_means,
         )
-        df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, self.target_col]
+        df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, "observed_demand"]
         return df
 
     def _impute_clipped_scaling(
@@ -312,8 +319,8 @@ class LatentDemandImputer:
     ) -> pd.DataFrame:
         """Baseline: Simply scale up the observed demand by a fixed factor during stockouts."""
         df.loc[is_censored, "latent_demand_est"] = np.maximum(
-            df.loc[is_censored, self.target_col],
-            df.loc[is_censored, self.target_col] * self.scaling_factor,
+            df.loc[is_censored, "observed_demand"],
+            df.loc[is_censored, "observed_demand"] * self.scaling_factor,
         )
-        df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, self.target_col]
+        df.loc[is_clean, "latent_demand_est"] = df.loc[is_clean, "observed_demand"]
         return df

@@ -49,13 +49,19 @@ class DatasetConfig(BaseModel):
         return self
 
 
+# Single source of truth for the latent-demand imputation strategies. It lives in `contracts`
+# because both consumers can reach it from here: `PreprocessingConfig` below validates the
+# configured value, and `data/censorship.py` types the imputer against it. The reverse is
+# impossible -- `contracts` imports no first-party layer -- which is why this was previously
+# declared twice, once in each place, with nothing keeping the two in step.
+ImputationStrategy = Literal["supervised", "historical_mean", "clipped_scaling", "none"]
+
+
 class PreprocessingConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     drop_negative_sales: bool = True
     fill_missing_values: bool = True
-    imputation_strategy: Literal["supervised", "historical_mean", "clipped_scaling", "none"] = (
-        "supervised"
-    )
+    imputation_strategy: ImputationStrategy = "supervised"
     # When True, the experiment run_mode skips forecasting and runs only the latent-demand
     # imputation strategies side by side, writing a lightweight comparison artifact for the
     # dashboard (no models, no folds).

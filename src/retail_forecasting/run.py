@@ -8,7 +8,6 @@ from pydantic import ValidationError
 
 from retail_forecasting.config import load_config
 from retail_forecasting.contracts.contracts_config import RunMode
-from retail_forecasting.forecasting.imputation_tuning import tune_imputation_lgbm
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
     run_fair_cost_backtest,
@@ -104,6 +103,11 @@ def main() -> None:
         print(f"Fair-cost backtest written to: {run_dir / 'fair_cost_backtest.csv'}")
         return
     if mode == "tune_imputation":
+        # Imported here, not at module scope: `imputation_tuning` pulls in mlflow and (through
+        # the search) torch, both from the optional `ml` extra. At module scope every run mode
+        # would need them installed just to reach its own branch.
+        from retail_forecasting.forecasting.imputation_tuning import tune_imputation_lgbm
+
         params_path = tune_imputation_lgbm(settings)
         print(f"Imputation tuning written to: {params_path}")
         return

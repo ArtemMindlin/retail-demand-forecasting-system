@@ -9,7 +9,7 @@ It tunes the model that reconstructs stockout-censored demand — **not** the fo
 flowchart TD
     LOAD["load_prepared_panel(split='train')<br/>45.000 rows · 500 series · 90 days"]
     SPLIT["_split_temporal_windows()<br/>last third held back · returns two masks"]
-    INC["_load_incumbent_params()<br/>read BEFORE the search:<br/>the decision below overwrites this file"]
+    INC["read the incumbent params from disk<br/>BEFORE the search:<br/>the decision below overwrites this file"]
 
     LOAD --> SPLIT
     LOAD --> INC
@@ -67,17 +67,25 @@ Three things to note:
 flowchart TD
     A{"beats_default?<br/>CI95 of (winner − defaults) entirely below 0"}
     A -->|no| DEL["DELETE any params file<br/>pipeline falls back to defaults"]
-    A -->|yes| B{"beats_incumbent?<br/>CI95 of (winner − incumbent) entirely below 0"}
+    A -->|yes| B{"beats_incumbent?<br/>MEAN of (winner − incumbent) below 0"}
     B -->|no| KEEP["KEEP the incumbent untouched<br/>this run's winner discarded"]
     B -->|"yes / no incumbent"| WRITE["WRITE imputation_lgbm_params.json"]
 ```
 
-Both decide on the **interval**, never the sign of the mean: a mean that merely lands below zero
-is what a coin flip looks like. A winner once cleared a point comparison at −1.14% and then
-measured −0.45% with a straddling interval on fresh draws.
+The two gates decide on **different statistics**, on purpose.
 
-Note the interval is about the **mean** difference, not about every draw — a challenger can lose
-several individual draws and still pass, and can win on a minority of draws yet fail.
+The **defaults** gate is the interval, because it guards a *claim*: an improvement whose interval
+includes zero is a null result and must be reported as one. A winner once cleared a point
+comparison at −1.14% and then measured −0.45% with a straddling interval on fresh draws.
+
+The **incumbent** gate is the mean, because it guards no claim — it only picks which of two files
+sits on disk. When the draws cannot separate the two, "keep whichever arrived first" is not a more
+defensible tiebreak than "keep the better mean"; it only looks more cautious, and it decided a
+real case on seniority alone. `incumbent_ci95` is still recorded so a decisive replacement can be
+told from a coin flip won by a hair.
+
+Note the defaults interval is about the **mean** difference, not about every draw — a challenger
+can lose several individual draws and still pass, and can win on a minority of draws yet fail.
 
 The failure branches are deliberately **asymmetric**:
 

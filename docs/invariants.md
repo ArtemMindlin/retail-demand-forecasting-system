@@ -375,21 +375,29 @@ See `docs/web_layer.md` for the full description.
     comparison cannot see the incumbent: a run measuring -4.65% overwrote a -5.33% winner,
     having scored BETTER on the selection draws it was optimizing (0.2821 vs 0.2836) and worse
     on the held-out series (0.2872 vs 0.2851) -- textbook selection-set overfitting, and the
-    defaults-only gate had no way to notice. So `_load_incumbent_params()` reads the file
+    defaults-only gate had no way to notice. So the incumbent is read
     BEFORE the search (by decision time it may be overwritten or deleted), both configs are
     scored on the same validation draws so the difference is paired, and `beats_incumbent`
-    requires the challenger's interval against the incumbent to clear zero too. When the two
-    are statistically indistinguishable the incumbent stays: churning the file the pipeline
-    depends on, on a difference the draws cannot resolve, buys nothing. Note the asymmetry in
-    the failure branches -- failing the DEFAULTS gate deletes any params file (the pipeline
-    should fall back to defaults rather than trust a winner this run rejected), while failing
-    only the INCUMBENT gate leaves it untouched, since it is still a validated winner.
-    `incumbent_mae_validation`/`beats_incumbent` record the comparison, both null on a first run.
+    compares them.
 
-    The decision is the interval, not the sign of the mean: a point comparison passed a winner
-    at -1.14% that then measured -0.45% with a straddling interval on fresh draws. The same
-    rule applies to anything read out of this run for the thesis -- an improvement whose
-    interval includes zero is a null result and must be reported as one.
+    The two gates decide on DIFFERENT statistics, on purpose. The defaults gate is the
+    interval, because it guards a CLAIM: an improvement whose interval includes zero is a null
+    result and must be reported as one. A point comparison once passed a winner at -1.14% that
+    then measured -0.45% with a straddling interval on fresh draws. The incumbent gate is the
+    MEAN, because it guards no claim -- it only picks which of two files sits on disk. When the
+    draws cannot separate the two, "keep whichever arrived first" is not a more defensible
+    tiebreak than "keep the better mean"; it only looks more cautious, and it already decided a
+    real case on seniority alone (-5.33% against -4.65% measured CI95 [-0.0011, +0.0051], a
+    tie). This reduces to a single comparison: the t interval is symmetric about the mean, so a
+    decisive verdict either way already agrees with it, and the mean does real work only in the
+    straddling case. `incumbent_ci95` is still recorded, since without it the metadata cannot
+    tell a decisive replacement from a coin flip won by a hair.
+
+    Note the asymmetry in the failure branches -- failing the DEFAULTS gate deletes any params
+    file (the pipeline should fall back to defaults rather than trust a winner this run
+    rejected), while failing only the INCUMBENT gate leaves it untouched, since it is still a
+    validated winner. `incumbent_mae_validation`/`incumbent_ci95`/`beats_incumbent` record the
+    comparison, all null on a first run.
 
 42. The synthetic-censoring holdout cannot rank imputation RECONCILIATION rules -- only
     hyperparameters and teacher models.

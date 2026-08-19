@@ -117,6 +117,10 @@ class ImputationTuningMetadata(BaseModel):
     # tuning beat no tuning", which says nothing about whether this particular search beat the
     # winner already on disk. Both None on the first run, when there is no incumbent to beat.
     incumbent_mae_validation: float | None = Field(default=None, ge=0)
+    # The interval is recorded but does NOT decide this gate -- the mean does. Kept because
+    # without it the metadata cannot tell a decisive replacement from a coin flip won by a
+    # hair, and those warrant very different confidence when read back later.
+    incumbent_ci95: list[float] | None = Field(default=None, min_length=2, max_length=2)
     beats_incumbent: bool | None = None
     persisted: bool
     n_selection_holdouts: int = Field(gt=0)

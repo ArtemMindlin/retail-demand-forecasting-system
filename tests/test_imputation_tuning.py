@@ -439,3 +439,73 @@ def test_holdout_set_owns_its_window_dates_and_derived_counts() -> None:
     assert selection.teacher_fit_rows == validation.teacher_fit_rows + (
         validation.n_eval_rows - selection.n_eval_rows
     )
+
+
+def test_tune_imputation_lgbm_breaks_a_statistical_tie_on_the_mean(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When the draws cannot separate challenger from incumbent, the better mean wins.
+
+    The defaults gate insists on the interval because it guards a CLAIM: an improvement whose
+    interval includes zero is a null result and must be reported as one. This gate only picks
+    which of two files sits on disk, and there "keep whichever arrived first" is not a more
+    defensible tiebreak than "keep the better mean" -- it only looks more cautious. It already
+    cost a decision once: -5.33% and -4.65% measured CI95 [-0.0011, +0.0051] against each other,
+    a tie, and the incumbent survived on seniority alone.
+
+    The draws below straddle zero by construction -- the challenger wins two and loses two --
+    while its mean lands a hair lower.
+    """
+    incumbent = _write_incumbent(tmp_path)
+    _stub_holdout_maes(
+        monkeypatch,
+        default_maes=[1.0, 1.0, 1.0, 1.0],
+        other_maes=[0.30, 0.70, 0.30, 0.68],
+        incumbent_maes=[0.70, 0.30, 0.70, 0.30],
+    )
+
+    returned = tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=4,
+    )
+
+    metadata = json.loads((tmp_path / METADATA_FILENAME).read_text(encoding="utf-8"))
+    lo, hi = metadata["incumbent_ci95"]
+    assert lo < 0 < hi, "precondition: the draws cannot separate the two"
+    assert metadata["best_mae_validation"] < metadata["incumbent_mae_validation"]
+    assert metadata["beats_incumbent"] is True, "the tie is broken on the mean"
+    assert metadata["persisted"] is True
+    assert returned == incumbent
+
+
+@pytest.mark.parametrize(
+    ("stockout_hours", "missing"),
+    [([1.0, 2.0, 3.0], "no clean rows to fake"), ([0.0, 0.0, 0.0], "no real stockouts to copy")],
+)
+def test_censoring_refuses_a_panel_it_cannot_build_a_holdout_from(
+    stockout_hours: list[float], missing: str
+) -> None:
+    """Scoring zero rows is never a legitimate outcome, so this raises rather than returning empty.
+
+    Both ingredients are required and for different reasons: a clean day is the only place the
+    true demand is known, and a real stockout is the only realistic severity to fake it at.
+
+    It used to return empty and let each caller decide, which is how the imputation study came
+    to write an `imputation_quality.csv` of headers and no rows -- an empty artifact reading as
+    "no result" rather than "this failed". Same failure mode as invariants 14 and 32.
+    """
+    panel = pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=3, freq="D"),
+            "series_id": ["1_101"] * 3,
+            "observed_demand": [10.0, 11.0, 12.0],
+            "stockout_hours": stockout_hours,
+        }
+    )
+
+    with pytest.raises(ValueError, match="Cannot build a synthetic-censoring holdout"):
+        synthetic_censor_holdout(panel, seed=0)
+    assert missing  # names which ingredient is absent, for the failure message

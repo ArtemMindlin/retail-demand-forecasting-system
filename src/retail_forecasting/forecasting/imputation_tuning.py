@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
+import mlflow
 import numpy as np
 import optuna
 import pandas as pd
@@ -46,14 +47,8 @@ class Holdout(NamedTuple):
     """One synthetic-censoring draw: a panel with some clean days faked, plus the answer key."""
 
     censored: pd.DataFrame
-    """The full panel with ``eval_idx`` rows disguised as stockouts. Full-size on purpose: the
-    imputer re-fits on whatever panel it is handed, so shrinking it would shrink the teacher."""
-
     eval_idx: np.ndarray
-    """Index labels of the faked rows -- which rows to score."""
-
     true_demand: np.ndarray
-    """Demand those rows really had, aligned with ``eval_idx``."""
 
 
 def _split_temporal_windows(
@@ -61,19 +56,10 @@ def _split_temporal_windows(
 ) -> tuple[pd.Series, pd.Series]:
     """Cut the panel's calendar into an early selection window and a late validation window.
 
-    Nothing is removed from the panel: these are MASKS over the full panel, restricting which
-    rows a draw may censor. The teacher is still fitted on the whole panel either way, which is
-    the point -- an earlier design partitioned the panel itself (by series), shrinking the
-    teacher to a third of deployment size, and that turned out to decide the answer rather than
-    merely add noise. See invariant 41.
+    Nothing is removed from the panel: these are MASKS over the full panel.
 
     Returns:
-        ``(selection_mask, validation_mask)``, disjoint and covering the panel. The boundary
-        dates are deliberately NOT returned: both are one ``.max()``/``.min()`` away from the
-        masks, and returning a third derivable value invited exactly one bug -- the caller
-        recovered the selection window's last day as ``cut_date - 1 day``, which names a date
-        absent from the panel wherever the calendar has a gap at the boundary. Derive boundary
-        dates FROM the masks, never by arithmetic around them.
+        ``(selection_mask, validation_mask)``, disjoint and covering the panel.
     """
     days = np.sort(panel["date"].unique())
     if len(days) < 2:
@@ -136,12 +122,6 @@ def _build_holdout_set(
         censored, eval_idx, true_demand = synthetic_censor_holdout(
             panel, seed=seed, censorable_mask=censorable_mask
         )
-        if len(eval_idx) == 0:
-            raise ValueError(
-                "Cannot tune the imputer: the requested window of the train panel has no "
-                "clean rows to censor, or the panel has no real stockouts to draw a "
-                "severity ratio from."
-            )
         draws.append(Holdout(censored, eval_idx, true_demand))
 
     window_dates = panel.loc[censorable_mask, "date"]
@@ -181,26 +161,13 @@ def _mean_ci95(deltas: np.ndarray) -> tuple[float, float]:
     return mean - half_width, mean + half_width
 
 
-def _load_incumbent_params(params_path: Path) -> dict[str, int | float] | None:
-    """Read the tuned params already on disk, or None on the first ever run.
-
-    Must be called BEFORE the persist decision, since that decision may overwrite or delete
-    the very file this reads.
-    """
-    if not params_path.exists():
-        return None
-    loaded: dict[str, int | float] = json.loads(params_path.read_text(encoding="utf-8"))
-    return loaded
-
-
 def _configure_mlflow() -> None:
     """Point MLflow at its tracking store and select the imputation-tuning experiment.
 
-    Imported locally, like torch elsewhere in this module, so importing this module does not
-    require the ``ml`` extra -- the contract tests exercise the persist gate without it.
+    The tracking store is one database holding many experiments, separated by name -- not one
+    database per use case -- so extending tracking elsewhere means a new experiment name here,
+    not a new store.
     """
-    import mlflow
-
     if not os.environ.get("MLFLOW_TRACKING_URI"):
         mlflow.set_tracking_uri(_MLFLOW_TRACKING_URI)
     mlflow.set_experiment(_MLFLOW_EXPERIMENT)
@@ -223,12 +190,7 @@ def _log_study_to_mlflow(
     storage), as two metric series sharing the trial number as their step: ``trial_mae``, the
     raw value the GP explored trial by trial, and ``trial_mae_best_so_far``, its running
     minimum -- the one that actually answers "is this still improving or has it stalled".
-
-    Imported locally, like torch and in ``_configure_mlflow``, so importing this module does not
-    require the ``ml`` extra.
     """
-    import mlflow
-
     with mlflow.start_run(run_name=study.study_name):
         mlflow.log_params(metadata.best_params.model_dump())
         mlflow.log_params(
@@ -305,9 +267,9 @@ def tune_imputation_lgbm(
     seed = seed if seed is not None else settings.project.random_seed
 
     print("\n" + "=" * 50)
-    print("🔍 IMPUTATION LGBM TUNING (supervised strategy, no forecasting)")
+    print("IMPUTATION LGBM TUNING")
     print("=" * 50 + "\n")
-    print("📂 Loading train panel...")
+    print("Loading train panel...")
     panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
@@ -322,17 +284,16 @@ def tune_imputation_lgbm(
     selection = _build_holdout_set(panel, selection_seeds, selection_mask)
     validation = _build_holdout_set(panel, validation_seeds, validation_mask)
     print(
-        f"📅 Temporal split of {n_series} series over {len(panel):,} rows: selection through "
+        f"Temporal split of {n_series} series over {len(panel):,} rows: selection through "
         f"{selection.window_end.date().isoformat()}, validation from "
         f"{validation.window_start.date().isoformat()} ({selection.n_eval_rows:,} vs "
         f"{validation.n_eval_rows:,} scorable rows per draw)"
     )
     print(
-        "🧑‍🏫 The teacher fits on the FULL panel either way: "
-        f"~{selection.teacher_fit_rows:,} clean rows"
+        f"The teacher fits on the FULL panel either way: ~{selection.teacher_fit_rows:,} clean rows"
     )
     print(
-        f"🎲 {len(selection.draws)} selection holdouts (seeds {selection.seeds}), "
+        f"{len(selection.draws)} selection holdouts (seeds {selection.seeds}), "
         f"{len(validation.draws)} validation holdouts (seeds {validation.seeds})"
     )
 
@@ -370,8 +331,11 @@ def tune_imputation_lgbm(
 
     # Read the incumbent before the search, not after: the persist decision below either
     # overwrites or deletes this exact file, so by then there is nothing left to compare against.
+    # None means no incumbent, which is the first ever run rather than an error.
     params_path = models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
-    incumbent_params = _load_incumbent_params(params_path)
+    incumbent_params: dict[str, int | float] | None = (
+        json.loads(params_path.read_text(encoding="utf-8")) if params_path.exists() else None
+    )
 
     study_name = f"imputation_lgbm_seed{seed}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
 
@@ -400,7 +364,7 @@ def tune_imputation_lgbm(
         max_bin=int(study.best_params["max_bin"]),
     )
     print(
-        f"✅ Best trial: selection MAE={study.best_value:.4f} "
+        f"Best trial: selection MAE={study.best_value:.4f} "
         f"(n_estimators={best_params.n_estimators}, "
         f"learning_rate={best_params.learning_rate:.4f}, max_depth={best_params.max_depth}, "
         f"num_leaves={best_params.num_leaves}, min_child_samples={best_params.min_child_samples}, "
@@ -410,7 +374,7 @@ def tune_imputation_lgbm(
         f"max_bin={best_params.max_bin})"
     )
 
-    print("🧪 Scoring the winner and the untuned defaults on the validation holdouts...")
+    print("Scoring the winner and the untuned defaults on the validation holdouts...")
     tuned_maes = _holdout_maes(validation.draws, best_params.model_dump())
     default_maes = _holdout_maes(validation.draws, dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
     best_mae_validation = float(np.mean(tuned_maes))
@@ -426,16 +390,27 @@ def tune_imputation_lgbm(
     beats_default = ci_hi < 0.0
 
     incumbent_mae_validation: float | None = None
+    incumbent_ci95: list[float] | None = None
     beats_incumbent: bool | None = None
     if incumbent_params is not None:
         print("🥊 Scoring the incumbent params already on disk on the same draws...")
         incumbent_maes = _holdout_maes(validation.draws, incumbent_params)
         incumbent_mae_validation = float(np.mean(incumbent_maes))
         inc_lo, inc_hi = _mean_ci95(tuned_maes - incumbent_maes)
-        beats_incumbent = inc_hi < 0.0
+        incumbent_ci95 = [inc_lo, inc_hi]
+        # The MEAN decides here, unlike the defaults gate above. That gate guards a CLAIM the
+        # thesis makes, where an unresolvable difference must be reported as no difference. This
+        # one only picks which of two files sits on disk, and when the draws cannot separate them
+        # "keep whichever arrived first" is not a more defensible tiebreak than "keep the better
+        # mean" -- it just looks more cautious. Note this reduces to one comparison: the interval
+        # is symmetric about the mean, so a decisive verdict either way already agrees with it,
+        # and the mean only does real work in the straddling case.
+        beats_incumbent = bool(np.mean(tuned_maes - incumbent_maes) < 0.0)
+        decisive = inc_hi < 0.0 or inc_lo > 0.0
         print(
             f"   challenger={best_mae_validation:.4f} vs incumbent="
-            f"{incumbent_mae_validation:.4f}, CI95 [{inc_lo:+.4f}, {inc_hi:+.4f}] -> "
+            f"{incumbent_mae_validation:.4f}, CI95 [{inc_lo:+.4f}, {inc_hi:+.4f}] "
+            f"({'decisive' if decisive else 'indistinguishable, decided on the mean'}) -> "
             f"{'replaces it' if beats_incumbent else 'does NOT replace it'}"
         )
 
@@ -449,6 +424,7 @@ def tune_imputation_lgbm(
         improvement_pct=improvement_pct,
         improvement_ci95=[ci_lo, ci_hi],
         incumbent_mae_validation=incumbent_mae_validation,
+        incumbent_ci95=incumbent_ci95,
         beats_incumbent=beats_incumbent,
         persisted=should_persist,
         n_selection_holdouts=len(selection.draws),
