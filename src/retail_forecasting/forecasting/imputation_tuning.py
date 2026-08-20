@@ -220,9 +220,36 @@ def _log_study_to_mlflow(
                 "improvement_ci95_high": metadata.improvement_ci95[1],
             }
         )
+        # Only when there was an incumbent to compete against. A run with none logs nothing
+        # here rather than a sentinel: absent means "no incumbent", where a -1 or a 0 is a
+        # number someone eventually averages.
+        if metadata.incumbent_mae_validation is not None and metadata.incumbent_ci95 is not None:
+            mlflow.log_metrics(
+                {
+                    "mae_validation_incumbent": metadata.incumbent_mae_validation,
+                    "incumbent_ci95_low": metadata.incumbent_ci95[0],
+                    "incumbent_ci95_high": metadata.incumbent_ci95[1],
+                }
+            )
+
+        # The three branches of the persist decision, resolved into one searchable value. Worth
+        # a tag of its own because the two gates do not decide alike: the defaults gate needs
+        # the whole interval below zero, the incumbent gate goes on the mean. Left to reassemble
+        # from the raw fields, a run that replaced its incumbent on a CI straddling zero reads
+        # as a bug. Order matters -- a run that loses to both is reported against the defaults,
+        # which is the branch that also deletes the superseded file.
+        if metadata.persisted:
+            outcome = "persisted"
+        elif not beats_default:
+            outcome = "no_gain_over_defaults"
+        else:
+            outcome = "lost_to_incumbent"
+
         mlflow.set_tags(
             {
                 "persisted": str(metadata.persisted),
+                "beats_incumbent": str(metadata.beats_incumbent),
+                "outcome": outcome,
                 "git_commit": metadata.git_commit or "unknown",
             }
         )
@@ -236,7 +263,7 @@ def _log_study_to_mlflow(
             mlflow.log_metric("trial_mae_best_so_far", best_so_far, step=trial.number)
 
         mlflow.log_artifact(str(metadata_path))
-        if beats_default:
+        if metadata.persisted:
             mlflow.log_artifact(str(params_path))
 
 
@@ -500,6 +527,6 @@ def tune_imputation_lgbm(
         metadata=metadata,
         metadata_path=metadata_path,
         params_path=params_path,
-        beats_default=should_persist,
+        beats_default=beats_default,
     )
     return params_path if should_persist else metadata_path

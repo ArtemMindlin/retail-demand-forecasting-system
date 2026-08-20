@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import mlflow
 import numpy as np
 import pandas as pd
 import pytest
@@ -435,6 +436,77 @@ def test_holdout_maes_are_unchanged_by_evaluating_the_draws_in_parallel() -> Non
     )
 
     assert np.array_equal(_holdout_maes(holdouts, params), serial)
+
+
+def _logged_run() -> mlflow.entities.Run:
+    """The MLflow run the search under test just wrote.
+
+    By identity rather than by searching the experiment, because the tests in this module do
+    not get a store each: MLflow caches its store per tracking-URI string, the URI is the same
+    relative path every time, and so every run in the module lands in whichever directory was
+    current the first time MLflow was touched.
+    """
+    run = mlflow.last_active_run()
+    assert run is not None, "the search logged no MLflow run"
+    return mlflow.get_run(run.info.run_id)
+
+
+def test_mlflow_records_why_a_run_lost_to_its_incumbent(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declined persist has to be readable in the UI, not only in the metadata file.
+
+    Without the incumbent comparison logged, a run that beat the defaults and still did not
+    persist shows good metrics, `persisted=False`, and no explanation anywhere.
+    """
+    _write_incumbent(tmp_path)
+    _stub_holdout_maes(
+        monkeypatch,
+        default_maes=[1.0, 1.0, 1.0, 1.0],
+        other_maes=[0.8, 0.8, 0.8, 0.8],
+        incumbent_maes=[0.5, 0.5, 0.5, 0.5],
+    )
+
+    tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=4,
+    )
+
+    run = _logged_run()
+    assert run.data.metrics["mae_validation_incumbent"] == pytest.approx(0.5)
+    assert "incumbent_ci95_low" in run.data.metrics
+    assert "incumbent_ci95_high" in run.data.metrics
+    assert run.data.tags["beats_incumbent"] == "False"
+    assert run.data.tags["persisted"] == "False"
+    # The verdict as one searchable value, so the UI does not need the two tags cross-read.
+    assert run.data.tags["outcome"] == "lost_to_incumbent"
+
+
+def test_mlflow_logs_no_incumbent_metrics_when_there_was_no_incumbent(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Absent, not zero. A sentinel is a number someone eventually averages."""
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0], other_maes=[0.5, 0.5])
+
+    tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+    )
+
+    run = _logged_run()
+    assert "mae_validation_incumbent" not in run.data.metrics
+    assert "incumbent_ci95_low" not in run.data.metrics
+    assert "incumbent_ci95_high" not in run.data.metrics
+    assert run.data.tags["beats_incumbent"] == "None"
+    assert run.data.tags["outcome"] == "persisted"
+    # The defaults comparison is logged either way -- that gate always runs.
+    assert run.data.metrics["mae_validation_default"] == pytest.approx(1.0)
 
 
 def test_censoring_draws_its_severity_from_the_same_window_it_censors() -> None:
