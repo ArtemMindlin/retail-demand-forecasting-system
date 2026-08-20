@@ -169,18 +169,7 @@ class LatentDemandImputer:
         return df
 
     def _passthrough(self, panel: pd.DataFrame) -> pd.DataFrame:
-        """Return demand uncorrected, marked as not imputed.
-
-        Taken when no correction applies: strategy ``none``, or a panel with no censored rows
-        at all -- which is a valid input rather than an error, since the correct imputation of
-        a panel with no stockouts is that panel.
-
-        Adds the SAME three columns as the correcting paths. Two shapes out of one public method
-        is a latent KeyError: `run_imputation_comparison` reads `original_observed_demand`
-        unguarded, and `_build_prediction_frame` tests for `latent_demand_est` and then reaches
-        for all three. Both were correct only because the v1 panel is 71.6% stockout days, so
-        this branch is one config change away, not unreachable.
-        """
+        """Return demand uncorrected, marked as not imputed."""
         df = panel.copy()
         df["latent_demand_est"] = df["observed_demand"]
         df["original_observed_demand"] = df["observed_demand"]
