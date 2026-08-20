@@ -541,7 +541,7 @@ def tune_imputation_lgbm(
 
     if not beats_default:
         print(
-            "️The tuned hyperparameters do NOT beat the untuned defaults by a margin the "
+            "The tuned hyperparameters do NOT beat the untuned defaults by a margin the "
             "validation draws can distinguish from zero, so they were NOT persisted -- the "
             "pipeline keeps using the defaults.\n"
             f"    Decision recorded in: {metadata_path}\n"
