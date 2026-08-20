@@ -16,6 +16,7 @@ from retail_forecasting.data.censorship import (
 )
 from retail_forecasting.forecasting.imputation_tuning import (
     _build_holdout_set,
+    _holdout_maes,
     _split_temporal_windows,
     tune_imputation_lgbm,
 )
@@ -371,6 +372,37 @@ def test_tune_imputation_lgbm_has_no_incumbent_to_beat_on_a_first_run(
     assert metadata["beats_incumbent"] is None
     assert metadata["incumbent_mae_validation"] is None
     assert metadata["persisted"] is True
+
+
+def test_holdout_maes_are_unchanged_by_evaluating_the_draws_in_parallel() -> None:
+    """Threading the draws must be an optimization, not a change of result.
+
+    The draws are independent and each builds its own imputer, so the only way this could
+    diverge is shared state. One value per draw, in the order given.
+    """
+    panel = make_synthetic_panel(num_series=4, num_days=80)
+    selection_mask, _ = _split_temporal_windows(panel)
+    holdouts = _build_holdout_set(panel, [42, 43, 44], selection_mask).draws
+    params = dict(DEFAULT_SUPERVISED_LGBM_PARAMS)
+
+    serial = np.asarray(
+        [
+            float(
+                np.mean(
+                    np.abs(
+                        LatentDemandImputer(strategy="supervised", lgbm_params=params)
+                        .impute(censored)
+                        .loc[eval_idx, "latent_demand_est"]
+                        .to_numpy(dtype=float)
+                        - true_demand
+                    )
+                )
+            )
+            for censored, eval_idx, true_demand in holdouts
+        ]
+    )
+
+    assert np.array_equal(_holdout_maes(holdouts, params), serial)
 
 
 def test_censoring_draws_its_severity_from_the_same_window_it_censors() -> None:
