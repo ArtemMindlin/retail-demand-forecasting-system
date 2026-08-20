@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ import numpy as np
 import optuna
 import pandas as pd
 from joblib import Parallel, cpu_count, delayed
+from mlflow.data.pandas_dataset import from_pandas
 from scipy import stats
 
 from retail_forecasting.config import Settings
@@ -24,7 +26,7 @@ from retail_forecasting.data.censorship import (
     LatentDemandImputer,
     synthetic_censor_holdout,
 )
-from retail_forecasting.data.dataset import load_prepared_panel
+from retail_forecasting.data.dataset import load_prepared_panel, panel_cache_filename
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 N_SELECTION_HOLDOUTS = 15
@@ -194,12 +196,33 @@ def _log_study_to_mlflow(
     metadata_path: Path,
     params_path: Path,
     beats_default: bool,
+    panel: pd.DataFrame,
+    panel_source: Path,
 ) -> None:
     """Record one completed search in MLflow: winner, validation verdict, and its artifacts."""
     mlflow.set_tracking_uri(_MLFLOW_TRACKING_URI)
     mlflow.set_experiment(_MLFLOW_EXPERIMENT)
 
+    # Digest of the panel this search actually read, alongside the parquet it came from.
+    # `n_series` and `teacher_fit_rows` pin the SHAPE; nothing pinned the content, and the panel
+    # cache is keyed on four dataset settings only -- not on the preprocessing config nor on the
+    # code version -- so a panel built before a change to `prepare_daily_panel` is served
+    # unchanged afterwards, under a run whose git_commit says otherwise.
+    #
+    # Both filters are for MLflow talking about itself. It registers LocalArtifactDatasetSource
+    # twice, so resolving any local path reports it as ambiguous while resolving it correctly;
+    # and it warns that integer columns cannot hold missing values, which is advice about
+    # enforcing a MODEL signature at inference time. No model is logged here.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="The specified dataset source can be interpreted")
+        warnings.filterwarnings("ignore", message="Hint: Inferred schema contains integer column")
+        dataset = from_pandas(panel, source=str(panel_source), name="imputation_train_panel")
+        # The schema is computed lazily, and it is the access that warns -- so force it here,
+        # inside the filter, rather than letting `log_input` trip it further down.
+        _ = dataset.schema
+
     with mlflow.start_run(run_name=study.study_name):
+        mlflow.log_input(dataset, context="training")
         mlflow.log_params(metadata.best_params.model_dump())
         # The seed lists are deliberately absent: both are `seed` plus an offset and an index,
         # so they are reconstructible from what is here, and the metadata artifact below carries
@@ -540,5 +563,8 @@ def tune_imputation_lgbm(
         metadata_path=metadata_path,
         params_path=params_path,
         beats_default=beats_default,
+        panel=panel,
+        panel_source=settings.dataset.processed_panel_dir
+        / panel_cache_filename(settings.dataset, "train"),
     )
     return params_path if should_persist else metadata_path

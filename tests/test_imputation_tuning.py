@@ -7,6 +7,7 @@ import mlflow
 import numpy as np
 import pandas as pd
 import pytest
+from mlflow.data.pandas_dataset import from_pandas
 
 from retail_forecasting.config import ModelConfig, Settings
 from retail_forecasting.data.censorship import (
@@ -544,6 +545,43 @@ def test_mlflow_records_the_shape_of_the_experiment_that_produced_a_run(
     # Reconstructible from `seed` and the two counts, and in the metadata artifact besides.
     assert "selection_seeds" not in run.data.params
     assert "validation_seeds" not in run.data.params
+
+
+def test_mlflow_records_which_panel_a_run_actually_read(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`n_series` and `teacher_fit_rows` pin the panel's shape. Nothing pinned its contents.
+
+    The panel cache is keyed on four dataset settings, not on the preprocessing config nor on
+    the code version, so a panel built before a change to `prepare_daily_panel` is served
+    unchanged afterwards -- under a run whose git_commit says otherwise. A digest is what tells
+    two same-shaped runs apart, which matters because invariant 41 makes a params file valid
+    only near the panel it was tuned on.
+    """
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0], other_maes=[0.5, 0.5])
+
+    tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+    )
+
+    inputs = _logged_run().inputs.dataset_inputs
+    assert len(inputs) == 1
+    dataset = inputs[0].dataset
+    assert dataset.name == "imputation_train_panel"
+    assert dataset.digest
+    assert dataset.source_type == "local"
+
+    # The same panel must hash the same, and a single changed cell must not.
+    expected = from_pandas(patched_train_only_loader, name="imputation_train_panel")
+    assert dataset.digest == expected.digest
+
+    touched = patched_train_only_loader.copy()
+    touched.loc[touched.index[0], "observed_demand"] += 1.0
+    assert from_pandas(touched, name="imputation_train_panel").digest != dataset.digest
 
 
 def test_censoring_draws_its_severity_from_the_same_window_it_censors() -> None:
