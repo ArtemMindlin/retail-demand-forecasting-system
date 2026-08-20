@@ -200,14 +200,7 @@ def _params_outside_the_space(candidate: dict[str, int | float]) -> list[str]:
 
 
 def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np.ndarray:
-    """Reconstruction MAE of one hyperparameter set on each holdout, one value per draw.
-
-    Threaded across draws, which are independent. Measured 4.6x on the untuned defaults and 3.4x
-    on the tuned params over 15 draws on 10 cores, MAEs identical and in the same order. Threads
-    rather than processes because the two matched on speed and threads do not pickle a 45k-row
-    panel per draw per trial. Each draw still fits LightGBM single-threaded -- see the comment
-    at `n_jobs` in `_impute_supervised` for why that is the faster arrangement.
-    """
+    """Reconstruction MAE of one hyperparameter set on each holdout, one value per draw."""
 
     def holdout_mae(holdout: Holdout) -> float:
         censored, eval_idx, true_demand = holdout
@@ -215,9 +208,6 @@ def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np
         pred = imputed.loc[eval_idx, "latent_demand_est"].to_numpy(dtype=float)
         return float(np.mean(np.abs(pred - true_demand)))
 
-    # joblib's own cpu_count, not os.cpu_count: it honours a CPU quota imposed on the process
-    # (LOKY_MAX_CPU_COUNT, container limits), where os.cpu_count reports the whole machine.
-    # Measured under LOKY_MAX_CPU_COUNT=2 on a 10-core host: 2 against 10.
     n_jobs = min(len(holdouts), cpu_count())
     maes = Parallel(n_jobs=n_jobs, prefer="threads")(delayed(holdout_mae)(h) for h in holdouts)
     return np.asarray(maes, dtype=float)
@@ -405,14 +395,12 @@ def tune_imputation_lgbm(
         return float(np.mean(_holdout_maes(selection.draws, params)))
 
     try:
-        import torch
+        import torch  # noqa: F401  -- imported for the check, GPSampler is what uses it
     except ModuleNotFoundError as exc:  # pragma: no cover - depends on the installed extras
         raise ModuleNotFoundError(
             "Imputation tuning uses Optuna's GPSampler, which needs PyTorch. Install the "
             "optional ML backends with: uv sync --extra dev --extra ml"
         ) from exc
-
-    torch.set_num_threads(1)
 
     models_dir = settings.models.models_dir
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -432,9 +420,6 @@ def tune_imputation_lgbm(
         sampler=optuna.samplers.GPSampler(
             seed=seed,
             n_startup_trials=_N_STARTUP_TRIALS,
-            # The objective is deterministic -- the draws are fixed, LightGBM is seeded and
-            # single-threaded, and repeated calls return bit-identical MAEs. Left at its default
-            # of False, the GP would estimate an observation-noise term that does not exist.
             deterministic_objective=True,
         ),
         storage=f"sqlite:///{models_dir / 'imputation_tuning_studies.db'}",
@@ -461,7 +446,7 @@ def tune_imputation_lgbm(
         outside = _params_outside_the_space(candidate)
         if outside:
             print(
-                f"⏭️  NOT enqueueing the {label}: {', '.join(outside)} outside the search space. "
+                f"NOT enqueueing the {label}: {', '.join(outside)} outside the search space. "
                 "It is still scored on the validation draws at the end."
             )
             continue
