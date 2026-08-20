@@ -11,7 +11,7 @@ import mlflow
 import numpy as np
 import optuna
 import pandas as pd
-from joblib import Parallel, delayed
+from joblib import Parallel, cpu_count, delayed
 from scipy import stats
 
 from retail_forecasting.config import Settings
@@ -215,7 +215,10 @@ def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np
         pred = imputed.loc[eval_idx, "latent_demand_est"].to_numpy(dtype=float)
         return float(np.mean(np.abs(pred - true_demand)))
 
-    n_jobs = min(len(holdouts), os.cpu_count() or 1)
+    # joblib's own cpu_count, not os.cpu_count: it honours a CPU quota imposed on the process
+    # (LOKY_MAX_CPU_COUNT, container limits), where os.cpu_count reports the whole machine.
+    # Measured under LOKY_MAX_CPU_COUNT=2 on a 10-core host: 2 against 10.
+    n_jobs = min(len(holdouts), cpu_count())
     maes = Parallel(n_jobs=n_jobs, prefer="threads")(delayed(holdout_mae)(h) for h in holdouts)
     return np.asarray(maes, dtype=float)
 
