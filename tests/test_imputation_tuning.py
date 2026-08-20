@@ -11,6 +11,7 @@ from retail_forecasting.config import ModelConfig, Settings
 from retail_forecasting.data.censorship import (
     DEFAULT_SUPERVISED_LGBM_PARAMS,
     IMPUTATION_LGBM_PARAMS_FILENAME,
+    LatentDemandImputer,
     synthetic_censor_holdout,
 )
 from retail_forecasting.forecasting.imputation_tuning import (
@@ -509,3 +510,55 @@ def test_censoring_refuses_a_panel_it_cannot_build_a_holdout_from(
     with pytest.raises(ValueError, match="Cannot build a synthetic-censoring holdout"):
         synthetic_censor_holdout(panel, seed=0)
     assert missing  # names which ingredient is absent, for the failure message
+
+
+def test_imputer_refuses_both_hyperparameter_sources_at_once() -> None:
+    """Two sources for the same 13 numbers is a caller mistake, not a precedence question.
+
+    The old behaviour let the file on disk win over an explicit argument, which is the harmful
+    direction: adding `model_path` to the tuning's call site -- easy to do while applying
+    invariant 40, which mandates it for `pipeline.py` -- would have made every trial score the
+    tuned file instead of its own params, producing a flat `best_value` with nothing to explain
+    it. Failing at construction turns that silent wrong answer into an immediate error.
+    """
+    with pytest.raises(ValueError, match="not both"):
+        LatentDemandImputer(
+            strategy="supervised",
+            lgbm_params={"n_estimators": 5, "learning_rate": 0.3, "max_depth": 2},
+            model_path=Path("whatever.json"),
+        )
+
+    # Either one alone stays valid: the tuning passes params, the pipeline passes the file.
+    assert LatentDemandImputer(strategy="supervised", lgbm_params={"n_estimators": 5}) is not None
+    assert LatentDemandImputer(strategy="supervised", model_path=Path("whatever.json")) is not None
+
+
+def test_imputer_returns_the_same_columns_whether_or_not_it_corrects_anything() -> None:
+    """One public method must not have two output shapes.
+
+    `impute()` took a passthrough branch for strategy ``none`` and for panels with no censored
+    rows, and that branch omitted `original_observed_demand`. Two consumers assume otherwise:
+    `run_imputation_comparison` reads it unguarded, and `_build_prediction_frame` tests for
+    `latent_demand_est` before reaching for all three. Both were correct only because the v1
+    panel is 71.6% stockout days -- one config change from a KeyError, not unreachable.
+    """
+    with_stockouts = make_synthetic_panel(num_series=2, num_days=20)
+    clean_only = with_stockouts.copy()
+    clean_only["stockout_hours"] = 0.0
+
+    corrected = LatentDemandImputer(strategy="supervised").impute(with_stockouts)
+    nothing_to_correct = LatentDemandImputer(strategy="supervised").impute(clean_only)
+    strategy_none = LatentDemandImputer(strategy="none").impute(with_stockouts)
+
+    expected = {"latent_demand_est", "original_observed_demand", "is_imputed"}
+    for name, frame in (
+        ("corrected", corrected),
+        ("no censored rows", nothing_to_correct),
+        ("strategy=none", strategy_none),
+    ):
+        added = set(frame.columns) - set(with_stockouts.columns)
+        assert added == expected, f"{name} added {added}"
+
+    # And the passthrough leaves demand untouched, which is what "not imputed" has to mean.
+    assert not nothing_to_correct["is_imputed"].any()
+    assert nothing_to_correct["observed_demand"].equals(clean_only["observed_demand"])

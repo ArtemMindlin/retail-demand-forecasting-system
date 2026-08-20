@@ -120,6 +120,14 @@ class LatentDemandImputer:
     ):
         self.strategy = strategy
         self.scaling_factor = scaling_factor
+        if lgbm_params is not None and model_path is not None:
+            raise ValueError(
+                "Pass lgbm_params or model_path, not both: they are two sources for the same "
+                "13 numbers and there is no reading of 'both' that is not a caller mistake. "
+                "The old precedence let the file win, which would have made an imputation "
+                "search score the tuned file 300 times instead of each trial's own params, "
+                "with a flat best_value and nothing to explain it."
+            )
         self.lgbm_params = lgbm_params
         self.model_path = model_path
         self.model: lgb.LGBMRegressor | None = None
@@ -160,29 +168,22 @@ class LatentDemandImputer:
 
         return df
 
-    def _resolve_lgbm_params(self) -> dict[str, int | float]:
-        """Pick the supervised teacher model's hyperparameters.
-
-        Precedence: a tuned params file on disk (written by imputation_tuning.py) beats
-        an explicit override, which beats the never-tuned defaults. Only the recipe is
-        persisted, not fitted weights, so the model is always re-fit on the current panel's
-        clean days -- this keeps leakage/feature-space properties identical to before tuning
-        existed.
-        """
-        if self.model_path is not None and self.model_path.exists():
-            loaded: dict[str, int | float] = json.loads(self.model_path.read_text(encoding="utf-8"))
-            return loaded
-        if self.lgbm_params is not None:
-            return self.lgbm_params
-        return dict(DEFAULT_SUPERVISED_LGBM_PARAMS)
-
     def _passthrough(self, panel: pd.DataFrame) -> pd.DataFrame:
-        """Return the panel unchanged, marking demand as not imputed.
+        """Return demand uncorrected, marked as not imputed.
 
-        Used when no correction applies (strategy ``none`` or no censored rows).
+        Taken when no correction applies: strategy ``none``, or a panel with no censored rows
+        at all -- which is a valid input rather than an error, since the correct imputation of
+        a panel with no stockouts is that panel.
+
+        Adds the SAME three columns as the correcting paths. Two shapes out of one public method
+        is a latent KeyError: `run_imputation_comparison` reads `original_observed_demand`
+        unguarded, and `_build_prediction_frame` tests for `latent_demand_est` and then reaches
+        for all three. Both were correct only because the v1 panel is 71.6% stockout days, so
+        this branch is one config change away, not unreachable.
         """
         df = panel.copy()
         df["latent_demand_est"] = df["observed_demand"]
+        df["original_observed_demand"] = df["observed_demand"]
         df["is_imputed"] = False
         return df
 
@@ -232,7 +233,16 @@ class LatentDemandImputer:
         X_train = train_df[feature_cols]
         y_train = train_df["observed_demand"]
 
-        params = self._resolve_lgbm_params()
+        # Only the recipe is ever persisted, never fitted weights, so the teacher is re-fit on
+        # this panel's clean days regardless of where its 13 numbers came from. A missing
+        # model_path file falls back to the defaults on purpose: the tuning run deletes that file
+        # when its winner failed revalidation, and the pipeline must then use the defaults.
+        params: dict[str, int | float] = DEFAULT_SUPERVISED_LGBM_PARAMS
+        if self.lgbm_params is not None:
+            params = self.lgbm_params
+        elif self.model_path is not None and self.model_path.exists():
+            params = json.loads(self.model_path.read_text(encoding="utf-8"))
+
         # Single-threaded on purpose: the teacher trains on one panel's clean days, and at
         # that width LightGBM spends more time synchronising threads than splitting nodes.
         # Measured 18x faster at 1.5k train rows and still 4.4x at 46k (the 500-series
@@ -287,12 +297,6 @@ class LatentDemandImputer:
         This replaces a ``max(observed, predicted)`` that treated the two as rival estimates
         of the same quantity and discarded whichever was smaller -- throwing away real sales
         on lightly-censored days, where the observed value is by far the better evidence.
-
-        NOTE: this rule cannot be ranked against the old one on the synthetic-censoring
-        holdout. That holdout is built as ``observed = truth * (1 - r)``, which is the very
-        assumption this formula encodes, so it scores near-zero error there by construction
-        (measured MAE 0.02 vs 0.74) and the comparison is circular. It is adopted on the
-        modelling argument above, not on that number. See invariant 42.
         """
         ratio = np.clip(stockout_hours / OPERATIVE_WINDOW_HOURS, 0.0, 1.0)
         estimate: np.ndarray = observed + ratio * np.clip(predicted_full_day, 0.0, None)
