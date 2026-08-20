@@ -35,6 +35,31 @@ IMPUTATION_LGBM_PARAMS_FILENAME = "imputation_lgbm_params.json"
 
 SYNTHETIC_CENSORING_EVAL_FRACTION = 0.30
 
+# Feature space of the supervised teacher, in the order LightGBM receives it. Columns absent
+# from the panel are dropped rather than required: the imputer also runs on panels that carry
+# no covariates (the synthetic panels in the tests, the OPS split).
+#
+# This list is a contract, not a convenience. The teacher fits on clean days and predicts on
+# censored ones, two populations that differ systematically, so a column correlated with
+# censorship poisons it -- `stockout_hours` is constant at 0 across every training row and
+# arrives at 1..16 in prediction, which is why it lives in `_reconcile_with_severity` instead.
+# Handing the teacher whatever the panel happens to hold would let a new panel column change
+# imputation silently, and would break invariant 40's guarantee that tuning cannot move the
+# feature space.
+SUPERVISED_CANDIDATE_FEATURES = [
+    "month",
+    "day_of_week",
+    "day_of_month",
+    "series_cat",
+    "series_mean_demand",
+    "discount",
+    "holiday_flag",
+    "avg_temperature",
+    "precpt",
+    "avg_humidity",
+    "avg_wind_level",
+]
+
 
 def synthetic_censor_holdout(
     panel: pd.DataFrame,
@@ -200,43 +225,18 @@ class LatentDemandImputer:
         global_mean = float(df_feat[is_clean]["observed_demand"].mean())
         df_feat["series_mean_demand"] = df_feat["series_mean_demand"].fillna(global_mean)
 
-        optional_cols = [
-            "discount",
-            "holiday_flag",
-            "avg_temperature",
-            "precpt",
-            "avg_humidity",
-            "avg_wind_level",
-        ]
-        extra_features = [c for c in optional_cols if c in df_feat.columns]
-
-        feature_cols = [
-            "month",
-            "day_of_week",
-            "day_of_month",
-            "series_cat",
-            "series_mean_demand",
-        ] + extra_features
+        feature_cols = [c for c in SUPERVISED_CANDIDATE_FEATURES if c in df_feat.columns]
 
         train_df = df_feat[is_clean].copy()
         X_train = train_df[feature_cols]
         y_train = train_df["observed_demand"]
 
-        # Only the recipe is ever persisted, never fitted weights, so the teacher is re-fit on
-        # this panel's clean days regardless of where its 13 numbers came from. A missing
-        # model_path file falls back to the defaults on purpose: the tuning run deletes that file
-        # when its winner failed revalidation, and the pipeline must then use the defaults.
         params: dict[str, int | float] = DEFAULT_SUPERVISED_LGBM_PARAMS
         if self.lgbm_params is not None:
             params = self.lgbm_params
         elif self.model_path is not None and self.model_path.exists():
             params = json.loads(self.model_path.read_text(encoding="utf-8"))
 
-        # Single-threaded on purpose: the teacher trains on one panel's clean days, and at
-        # that width LightGBM spends more time synchronising threads than splitting nodes.
-        # Measured 18x faster at 1.5k train rows and still 4.4x at 46k (the 500-series
-        # panel), with bit-identical predictions. Revisit above ~200k rows, where the two
-        # converge.
         lgbm_kwargs: dict[str, Any] = dict(params)
         lgbm_kwargs["n_estimators"] = int(lgbm_kwargs["n_estimators"])
         lgbm_kwargs["max_depth"] = int(lgbm_kwargs["max_depth"])
