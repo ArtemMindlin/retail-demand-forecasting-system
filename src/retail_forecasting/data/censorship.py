@@ -232,6 +232,10 @@ class LatentDemandImputer:
             ).model_dump()
 
         lgbm_kwargs: dict[str, Any] = dict(params)
+        # n_jobs=1 is faster here, not a safety setting: 11 features leave LightGBM little to
+        # split across threads, so what remains is a fixed coordination cost per fit. On 10 cores
+        # one thread beat all of them by 17.6x at 2.2k training rows and by 2.8x at 16.7k rows
+        # with 3254 trees, monotonically worse from 2 threads up, predictions identical.
         lgbm_kwargs.update({"random_state": 42, "verbosity": -1, "n_jobs": 1})
         self.model = lgb.LGBMRegressor(**lgbm_kwargs)
         self.model.fit(X_train, y_train)
