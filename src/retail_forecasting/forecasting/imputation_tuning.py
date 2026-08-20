@@ -297,13 +297,39 @@ def _log_study_to_mlflow(
             }
         )
 
+        # Two views of the same 300 trials, because they answer different questions. The metric
+        # series on this run draws the convergence curve -- is it still improving, or has it
+        # stalled. The nested run per trial carries that trial's own hyperparameters, which the
+        # curve cannot hold: a step number is not a place to put thirteen values. Only the
+        # nested form lets the UI plot a hyperparameter against the objective across the search.
+        #
+        # Optuna's own storage has the same trials, so this is a duplicate on purpose: reading
+        # it there means a second tool over a second database, and this is where the run's
+        # verdict, panel digest and configuration already live.
+        #
+        # `best_trial_number` names the winner among the children, which are otherwise 300 rows
+        # sorted by nothing in particular.
+        mlflow.log_param("best_trial_number", study.best_trial.number)
+
         best_so_far = float("inf")
         for trial in study.trials:
+            # None means the trial never produced a value -- failed, or still running when the
+            # study was read. There is nothing to log and nothing to plot.
             if trial.value is None:
                 continue
             best_so_far = min(best_so_far, trial.value)
             mlflow.log_metric("trial_mae", trial.value, step=trial.number)
             mlflow.log_metric("trial_mae_best_so_far", best_so_far, step=trial.number)
+
+            # Zero-padded so the UI's alphabetical run list runs 0001, 0002, ... rather than
+            # 1, 10, 100.
+            with mlflow.start_run(run_name=f"trial-{trial.number:04d}", nested=True):
+                mlflow.log_params(trial.params)
+                mlflow.log_metric("mae", trial.value)
+                if trial.duration is not None:
+                    # Cost per trial varies by more than an order of magnitude with the tree
+                    # count, so this is what makes "was that gain worth the runtime" answerable.
+                    mlflow.log_metric("duration_seconds", trial.duration.total_seconds())
 
         mlflow.log_artifact(str(metadata_path))
         if metadata.persisted:

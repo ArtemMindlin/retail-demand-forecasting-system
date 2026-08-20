@@ -19,6 +19,7 @@ from retail_forecasting.data.censorship import (
 from retail_forecasting.forecasting.imputation_tuning import (
     _FLOAT_BOUNDS,
     _INT_BOUNDS,
+    _MLFLOW_EXPERIMENT,
     _build_holdout_set,
     _holdout_maes,
     _split_temporal_windows,
@@ -638,6 +639,45 @@ def test_config_path_is_optional_and_says_so_when_missing(
     tags = _logged_run().data.tags
     assert tags["config_path"] == "unknown"
     assert tags["config_hash"], "the hash never depends on how the run was launched"
+
+
+def test_mlflow_gives_every_trial_its_own_nested_run(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The convergence curve says when the search improved. It cannot say with what.
+
+    A metric series indexed by trial number has one number per step, so the thirteen
+    hyperparameters that produced it have nowhere to live. Nested runs are also what lets the
+    UI plot a hyperparameter against the objective across the whole search.
+    """
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0], other_maes=[0.5, 0.5])
+
+    tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=3,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+    )
+
+    parent = _logged_run()
+    children = mlflow.search_runs(
+        experiment_names=[_MLFLOW_EXPERIMENT],
+        filter_string=f"tags.mlflow.parentRunId = '{parent.info.run_id}'",
+        output_format="list",
+    )
+    assert len(children) == 3, "one per trial that produced a value"
+
+    # Every child carries the parameters of its own trial, not the winner's.
+    for child in children:
+        assert set(child.data.params) == set(_INT_BOUNDS) | set(_FLOAT_BOUNDS)
+        assert "mae" in child.data.metrics
+
+    # The winner is findable among them rather than left to be spotted by eye.
+    assert parent.data.params["best_trial_number"] in {
+        c.info.run_name.removeprefix("trial-").lstrip("0") or "0" for c in children
+    }
+    assert {c.info.run_name for c in children} == {"trial-0000", "trial-0001", "trial-0002"}
 
 
 def test_censoring_draws_its_severity_from_the_same_window_it_censors() -> None:
