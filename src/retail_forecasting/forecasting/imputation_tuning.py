@@ -189,16 +189,6 @@ def _reference_trial_params(params: dict[str, int | float]) -> dict[str, int | f
     return candidate
 
 
-def _params_outside_the_space(candidate: dict[str, int | float]) -> list[str]:
-    """Names in `candidate` the search space cannot draw, missing ones included."""
-    bounds: dict[str, tuple[float, float]] = {**_INT_BOUNDS, **_FLOAT_BOUNDS}
-    return [
-        name
-        for name in _SUGGESTED_PARAM_NAMES
-        if name not in candidate or not bounds[name][0] <= candidate[name] <= bounds[name][1]
-    ]
-
-
 def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np.ndarray:
     """Reconstruction MAE of one hyperparameter set on each holdout, one value per draw."""
 
@@ -426,32 +416,11 @@ def tune_imputation_lgbm(
         study_name=study_name,
     )
 
-    # Score the reference points first. Without them the search spends its whole budget never
-    # seeing the baselines its winner is judged against, and the GP starts with no informative
-    # anchor. They consume trials from `n_trials` like any other.
-    #
-    # A reference the space cannot draw is SKIPPED rather than clamped into range. Clamping
-    # would enqueue a different candidate under the reference's name, and would hand the GP a
-    # point it could never propose itself. This is live, not hypothetical: the params file on
-    # disk carries n_estimators=3254 from a search whose upper bound was 8000 before it was
-    # narrowed to 3000, so the current space cannot reproduce its own incumbent.
-    references: tuple[tuple[str, dict[str, int | float] | None], ...] = (
-        ("untuned defaults", dict(DEFAULT_SUPERVISED_LGBM_PARAMS)),
-        ("incumbent params on disk", incumbent_params),
-    )
-    for label, reference in references:
-        if reference is None:
-            continue
-        candidate = _reference_trial_params(reference)
-        outside = _params_outside_the_space(candidate)
-        if outside:
-            print(
-                f"NOT enqueueing the {label}: {', '.join(outside)} outside the search space. "
-                "It is still scored on the validation draws at the end."
-            )
-            continue
-        study.enqueue_trial(candidate)
-        print(f"📌 Enqueued the {label} as a reference trial")
+    study.enqueue_trial(_reference_trial_params(DEFAULT_SUPERVISED_LGBM_PARAMS))
+    print("Enqueued the untuned defaults as a reference trial")
+    if incumbent_params is not None:
+        study.enqueue_trial(_reference_trial_params(incumbent_params))
+        print("Enqueued the incumbent params on disk as a reference trial")
 
     study.optimize(objective, n_trials=n_trials)
 

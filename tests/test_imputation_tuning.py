@@ -19,7 +19,6 @@ from retail_forecasting.forecasting.imputation_tuning import (
     _INT_BOUNDS,
     _build_holdout_set,
     _holdout_maes,
-    _params_outside_the_space,
     _reference_trial_params,
     _split_temporal_windows,
     tune_imputation_lgbm,
@@ -392,23 +391,12 @@ def test_reference_trial_params_are_enqueueable_for_the_untuned_defaults() -> No
     assert "subsample_freq" not in candidate
     assert candidate["reg_alpha"] == _FLOAT_BOUNDS["reg_alpha"][0]
     assert candidate["reg_lambda"] == _FLOAT_BOUNDS["reg_lambda"][0]
-    assert _params_outside_the_space(candidate) == []
 
-
-def test_a_reference_the_space_cannot_draw_is_reported_rather_than_clamped() -> None:
-    """Clamping would enqueue a different candidate under the reference's name.
-
-    Not hypothetical: the params file shipped in `models/` carries n_estimators=3254, from a
-    search whose upper bound was 8000 before it was narrowed to 3000. Enqueueing it would hand
-    the GP a point it can never propose itself, which Optuna accepts with only a warning.
-    """
-    over = dict(DEFAULT_SUPERVISED_LGBM_PARAMS) | {
-        "n_estimators": _INT_BOUNDS["n_estimators"][1] + 1
-    }
-    assert _params_outside_the_space(_reference_trial_params(over)) == ["n_estimators"]
-
-    missing = {k: v for k, v in DEFAULT_SUPERVISED_LGBM_PARAMS.items() if k != "max_bin"}
-    assert _params_outside_the_space(_reference_trial_params(missing)) == ["max_bin"]
+    bounds = {**_INT_BOUNDS, **_FLOAT_BOUNDS}
+    assert set(candidate) == set(bounds), "every searched parameter needs a value to enqueue"
+    for name, value in candidate.items():
+        low, high = bounds[name]
+        assert low <= value <= high, f"{name}={value} is outside the space's [{low}, {high}]"
 
 
 def test_holdout_maes_are_unchanged_by_evaluating_the_draws_in_parallel() -> None:
