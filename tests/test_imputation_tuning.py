@@ -19,7 +19,6 @@ from retail_forecasting.forecasting.imputation_tuning import (
     _INT_BOUNDS,
     _build_holdout_set,
     _holdout_maes,
-    _reference_trial_params,
     _split_temporal_windows,
     tune_imputation_lgbm,
 )
@@ -242,9 +241,16 @@ def test_tune_imputation_lgbm_skips_persisting_when_the_gain_could_be_a_coin_fli
     assert not (tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME).exists()
 
 
-def test_tune_imputation_lgbm_skips_persisting_when_winner_loses_to_defaults(
+def test_tune_imputation_lgbm_returns_the_defaults_when_nothing_beats_them(
     tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A search that finds nothing better must end on the defaults, not on its best guess.
+
+    The defaults are enqueued as a trial, so they compete. When every other candidate is worse
+    they win outright, the improvement is exactly zero, and the gate declines to persist. Before
+    they were enqueued the search returned its best random candidate and only the gate stood
+    between that and the pipeline.
+    """
     _stub_holdout_maes(monkeypatch, default_maes=[0.5, 0.5], other_maes=[1.0, 1.0])
 
     returned = tune_imputation_lgbm(
@@ -262,7 +268,8 @@ def test_tune_imputation_lgbm_skips_persisting_when_winner_loses_to_defaults(
 
     metadata = json.loads(returned.read_text(encoding="utf-8"))
     assert metadata["persisted"] is False
-    assert metadata["improvement_pct"] == pytest.approx(100.0)
+    assert metadata["best_mae_validation"] == metadata["default_mae_validation"]
+    assert metadata["improvement_pct"] == pytest.approx(0.0)
 
 
 def test_tune_imputation_lgbm_removes_a_superseded_params_file_when_the_gate_fails(
@@ -340,7 +347,9 @@ def test_tune_imputation_lgbm_replaces_an_incumbent_the_new_winner_beats(
 
     returned = tune_imputation_lgbm(
         _settings(tmp_path),
-        n_trials=2,
+        # Four: the first two trials are the enqueued references, the defaults and the planted
+        # incumbent. At two there is no budget left for the search to produce a challenger.
+        n_trials=4,
         seed=42,
         n_selection_holdouts=2,
         n_validation_holdouts=4,
@@ -377,26 +386,23 @@ def test_tune_imputation_lgbm_has_no_incumbent_to_beat_on_a_first_run(
     assert metadata["persisted"] is True
 
 
-def test_reference_trial_params_are_enqueueable_for_the_untuned_defaults() -> None:
-    """The defaults must be expressible in the search space, or they cannot anchor it.
+def test_the_untuned_defaults_sit_inside_the_search_space() -> None:
+    """The baseline is enqueued as a trial, so the space has to be able to express it.
 
-    Two ways they could fail to be. They carry `subsample_freq`, which the objective derives
-    from `subsample` rather than suggesting, so enqueueing it would name a parameter the space
-    has no distribution for. And they set both regularizers to exactly 0.0, which a log-uniform
-    range cannot represent -- raised to the space's floor, a substitution measured at 3e-11 of
-    reconstruction MAE.
+    The regularizers are the ones that can break this: they are drawn log-uniformly from 1e-8,
+    and no log scale reaches zero. Setting them back to LightGBM's own 0.0 would put the
+    baseline outside the space, where Optuna enqueues it anyway behind a warning and leaves the
+    Gaussian process holding a point it can never propose.
     """
-    candidate = _reference_trial_params(DEFAULT_SUPERVISED_LGBM_PARAMS)
+    bounds: dict[str, tuple[float, float]] = {**_INT_BOUNDS, **_FLOAT_BOUNDS}
 
-    assert "subsample_freq" not in candidate
-    assert candidate["reg_alpha"] == _FLOAT_BOUNDS["reg_alpha"][0]
-    assert candidate["reg_lambda"] == _FLOAT_BOUNDS["reg_lambda"][0]
-
-    bounds = {**_INT_BOUNDS, **_FLOAT_BOUNDS}
-    assert set(candidate) == set(bounds), "every searched parameter needs a value to enqueue"
-    for name, value in candidate.items():
-        low, high = bounds[name]
+    for name, (low, high) in bounds.items():
+        value = DEFAULT_SUPERVISED_LGBM_PARAMS[name]
         assert low <= value <= high, f"{name}={value} is outside the space's [{low}, {high}]"
+
+    # Everything the space searches has a default, and `subsample_freq` is derived rather than
+    # searched -- so the defaults cover the space exactly, plus that one.
+    assert set(DEFAULT_SUPERVISED_LGBM_PARAMS) == set(bounds) | {"subsample_freq"}
 
 
 def test_holdout_maes_are_unchanged_by_evaluating_the_draws_in_parallel() -> None:
@@ -524,7 +530,9 @@ def test_tune_imputation_lgbm_breaks_a_statistical_tie_on_the_mean(
 
     returned = tune_imputation_lgbm(
         _settings(tmp_path),
-        n_trials=2,
+        # Four: the first two trials are the enqueued references, the defaults and the planted
+        # incumbent. At two there is no budget left for the search to produce a challenger.
+        n_trials=4,
         seed=42,
         n_selection_holdouts=2,
         n_validation_holdouts=4,

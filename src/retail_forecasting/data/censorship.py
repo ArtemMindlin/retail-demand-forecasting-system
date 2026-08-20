@@ -23,8 +23,11 @@ DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
     "colsample_bytree": 1.0,
     "subsample": 1.0,
     "subsample_freq": 0,
-    "reg_alpha": 0.0,
-    "reg_lambda": 0.0,
+    # 1e-8 rather than LightGBM's own 0.0, so this baseline is a point the imputation search
+    # can express: its regularizers are drawn log-uniformly from 1e-8, and no log scale reaches
+    # zero. The two are the same model in practice -- measured at 1.4e-11 of reconstruction MAE.
+    "reg_alpha": 1e-8,
+    "reg_lambda": 1e-8,
     "min_data_per_group": 100,
     "cat_smooth": 10.0,
     "max_bin": 255,

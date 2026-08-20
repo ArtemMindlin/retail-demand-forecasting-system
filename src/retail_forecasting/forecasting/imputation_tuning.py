@@ -48,24 +48,6 @@ _MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 # What `objective` actually suggests. `subsample_freq` is absent on purpose: it is derived from
 # `subsample` rather than searched, so enqueueing it would name a parameter the space has no
 # distribution for.
-_SUGGESTED_PARAM_NAMES = (
-    "subsample",
-    "n_estimators",
-    "learning_rate",
-    "max_depth",
-    "num_leaves",
-    "min_child_samples",
-    "colsample_bytree",
-    "reg_alpha",
-    "reg_lambda",
-    "min_data_per_group",
-    "cat_smooth",
-    "max_bin",
-)
-
-# The search space, owned here rather than inline in `objective`, so the enqueue guard below can
-# check a reference point against the same bounds the search draws from. `subsample_freq` is
-# absent from both because it is derived from `subsample` rather than searched.
 _INT_BOUNDS: dict[str, tuple[int, int]] = {
     "n_estimators": (50, 3000),
     "max_depth": (2, 12),
@@ -173,20 +155,6 @@ def _build_holdout_set(
         window_start=pd.Timestamp(window_dates.min()),
         window_end=pd.Timestamp(window_dates.max()),
     )
-
-
-def _reference_trial_params(params: dict[str, int | float]) -> dict[str, int | float]:
-    """Trim a known-good params set to the parameters `objective` actually suggests.
-
-    `reg_alpha` and `reg_lambda` are raised to the space's floor when they arrive at 0.0, which
-    the untuned defaults do: a log-uniform range cannot represent zero. Measured, the
-    substitution moves reconstruction MAE by 3e-11, so the enqueued point is the defaults.
-    """
-    candidate = {name: params[name] for name in _SUGGESTED_PARAM_NAMES if name in params}
-    for name in ("reg_alpha", "reg_lambda"):
-        if name in candidate:
-            candidate[name] = max(float(candidate[name]), _FLOAT_BOUNDS[name][0])
-    return candidate
 
 
 def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np.ndarray:
@@ -416,10 +384,10 @@ def tune_imputation_lgbm(
         study_name=study_name,
     )
 
-    study.enqueue_trial(_reference_trial_params(DEFAULT_SUPERVISED_LGBM_PARAMS))
+    study.enqueue_trial(dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
     print("Enqueued the untuned defaults as a reference trial")
     if incumbent_params is not None:
-        study.enqueue_trial(_reference_trial_params(incumbent_params))
+        study.enqueue_trial(dict(incumbent_params))
         print("Enqueued the incumbent params on disk as a reference trial")
 
     study.optimize(objective, n_trials=n_trials)
@@ -460,9 +428,6 @@ def tune_imputation_lgbm(
         (best_mae_validation - default_mae_validation) / default_mae_validation * 100
     )
 
-    # Decide on the interval, not the point estimate. A mean that happens to land below zero
-    # is exactly what a coin-flip result looks like: one winner cleared this gate at -1.14%
-    # and then measured -0.45% with a CI straddling zero on fresh draws.
     ci_lo, ci_hi = _mean_ci95(tuned_maes - default_maes)
     beats_default = ci_hi < 0.0
 
@@ -470,7 +435,7 @@ def tune_imputation_lgbm(
     incumbent_ci95: list[float] | None = None
     beats_incumbent: bool | None = None
     if incumbent_params is not None:
-        print("🥊 Scoring the incumbent params already on disk on the same draws...")
+        print("Scoring the incumbent params already on disk on the same draws...")
         incumbent_maes = _holdout_maes(validation.draws, incumbent_params)
         incumbent_mae_validation = float(np.mean(incumbent_maes))
         inc_lo, inc_hi = _mean_ci95(tuned_maes - incumbent_maes)
