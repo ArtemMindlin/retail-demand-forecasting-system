@@ -44,19 +44,6 @@ def _models_dir_never_points_at_the_repo(tmp_path_factory, monkeypatch) -> None:
     ModelConfig.model_rebuild(force=True)
 
 
-@pytest.fixture(autouse=True)
-def _mlflow_tracking_never_points_at_the_repo(tmp_path_factory, monkeypatch) -> None:
-    """Redirect MLflow's tracking store away from the repo's own ``mlflow.db``.
-
-    Same failure as the fixture above, one layer over: ``tune_imputation_lgbm`` logs to
-    MLflow unconditionally, and without this every test exercising it would write its
-    synthetic-panel search -- stubbed loaders, 2-trial budgets, meaningless metrics -- straight
-    into the store a human browses with ``make mlflow-ui``.
-    """
-    store = tmp_path_factory.mktemp("mlflow_default") / "mlflow.db"
-    monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{store}")
-
-
 def make_synthetic_panel(num_series: int = 3, num_days: int = 70) -> pd.DataFrame:
     dates = pd.date_range("2025-01-01", periods=num_days, freq="D")
     rows = []

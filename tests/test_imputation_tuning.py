@@ -28,17 +28,18 @@ METADATA_FILENAME = "imputation_lgbm_tuning_metadata.json"
 
 
 @pytest.fixture(autouse=True)
-def _mlflow_artifacts_never_land_in_the_repo(
+def _mlflow_never_lands_in_the_repo(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Run these tests from a scratch directory so MLflow's artifact root follows them.
+    """Run these tests from a scratch directory so MLflow's output follows them.
 
-    The conftest fixture redirects the tracking database, but MLflow resolves the artifact
-    root against the working directory independently of it -- confirmed live during manual
-    verification, where a search with MLFLOW_TRACKING_URI pointed at /tmp still wrote an
-    mlruns/ folder into the repo. Safe here specifically because this module stubs the panel
-    loader and passes an absolute models_dir, so nothing else it touches is relative to the
-    repo root.
+    Both halves of it. `mlflow.db` is a relative path, and the artifact root is resolved
+    against the working directory too -- separately, so redirecting one leaves the other
+    behind: a search with MLFLOW_TRACKING_URI pointed at /tmp still wrote an mlruns/ folder
+    into the repo. Moving the working directory is what catches both.
+
+    Safe here specifically because this module stubs the panel loader and passes an absolute
+    models_dir, so nothing else it touches is relative to the repo root.
     """
     monkeypatch.chdir(tmp_path_factory.mktemp("mlflow_cwd"))
 
