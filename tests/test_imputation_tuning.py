@@ -509,6 +509,43 @@ def test_mlflow_logs_no_incumbent_metrics_when_there_was_no_incumbent(
     assert run.data.metrics["mae_validation_default"] == pytest.approx(1.0)
 
 
+def test_mlflow_records_the_shape_of_the_experiment_that_produced_a_run(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two runs are only comparable if the UI says what each of them measured.
+
+    The sizes are metrics rather than params because MLflow stores params as strings, and
+    these are the numbers a search is sorted and filtered by -- `teacher_fit_rows` above all,
+    which invariant 41 makes the variable deciding whether tuning helps at all.
+    """
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0, 1.0], other_maes=[0.5, 0.5, 0.5])
+
+    returned = tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=7,
+        n_selection_holdouts=2,
+        n_validation_holdouts=3,
+    )
+    metadata = json.loads((tmp_path / METADATA_FILENAME).read_text(encoding="utf-8"))
+    assert returned.exists()
+
+    run = _logged_run()
+    assert run.data.params["n_selection_holdouts"] == "2"
+    assert run.data.params["n_validation_holdouts"] == "3"
+    assert run.data.params["selection_window_end"] == metadata["selection_window_end"]
+    assert run.data.params["validation_window_start"] == metadata["validation_window_start"]
+    assert run.data.params["seed"] == "7"
+
+    assert run.data.metrics["teacher_fit_rows"] == metadata["teacher_fit_rows"]
+    assert run.data.metrics["n_selection_eval_rows"] == metadata["n_selection_eval_rows"]
+    assert run.data.metrics["n_validation_eval_rows"] == metadata["n_validation_eval_rows"]
+
+    # Reconstructible from `seed` and the two counts, and in the metadata artifact besides.
+    assert "selection_seeds" not in run.data.params
+    assert "validation_seeds" not in run.data.params
+
+
 def test_censoring_draws_its_severity_from_the_same_window_it_censors() -> None:
     """A faked stockout must borrow its severity from a REAL stockout of its own window.
 

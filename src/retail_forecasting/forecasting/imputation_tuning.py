@@ -201,15 +201,24 @@ def _log_study_to_mlflow(
 
     with mlflow.start_run(run_name=study.study_name):
         mlflow.log_params(metadata.best_params.model_dump())
+        # The seed lists are deliberately absent: both are `seed` plus an offset and an index,
+        # so they are reconstructible from what is here, and the metadata artifact below carries
+        # them verbatim anyway.
         mlflow.log_params(
             {
                 "n_trials": metadata.n_trials_requested,
                 "seed": metadata.seed,
                 "n_series": metadata.n_series,
-                "teacher_fit_rows": metadata.teacher_fit_rows,
+                "n_selection_holdouts": metadata.n_selection_holdouts,
+                "n_validation_holdouts": metadata.n_validation_holdouts,
+                "selection_window_end": metadata.selection_window_end,
                 "validation_window_start": metadata.validation_window_start,
             }
         )
+        # The row counts are metrics rather than params despite measuring nothing: MLflow stores
+        # params as strings, so `params.teacher_fit_rows > 10000` in the UI compares text. These
+        # are the sizes a search is judged by -- invariant 41 makes `teacher_fit_rows` the
+        # variable that decides whether tuning helps at all -- and they have to sort as numbers.
         mlflow.log_metrics(
             {
                 "mae_selection_best": metadata.best_mae_selection,
@@ -218,6 +227,9 @@ def _log_study_to_mlflow(
                 "improvement_pct": metadata.improvement_pct,
                 "improvement_ci95_low": metadata.improvement_ci95[0],
                 "improvement_ci95_high": metadata.improvement_ci95[1],
+                "teacher_fit_rows": metadata.teacher_fit_rows,
+                "n_selection_eval_rows": metadata.n_selection_eval_rows,
+                "n_validation_eval_rows": metadata.n_validation_eval_rows,
             }
         )
         # Only when there was an incumbent to compete against. A run with none logs nothing
