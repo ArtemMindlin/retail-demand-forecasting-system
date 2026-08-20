@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,7 +9,7 @@ import pandas as pd
 import shap
 from pydantic import BaseModel, ConfigDict, Field
 
-from retail_forecasting.config import Settings
+from retail_forecasting.config import Settings, build_config_hash
 from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
 from retail_forecasting.contracts.contracts_business import ChampionRecord, ChampionRegistry
 from retail_forecasting.contracts.contracts_config import RunMode
@@ -273,11 +272,6 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
         )
     artifacts.run_directory = run_dir
     return artifacts
-
-
-def build_config_hash(settings: Settings) -> str:
-    serialized = json.dumps(settings.model_dump(mode="json"), sort_keys=True)
-    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:

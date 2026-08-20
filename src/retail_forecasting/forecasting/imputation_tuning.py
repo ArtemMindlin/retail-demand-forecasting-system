@@ -15,7 +15,7 @@ from joblib import Parallel, cpu_count, delayed
 from mlflow.data.pandas_dataset import from_pandas
 from scipy import stats
 
-from retail_forecasting.config import Settings
+from retail_forecasting.config import Settings, build_config_hash
 from retail_forecasting.contracts.contracts_tuning import (
     ImputationBoostingParams,
     ImputationTuningMetadata,
@@ -198,6 +198,8 @@ def _log_study_to_mlflow(
     beats_default: bool,
     panel: pd.DataFrame,
     panel_source: Path,
+    config_hash: str,
+    config_path: Path | None,
 ) -> None:
     """Record one completed search in MLflow: winner, validation verdict, and its artifacts."""
     mlflow.set_tracking_uri(_MLFLOW_TRACKING_URI)
@@ -286,6 +288,12 @@ def _log_study_to_mlflow(
                 "beats_incumbent": str(metadata.beats_incumbent),
                 "outcome": outcome,
                 "git_commit": metadata.git_commit or "unknown",
+                # Two answers to "which configuration was this". The hash is the identity: it
+                # covers the RESOLVED settings, so a hand-edited YAML or an environment override
+                # moves it. The path is what a human recognises in the UI, where a bare sha256
+                # identifies nothing. They differ exactly when someone changed the file.
+                "config_hash": config_hash,
+                "config_path": str(config_path) if config_path is not None else "unknown",
             }
         )
 
@@ -308,6 +316,7 @@ def tune_imputation_lgbm(
     seed: int | None = None,
     n_selection_holdouts: int = N_SELECTION_HOLDOUTS,
     n_validation_holdouts: int = N_VALIDATION_HOLDOUTS,
+    config_path: Path | None = None,
 ) -> Path:
     """Search LGBM hyperparameters for the supervised imputer and persist the winner.
 
@@ -482,13 +491,7 @@ def tune_imputation_lgbm(
         incumbent_mae_validation = float(np.mean(incumbent_maes))
         inc_lo, inc_hi = _mean_ci95(tuned_maes - incumbent_maes)
         incumbent_ci95 = [inc_lo, inc_hi]
-        # The MEAN decides here, unlike the defaults gate above. That gate guards a CLAIM the
-        # thesis makes, where an unresolvable difference must be reported as no difference. This
-        # one only picks which of two files sits on disk, and when the draws cannot separate them
-        # "keep whichever arrived first" is not a more defensible tiebreak than "keep the better
-        # mean" -- it just looks more cautious. Note this reduces to one comparison: the interval
-        # is symmetric about the mean, so a decisive verdict either way already agrees with it,
-        # and the mean only does real work in the straddling case.
+
         beats_incumbent = bool(np.mean(tuned_maes - incumbent_maes) < 0.0)
         decisive = inc_hi < 0.0 or inc_lo > 0.0
         print(
@@ -531,14 +534,14 @@ def tune_imputation_lgbm(
     metadata_path.write_text(json.dumps(metadata.model_dump(), indent=2), encoding="utf-8")
 
     print(
-        f"\n📏 Validation: tuned={best_mae_validation:.4f} vs "
+        f"\nValidation: tuned={best_mae_validation:.4f} vs "
         f"default={default_mae_validation:.4f} ({improvement_pct:+.2f}%), "
         f"CI95 of the difference [{ci_lo:+.4f}, {ci_hi:+.4f}]"
     )
 
     if not beats_default:
         print(
-            "⚠️  The tuned hyperparameters do NOT beat the untuned defaults by a margin the "
+            "️The tuned hyperparameters do NOT beat the untuned defaults by a margin the "
             "validation draws can distinguish from zero, so they were NOT persisted -- the "
             "pipeline keeps using the defaults.\n"
             f"    Decision recorded in: {metadata_path}\n"
@@ -566,5 +569,7 @@ def tune_imputation_lgbm(
         panel=panel,
         panel_source=settings.dataset.processed_panel_dir
         / panel_cache_filename(settings.dataset, "train"),
+        config_hash=build_config_hash(settings),
+        config_path=config_path,
     )
     return params_path if should_persist else metadata_path

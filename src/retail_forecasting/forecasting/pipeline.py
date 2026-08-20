@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from retail_forecasting.config import InventoryConfig, Settings
+from retail_forecasting.config import InventoryConfig, Settings, build_config_hash
 from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
 from retail_forecasting.contracts.contracts_config import ImputationStrategy
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
@@ -35,7 +35,6 @@ from retail_forecasting.evaluation.reporting import (
     ModelRunMetadata,
     RunArtifacts,
     ValidationMetadata,
-    build_config_hash,
     write_run_artifacts,
 )
 from retail_forecasting.evaluation.xai import calculate_shap_values

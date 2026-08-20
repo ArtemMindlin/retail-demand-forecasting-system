@@ -108,7 +108,7 @@ def main() -> None:
         # would need them installed just to reach its own branch.
         from retail_forecasting.forecasting.imputation_tuning import tune_imputation_lgbm
 
-        params_path = tune_imputation_lgbm(settings)
+        params_path = tune_imputation_lgbm(settings, config_path=Path(args.config))
         print(f"Imputation tuning written to: {params_path}")
         return
     if mode == "score_daily":

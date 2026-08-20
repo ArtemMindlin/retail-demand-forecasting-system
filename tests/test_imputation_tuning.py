@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 from mlflow.data.pandas_dataset import from_pandas
 
-from retail_forecasting.config import ModelConfig, Settings
+from retail_forecasting.config import ModelConfig, Settings, build_config_hash
 from retail_forecasting.data.censorship import (
     DEFAULT_SUPERVISED_LGBM_PARAMS,
     IMPUTATION_LGBM_PARAMS_FILENAME,
@@ -582,6 +582,62 @@ def test_mlflow_records_which_panel_a_run_actually_read(
     touched = patched_train_only_loader.copy()
     touched.loc[touched.index[0], "observed_demand"] += 1.0
     assert from_pandas(touched, name="imputation_train_panel").digest != dataset.digest
+
+
+def test_mlflow_records_which_configuration_a_run_came_from(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both answers to "which configuration", because they answer different questions.
+
+    The hash covers the RESOLVED settings, so it moves when a value does -- by a hand-edited
+    YAML or an environment override -- where the path would not. The path is what a human
+    recognises in the UI, where a bare sha256 identifies nothing.
+    """
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0], other_maes=[0.5, 0.5])
+    settings = _settings(tmp_path)
+
+    tune_imputation_lgbm(
+        settings,
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+        config_path=Path("configs/imputation_tuning.yaml"),
+    )
+
+    tags = _logged_run().data.tags
+    assert tags["config_path"] == "configs/imputation_tuning.yaml"
+    assert tags["config_hash"] == build_config_hash(settings)
+
+    # A settings change the path cannot see has to move the hash. Copied rather than mutated:
+    # the config models are frozen, which is why the hash is worth anything in the first place.
+    changed = settings.model_copy(
+        update={
+            "dataset": settings.dataset.model_copy(
+                update={"top_n_series": (settings.dataset.top_n_series or 0) + 1}
+            )
+        }
+    )
+    assert build_config_hash(changed) != tags["config_hash"]
+
+
+def test_config_path_is_optional_and_says_so_when_missing(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Called as a library rather than through run.py, there is no --config to report."""
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0], other_maes=[0.5, 0.5])
+
+    tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+    )
+
+    tags = _logged_run().data.tags
+    assert tags["config_path"] == "unknown"
+    assert tags["config_hash"], "the hash never depends on how the run was launched"
 
 
 def test_censoring_draws_its_severity_from_the_same_window_it_censors() -> None:

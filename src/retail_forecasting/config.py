@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 import yaml
@@ -66,3 +68,14 @@ def load_config(path: str | Path) -> Settings:
         raw_config = yaml.safe_load(handle) or {}
 
     return Settings(**raw_config)
+
+
+def build_config_hash(settings: Settings) -> str:
+    """Fingerprint of the RESOLVED settings, not of the YAML that produced them.
+
+    Lives here rather than beside its first caller in `evaluation/reporting.py`: it takes a
+    Settings and returns a hash of that Settings, and every layer allowed to read the config can
+    reach it without importing the reporting module.
+    """
+    serialized = json.dumps(settings.model_dump(mode="json"), sort_keys=True)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
