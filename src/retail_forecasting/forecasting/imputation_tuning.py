@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -189,18 +188,6 @@ def _mean_ci95(deltas: np.ndarray) -> tuple[float, float]:
     return mean - half_width, mean + half_width
 
 
-def _configure_mlflow() -> None:
-    """Point MLflow at its tracking store and select the imputation-tuning experiment.
-
-    The tracking store is one database holding many experiments, separated by name -- not one
-    database per use case -- so extending tracking elsewhere means a new experiment name here,
-    not a new store.
-    """
-    if not os.environ.get("MLFLOW_TRACKING_URI"):
-        mlflow.set_tracking_uri(_MLFLOW_TRACKING_URI)
-    mlflow.set_experiment(_MLFLOW_EXPERIMENT)
-
-
 def _log_study_to_mlflow(
     study: optuna.Study,
     metadata: ImputationTuningMetadata,
@@ -208,17 +195,10 @@ def _log_study_to_mlflow(
     params_path: Path,
     beats_default: bool,
 ) -> None:
-    """Record one completed search in MLflow: winner, validation verdict, and its artifacts.
+    """Record one completed search in MLflow: winner, validation verdict, and its artifacts."""
+    mlflow.set_tracking_uri(_MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(_MLFLOW_EXPERIMENT)
 
-    Called once, after the search and the persist decision are already final -- this only
-    translates what ``tune_imputation_lgbm`` already computed and already wrote to disk, so a
-    tracking failure here cannot cost the run its actual output.
-
-    Also logs the per-trial convergence curve from ``study`` (persisted in step 1's Optuna
-    storage), as two metric series sharing the trial number as their step: ``trial_mae``, the
-    raw value the GP explored trial by trial, and ``trial_mae_best_so_far``, its running
-    minimum -- the one that actually answers "is this still improving or has it stalled".
-    """
     with mlflow.start_run(run_name=study.study_name):
         mlflow.log_params(metadata.best_params.model_dump())
         mlflow.log_params(
@@ -515,7 +495,6 @@ def tune_imputation_lgbm(
         params_path.write_text(json.dumps(best_params.model_dump(), indent=2), encoding="utf-8")
         print(f"\nTuned imputation hyperparameters written to: {params_path}\n")
 
-    _configure_mlflow()
     _log_study_to_mlflow(
         study=study,
         metadata=metadata,
