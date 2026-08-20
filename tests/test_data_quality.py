@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 
-import numpy as np
 import pandas as pd
 import pytest
 from pydantic import ValidationError
@@ -250,21 +249,31 @@ def test_supervised_imputer_keeps_observed_sales_and_fills_only_the_unstocked_sl
     The old max(observed, predicted) rule returned the prediction whenever it exceeded the
     observed sale, throwing away the strongest evidence available on days that were mostly
     sellable. The reconciliation must instead add only the missing slice.
+
+    Every clean day carries the same demand, so the teacher predicts that constant for a full
+    day and the expected estimates are exact. The two censored days are chosen so the additive
+    rule and the max rule disagree on BOTH -- max would return 10.0 for each, which is what
+    this test exists to catch.
     """
-    observed = np.array([9.0, 2.0])
-    predicted_full_day = np.array([10.0, 10.0])
-    # 1.6h of a 16h window = 10% censored; 12.8h = 80% censored.
-    stockout_hours = np.array([1.6, 12.8])
-
-    estimate = LatentDemandImputer._reconcile_with_severity(
-        observed=observed,
-        predicted_full_day=predicted_full_day,
-        stockout_hours=stockout_hours,
+    panel = pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=102),
+            "series_id": "test_1",
+            "observed_demand": 10.0,
+            "stockout_hours": 0.0,
+        }
     )
+    # 1.6h of a 16h window = 10% censored; 12.8h = 80% censored.
+    panel.loc[100, ["observed_demand", "stockout_hours"]] = [9.5, 1.6]
+    panel.loc[101, ["observed_demand", "stockout_hours"]] = [3.0, 12.8]
 
-    assert estimate == pytest.approx([9.0 + 0.1 * 10.0, 2.0 + 0.8 * 10.0])
+    imputed = LatentDemandImputer(strategy="supervised").impute(panel)
+
+    estimate = imputed.loc[[100, 101], "latent_demand_est"].to_numpy()
+    sold = imputed.loc[[100, 101], "original_observed_demand"].to_numpy()
+    assert estimate == pytest.approx([9.5 + 0.1 * 10.0, 3.0 + 0.8 * 10.0])
     # Never below what actually sold, on any severity.
-    assert (estimate >= observed).all()
+    assert (estimate >= sold).all()
 
 
 def test_supervised_imputer_does_not_feed_stockout_severity_to_the_teacher() -> None:
