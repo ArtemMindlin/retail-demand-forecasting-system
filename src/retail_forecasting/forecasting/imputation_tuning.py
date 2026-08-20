@@ -36,12 +36,53 @@ _VALIDATION_SEED_OFFSET = 10_000
 
 _VALIDATION_WINDOW_FRACTION = 1.0 / 3.0
 
-_N_STARTUP_TRIALS = 5
+# Optuna's own default for GPSampler. Five was below it, which is thin ground for fitting a
+# Gaussian process over 13 dimensions.
+_N_STARTUP_TRIALS = 10
 
 # MLflow experiment collecting every imputation search, so runs stay comparable across time.
 _MLFLOW_EXPERIMENT = "imputation_lgbm_tuning"
 
 _MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
+
+# What `objective` actually suggests. `subsample_freq` is absent on purpose: it is derived from
+# `subsample` rather than searched, so enqueueing it would name a parameter the space has no
+# distribution for.
+_SUGGESTED_PARAM_NAMES = (
+    "subsample",
+    "n_estimators",
+    "learning_rate",
+    "max_depth",
+    "num_leaves",
+    "min_child_samples",
+    "colsample_bytree",
+    "reg_alpha",
+    "reg_lambda",
+    "min_data_per_group",
+    "cat_smooth",
+    "max_bin",
+)
+
+# The search space, owned here rather than inline in `objective`, so the enqueue guard below can
+# check a reference point against the same bounds the search draws from. `subsample_freq` is
+# absent from both because it is derived from `subsample` rather than searched.
+_INT_BOUNDS: dict[str, tuple[int, int]] = {
+    "n_estimators": (50, 3000),
+    "max_depth": (2, 12),
+    "num_leaves": (2, 1024),
+    "min_child_samples": (2, 100),
+    "min_data_per_group": (1, 100),
+    "max_bin": (8, 255),
+}
+
+_FLOAT_BOUNDS: dict[str, tuple[float, float]] = {
+    "subsample": (0.4, 1.0),
+    "learning_rate": (0.005, 0.3),
+    "colsample_bytree": (0.3, 1.0),
+    "reg_alpha": (1e-8, 100.0),
+    "reg_lambda": (1e-8, 100.0),
+    "cat_smooth": (0.0, 50.0),
+}
 
 
 class Holdout(NamedTuple):
@@ -132,6 +173,30 @@ def _build_holdout_set(
         window_start=pd.Timestamp(window_dates.min()),
         window_end=pd.Timestamp(window_dates.max()),
     )
+
+
+def _reference_trial_params(params: dict[str, int | float]) -> dict[str, int | float]:
+    """Trim a known-good params set to the parameters `objective` actually suggests.
+
+    `reg_alpha` and `reg_lambda` are raised to the space's floor when they arrive at 0.0, which
+    the untuned defaults do: a log-uniform range cannot represent zero. Measured, the
+    substitution moves reconstruction MAE by 3e-11, so the enqueued point is the defaults.
+    """
+    candidate = {name: params[name] for name in _SUGGESTED_PARAM_NAMES if name in params}
+    for name in ("reg_alpha", "reg_lambda"):
+        if name in candidate:
+            candidate[name] = max(float(candidate[name]), _FLOAT_BOUNDS[name][0])
+    return candidate
+
+
+def _params_outside_the_space(candidate: dict[str, int | float]) -> list[str]:
+    """Names in `candidate` the search space cannot draw, missing ones included."""
+    bounds: dict[str, tuple[float, float]] = {**_INT_BOUNDS, **_FLOAT_BOUNDS}
+    return [
+        name
+        for name in _SUGGESTED_PARAM_NAMES
+        if name not in candidate or not bounds[name][0] <= candidate[name] <= bounds[name][1]
+    ]
 
 
 def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np.ndarray:
@@ -310,21 +375,29 @@ def tune_imputation_lgbm(
     )
 
     def objective(trial: optuna.Trial) -> float:
-        subsample = trial.suggest_float("subsample", 0.4, 1.0)
+        subsample = trial.suggest_float("subsample", *_FLOAT_BOUNDS["subsample"])
         params = {
-            "n_estimators": trial.suggest_int("n_estimators", 50, 3000),
-            "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.3, log=True),
-            "max_depth": trial.suggest_int("max_depth", 2, 12),
-            "num_leaves": trial.suggest_int("num_leaves", 2, 1024, log=True),
-            "min_child_samples": trial.suggest_int("min_child_samples", 2, 100),
-            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.3, 1.0),
+            "n_estimators": trial.suggest_int("n_estimators", *_INT_BOUNDS["n_estimators"]),
+            "learning_rate": trial.suggest_float(
+                "learning_rate", *_FLOAT_BOUNDS["learning_rate"], log=True
+            ),
+            "max_depth": trial.suggest_int("max_depth", *_INT_BOUNDS["max_depth"]),
+            "num_leaves": trial.suggest_int("num_leaves", *_INT_BOUNDS["num_leaves"], log=True),
+            "min_child_samples": trial.suggest_int(
+                "min_child_samples", *_INT_BOUNDS["min_child_samples"]
+            ),
+            "colsample_bytree": trial.suggest_float(
+                "colsample_bytree", *_FLOAT_BOUNDS["colsample_bytree"]
+            ),
             "subsample": subsample,
             "subsample_freq": 1 if subsample < 1.0 else 0,
-            "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 100.0, log=True),
-            "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 100.0, log=True),
-            "min_data_per_group": trial.suggest_int("min_data_per_group", 1, 100),
-            "cat_smooth": trial.suggest_float("cat_smooth", 0.0, 50.0),
-            "max_bin": trial.suggest_int("max_bin", 8, 255),
+            "reg_alpha": trial.suggest_float("reg_alpha", *_FLOAT_BOUNDS["reg_alpha"], log=True),
+            "reg_lambda": trial.suggest_float("reg_lambda", *_FLOAT_BOUNDS["reg_lambda"], log=True),
+            "min_data_per_group": trial.suggest_int(
+                "min_data_per_group", *_INT_BOUNDS["min_data_per_group"]
+            ),
+            "cat_smooth": trial.suggest_float("cat_smooth", *_FLOAT_BOUNDS["cat_smooth"]),
+            "max_bin": trial.suggest_int("max_bin", *_INT_BOUNDS["max_bin"]),
         }
         return float(np.mean(_holdout_maes(selection.draws, params)))
 
@@ -353,10 +426,45 @@ def tune_imputation_lgbm(
 
     study = optuna.create_study(
         direction="minimize",
-        sampler=optuna.samplers.GPSampler(seed=seed, n_startup_trials=_N_STARTUP_TRIALS),
+        sampler=optuna.samplers.GPSampler(
+            seed=seed,
+            n_startup_trials=_N_STARTUP_TRIALS,
+            # The objective is deterministic -- the draws are fixed, LightGBM is seeded and
+            # single-threaded, and repeated calls return bit-identical MAEs. Left at its default
+            # of False, the GP would estimate an observation-noise term that does not exist.
+            deterministic_objective=True,
+        ),
         storage=f"sqlite:///{models_dir / 'imputation_tuning_studies.db'}",
         study_name=study_name,
     )
+
+    # Score the reference points first. Without them the search spends its whole budget never
+    # seeing the baselines its winner is judged against, and the GP starts with no informative
+    # anchor. They consume trials from `n_trials` like any other.
+    #
+    # A reference the space cannot draw is SKIPPED rather than clamped into range. Clamping
+    # would enqueue a different candidate under the reference's name, and would hand the GP a
+    # point it could never propose itself. This is live, not hypothetical: the params file on
+    # disk carries n_estimators=3254 from a search whose upper bound was 8000 before it was
+    # narrowed to 3000, so the current space cannot reproduce its own incumbent.
+    references: tuple[tuple[str, dict[str, int | float] | None], ...] = (
+        ("untuned defaults", dict(DEFAULT_SUPERVISED_LGBM_PARAMS)),
+        ("incumbent params on disk", incumbent_params),
+    )
+    for label, reference in references:
+        if reference is None:
+            continue
+        candidate = _reference_trial_params(reference)
+        outside = _params_outside_the_space(candidate)
+        if outside:
+            print(
+                f"⏭️  NOT enqueueing the {label}: {', '.join(outside)} outside the search space. "
+                "It is still scored on the validation draws at the end."
+            )
+            continue
+        study.enqueue_trial(candidate)
+        print(f"📌 Enqueued the {label} as a reference trial")
+
     study.optimize(objective, n_trials=n_trials)
 
     subsample_best = float(study.best_params["subsample"])

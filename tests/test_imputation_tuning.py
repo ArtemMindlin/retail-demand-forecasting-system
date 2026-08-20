@@ -15,8 +15,12 @@ from retail_forecasting.data.censorship import (
     synthetic_censor_holdout,
 )
 from retail_forecasting.forecasting.imputation_tuning import (
+    _FLOAT_BOUNDS,
+    _INT_BOUNDS,
     _build_holdout_set,
     _holdout_maes,
+    _params_outside_the_space,
+    _reference_trial_params,
     _split_temporal_windows,
     tune_imputation_lgbm,
 )
@@ -372,6 +376,39 @@ def test_tune_imputation_lgbm_has_no_incumbent_to_beat_on_a_first_run(
     assert metadata["beats_incumbent"] is None
     assert metadata["incumbent_mae_validation"] is None
     assert metadata["persisted"] is True
+
+
+def test_reference_trial_params_are_enqueueable_for_the_untuned_defaults() -> None:
+    """The defaults must be expressible in the search space, or they cannot anchor it.
+
+    Two ways they could fail to be. They carry `subsample_freq`, which the objective derives
+    from `subsample` rather than suggesting, so enqueueing it would name a parameter the space
+    has no distribution for. And they set both regularizers to exactly 0.0, which a log-uniform
+    range cannot represent -- raised to the space's floor, a substitution measured at 3e-11 of
+    reconstruction MAE.
+    """
+    candidate = _reference_trial_params(DEFAULT_SUPERVISED_LGBM_PARAMS)
+
+    assert "subsample_freq" not in candidate
+    assert candidate["reg_alpha"] == _FLOAT_BOUNDS["reg_alpha"][0]
+    assert candidate["reg_lambda"] == _FLOAT_BOUNDS["reg_lambda"][0]
+    assert _params_outside_the_space(candidate) == []
+
+
+def test_a_reference_the_space_cannot_draw_is_reported_rather_than_clamped() -> None:
+    """Clamping would enqueue a different candidate under the reference's name.
+
+    Not hypothetical: the params file shipped in `models/` carries n_estimators=3254, from a
+    search whose upper bound was 8000 before it was narrowed to 3000. Enqueueing it would hand
+    the GP a point it can never propose itself, which Optuna accepts with only a warning.
+    """
+    over = dict(DEFAULT_SUPERVISED_LGBM_PARAMS) | {
+        "n_estimators": _INT_BOUNDS["n_estimators"][1] + 1
+    }
+    assert _params_outside_the_space(_reference_trial_params(over)) == ["n_estimators"]
+
+    missing = {k: v for k, v in DEFAULT_SUPERVISED_LGBM_PARAMS.items() if k != "max_bin"}
+    assert _params_outside_the_space(_reference_trial_params(missing)) == ["max_bin"]
 
 
 def test_holdout_maes_are_unchanged_by_evaluating_the_draws_in_parallel() -> None:
