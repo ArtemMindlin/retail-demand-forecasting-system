@@ -26,7 +26,7 @@ from retail_forecasting.data.censorship import (
     synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel
-from retail_forecasting.evaluation.reporting import get_git_commit, utc_timestamp
+from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 N_SELECTION_HOLDOUTS = 15
 
@@ -493,6 +493,7 @@ def tune_imputation_lgbm(
         f"default={default_mae_validation:.4f} ({improvement_pct:+.2f}%), "
         f"CI95 of the difference [{ci_lo:+.4f}, {ci_hi:+.4f}]"
     )
+
     if not beats_default:
         print(
             "⚠️  The tuned hyperparameters do NOT beat the untuned defaults by a margin the "
@@ -500,23 +501,19 @@ def tune_imputation_lgbm(
             "pipeline keeps using the defaults.\n"
             f"    Decision recorded in: {metadata_path}\n"
         )
-        # A params file from an earlier run would otherwise survive a search that just
-        # failed revalidation, and the pipeline would go on using a winner this run rejected.
+
         if params_path.exists():
             params_path.unlink()
-            print(f"🧹 Removed the superseded params file: {params_path}\n")
+            print(f"Removed the superseded params file: {params_path}\n")
     elif beats_incumbent is False:
-        # Deliberately NOT deleted: unlike the branch above, tuning did beat the defaults here,
-        # so the incumbent on disk is still a validated winner -- and a better one than this
-        # run produced. Leaving it in place is the whole point of this gate.
         print(
-            "⚖️  The tuned hyperparameters beat the untuned defaults but NOT the incumbent "
+            "The tuned hyperparameters beat the untuned defaults but NOT the incumbent "
             "already on disk, so the incumbent was KEPT and this run's winner discarded.\n"
             f"    Decision recorded in: {metadata_path}\n"
         )
     else:
         params_path.write_text(json.dumps(best_params.model_dump(), indent=2), encoding="utf-8")
-        print(f"\n✅ Tuned imputation hyperparameters written to: {params_path}\n")
+        print(f"\nTuned imputation hyperparameters written to: {params_path}\n")
 
     _configure_mlflow()
     _log_study_to_mlflow(

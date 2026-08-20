@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -23,6 +21,7 @@ from retail_forecasting.utils.io import (
     dataframe_to_markdown,
     make_run_directory,
 )
+from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 
 class DatasetMetadata(BaseModel):
@@ -152,9 +151,8 @@ class RunArtifacts:
 def _render_experiment_plots(run_dir: Path, artifacts: RunArtifacts) -> None:
     """Render the standard plots plus, when SHAP is available, the SHAP summary and drift report."""
     # Imported here, like render_shap_summary below, because visualization.plots forces the Agg
-    # backend at import time. At module scope that reached every importer of this module -- most
-    # of which only want get_git_commit/utc_timestamp -- and silently killed inline figures in
-    # the notebooks.
+    # backend at import time. At module scope that reached every importer of this module and
+    # silently killed inline figures in the notebooks.
     from retail_forecasting.visualization.plots import render_standard_plots
 
     render_standard_plots(
@@ -280,23 +278,6 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
 def build_config_hash(settings: Settings) -> str:
     serialized = json.dumps(settings.model_dump(mode="json"), sort_keys=True)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-
-
-def get_git_commit() -> str | None:
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    return result.stdout.strip() or None
-
-
-def utc_timestamp() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:

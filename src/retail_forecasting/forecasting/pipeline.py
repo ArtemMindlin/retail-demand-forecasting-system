@@ -36,8 +36,6 @@ from retail_forecasting.evaluation.reporting import (
     RunArtifacts,
     ValidationMetadata,
     build_config_hash,
-    get_git_commit,
-    utc_timestamp,
     write_run_artifacts,
 )
 from retail_forecasting.evaluation.xai import calculate_shap_values
@@ -64,6 +62,7 @@ from retail_forecasting.utils.io import (
     quantile_column_name,
     quantile_level_from_column,
 )
+from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 
 def _split_train_calibration(
