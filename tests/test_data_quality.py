@@ -5,15 +5,34 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
 from retail_forecasting.config import DataQualityConfig, ProjectConfig, Settings
-from retail_forecasting.data.censorship import LatentDemandImputer
+from retail_forecasting.data.censorship import (
+    DEFAULT_SUPERVISED_LGBM_PARAMS,
+    LatentDemandImputer,
+)
 from retail_forecasting.data.quality import (
     DataQualityError,
     raise_on_blocking_data_quality,
     validate_prepared_panel,
 )
 from tests import make_synthetic_panel
+
+
+def _single_series_panel_with_one_stockout() -> pd.DataFrame:
+    """Minimal panel that reaches the supervised teacher: 99 clean days and one censored."""
+    panel = pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=100),
+            "series_id": "test_1",
+            "observed_demand": 10.0,
+            "stockout_hours": 0.0,
+        }
+    )
+    panel.loc[99, "observed_demand"] = 0.0
+    panel.loc[99, "stockout_hours"] = 24.0
+    return panel
 
 
 def test_validate_prepared_panel_blocks_duplicate_series_dates() -> None:
@@ -169,9 +188,15 @@ def test_latent_demand_imputer_loads_tuned_params_from_disk(tmp_path) -> None:
     df.loc[99, "observed_demand"] = 0.0
     df.loc[99, "stockout_hours"] = 24.0
 
+    # A COMPLETE params file, because that is the only kind that exists: the file is always
+    # written from an `ImputationBoostingParams` dump, and the imputer now reads it back
+    # through that same contract. A three-key fixture tested a shape no run can produce.
     params_path = tmp_path / "imputation_lgbm_params.json"
     params_path.write_text(
-        json.dumps({"n_estimators": 7, "learning_rate": 0.2, "max_depth": 3}),
+        json.dumps(
+            dict(DEFAULT_SUPERVISED_LGBM_PARAMS)
+            | {"n_estimators": 7, "learning_rate": 0.2, "max_depth": 3}
+        ),
         encoding="utf-8",
     )
 
@@ -182,6 +207,30 @@ def test_latent_demand_imputer_loads_tuned_params_from_disk(tmp_path) -> None:
     assert imputer.model.n_estimators == 7
     assert imputer.model.learning_rate == 0.2
     assert imputer.model.max_depth == 3
+
+
+def test_latent_demand_imputer_rejects_an_invalid_tuned_params_file(tmp_path) -> None:
+    """An unusable params file must fail by name, not by LightGBM abort or silent repair.
+
+    The seven integer hyperparameters used to be coerced with `int()` at read time, which
+    repaired a float and let everything else through: a `num_leaves` under LightGBM's own
+    floor of 1, a negative tree count, a mistyped key silently ignored. Reading through the
+    contract the tuning writes with turns each of those into a message naming the field.
+    """
+    for patch, expected in (
+        ({"num_leaves": 1}, "num_leaves"),
+        ({"n_estimators": -5}, "n_estimators"),
+        ({"n_estimators": 3254.5}, "n_estimators"),
+        ({"boosting_typo": 3}, "boosting_typo"),
+    ):
+        params_path = tmp_path / "imputation_lgbm_params.json"
+        params_path.write_text(
+            json.dumps(dict(DEFAULT_SUPERVISED_LGBM_PARAMS) | patch), encoding="utf-8"
+        )
+        with pytest.raises(ValidationError, match=expected):
+            LatentDemandImputer(strategy="supervised", model_path=params_path).impute(
+                _single_series_panel_with_one_stockout()
+            )
 
 
 def test_raise_on_blocking_data_quality_raises_error() -> None:

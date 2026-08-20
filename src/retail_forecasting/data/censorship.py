@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from retail_forecasting.contracts.contracts_config import ImputationStrategy
+from retail_forecasting.contracts.contracts_tuning import ImputationBoostingParams
 
 # Normalizing denominator for 16-hour operative window (6:00-22:00).
 OPERATIVE_WINDOW_HOURS = 16.0
@@ -235,28 +235,12 @@ class LatentDemandImputer:
         if self.lgbm_params is not None:
             params = self.lgbm_params
         elif self.model_path is not None and self.model_path.exists():
-            params = json.loads(self.model_path.read_text(encoding="utf-8"))
+            params = ImputationBoostingParams.model_validate_json(
+                self.model_path.read_text(encoding="utf-8")
+            ).model_dump()
 
         lgbm_kwargs: dict[str, Any] = dict(params)
-        lgbm_kwargs["n_estimators"] = int(lgbm_kwargs["n_estimators"])
-        lgbm_kwargs["max_depth"] = int(lgbm_kwargs["max_depth"])
-        if "num_leaves" in lgbm_kwargs:
-            lgbm_kwargs["num_leaves"] = int(lgbm_kwargs["num_leaves"])
-        if "min_child_samples" in lgbm_kwargs:
-            lgbm_kwargs["min_child_samples"] = int(lgbm_kwargs["min_child_samples"])
-        if "subsample_freq" in lgbm_kwargs:
-            lgbm_kwargs["subsample_freq"] = int(lgbm_kwargs["subsample_freq"])
-        if "min_data_per_group" in lgbm_kwargs:
-            lgbm_kwargs["min_data_per_group"] = int(lgbm_kwargs["min_data_per_group"])
-        if "max_bin" in lgbm_kwargs:
-            lgbm_kwargs["max_bin"] = int(lgbm_kwargs["max_bin"])
-        lgbm_kwargs.update(
-            {
-                "random_state": 42,
-                "verbosity": -1,
-                "n_jobs": 1,
-            }
-        )
+        lgbm_kwargs.update({"random_state": 42, "verbosity": -1, "n_jobs": 1})
         self.model = lgb.LGBMRegressor(**lgbm_kwargs)
         self.model.fit(X_train, y_train)
 
