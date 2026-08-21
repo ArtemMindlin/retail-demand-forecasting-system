@@ -353,6 +353,19 @@ Los dos objetivos que minimiza el algoritmo son por tanto:
 
 El resultado no es una única configuración de hiperparámetros ``óptima'', sino un \textbf{Frente de Pareto} donde cada punto representa un compromiso inmejorable entre el coste logístico de la predicción central y la fiabilidad de las cotas de incertidumbre. El orquestador selecciona el punto del frente que minimiza la suma $\text{Pinball}(q^*) + \text{Winkler}$ (ambos objetivos con igual peso) antes de iniciar el \textit{backtesting} global.
 
+La suma con pesos iguales no pretende ser una ponderación óptima, sino un criterio neutro y
+reproducible que automatiza la elección a falta de una preferencia declarada por parte del negocio.
+Conviene precisar su efecto real, porque los dos objetivos no comparten escala: el Winkler Score
+incorpora las penalizaciones por fallo de cobertura y toma valores de un orden de magnitud superior
+a la Pinball Loss en $q^*$, de modo que la suma inclina la selección hacia configuraciones con
+intervalos fiables antes que hacia el mejor error puntual. Ese sesgo es coherente con el propósito
+del sistema, pues es la calidad de la distribución predicha, y no el acierto de su valor central, la
+que sostiene la decisión de inventario. Conviene, no obstante, atribuirlo a las escalas respectivas
+de ambas métricas y no al reparto equitativo de los pesos. El frente completo se conserva entre los
+artefactos de la ejecución y se publica en el cuadro de mandos
+(Figura~\ref{fig:ui_pareto_tuning}), de manera que una organización con una preferencia distinta
+entre coste puntual y fiabilidad del intervalo puede escoger otro punto sin repetir la búsqueda.
+
 \subsection{Calibración: Mondrian Conformal Prediction}
 \label{sec:conformal}
 El modelo entrenado con \textit{Pinball Loss} en $q = 0{,}9$ debería, en teoría, producir
@@ -660,68 +673,11 @@ cada serie se calculan tres factores dimensionales que determinan los costes de 
 y rotura $c_u^{(s)}$, lo que fija el fractil crítico $q^*_s$ específico para ese producto.}
 \label{fig:cost_profiles}
 \end{figure}
-
-\subsection{El Gemelo Digital Logístico: Simulación Dinámica Order-Up-To}
-La evaluación tradicional en forecasting asume modelos estáticos (o de un solo periodo), como
-el modelo básico del \textit{Newsvendor} \cite{silver1998inventory}. Sin embargo, este supuesto
-ignora el hecho físico de que el inventario no vendido un día permanece en la estantería al
-día siguiente.
-
-Para superar esta limitación, se implementa una \textbf{Simulación Dinámica de Política Order-Up-To}. Para cada \textit{fold} de la validación cruzada temporal, el simulador mantiene el estado físico de cada SKU, incluyendo:
-\begin{itemize}
-    \item \textbf{Stock Remanente (\textit{On-Hand})}: Unidades físicas disponibles.
-    \item \textbf{Pedidos en Curso (\textit{On-Order})}: Unidades compradas que aún no han llegado debido al \textit{lead time}.
-    \item \textbf{Demanda Diferida (\textit{Backlog})}: Unidades demandadas que no se pudieron servir y generan penalización o pérdida de fidelidad.
-\end{itemize}
-
-Bajo esta simulación, la orden sugerida $Q$ se ajusta restando la \textit{Posición del Inventario} actual del nivel óptimo sugerido por el cuantil del pronóstico probabilístico $S$. De este modo, la evaluación de costes operativos captura fielmente el impacto devastador a largo plazo de errores correlacionados y del ``efecto látigo''.
-
-\subsubsection{Formulación Matemática de la Política Logística Dinámica Order-Up-To}
-En el simulador, la posición de inventario $IP_{s,t}$ para una serie $s$ en el
-día $t$ incorpora tanto el stock físico como los pedidos en tránsito:
-\begin{equation}
-    IP_{s,t} = OH_{s,t} + OO_{s,t} - BL_{s,t}
-\end{equation}
-donde $OH_{s,t}$ es el stock disponible en estante (\textit{on-hand}), $OO_{s,t}$ son las
-unidades compradas en tránsito (\textit{on-order}), y $BL_{s,t}$ representa la demanda acumulada
-no satisfecha (\textit{backlog}).
-
-El nivel objetivo de stock $S_{s,t}$ (\textit{order-up-to level}) se fija en el cuantil de la
-demanda acumulada del lead time correspondiente al fractil crítico $q^*$:
-\begin{equation}
-    S_{s,t} = \hat{q}_{q^*}(Y_{s,t})
-\end{equation}
-
-La cantidad de pedido diaria $Q_{s,t}$ cubre exactamente la brecha entre el nivel objetivo
-y la posición actual de inventario:
-\begin{equation}
-    Q_{s,t} = \max\!\left(0,\ S_{s,t} - IP_{s,t}\right)
-\end{equation}
-
-Esta política se revisa cada día: si $IP_{s,t} \geq S_{s,t}$ no se emite ningún pedido; si
-cae por debajo, se pide lo justo para volver al nivel objetivo. La implementación es equivalente
-a una política base-stock de revisión continua, que es el caso límite de la familia $(s,S)$
-cuando el coste fijo de pedido es nulo \cite{silver1998inventory}.
-
 % ==============================================================================
 \section{Bloque II: Operación}
 % ==============================================================================
 
-Una vez identificado el modelo óptimo en la fase de investigación, el sistema entra en modo operacional. El modo \texttt{retrain} reentrena el modelo champion sobre la totalidad de los datos disponibles y lo persiste. El modo \texttt{score\_daily} carga ese modelo y genera diariamente las recomendaciones de pedido para cada SKU, aplicando las restricciones logísticas reales mediante programación lineal.
-
-\subsection{Resolución de Conflictos: Optimización Global por Programación Lineal}
-Las recomendaciones individuales de cada SKU pueden ser matemáticamente óptimas a nivel aislado, pero el despliegue en un supermercado real está sujeto a severas restricciones de volumen físico de almacenaje.
-
-Para cerrar la brecha entre Machine Learning e Investigación de Operaciones (OR), la decisión final se orquesta a través de un \textbf{Módulo de Programación Lineal (LP)}. El problema se plantea como un \textit{Continuous Knapsack}:
-
-\begin{itemize}
-    \item \textbf{Variables de Decisión}: Cantidad a pedir de cada SKU.
-    \item \textbf{Función Objetivo}: Maximizar la utilidad marginal (evitar el coste de oportunidad por rotura, fuertemente penalizado por la criticidad del producto).
-    \item \textbf{Restricciones}: La suma total de unidades pedidas en el catálogo no debe exceder una constante $C_{max}$ (ej. Límite del camión logístico).
-\end{itemize}
-
-El módulo utiliza el solver \texttt{HiGHS} de SciPy para reducir las órdenes allí donde el impacto de una rotura sea menor, permitiendo tomar decisiones de pedido razonables incluso cuando la capacidad de almacén es limitada.
-
+Una vez identificado el modelo óptimo en la fase de investigación, el sistema entra en modo operacional. El modo \texttt{retrain} reentrena el modelo champion sobre la totalidad de los datos disponibles y lo persiste. El modo \texttt{score\_daily} carga ese modelo y genera diariamente las recomendaciones de pedido para cada SKU a partir del fractil crítico del \textit{Newsvendor}.
 \subsection{Criterio de Promoción del Modelo Campeón}
 
 El ciclo de operación no es estático: tras cada ejecución del modo \texttt{experiment}, el sistema evalúa si alguno de los modelos candidatos (\textit{challengers}) debe reemplazar al modelo actualmente en producción. La promoción no se decide por una única métrica, sino por dos guardarraíles independientes:

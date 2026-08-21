@@ -11,24 +11,22 @@ Antes de desarrollar las conclusiones temáticas, se revisa el grado de consecuc
 
 \begin{itemize}
     \item \textbf{\ref{obj:pipeline} (Pipeline de datos e imputación de censura): alcanzado.} El pipeline reproducible con compuertas de calidad quedó operativo (Capítulos~\ref{chap:analisis_datos} y~\ref{chap:implementacion}), la ausencia de fuga de información se verificó mediante el contrato causal de las variables, y la imputación de demanda latente demostró su valor económico: $-3{,}72\%$ de coste bajo evaluación justa sobre el panel de 500 series.
-    \item \textbf{\ref{obj:modelos} (Modelos globales probabilísticos): alcanzado.} CatBoost supera al \textit{baseline} Seasonal Naïve en coste logístico simulado ($-3{,}9\%$ a escala de 500 series), validando la hipótesis central de que el modelo probabilístico global induce mejores decisiones aunque no gane en MAE.
+    \item \textbf{\ref{obj:modelos} (Modelos globales probabilísticos): KPI de coste no alcanzado.} El objetivo fijaba un coste de inventario simulado estrictamente inferior al del \textit{baseline} estacional, y a 500 series el \textit{Seasonal Naïve} resulta marginalmente más barato (119.958 frente a 120.023 u.m., un 0{,}05\%). El modelo global probabilístico sí queda construido y evaluado, y a coste equivalente eleva el nivel de servicio del 79{,}3\% al 94{,}4\%: el heurístico logra ese coste pidiendo de menos. La lectura correcta no es que el KPI fuera ambicioso, sino que estaba mal formulado, al medir la política por una sola de las dos magnitudes que la definen.
     \item \textbf{\ref{obj:conformal} (Calibración conformal $\geq 80\%$): no alcanzado, con diagnóstico preciso.} La cobertura empírica se quedó en el 55{,}0\% en el subset base y el 68{,}3\% a escala. El análisis delimitó las causas mediante un experimento de control (Sección~\ref{sec:embargo_calibracion}): descartado el solapamiento de \textit{targets} entre entrenamiento y calibración, la brecha residual de unos 12 puntos se atribuye a la no-intercambiabilidad temporal en un panel de 90 días, no al tamaño muestral. La solución (CP adaptativa) queda como la línea de trabajo futuro prioritaria.
-    \item \textbf{\ref{obj:gemelo} (Gemelo digital con restricciones): alcanzado.} La simulación dinámica \textit{Order-Up-To} con capa de Programación Lineal cuantificó la reducción de coste frente a la política puntual y expuso efectos (látigo, acumulación de backlog) invisibles para la evaluación estática.
     \item \textbf{\ref{obj:mlops} (Operativización MLOps): alcanzado.} El sistema quedó desplegado como aplicación Django que sirve tanto el cuadro de mandos como la API operacional, con trazabilidad por artefactos versionados (\textit{hash} de configuración y \textit{commit} de Git en cada ejecución), explicabilidad SHAP, contenedores Docker e integración continua (Capítulo~\ref{chap:implementacion}).
 \end{itemize}
 
-Cuatro de los cinco objetivos específicos se cumplen íntegramente; el tercero no alcanza su KPI pero produce el diagnóstico metodológico más valioso del trabajo. Las conclusiones principales se resumen en los siguientes puntos:
+De los cuatro objetivos específicos, dos se cumplen íntegramente. El segundo no alcanza su KPI de coste, aunque el modelo probabilístico compra 15 puntos de nivel de servicio a coste equivalente, y el tercero tampoco alcanza el suyo de cobertura; ambos producen los diagnósticos metodológicos más valiosos del trabajo. Las conclusiones principales se resumen en los siguientes puntos:
 
 \begin{itemize}
     \item \textbf{Censura y Demanda Latente}: La imputación de la demanda censurada por \textit{stockouts} es el factor técnico más determinante para la rentabilidad de la cadena de suministro. Bajo una evaluación justa con un target común de demanda real, los modelos entrenados con la estrategia de Demanda Latente Supervisada reducen el coste total de inventario en un \textbf{3,72\%} frente al baseline observado sin corregir (1.774,82 frente a 1.843,41 unidades monetarias), elevando el nivel de servicio (\textit{fill rate}) del \textbf{90,43\%} al \textbf{99,75\%}. Este resultado valida de forma cuantitativa y sin sesgo de evaluación el beneficio de recuperar la señal latente, con el alcance acotado al panel de 500 series del que se muestrea el protocolo (Sección~\ref{sec:resultados_gemelo}).
 
-    \item \textbf{La trampa del MAE y el valor del modelo probabilístico}: El Seasonal Naïve obtiene el mejor MAE del backtesting predictivo (\textbf{4,47} bajo estrategia Latent) al tiempo que en la simulación dinámica a escala (500 series) incurre en un coste logístico significativamente superior al de un modelo probabilístico global como CatBoost (443.289 frente a 426.215 u.m., una diferencia del \textbf{3,9\%}). Este resultado reproduce el fenómeno teórico advertido en el Capítulo~\ref{chap:estado_del_arte} y constituye la justificación empírica más sólida del diseño probabilístico: optimizar el MAE no equivale a optimizar la política de inventario.
+    \item \textbf{La trampa del MAE y el valor del modelo probabilístico}: El \textit{Seasonal Naïve} obtiene el mejor MAE del backtesting predictivo (\textbf{4,47} bajo estrategia Latent), un 35\% mejor que CatBoost, y sin embargo a escala de 500 series ese margen no se traduce en ninguna ventaja operativa: su coste de inventario es apenas un 0{,}05\% inferior (119.958 frente a 120.023 u.m.) y sirve \textbf{15{,}1 puntos menos de demanda} (79{,}3\% frente al 94{,}4\%). El heurístico compra su bajo coste pidiendo de menos. Este resultado reproduce el fenómeno teórico advertido en el Capítulo~\ref{chap:estado_del_arte} y constituye la justificación empírica más sólida del diseño probabilístico: optimizar el MAE no equivale a optimizar la política de inventario, y el coste por sí solo tampoco basta para distinguirlas.
 
     \item \textbf{Calibración Conformal: garantías teóricas y limitaciones prácticas}: La implementación de \textit{Mondrian Conformal Prediction} proporciona las herramientas correctas para la calibración condicional por categoría. En el subset de evaluación base (50 series), la cobertura promedio fue del 55{,}0\% para CatBoost con varianza extrema entre folds (42{,}9\%--81{,}4\%). La validación a escala con 500 series confirmó el diagnóstico parcialmente: la cobertura sube al 68{,}3\% y la inestabilidad entre folds se estrecha (59{,}1\%--76{,}3\%), pero persiste una infracobertura residual de unos 12 puntos atribuible a la no-intercambiabilidad temporal entre la ventana de calibración y el periodo de test en un panel de solo 90 días. El experimento de control del embargo temporal (Sección~\ref{sec:embargo_calibracion}) permitió además descartar una causa alternativa puramente mecánica y reveló que la cobertura previamente reportada estaba en parte inflada por intervalos derivados de una calibración contaminada: el 55{,}0\% es la cifra honesta. Esta evidencia delimita con precisión el supuesto que falla (intercambiabilidad, no tamaño muestral) y motiva la adopción de Conformal Prediction adaptativa como evolución natural del sistema.
 
-    \item \textbf{El Gemelo Digital Logístico}: La evaluación estática (aislada por día) oculta el impacto acumulativo de los errores de inventario. La integración de la \textbf{Simulación Dinámica Order-Up-To} permite medir el verdadero coste logístico con estado de inventario persistente, exponiendo el \textit{efecto látigo} que los modelos evaluados en aislamiento no pueden detectar. La validación a 500 series reveló además que el beneficio de la corrección de censura sobre el coste dinámico es sensible a la composición del catálogo: se concentra en series de stockout severo y se diluye cuando el catálogo es más heterogéneo, matiz que el coste estático no captura.
+    \item \textbf{Los dos ejes de la evaluación económica}: el coste y el nivel de servicio no ordenan igual a los modelos, y leer solo uno de los dos induce a error. A 500 series el coste separa a los tres modelos por menos de un 2\%, mientras que el nivel de servicio los separa por 15 puntos y en el orden inverso al del MAE. La validación a escala reveló además que el beneficio de la corrección de censura es sensible a la composición del catálogo: se concentra en series de stockout severo y se diluye cuando el catálogo es más heterogéneo.
 
-    \item \textbf{Resolución de Conflictos de Capacidad}: Los modelos aislados generan recomendaciones óptimas individuales pero ciegamente agresivas. La integración de una capa de \textbf{Programación Lineal} garantiza que las decisiones respetan las restricciones globales de almacén, priorizando la inversión en los SKUs con mayor penalización de rotura frente a los de lenta rotación y alta caducidad.
 
     \item \textbf{Madurez MLOps y Operativización}: El despliegue del sistema como aplicación \textbf{Django} con trazabilidad por ejecución, lógica de promoción automática del modelo campeón, autodiagnóstico \textit{post-mortem} y cuadro de mandos \textit{What-If} renderizado en servidor demuestra la viabilidad técnica de integrar investigación académica de vanguardia en la operativa diaria de un entorno corporativo. La arquitectura resultante mantiene una separación estricta entre el cálculo de dominio y la capa de presentación, de modo que las decisiones del sistema son verificables sin instanciar la interfaz.
 \end{itemize}
@@ -39,7 +37,7 @@ Cuatro de los cinco objetivos específicos se cumplen íntegramente; el tercero 
 Más allá de las conclusiones metodológicas, este TFG deja como legado un sistema completo y reproducible:
 
 \begin{itemize}
-    \item \textbf{Código y reproducibilidad}: la totalidad del código (pipeline de datos, motor de modelos, calibración conformal, optimizador, simulador dinámico, API y \textit{dashboard}) se encuentra versionada en un repositorio Git\footnote{\url{https://github.com/ArtemMindlin/retail-demand-forecasting-system}}, con integración continua (verificación de estilo, tipos estáticos y batería de tests en cada \textit{commit}). La arquitectura completa se levanta con un único comando mediante \texttt{docker-compose}, de modo que un tercero puede reproducir los experimentos y obtener resultados equivalentes sin configuración manual. Cada experimento deja además un directorio propio bajo \texttt{reports/} con su configuración, métricas, predicciones y el \textit{commit} de Git que lo generó, lo que permite auditar cualquier cifra de esta memoria hasta la ejecución que la produjo.
+    \item \textbf{Código y reproducibilidad}: la totalidad del código (pipeline de datos, motor de modelos, calibración conformal, decisión Newsvendor, API y \textit{dashboard}) se encuentra versionada en un repositorio Git\footnote{\url{https://github.com/ArtemMindlin/retail-demand-forecasting-system}}, con integración continua (verificación de estilo, tipos estáticos y batería de tests en cada \textit{commit}). La arquitectura completa se levanta con un único comando mediante \texttt{docker-compose}, de modo que un tercero puede reproducir los experimentos y obtener resultados equivalentes sin configuración manual. Cada experimento deja además un directorio propio bajo \texttt{reports/} con su configuración, métricas, predicciones y el \textit{commit} de Git que lo generó, lo que permite auditar cualquier cifra de esta memoria hasta la ejecución que la produjo.
     \item \textbf{Datos}: el trabajo se apoya íntegramente en el dataset público \textit{FreshRetailNet-50K} \cite{freshretailnet2025}, disponible en abierto, por lo que la reproducción del análisis no depende de datos propietarios ni de acuerdos de cesión.
     \item \textbf{Elemento persistente}: el sistema está desplegado como instancia de demostración en un servidor propio, con el \textit{dashboard} operativo sobre los modelos entrenados. A corto plazo su función es servir de soporte a la defensa y de demostrador para terceros; a medio plazo, la arquitectura contenerizada permite trasladarlo a la infraestructura de cualquier organización interesada; y a largo plazo, las líneas de la Sección~\ref{sec:trabajo_futuro} marcan su evolución natural hacia un entorno productivo real.
     \item \textbf{Beneficiarios}: los responsables de aprovisionamiento de \textit{retail} de frescos disponen de una metodología cuantificada (imputación de censura, previsión probabilística, \textit{Newsvendor} con restricciones) directamente trasladable a sus datos; y la comunidad académica dispone de una implementación de referencia que conecta \textit{Conformal Prediction} con la evaluación económica de inventario, un puente poco transitado en la literatura aplicada.
@@ -47,7 +45,7 @@ Más allá de las conclusiones metodológicas, este TFG deja como legado un sist
 
 \section{Sostenibilidad e Impacto Ambiental}
 
-El trabajo presenta una relación directa y cuantificada con el \textbf{ODS 12} (Producción y Consumo Responsables), y una relación indirecta con el \textbf{ODS 13} (Acción por el Clima), ambas a través de la reducción del sobrestock de productos frescos perecederos. La reducción empírica del 3,9\% en coste de inventario simulado frente al modelo estacional implica directamente menos producto caducado en estantería y menor demanda de producción agrícola en origen. El análisis detallado del grado de relación con los 17 ODS se recoge en el Anexo~\ref{anx:ods}, conforme a los requisitos de la ETSINF-UPV.
+El trabajo presenta una relación directa y cuantificada con el \textbf{ODS 12} (Producción y Consumo Responsables), y una relación indirecta con el \textbf{ODS 13} (Acción por el Clima), ambas a través de la reducción del sobrestock de productos frescos perecederos. La reducción empírica del 3,72\% en coste de inventario que aporta la corrección de la demanda censurada, bajo evaluación justa, implica directamente menos producto caducado en estantería y menor demanda de producción agrícola en origen. El análisis detallado del grado de relación con los 17 ODS se recoge en el Anexo~\ref{anx:ods}, conforme a los requisitos de la ETSINF-UPV.
 
 \section{Análisis de Impacto Ético, Social y Privacidad}
 Más allá de los resultados logísticos, el sistema se ha estructurado atendiendo a criterios
@@ -78,8 +76,6 @@ de ética algorítmica, responsabilidad social corporativa y cumplimiento legal:
 El diseño e implementación del sistema presentan ciertas limitaciones y simplificaciones operativas, metodológicas y tecnológicas que es necesario advertir para contextualizar el alcance de los resultados:
 
 \begin{itemize}
-    \item \textbf{Simplificación de la Utilidad Marginal}: En la optimización agregada bajo restricciones de almacén (\texttt{optimize\_orders\_lp}), se asume que la utilidad marginal de cada unidad pedida de un SKU es constante e igual a su coste de rotura ($c_{u}$). En entornos reales, la utilidad marginal es estrictamente decreciente por SKU (ley de rendimientos decrecientes del stock). Esta linealización es una simplificación necesaria para formular el problema como programación lineal continua (Continuous Knapsack) resoluble de forma determinista y ultrarrápida a escala del catálogo.
-    \item \textbf{Penalización Acumulativa del Backlog}: La simulación dinámica asume que la demanda insatisfecha se acumula en el backlog de forma indefinida y se penaliza con el coste de rotura en cada período hasta que sea satisfecha. En la operativa real de gran consumo, un stockout prolongado suele derivar en una venta perdida (sustitución o abandono del cliente), lo que significa que el coste por rotura no escala linealmente de manera indefinida.
     \item \textbf{Generalización y Diversidad de Paneles}: Todo el análisis se apoya en el dataset \textit{FreshRetailNet-50K} bajo un marco de censura sintética controlada. Validar la robustez del imputer y la cobertura conformal en paneles externos heterogéneos (como el dataset M5 de Walmart) constituye un paso metodológico necesario para demostrar la generalización del DSS ante patrones de demanda muy distintos.
     \item \textbf{MLOps en Entorno Local}: La arquitectura Django y el cuadro de mandos se han desarrollado como un prototipo funcional local. La trazabilidad se apoya en artefactos en el sistema de ficheros, suficiente para un panel de esta escala pero no para una organización con múltiples equipos concurrentes, que requeriría un registro centralizado de experimentos y modelos. Un entorno productivo corporativo real exigiría una infraestructura distribuida en la nube, el despliegue mediante orquestadores (Kubernetes), el uso de bases de datos de características en tiempo real (Feature Stores) y flujos CI/CD para el reentrenamiento y promoción automática en caliente tras alertas de drift.
 \end{itemize}
@@ -93,7 +89,7 @@ Este trabajo integra conocimientos de prácticamente todos los bloques formativo
     \item \textbf{Análisis y comprensión de datos}: el análisis exploratorio del Capítulo~\ref{chap:analisis_datos} (caracterización de la intermitencia, la censura por \textit{stockouts} y la estacionalidad del panel) aplica directamente las competencias de \textit{Análisis Exploratorio de Datos}, \textit{Visualización} y \textit{Proyecto I: Comprensión de Datos}.
     \item \textbf{Preparación e integración}: la construcción del panel balanceado, la ingeniería de variables con contrato causal y la imputación de demanda latente se apoyan en \textit{Gestión de Datos}, \textit{Bases de Datos} y \textit{Proyecto II: Integración y Preparación de Datos}.
     \item \textbf{Modelización estadística y aprendizaje automático}: el núcleo predictivo (regresión cuantílica con \textit{Gradient Boosting}, evaluación por \textit{backtesting} y métricas probabilísticas) descansa sobre \textit{Modelos Descriptivos y Predictivos I y II} y sobre la base inferencial de \textit{Modelos Estadísticos para la Toma de Decisiones I y II}, de la que deriva también el marco de decisión bajo incertidumbre que fundamenta el modelo \textit{Newsvendor}.
-    \item \textbf{Optimización y simulación}: la capa de Programación Lineal para las restricciones de almacén y el simulador dinámico \textit{Order-Up-To} conectan con \textit{Algorítmica} y \textit{Modelado y Simulación Continuos}.
+    \item \textbf{Optimización y decisión bajo incertidumbre}: la formulación del Newsvendor, la traducción de la distribución predicha en una cantidad de pedido y la búsqueda multiobjetivo de hiperparámetros conectan con \textit{Algorítmica} y \textit{Modelado y Simulación Continuos}.
     \item \textbf{Ingeniería y despliegue}: la arquitectura de la aplicación web y la API operacional (Django, contenedores, proxy inverso) y su operación aplican las competencias de \textit{Programación}, \textit{Estructuras de Datos}, \textit{Fundamentos de Computadores y Sistemas Operativos} e \textit{Infraestructura para el Procesamiento de Datos}.
     \item \textbf{Dimensión económica y de negocio}: la traducción del error predictivo a coste de inventario, el caso de uso logístico y el presupuesto del Capítulo~\ref{chap:presupuesto} se benefician de \textit{Fundamentos de Organización de Empresas} y \textit{Economía Digital}.
 \end{itemize}
@@ -120,19 +116,19 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     \item \textbf{Costes Reales e Integración ERP}: Los perfiles de coste sintéticos ($c_u$, $c_o$)
     utilizados en este trabajo son una aproximación necesaria dado que el dataset no incluye
     márgenes reales. La integración con el ERP permitiría sustituirlos por costes empíricos de
-    merma, rotura y liquidación, haciendo el Newsvendor completamente operativo tanto en su
-    formulación estática (Sección~\ref{sec:resultados_lp}) como en la simulación dinámica
-    (Sección~\ref{sec:cost_profiles}).
+    merma, rotura y liquidación, haciendo el Newsvendor completamente operativo sobre costes
+    medidos en lugar de sobre los perfiles sintéticos de la Sección~\ref{sec:cost_profiles}.
 
-    \item \textbf{Extensiones del Simulador Dinámico}: El simulador Order-Up-To de la
-    Sección~\ref{sec:cost_profiles} asume un \textit{lead time} determinista fijo y no tiene
-    techo de capacidad en la propia política de reposición. Las extensiones naturales son dos:
-    (1) modelar el \textit{lead time} como variable aleatoria (distribución empírica sobre
-    histórico de entregas) para capturar la variabilidad real del proveedor; y (2) incorporar
-    un techo de inventario por almacén directamente en la política Order-Up-To (distinto de
-    la capa LP estática de la Sección~\ref{sec:resultados_lp}, que opera sobre cantidades
-    Newsvendor de un único periodo sin estado acumulado), permitiendo que el simulador rechace
-    pedidos que superen la capacidad física disponible.
+    \item \textbf{Gemelo Digital de Inventario con Estado}: la evaluación económica actual
+    resuelve una decisión independiente por origen de predicción, sin arrastre de existencias
+    entre periodos. La extensión natural, y la línea prioritaria en el plano de la decisión, es un
+    simulador de reposición con estado que encadene existencias, pedidos en tránsito y demanda
+    insatisfecha, permitiendo medir efectos que una decisión aislada no puede exponer, como la
+    amplificación de la variabilidad de los pedidos a lo largo de la cadena (\textit{efecto
+    látigo}). Sobre esa base se apoyarían dos extensiones inmediatas: modelar el \textit{lead
+    time} como variable aleatoria a partir del histórico de entregas, e incorporar un techo de
+    capacidad de almacén que obligue a repartir el espacio entre productos cuando la suma de las
+    cantidades individualmente óptimas no cabe.
 
     \item \textbf{Modelos de Deep Learning para Series Temporales}: Explorar arquitecturas como el
     Temporal Fusion Transformer para sustituir el motor de \textit{Gradient Boosting}, capturando
@@ -159,7 +155,7 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
 
     \item \textbf{Modelos Hurdle para Demanda Intermitente}: De las 200.760 observaciones con venta
     cero identificadas en el Capítulo~\ref{chap:analisis_datos} (un 4{,}5\% del panel), el subconjunto
-    con demanda \emph{genuinamente} nula ---es decir, excluyendo los ceros inducidos por stockout---
+    con demanda \emph{genuinamente} nula, es decir, excluyendo los ceros inducidos por stockout,
     representa el 3{,}3\% del panel. Esa fracción no justifica
     un modelo de dos etapas para el catálogo general, pero sí para los SKUs de alta intermitencia
     donde la probabilidad de venta cero es estructuralmente distinta de la magnitud cuando sí se
@@ -170,10 +166,10 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     este enfoque se ha aplicado con éxito a demanda esporádica en retail \cite{syntetos2005accuracy}.
 
     \item \textbf{Aprendizaje por Refuerzo para Política de Reposición}: Transicionar de un
-    pipeline secuencial (pronóstico $\rightarrow$ Newsvendor $\rightarrow$ simulación) a un agente
-    que aprenda directamente la política óptima de reposición a través de interacciones con el
-    simulador dinámico de inventario, eliminando la necesidad de especificar los perfiles de coste
-    de forma explícita.
+    pipeline secuencial (pronóstico $\rightarrow$ Newsvendor) a un agente que aprenda
+    directamente la política óptima de reposición interactuando con un simulador de inventario con
+    estado, eliminando la necesidad de especificar los perfiles de coste de forma explícita. Esta
+    línea presupone el gemelo digital descrito más arriba.
 \end{itemize}
 
 Como cierre, este TFG demuestra empíricamente que el valor de la inteligencia artificial aplicada a operaciones no está solo en los algoritmos, sino en integrarlos dentro de un diseño de software que cierra el bucle desde el dato bruto hasta la decisión logística operativa, con sus garantías, sus limitaciones cuantificadas y su trazabilidad completa.

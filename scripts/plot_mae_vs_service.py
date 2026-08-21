@@ -1,13 +1,14 @@
-"""Render the MAE-versus-simulated-cost figure used in the results chapter.
+"""Render the MAE-versus-service figure used in the results chapter.
 
-Shows the dissociation that is the central result of the work: the ranking of the
-models by point error is the inverse of their ranking by simulated logistic cost.
+Shows the dissociation that is the central result of the work: ranking the models by
+point error says one thing, inventory cost barely separates them, and service level
+reverses the order outright.
 
 Reads `metrics_summary.csv` and `cost_summary.csv` from one run directory, so the
 figure is reproducible from artifacts instead of being a hand-made PDF.
 
 Usage:
-    python scripts/plot_mae_vs_cost.py --run reports/fresh_retailnet_large_20260811_125735
+    python scripts/plot_mae_vs_service.py --run reports/fresh_retailnet_large_20260811_125735
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-OUTPUT = Path("memoria/figures/mae_vs_coste.pdf")
+OUTPUT = Path("memoria/figures/mae_vs_servicio.pdf")
 LABELS = {"seasonal_naive": "Seasonal Naïve", "lightgbm": "LightGBM", "catboost": "CatBoost"}
 
 
@@ -36,16 +37,16 @@ def build_parser() -> argparse.ArgumentParser:
 def load_frame(run_dir: Path, strategy: str) -> pd.DataFrame:
     metrics = pd.read_csv(run_dir / "metrics_summary.csv")
     costs = pd.read_csv(run_dir / "cost_summary.csv")
-    cost_column = "sim_total_cost" if "sim_total_cost" in costs.columns else "total_cost"
 
     merged = metrics.merge(
-        costs[["data_strategy", "model_name", cost_column]],
+        costs[["data_strategy", "model_name", "total_cost", "service_level"]],
         on=["data_strategy", "model_name"],
     )
     merged = merged[merged["data_strategy"] == strategy].copy()
     if merged.empty:
         raise SystemExit(f"No rows for strategy {strategy} in {run_dir}")
-    merged = merged.rename(columns={cost_column: "cost"}).sort_values("mae")
+    merged = merged.rename(columns={"total_cost": "cost"}).sort_values("mae")
+    merged["service_pct"] = merged["service_level"] * 100.0
     merged["label"] = merged["model_name"].map(lambda m: LABELS.get(m, m))
     return merged
 
@@ -54,7 +55,7 @@ def main() -> None:
     args = build_parser().parse_args()
     frame = load_frame(args.run, args.strategy)
 
-    fig, (ax_mae, ax_cost) = plt.subplots(1, 2, figsize=(8.4, 3.8))
+    fig, (ax_mae, ax_cost, ax_svc) = plt.subplots(1, 3, figsize=(11.4, 3.8))
     positions = range(len(frame))
     colours = ["#0f766e", "#1d4ed8", "#c2410c"]
 
@@ -74,8 +75,8 @@ def main() -> None:
 
     ax_cost.barh(list(positions), frame["cost"] / 1000.0, color=colours, height=0.55)
     ax_cost.set_yticks(list(positions), frame["label"])
-    ax_cost.set_xlabel("Coste simulado Order-Up-To (miles de u.m.)")
-    ax_cost.set_title("Coste logístico · menor es mejor", fontsize=10)
+    ax_cost.set_xlabel("Coste de inventario (miles de u.m.)")
+    ax_cost.set_title("Coste logístico · no discrimina", fontsize=10)
     for y, value in zip(positions, frame["cost"], strict=True):
         ax_cost.annotate(
             f"{value / 1000:.0f}k",
@@ -86,7 +87,21 @@ def main() -> None:
             fontsize=9,
         )
 
-    for axis in (ax_mae, ax_cost):
+    ax_svc.barh(list(positions), frame["service_pct"], color=colours, height=0.55)
+    ax_svc.set_yticks(list(positions), frame["label"])
+    ax_svc.set_xlabel("Nivel de servicio (%)")
+    ax_svc.set_title("Servicio · mayor es mejor", fontsize=10)
+    for y, value in zip(positions, frame["service_pct"], strict=True):
+        ax_svc.annotate(
+            f"{value:.1f}%",
+            (value, y),
+            xytext=(4, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=9,
+        )
+
+    for axis in (ax_mae, ax_cost, ax_svc):
         axis.invert_yaxis()
         axis.grid(axis="x", alpha=0.25, lw=0.6)
         axis.spines[["top", "right"]].set_visible(False)
