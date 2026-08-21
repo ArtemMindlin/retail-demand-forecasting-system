@@ -252,24 +252,20 @@ Expected properties:
 
 ### Two persisted variants
 
-The prediction frame is written twice, at two different granularities. They share
-the schema above and differ only in which rows survive.
+The prediction frame is written twice under two names that now hold the same rows.
 
 | Artifact | Rows | Produced by | Consumed by |
 | --- | --- | --- | --- |
 | `validation_predictions.csv` | every validation origin: one per series, date, model and strategy | `pd.concat(fold_predictions)` | `summarize_predictions()` → `metrics_summary.csv`, `fold_metrics.csv` |
-| `predictions.csv` | one decision per series, fold, model and strategy | `simulate_inventory_policy()` | `summarize_costs()`, `run_sensitivity_analysis()`, the dashboard |
+| `predictions.csv` | the same rows | `pd.concat(fold_predictions)` | `summarize_costs()`, `run_sensitivity_analysis()`, the dashboard |
 
-`predictions.csv` is a strict row subset of `validation_predictions.csv`, because
-the dynamic Order-Up-To policy orders once per fold (the ordering cadence equals
-`fold_size_days`). It additionally carries the simulation columns `sim_on_hand`,
-`sim_backlog`, `sim_arrivals` and `sim_total_cost`, and its `order_quantity` and
-cost columns hold the *dynamic* decision rather than the single-period one.
-
-Forecast metrics must be read from the validation frame and inventory economics
-from the decision frame — see invariant 13. Computing coverage or Winkler on the
-decision frame silently drops `fold_size_days - 1` of every `fold_size_days`
-predictions.
+Every row carries its own single-period Newsvendor `order_quantity` and cost
+columns, attached fold by fold by the per-fold builders. A multi-period Order-Up-To
+simulation used to sit between the two, narrowing `predictions.csv` to one decision
+per series and fold and adding `sim_on_hand`, `sim_backlog`, `sim_arrivals` and
+`sim_total_cost`; it was removed, so those columns no longer exist and the two
+artifacts no longer differ. Reintroducing a coarser decision cadence means
+reinstating the split — see invariant 13.
 
 ## Business Output Frame
 

@@ -165,11 +165,12 @@ def test_calibration_split_embargoes_the_horizon() -> None:
 
 
 def test_forecast_metrics_cover_every_validation_origin(tmp_path: Path) -> None:
-    """Forecast metrics must summarize all validation origins, not the decision subset.
+    """Forecast metrics must summarize all validation origins.
 
-    The dynamic Order-Up-To simulation narrows the frame to one order per series and
-    fold. Measuring MAE, Winkler or coverage on that subset would silently discard
-    ``fold_size_days - 1`` of every ``fold_size_days`` predictions.
+    Every origin carries its own single-period decision, so the decision frame and
+    the validation frame hold the same rows. A coarser ordering cadence would make
+    the former a strict subset, and measuring MAE, Winkler or coverage on it would
+    silently discard predictions -- which is what this test exists to catch.
     """
     panel = make_synthetic_panel(num_series=3, num_days=90)
     settings = Settings(
@@ -182,8 +183,8 @@ def test_forecast_metrics_cover_every_validation_origin(tmp_path: Path) -> None:
 
     validation = artifacts.validation_predictions
     assert validation is not None
-    # The decision frame is a strict subset: one row per series, fold and model.
-    assert len(artifacts.predictions) < len(validation)
+    # One decision per validation origin: the two frames must not diverge.
+    assert len(artifacts.predictions) == len(validation)
 
     group_cols = ["data_strategy", "model_name", "backend_name"]
     observations = (

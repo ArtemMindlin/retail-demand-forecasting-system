@@ -69,11 +69,6 @@ def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
         enriched["order_quantity"].to_numpy(dtype=float),
     )
 
-    if "sim_backlog" in enriched.columns:
-        enriched["sim_service_level_hit"] = (
-            enriched["sim_backlog"].to_numpy(dtype=float) <= 0.0
-        ).astype(float)
-
     group_cols = ["model_name", "backend_name"]
     if "data_strategy" in predictions.columns:
         group_cols.insert(0, "data_strategy")
@@ -91,15 +86,6 @@ def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
         "served_units": ("served_units", "sum"),
         "total_demand": ("y_true", "sum"),
     }
-
-    if "sim_total_cost" in enriched.columns:
-        agg_map.update(
-            {
-                "sim_total_cost": ("sim_total_cost", "sum"),
-                "sim_mean_cost": ("sim_total_cost", "mean"),
-                "sim_service_level": ("sim_service_level_hit", "mean"),
-            }
-        )
 
     # Global summary costs exclude the holdout fold to avoid mixing it with walk-forward folds.
     summary = (

@@ -347,9 +347,7 @@ def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
         "- `interval_coverage` (PICP): Fraction of observations in the P10-P90 interval. ~0.80.",
         "- `interval_width` (MPIW): Average width of the prediction interval. Narrower is better.",
         "- `winkler_score`: Proper scoring rule for intervals. Penalizes width and miscoverage.",
-        "- `total_cost`: Static single-period inventory cost (Newsvendor). Good for SKU ranking.",
-        "- `sim_total_cost`: Dynamic multi-period cost. Accounts for carry-over stock and backlog.",
-        "- `sim_service_level`: Service level achieved in the dynamic simulation.",
+        "- `total_cost`: Single-period inventory cost (Newsvendor). Main ranking metric.",
         "- `total_cost` is the main ranking metric because the TFG focuses on inventory decisions.",
     ]
 

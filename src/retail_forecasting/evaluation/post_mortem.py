@@ -7,15 +7,15 @@ from retail_forecasting.config import Settings
 
 def generate_post_mortem_report(artifacts: Any, settings: Settings) -> str:
     """
-    Identifies the Top 5 most problematic SKUs based on their simulated total cost
+    Identifies the Top 5 most problematic SKUs based on their inventory cost
     and attempts to diagnose the root cause (Drift, High Intermittency, etc.).
     """
     preds = artifacts.predictions
-    if preds.empty or "sim_total_cost" not in preds.columns:
-        return "_No post-mortem analysis available (requires dynamic simulation)._"
+    if preds.empty or "total_cost" not in preds.columns:
+        return "_No post-mortem analysis available (predictions carry no inventory cost)._"
 
-    # Aggregate simulated cost by series_id across the whole run to find the worst offenders.
-    sku_costs = preds.groupby("series_id")["sim_total_cost"].sum().sort_values(ascending=False)
+    # Aggregate cost by series_id across the whole run to find the worst offenders.
+    sku_costs = preds.groupby("series_id")["total_cost"].sum().sort_values(ascending=False)
 
     if sku_costs.empty:
         return "_No cost data to analyze._"
@@ -57,11 +57,11 @@ def generate_post_mortem_report(artifacts: Any, settings: Settings) -> str:
             )
 
         # 4. Stockout Risk
-        if "sim_service_level_hit" in sku_data.columns:
-            service_level = sku_data["sim_service_level_hit"].mean()
+        if "stockout_units" in sku_data.columns:
+            service_level = float((sku_data["stockout_units"].to_numpy(dtype=float) <= 0.0).mean())
             if service_level < 0.8:
                 diagnostics.append(
-                    f"**Riesgo Crítico de Rotura:** El nivel de servicio dinámico cayó al {service_level * 100:.1f}%. El modelo es demasiado conservador para la varianza real."
+                    f"**Riesgo Crítico de Rotura:** El nivel de servicio cayó al {service_level * 100:.1f}%. El modelo es demasiado conservador para la varianza real."
                 )
 
         if not diagnostics:

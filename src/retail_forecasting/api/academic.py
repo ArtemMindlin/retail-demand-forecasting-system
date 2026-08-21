@@ -1,7 +1,6 @@
 """Content for the "Fundamentos matemáticos" modules on the dashboard.
 
-Three expandable cards — Conformal Prediction, Newsvendor and the capacity LP —
-each with its formula, derivation, worked example, reference code and the notes
+Two expandable cards — Conformal Prediction and Newsvendor — each with its formula, derivation, worked example, reference code and the notes
 for defending it. This is editorial content, so it lives in one data module
 rather than being scattered through templates.
 
@@ -221,107 +220,7 @@ q_star = newsvendor_q(mu=avg_pred, sigma=conformal_sigma,
 )
 
 
-def _capacity_example(p: Params, r: Recommendation) -> str:
-    utilization = r["utilization"]
-    if utilization >= 100:
-        tail = (
-            " <b>Restricción activa</b>: el solver está recortando q_i en SKUs de bajo margen. "
-            "El precio sombra es estrictamente positivo — ampliar capacidad mejoraría el margen."
-        )
-    else:
-        tail = (
-            f" Restricción <b>no vinculante</b>: cada SKU recibe su q* del Newsvendor sin "
-            f"recortes. Holgura {100 - utilization:g}%."
-        )
-    return (
-        f"Capacidad actual <code>V = {p.capacity / 1000:.1f}k u</code>. La política agregada "
-        f"utiliza <code>{utilization:g}%</code> del espacio.{tail}"
-    )
-
-
-CAPACITY = AcademicModule(
-    id="capacity",
-    icon="layers",
-    color="var(--c-ai)",
-    kicker="LP",
-    title="Capacity Optimization",
-    formula=(
-        r"\max \sum_{i=1}^N \pi_i q_i \quad \text{s.t.} \quad \sum_{i=1}^N v_i q_i \le V, "
-        r"\; q_i \ge q^*_i, \; q_i \in \mathbb{R}^+"
-    ),
-    short=(
-        "Cuando la capacidad <code>V</code> es vinculante, repartimos espacio entre SKUs "
-        "maximizando margen esperado."
-    ),
-    big_formula=(
-        r"\begin{aligned} \max_{q_1, \dots, q_N} \quad &\sum_{i=1}^N \pi_i \cdot q_i \quad "
-        r"\text{(Margen Esperado Total)} \\ \text{sujeto a:} \quad &\sum_{i=1}^N v_i \cdot q_i "
-        r"\le V \quad \text{(Capacidad Física de Almacén)} \\ &q_i \ge q^{*,\text{news}}_i \quad "
-        r"\text{(Mínimo Newsvendor por SKU)} \\ &q_i \le U_i^{\text{conformal}} \quad "
-        r"\text{(Cota Conformal por SKU)} \\ &q_i \ge 0 \quad \forall i \end{aligned}"
-    ),
-    intuition=(
-        "El Newsvendor te dice cuánto pedir <i>por SKU aislado</i>. Pero el almacén es "
-        "<b>finito</b>: si la suma de los <code>q*_i</code> excede la capacidad, alguien tiene "
-        "que ceder. La LP elige qué SKU sacrifica unidades minimizando la pérdida de margen "
-        "total. Es una <b>capa de decisión</b> sobre las recomendaciones probabilísticas del "
-        "modelo."
-    ),
-    derivation=(
-        "Es un problema de Programación Lineal estándar — convexo, con dualidad fuerte. El dual "
-        'nos da los <i>precios sombra</i> <code>λ</code> del recurso "capacidad": cuántos '
-        "dólares de margen perdemos por cada unidad de espacio que <i>no</i> tenemos. <b>Es la "
-        "métrica clave para decidir cuándo ampliar el almacén</b>. Resoluble con "
-        "<code>scipy.optimize.linprog</code> (método HiGHS) en milisegundos para miles de SKUs."
-    ),
-    code="""from scipy.optimize import linprog
-import numpy as np
-
-def allocate_capacity(margins, volumes, q_min, q_max, capacity):
-    # linprog minimiza ⇒ negamos el margen para maximizar
-    c = -np.array(margins)
-
-    # A_ub @ q ≤ b_ub : restricción de capacidad
-    A_ub = [volumes]
-    b_ub = [capacity]
-
-    # bounds por SKU: [q*_i_news,  U_i_conformal]
-    bounds = list(zip(q_min, q_max))
-
-    res = linprog(c, A_ub=A_ub, b_ub=b_ub,
-                  bounds=bounds, method="highs")
-
-    return {
-        "q":            res.x,
-        "margin":       -res.fun,
-        "shadow_price": res.ineqlin.marginals[0],
-    }""",
-    example=_capacity_example,
-    pills=lambda p, r: [
-        {"label": "V", "value": f"{p.capacity / 1000:.1f}k u", "accent": True},
-        {"label": "utilización", "value": f"{r['utilization']:g}%"},
-        {"label": "estado", "value": "binding" if r["utilization"] >= 100 else "slack"},
-        {"label": "solver", "value": "HiGHS"},
-    ],
-    readout=lambda p, r: f"capacity = {p.capacity / 1000:.1f}k u",
-    defense=(
-        "La LP encadena con el Newsvendor: usamos sus q* como cota inferior, manteniendo "
-        "coherencia entre los dos niveles de decisión.",
-        "El precio sombra λ del dual da una interpretación económica directa al stakeholder: "
-        "'X u.m. de margen perdido por cada unidad de espacio faltante'.",
-        "Complejidad polinomial — escala a >10k SKUs en <1s con HiGHS. Listo para producción.",
-        "Extensible a programación entera mixta (MILP) si se incluyen costes fijos por SKU o "
-        "restricciones de lote mínimo.",
-    ),
-    refs=(
-        "Dantzig (1963) — Linear Programming and Extensions.",
-        "Bertsimas & Tsitsiklis (1997) — Introduction to Linear Optimization.",
-        "Huangfu & Hall (2018) — Parallelizing the Dual Revised Simplex Method (HiGHS).",
-    ),
-)
-
-
-MODULES: tuple[AcademicModule, ...] = (CONFORMAL, NEWSVENDOR, CAPACITY)
+MODULES: tuple[AcademicModule, ...] = (CONFORMAL, NEWSVENDOR)
 MODULES_BY_ID = {module.id: module for module in MODULES}
 
 

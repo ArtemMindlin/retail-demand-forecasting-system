@@ -49,7 +49,6 @@ from retail_forecasting.inventory.newsvendor import (
     choose_order_quantity,
     run_sensitivity_analysis,
 )
-from retail_forecasting.inventory.simulation import simulate_inventory_policy
 from retail_forecasting.models.boosting import LightGBMModel
 from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
@@ -477,23 +476,9 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         ignore_index=True,
     )
 
-    # Extract cost profile from one of the strategies (they share the same series)
-    # This is safe as the synthetic cost profile is built from the same initial panel
-    sample_series_cost_profile = None
-    if settings.inventory.use_series_costs:
-        sample_series_cost_profile = build_series_cost_profile(raw_panel, settings.inventory)
-
-    print("\n📦 Running inventory simulation on merged predictions...")
-    # The multi-period state is built here, over the merged validation origins, so
-    # both strategies advance their inventory under one common simulation. Running
-    # it per strategy inside run_experiment_from_frame and merging the results
-    # afterwards collapses the state (sim_on_hand ends at 0 and sim_total_cost stops
-    # discriminating between models), so this pass is the authoritative one.
-    merged_predictions = simulate_inventory_policy(
-        merged_validation,
-        inventory_config=settings.inventory,
-        series_cost_profile=sample_series_cost_profile,
-    )
+    # Every validation origin already carries its order quantity and its inventory
+    # costs: the per-fold builders close each frame with attach_inventory_costs.
+    merged_predictions = merged_validation
 
     merged_metrics, merged_folds = summarize_predictions(merged_validation)
     merged_costs = summarize_costs(merged_predictions)
@@ -989,19 +974,10 @@ def run_experiment_from_frame(
     # forecast quality: one row per series, date, model and strategy.
     validation_predictions = pd.concat(fold_predictions, ignore_index=True)
 
-    # The dynamic Order-Up-To simulation acts once per series and fold (the ordering
-    # cadence equals the fold length), so it deliberately returns one decision row
-    # per series and fold — a strict subset of the validation origins.
-    predictions = simulate_inventory_policy(
-        validation_predictions,
-        inventory_config=settings.inventory,
-        series_cost_profile=series_cost_profile,
-    )
+    # One decision per validation origin: the single-period Newsvendor quantity and
+    # its cost, both attached fold by fold before the frames were concatenated.
+    predictions = validation_predictions
 
-    # Forecast quality is measured over every validation origin; inventory economics
-    # only over the points where the policy actually places an order. Measuring the
-    # former on the decision subset would discard ``fold_size_days - 1`` of every
-    # ``fold_size_days`` predictions and inflate the variance of coverage and Winkler.
     metrics_summary, fold_metrics = summarize_predictions(validation_predictions)
     cost_summary = summarize_costs(predictions)
     sensitivity_summary = run_sensitivity_analysis(

@@ -48,13 +48,8 @@ which needs the per-point geometry the server already computed.
   </div>
 
   <div class="chart-stats">
-    {% comment %}
-      q* here is the single-period Newsvendor quantity, not the Order-Up-To level the
-      pipeline decides with: the dashboard has no inventory position to subtract. The
-      label says so to avoid reading it as the pipeline's order.
-    {% endcomment %}
     <div>
-      <div class="label-mono">q* newsvendor estático</div>
+      <div class="label-mono">q* newsvendor</div>
       <div class="tnum chart-stat-value">{{ recommendation.qStar|fmt_units }}<span>u</span></div>
     </div>
     {% comment %}

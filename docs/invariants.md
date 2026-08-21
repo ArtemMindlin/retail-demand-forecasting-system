@@ -75,13 +75,17 @@ These rules protect the experimental validity and architecture of the project.
     days inside the calibration window, the conformity scores come out
     optimistically small, and the intervals undercover.
 
-13. Forecast metrics are summarized over every validation origin.
+13. Forecast metrics and inventory economics are summarized over the same frame:
+    every validation origin.
 
-    The dynamic Order-Up-To simulation narrows the frame to one decision per
-    series and fold, because the ordering cadence equals the fold length. That
-    subset is the correct domain for `summarize_costs()` and the sensitivity
-    analysis, and the wrong one for `summarize_predictions()`: MAE, Winkler and
-    coverage must not be computed on it.
+    Each origin carries its own single-period Newsvendor decision, attached fold by
+    fold by the per-fold builders before the frames are concatenated, so
+    `summarize_predictions()`, `summarize_costs()` and the sensitivity analysis all
+    read one row per series, date, model and strategy. A multi-period Order-Up-To
+    simulation used to narrow the cost frame to one decision per series and fold;
+    it was removed, and with it the `sim_*` columns. Anything that reintroduces a
+    decision cadence coarser than the origin grid must re-split the two domains,
+    because MAE, Winkler and coverage must not be computed on a decision subset.
 
 14. The official `eval` split is wired as an external holdout, and its rows must never
     reach a training target.
@@ -319,7 +323,7 @@ See `docs/web_layer.md` for the full description.
     The last two agree across different scoring periods, so this is scale, not calendar. An
     earlier design partitioned the panel by series, which shrank the teacher to a third of
     deployment size and produced the -5.33% headline; at the 500-series scale where
-    `configs/imputation_compare.yaml` actually runs, those same params are 12% WORSE than not
+    `configs/experiment/imputation_compare.yaml` actually runs, those same params are 12% WORSE than not
     tuning. Hence `teacher_fit_rows` in the metadata: a tuned params file is only valid near the
     teacher size it was tuned at, and the file cannot express that on its own. Tune at the scale
     you deploy.

@@ -272,7 +272,7 @@ pendiente.
 - deteccion de drift por PSI, con informe por feature (`drift_report.json`);
 - reentrenamiento como modo de ejecucion (`retrain`) y comparacion de cadencias
   de reentreno en el backtest de origen rodante (`simulate_ops`);
-- politica Order-Up-To con simulacion dinamica de inventario;
+- decision de pedido Newsvendor de un periodo por origen de prediccion;
 - cuadro de mandos y API operacional (Django, ver `docs/web_layer.md`).
 
 ### Pendiente

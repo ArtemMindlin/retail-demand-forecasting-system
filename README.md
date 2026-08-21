@@ -20,9 +20,8 @@ El pipeline transforma datos brutos de ventas en recomendaciones operacionales d
 
 1. **Mondrian Conformal Prediction:** Garantías matemáticas de cobertura de intervalos de confianza condicionadas por categoría de producto, asegurando equidad en el pronóstico.
 2. **Optimización Multi-Objetivo (NSGA-II):** Sintonización con Optuna buscando el Frente de Pareto entre precisión puntual (MAE) y nitidez probabilística (Winkler Score).
-3. **Simulación Dinámica (s, S):** Gemelo digital logístico que arrastra el stock remanente y pendientes (*backlog*) entre periodos para medir el verdadero impacto económico (Efecto Látigo).
-4. **Optimización bajo Restricciones:** Resolución de escasez global de presupuesto o volumen mediante Programación Lineal (*Continuous Knapsack*) utilizando SciPy.
-5. **Ecosistema MLOps Profesional:**
+3. **Decisión de Inventario Newsvendor:** Traducción de la distribución predicha en una cantidad de pedido por origen de predicción, usando el fractil crítico que fija la asimetría entre coste de rotura y coste de sobrestock.
+4. **Ecosistema MLOps Profesional:**
    * **Django:** Dashboard renderizado en servidor y API operacional JSON para integración con ERPs.
    * **Post-Mortem Analysis:** Módulo de autodiagnóstico algorítmico que explica fallos por drift, intermitencia o ruido.
    * **Docker & CI/CD:** Arquitectura 100% reproducible y protegida por GitHub Actions.
