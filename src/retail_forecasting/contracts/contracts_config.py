@@ -15,8 +15,86 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Single source of truth for the execution modes; reused by the CLI parser
 # (run.py) and the run metadata schema (evaluation.reporting).
 RunMode = Literal[
-    "experiment", "retrain", "score_daily", "simulate_ops", "fair_cost_backtest", "tune_imputation"
+    "experiment",
+    "retrain",
+    "score_daily",
+    "simulate_ops",
+    "fair_cost_backtest",
+    "tune_imputation",
+    "eda",
 ]
+
+# Which `Settings` sections each run mode actually reads, traced from each entry point by
+# transitive closure over the call graph. A config under `configs/<mode>/` may declare a
+# SUBSET of these (every section has a default) but never a section outside the set: a
+# declared section the mode never reads is a knob that silently does nothing, which is
+# worse than a missing one. Pinned by `tests/test_config_layout.py`.
+MODE_SECTIONS: dict[RunMode, frozenset[str]] = {
+    "experiment": frozenset(
+        {
+            "project",
+            "dataset",
+            "preprocessing",
+            "features",
+            "validation",
+            "drift",
+            "data_quality",
+            "models",
+            "inventory",
+            "business",
+            "reporting",
+        }
+    ),
+    "retrain": frozenset(
+        {
+            "project",
+            "dataset",
+            "preprocessing",
+            "features",
+            "validation",
+            "data_quality",
+            "models",
+            "inventory",
+            "business",
+        }
+    ),
+    "score_daily": frozenset(
+        {
+            "project",
+            "dataset",
+            "preprocessing",
+            "features",
+            "data_quality",
+            "models",
+            "inventory",
+            "business",
+            "reporting",
+        }
+    ),
+    "simulate_ops": frozenset(
+        {
+            "project",
+            "dataset",
+            "preprocessing",
+            "features",
+            "validation",
+            "data_quality",
+            "models",
+            "inventory",
+            "business",
+            "reporting",
+            "simulation",
+        }
+    ),
+    "fair_cost_backtest": frozenset(
+        {"project", "dataset", "preprocessing", "models", "inventory", "reporting"}
+    ),
+    "tune_imputation": frozenset({"project", "dataset", "preprocessing", "models"}),
+    # `run_eda` forces `dataset.top_n_series` and `dataset.max_rows` to None: the EDA plane
+    # describes the whole panel, not the subset a model trains on. Declaring either in an eda
+    # config would be a knob that does nothing, so they stay out of the file.
+    "eda": frozenset({"project", "dataset", "preprocessing", "reporting"}),
+}
 
 
 class ProjectConfig(BaseModel):
@@ -130,7 +208,6 @@ class InventoryConfig(BaseModel):
     stockout_cost: float = Field(default=4.0, gt=0)
     use_series_costs: bool = False
     clip_negative_orders: bool = True
-    global_capacity_units: int | None = Field(default=None, gt=0)
 
 
 class BusinessConfig(BaseModel):

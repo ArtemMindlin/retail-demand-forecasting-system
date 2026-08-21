@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 
 import pandas as pd
 
-from retail_forecasting.config import DatasetConfig, Settings, load_config
+from retail_forecasting.config import DatasetConfig, Settings
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.eda.plots import render_eda_plots
 from retail_forecasting.eda.profiling import (
@@ -25,29 +24,6 @@ from retail_forecasting.eda.temporal import (
     build_temporal_summary,
     build_weekday_summary,
 )
-
-
-def build_parser() -> argparse.ArgumentParser:
-    """Build the command-line interface for EDA execution."""
-    parser = argparse.ArgumentParser(
-        description="Run reproducible EDA on the prepared retail panel.",
-    )
-    parser.add_argument(
-        "--config",
-        default="configs/experiment.yaml",
-        help="Path to the YAML experiment configuration.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default=None,
-        help="Optional override for the EDA reporting output directory.",
-    )
-    parser.add_argument(
-        "--split",
-        default="train",
-        help="Dataset split to analyze after panel preparation.",
-    )
-    return parser
 
 
 def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
@@ -174,19 +150,3 @@ def raise_on_alignment_warnings(warnings: list[str]) -> None:
         "EDA aborted because the loaded prepared panel does not match the active dataset "
         f"configuration. {joined_warnings}"
     )
-
-
-def main() -> None:
-    """Parse CLI arguments and execute the configured EDA run."""
-    args = build_parser().parse_args()
-    settings = load_config(args.config)
-    if args.output_dir is not None:
-        settings.reporting.output_dir = Path(args.output_dir)
-
-    artifacts = run_eda(settings=settings, split=args.split)
-    assert artifacts.run_directory is not None
-    print(f"EDA report written to: {artifacts.run_directory / 'eda_report.md'}")
-
-
-if __name__ == "__main__":
-    main()

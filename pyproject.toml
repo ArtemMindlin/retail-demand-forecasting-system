@@ -86,7 +86,6 @@ ml = [
 
 [project.scripts]
 retail-forecast = "retail_forecasting.run:main"
-retail-eda = "retail_forecasting.eda.run:main"
 
 [tool.hatch.version]
 path = "src/retail_forecasting/__init__.py"

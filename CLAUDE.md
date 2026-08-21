@@ -6,7 +6,18 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 
 ## Repo Map
 
-- `configs/`: experiment configuration. `configs/experiment.yaml` is the canonical v1 config; `configs/experiment_large.yaml`/`experiment_daily.yaml` cover the scale/daily variants, `configs/imputation_compare.yaml` the imputation study, `configs/simulation.yaml` the OPS-plane rolling-origin backtest.
+- `configs/`: one folder per run mode, so a config file declares only the `Settings` sections
+  its own mode reads. `configs/experiment/default.yaml` is the canonical v1 config;
+  `large.yaml`/`daily.yaml` cover the scale/daily variants and `imputation_compare.yaml` the
+  imputation study, all three still `run_mode = experiment`. The other folders
+  (`retrain/`, `score_daily/`, `simulate_ops/`, `fair_cost_backtest/`, `tune_imputation/`)
+  hold a `default.yaml` each, `eda/` included: exploratory analysis is a run mode like the
+  rest, not a second CLI. `project.run_mode` always matches the folder name, so `--run-mode`
+  is only for ad-hoc overrides. The map of which sections each mode reads is
+  `MODE_SECTIONS` in `contracts/contracts_config.py`, enforced by `tests/test_config_layout.py`:
+  declaring a section the mode never reads is a knob that silently does nothing, and fails the
+  suite. The price of the split is that `dataset` and `preprocessing` are duplicated across
+  files; the same test pins the identity fields that must not drift apart.
 - `data/`: local raw/interim/processed caches. Do not commit generated datasets.
 - `docs/`: system of record for architecture, contracts, invariants, and decisions.
 - `notebooks/`: lightweight exploration only. Production pipeline logic belongs in `src/`.
@@ -18,11 +29,11 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 - `src/retail_forecasting/features/`: supervised frame creation, temporal features, and target construction.
 - `src/retail_forecasting/forecasting/`: walk-forward validation, conformal calibration, imputation comparison, fair-cost backtesting, and experiment/retrain/scoring orchestration (`pipeline.py`); `imputation_tuning.py` runs a separate Optuna search over the supervised imputer's LGBM hyperparameters and persists the winner (never fitted weights) to `models.models_dir/imputation_lgbm_params.json` — its flow, draws and persist gates are mapped in `src/retail_forecasting/forecasting/imputation_tuning.md`. It is the only entry point that logs to MLflow (`mlflow.db`, browsable via `make mlflow-ui`); every other run mode still writes its artifacts under `reports/`, which the dashboard and `utils/latex_exporter.py` read.
 - `src/retail_forecasting/models/`: forecast models only (`naive.py`, `boosting.py` for LightGBM, `catboosting.py` for CatBoost — the current champion).
-- `src/retail_forecasting/inventory/`: newsvendor order quantity, cost profiles, optimization, and dynamic simulation logic.
+- `src/retail_forecasting/inventory/`: newsvendor order quantity and cost profiles. The multi-period Order-Up-To simulation and the LP capacity allocator lived here and were removed; the decision is single-period, one per forecast origin.
 - `src/retail_forecasting/simulation/`: OPS-plane rolling-origin production backtest, reused by the dashboard's `/ops/` view. Independent single-period Newsvendor decisions — no inventory state, no lead time — so its costs rank policies rather than reproduce a replenishment ledger.
 - `src/retail_forecasting/evaluation/`: metrics, run reporting, post-mortem analysis, and XAI/explainability.
 - `src/retail_forecasting/drift/`: regime/drift analysis hooks.
-- `src/retail_forecasting/eda/`: exploratory analysis and figure generation, surfaced in the dashboard's `/eda/` tab.
+- `src/retail_forecasting/eda/`: exploratory analysis and figure generation, surfaced in the dashboard's `/eda/` tab. Entered through `run_mode = eda` (`--split` picks the split); `run_eda()` forces `top_n_series`/`max_rows` to None so the analysis describes the whole panel.
 - `src/retail_forecasting/contracts/`: pydantic-style contracts for backtesting, business rules, config, drift, feature engineering, quality, and tuning — enforced by the `tests/test_*_contract.py` / `tests/test_*_boundaries.py` suite.
 - `src/retail_forecasting/api/`: Django dashboard and JSON API (`views/`, `templates/`, `static/`, `services/`) — visualizes experiments, EDA, drift, latent-demand imputation, the OPS plane, and exposes a documented JSON surface (`/api/forecast`, `/api/skus`, `/predict_orders`, etc.). Served via `asgi.py`/`wsgi.py`.
 - `tests/`: contract tests, smoke tests, synthetic-panel tests, and API tests.
@@ -33,7 +44,7 @@ The v1 pipeline supports only `FreshRetailNet-50K` through `dataset.source = fre
 
 Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/censorship.py`), compared against the raw observed-demand baseline. Model selection and champion evaluation run on a base subset of the 50 highest-rotation series; a separate 500-series run validates conformal-calibration stability at scale, and a 30-series fair-cost backtest isolates the imputation signal from the rest of the pipeline under a common ground truth. Each subset answers a different question, so do not average metrics across them as if they were the same experiment.
 
-CatBoost is the current champion model, selected by simulated logistic cost (Order-Up-To), not by MAE or Winkler Score alone — point-error and logistic-cost rankings can (and do) invert.
+CatBoost is the current champion model, selected by simulated logistic cost, not by MAE or Winkler Score alone — point-error and logistic-cost rankings can (and do) invert.
 
 The official `eval` split is wired as an external holdout and its temporal semantics are verified: the 7 days immediately after the train split. A non-train split inherits train's series universe rather than recomputing one — applying `min_history_days`/`top_n_series` to a 7-day split emptied it entirely (and, had it not, would have selected 50 series the model never trained on). A holdout that prepares to zero rows now raises instead of being skipped. Note the scope: horizon 7 over a 7-day split leaves ONE origin per series (50 rows, all 2024-06-26), so it corroborates the walk-forward and cannot rank models by itself. Every number currently in the thesis predates this and comes from the walk-forward. See invariant 14.
 
@@ -128,7 +139,7 @@ uv run pytest tests/test_architecture_imports.py tests/test_temporal_leakage_con
 Run the default experiment:
 
 ```bash
-uv run python -m retail_forecasting.run --config configs/experiment.yaml
+uv run python -m retail_forecasting.run --config configs/experiment/default.yaml
 ```
 
 Run the dashboard:

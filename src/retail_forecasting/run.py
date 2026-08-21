@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from retail_forecasting.config import load_config
 from retail_forecasting.contracts.contracts_config import RunMode
+from retail_forecasting.eda.run import run_eda
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
     run_fair_cost_backtest,
@@ -29,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--config",
-        default="configs/experiment.yaml",
+        default="configs/experiment/default.yaml",
         help="Path to the YAML experiment configuration.",
     )
     parser.add_argument(
@@ -47,6 +48,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         choices=list(get_args(RunMode)),
         help="Optional override for the execution mode.",
+    )
+    parser.add_argument(
+        "--split",
+        default="train",
+        help="Dataset split to analyze. Only the eda run mode reads it.",
     )
     return parser
 
@@ -110,6 +116,11 @@ def main() -> None:
 
         params_path = tune_imputation_lgbm(settings, config_path=Path(args.config))
         print(f"Imputation tuning written to: {params_path}")
+        return
+    if mode == "eda":
+        eda_artifacts = run_eda(settings, split=args.split)
+        assert eda_artifacts.run_directory is not None
+        print(f"EDA report written to: {eda_artifacts.run_directory / 'eda_report.md'}")
         return
     if mode == "score_daily":
         artifacts = run_scoring(settings)

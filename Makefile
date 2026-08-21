@@ -1,12 +1,16 @@
 # Variables
 PYTHON = uv run python
 PYTEST = uv run pytest
-CONFIG = configs/experiment.yaml
-SIM_CONFIG = configs/simulation.yaml
+CONFIG = configs/experiment/default.yaml
+RETRAIN_CONFIG = configs/retrain/default.yaml
+SCORE_CONFIG = configs/score_daily/default.yaml
+FAIRCOST_CONFIG = configs/fair_cost_backtest/default.yaml
+SIM_CONFIG = configs/simulate_ops/default.yaml
+EDA_CONFIG = configs/eda/default.yaml
 # The imputation search has its own config on purpose: it must be tuned at the scale the
 # imputation study runs at (500 series), not at experiment.yaml's 50. A winner tuned on 50
 # series measured 12.4% WORSE than the untuned defaults at 500. See docs/invariants.md 41.
-TUNE_CONFIG = configs/imputation_tuning.yaml
+TUNE_CONFIG = configs/tune_imputation/default.yaml
 OPS_SPLIT = data/processed/ops_sim/.built
 SNAPSHOT = current
 REPORTS = reports
@@ -19,16 +23,16 @@ install: ## Install dependencies and create virtual environment with uv
 	uv sync --extra ml --extra dev
 
 run: ## Run the full experiment with default configuration
-	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode experiment
+	$(PYTHON) -m retail_forecasting.run --config $(CONFIG)
 
 retrain: ## Retrain champion model on all available data
-	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode retrain
+	$(PYTHON) -m retail_forecasting.run --config $(RETRAIN_CONFIG)
 
 score: ## Generate daily reorder recommendations (production mode)
-	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode score_daily
+	$(PYTHON) -m retail_forecasting.run --config $(SCORE_CONFIG)
 
 simulate: $(OPS_SPLIT) ## Run rolling-origin production backtest comparing retrain cadences
-	$(PYTHON) -m retail_forecasting.run --config $(SIM_CONFIG) --run-mode simulate_ops
+	$(PYTHON) -m retail_forecasting.run --config $(SIM_CONFIG)
 
 # The OPS plane streams a dedicated train/eval split carved out of the prepared
 # panel. Built once, on demand: `simulate` depends on the file, not the script.
@@ -36,16 +40,16 @@ $(OPS_SPLIT):
 	$(PYTHON) scripts/build_ops_sim_split.py --train-days 49 --n-series 100
 
 backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common ground truth (no training)
-	$(PYTHON) -m retail_forecasting.run --config $(CONFIG) --run-mode fair_cost_backtest
+	$(PYTHON) -m retail_forecasting.run --config $(FAIRCOST_CONFIG)
 
 tune-imputation: ## Tune LGBM hyperparameters for the supervised imputer, persist to disk
-	$(PYTHON) -m retail_forecasting.run --config $(TUNE_CONFIG) --run-mode tune_imputation
+	$(PYTHON) -m retail_forecasting.run --config $(TUNE_CONFIG)
 
 mlflow-ui: ## Browse past imputation tuning searches at http://localhost:5000
 	uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 
 eda: ## Run the reproducible EDA module on the prepared panel
-	$(PYTHON) -m retail_forecasting.eda.run --config $(CONFIG)
+	$(PYTHON) -m retail_forecasting.run --config $(EDA_CONFIG)
 
 api: ## Start the dashboard over ASGI (production-style, no autoreload)
 	uv run uvicorn retail_forecasting.api.asgi:application --host 0.0.0.0 --port 8000
