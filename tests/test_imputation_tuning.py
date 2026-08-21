@@ -711,6 +711,38 @@ def test_a_broken_tracking_store_does_not_take_the_search_down_with_it(
     assert (tmp_path / METADATA_FILENAME).exists()
 
 
+def test_the_search_pins_torch_to_one_thread(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Not a speed setting. Without it the process segfaults at the first GP fit.
+
+    GPSampler stops sampling at random after `n_startup_trials` and starts fitting a Gaussian
+    process in torch. In a process where LightGBM has already run under joblib's threads, that
+    first fit dies -- two OpenMP runtimes, and torch left free to spawn a pool of its own.
+    Reproduced three times out of three at 50 series, and three out of three surviving with the
+    pin, after 1c7a490 removed it as dead weight on a measurement of the sampler alone.
+
+    The crash itself cannot be asserted from inside the process it kills, so this pins the guard
+    rather than the behaviour: torch left on a different setting must come back to one.
+    """
+    import torch
+
+    monkeypatch.setattr(torch, "set_num_threads", torch.set_num_threads)
+    torch.set_num_threads(4)
+    assert torch.get_num_threads() == 4, "precondition: torch starts somewhere else"
+
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0], other_maes=[0.5, 0.5])
+    tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+    )
+
+    assert torch.get_num_threads() == 1
+
+
 def test_censoring_draws_its_severity_from_the_same_window_it_censors() -> None:
     """A faked stockout must borrow its severity from a REAL stockout of its own window.
 

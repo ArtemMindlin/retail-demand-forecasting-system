@@ -430,12 +430,19 @@ def tune_imputation_lgbm(
         return float(np.mean(_holdout_maes(selection.draws, params)))
 
     try:
-        import torch  # noqa: F401  -- imported for the check, GPSampler is what uses it
+        import torch
     except ModuleNotFoundError as exc:  # pragma: no cover - depends on the installed extras
         raise ModuleNotFoundError(
             "Imputation tuning uses Optuna's GPSampler, which needs PyTorch. Install the "
             "optional ML backends with: uv sync --extra dev --extra ml"
         ) from exc
+
+    # Not a speed setting -- measured at 69.0s against 68.5s over 300 trials, and identical
+    # results either way. Without it the process SEGFAULTS at the first GP fit, reproducibly,
+    # once LightGBM has run under joblib's threads in the same process: two OpenMP runtimes,
+    # torch's and LightGBM's, and torch left free to spawn its own pool. Removing it as dead
+    # weight is what 1c7a490 did, on a measurement that exercised the sampler alone.
+    torch.set_num_threads(1)
 
     models_dir = settings.models.models_dir
     models_dir.mkdir(parents=True, exist_ok=True)
