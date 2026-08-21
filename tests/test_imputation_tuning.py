@@ -603,11 +603,11 @@ def test_mlflow_records_which_configuration_a_run_came_from(
         seed=42,
         n_selection_holdouts=2,
         n_validation_holdouts=2,
-        config_path=Path("configs/imputation_tuning.yaml"),
+        config_path=Path("configs/tune_imputation/default.yaml"),
     )
 
     tags = _logged_run().data.tags
-    assert tags["config_path"] == "configs/imputation_tuning.yaml"
+    assert tags["config_path"] == "configs/tune_imputation/default.yaml"
     assert tags["config_hash"] == build_config_hash(settings)
 
     # A settings change the path cannot see has to move the hash. Copied rather than mutated:

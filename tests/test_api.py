@@ -504,7 +504,7 @@ def test_predict_orders_returns_recommendations(
     auth_client: Client, reports_dir: Path, tmp_path: Path
 ) -> None:
     config_file = tmp_path / "config.yaml"
-    config_file.write_text(Path("configs/experiment.yaml").read_text(encoding="utf-8"))
+    config_file.write_text(Path("configs/experiment/default.yaml").read_text(encoding="utf-8"))
 
     artifacts = mock.MagicMock()
     artifacts.run_directory = str(tmp_path / "output")
@@ -564,7 +564,7 @@ def test_config_editor_shows_the_current_file(auth_client: Client) -> None:
 
 def test_config_editor_rejects_invalid_yaml(auth_client: Client, tmp_path: Path) -> None:
     target = tmp_path / "experiment.yaml"
-    original = Path("configs/experiment.yaml").read_text(encoding="utf-8")
+    original = Path("configs/experiment/default.yaml").read_text(encoding="utf-8")
     target.write_text(original, encoding="utf-8")
 
     with override_settings(CONFIG_PATH=target):
@@ -578,7 +578,7 @@ def test_config_editor_rejects_invalid_yaml(auth_client: Client, tmp_path: Path)
 
 def test_config_editor_saves_a_valid_file(auth_client: Client, tmp_path: Path) -> None:
     target = tmp_path / "experiment.yaml"
-    original = Path("configs/experiment.yaml").read_text(encoding="utf-8")
+    original = Path("configs/experiment/default.yaml").read_text(encoding="utf-8")
 
     with override_settings(CONFIG_PATH=target):
         response = auth_client.post("/configuracion/", {"yaml": original})

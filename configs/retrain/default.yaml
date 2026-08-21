@@ -1,6 +1,7 @@
 project:
   random_seed: 42
-  run_mode: experiment
+  run_mode: retrain
+
 
 dataset:
   hf_dataset_id: Dingdong-Inc/FreshRetailNet-50K
@@ -9,16 +10,18 @@ dataset:
     eval: data/eval.parquet
   local_cache_dir: data/raw/fresh_retailnet
   processed_panel_dir: data/processed
-  use_cache: false
-  top_n_series: 500
+  use_cache: true
+  top_n_series: 50
   min_history_days: 70
-  max_rows: null
+  max_rows: 50000
   horizon: 7
+
 
 preprocessing:
   drop_negative_sales: true
   fill_missing_values: true
   imputation_strategy: supervised
+
 
 features:
   lags: [1, 7, 14, 28]
@@ -28,6 +31,7 @@ features:
   include_discount_lags: true
   include_stockout_lags: true
 
+
 validation:
   initial_train_days: 45
   n_folds: 3
@@ -36,14 +40,11 @@ validation:
   retrain_each_fold: true
   drift_triggered_retrain: false
 
-drift:
-  threshold: 15.0
-  delta: 0.005
-  min_instances: 2
 
 data_quality:
   max_missing_fraction_warning: 0.05
   max_data_age_days: null
+
 
 models:
   models_dir: models
@@ -53,14 +54,14 @@ models:
   learning_rate: 0.05
   max_depth: 6
   use_tuning: false
-  tuning_trials: 1
+  tuning_trials: 40
+
 
 inventory:
   overstock_cost: 1.0
   stockout_cost: 4.0
   use_series_costs: true
   clip_negative_orders: true
-  global_capacity_units: 3000000
 
 
 business:
@@ -75,13 +76,3 @@ business:
   champion_backend_name: conformal_catboost_official
   champion_min_cost_improvement_pct: 0.0
   champion_max_service_level_degradation: 0.02
-
-reporting:
-  output_dir: reports
-  run_name: fresh_retailnet_large
-  make_plots: false
-
-simulation:
-  retrain_cadences: [null, 7, 1]
-  simulation_days: null
-  make_plots: false

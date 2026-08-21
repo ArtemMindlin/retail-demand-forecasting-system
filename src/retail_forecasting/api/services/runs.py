@@ -24,7 +24,7 @@ from retail_forecasting.config import load_config
 logger = logging.getLogger(__name__)
 
 DEFAULT_REPORTS_DIR = Path("reports")
-DEFAULT_CONFIG_PATH = Path("configs/experiment.yaml")
+DEFAULT_CONFIG_PATH = Path("configs/experiment/default.yaml")
 
 # Directory-name prefixes that are never experiment runs.
 _NON_RUN_PREFIXES = (".", "models", "ablation")

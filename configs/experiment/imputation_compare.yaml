@@ -1,0 +1,41 @@
+project:
+  random_seed: 42
+  run_mode: experiment
+
+
+dataset:
+  hf_dataset_id: Dingdong-Inc/FreshRetailNet-50K
+  splits:
+    train: data/train.parquet
+    eval: data/eval.parquet
+  local_cache_dir: data/raw/fresh_retailnet
+  processed_panel_dir: data/processed
+  use_cache: true
+  top_n_series: 500
+  min_history_days: 70
+  max_rows: null
+  horizon: 7
+
+
+preprocessing:
+  drop_negative_sales: true
+  fill_missing_values: true
+  imputation_strategy: supervised
+  compare_imputation: true
+
+
+models:
+  models_dir: models
+  quantiles: [0.1, 0.5, 0.9]
+  seasonal_period: 7
+  n_estimators: 200
+  learning_rate: 0.05
+  max_depth: 6
+  use_tuning: false
+  tuning_trials: 3
+
+
+reporting:
+  output_dir: reports
+  run_name: imputation_compare
+  make_plots: false

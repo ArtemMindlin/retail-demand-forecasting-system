@@ -39,7 +39,7 @@ def latent(request: HttpRequest) -> HttpResponse:
             ),
             hint=(
                 "Genérala con: uv run python -m retail_forecasting.run "
-                "--config configs/imputation_compare.yaml"
+                "--config configs/experiment/imputation_compare.yaml"
             ),
         )
 

@@ -20,7 +20,7 @@ from retail_forecasting.config import (
     load_config,
 )
 
-CONFIG_PATH = Path("configs/experiment.yaml")
+CONFIG_PATH = Path("configs/experiment/default.yaml")
 
 
 def test_default_config_preserves_experimental_guardrails() -> None:

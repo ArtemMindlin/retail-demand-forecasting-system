@@ -18,10 +18,9 @@ citable — re-run it before citing.
 | `tab:metrics_predictive` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | Generated; see "Generated tables" below |
 | `tab:conformal_metrics`, `tab:fold_coverage` | `fresh_retailnet_v2_20260811_123002` | 50 series, 4 500 rows | 1 050 evaluation origins |
 | `tab:embargo_control` (embargo off) | `fresh_retailnet_v2_20260811_123106` | 50 series, 4 500 rows | Control: only the calibration embargo differs |
-| `tab:scale_coverage`, simulated costs, `fig:mae_vs_coste` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | 10 500 evaluation origins |
+| `tab:scale_coverage`, simulated costs, `fig:mae_vs_servicio` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | 10 500 evaluation origins |
 | `tab:metrics_cost` (fair cost) | `fresh_retailnet_large_20260811_184959` | 30 sampled from 500 | Generated. Ranking depends on the source panel — see below |
 | `tab:imputation_reconstruction` | `imputation_compare_20260811_174500` | 500 series | Bit-identical to the June run: no forecasting involved |
-| `tab:lp_sweep` | `fresh_retailnet_v2_20260811_123002` | 50 series | Via `scripts/capacity_lp_experiment.py` |
 
 Every numbered table in chapter 6 is listed above. A table that is not in this list has
 no declared provenance, which is the state that produced the August 13 findings: both
@@ -80,17 +79,16 @@ that it cannot tell them apart.
 ## Reproducing
 
 ```bash
-make run                 # base subset      → configs/experiment.yaml
-make simulate            # OPS plane        → configs/simulation.yaml (builds the split if missing)
-uv run python -m retail_forecasting.run --config configs/experiment_large.yaml
-uv run python -m retail_forecasting.run --config configs/experiment.yaml --run-mode fair_cost_backtest
-uv run python -m retail_forecasting.run --config configs/imputation_compare.yaml
+make run                 # base subset      → configs/experiment/default.yaml
+make simulate            # OPS plane        → configs/simulate_ops/default.yaml (builds the split if missing)
+uv run python -m retail_forecasting.run --config configs/experiment/large.yaml
+uv run python -m retail_forecasting.run --config configs/experiment/default.yaml --run-mode fair_cost_backtest
+uv run python -m retail_forecasting.run --config configs/experiment/imputation_compare.yaml
 ```
 
-Figures and the capacity experiment read finished runs:
+The figures read finished runs:
 
 ```bash
 uv run python scripts/plot_coverage_folds.py --base <base-run> --scale <scale-run>
-uv run python scripts/plot_mae_vs_cost.py --run <scale-run>
-uv run python scripts/capacity_lp_experiment.py --run <base-run>
+uv run python scripts/plot_mae_vs_service.py --run <scale-run>
 ```

@@ -90,7 +90,7 @@ def _validate_config(text: str) -> str | None:
 
 @require_http_methods(["GET", "POST"])
 def config(request: HttpRequest) -> HttpResponse:
-    """View and edit ``configs/experiment.yaml`` with full validation."""
+    """View and edit ``configs/experiment/default.yaml`` with full validation."""
     path: Path = settings.CONFIG_PATH
 
     if request.method == "GET":

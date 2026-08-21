@@ -112,7 +112,7 @@ STORAGES = {
 # CWD-relative by default, matching how the pipeline and the Makefile targets
 # already resolve these paths.
 REPORTS_DIR = Path(os.environ.get("RETAIL_REPORTS_DIR", "reports"))
-CONFIG_PATH = Path(os.environ.get("RETAIL_CONFIG_PATH", "configs/experiment.yaml"))
+CONFIG_PATH = Path(os.environ.get("RETAIL_CONFIG_PATH", "configs/experiment/default.yaml"))
 
 # Rate limit for the pipeline-trigger endpoint.
 RUN_RATE_LIMIT_MAX = 3

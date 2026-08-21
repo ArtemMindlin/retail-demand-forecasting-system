@@ -10,7 +10,7 @@ the number of simulated weeks we carve the simulation window out of the existing
 Outputs are written to ``data/processed/ops_sim/`` under the hashed names that
 ``load_prepared_panel`` derives from the simulation config, so the
 canonical ``data/processed`` splits are never touched. The simulation config
-(``configs/simulation.yaml``) points ``dataset.processed_panel_dir`` here.
+(``configs/simulate_ops/default.yaml``) points ``dataset.processed_panel_dir`` here.
 
 The source panel decides the series universe and the calendar of the whole OPS
 window, so it is validated and its provenance is recorded in the ``.built`` stamp
@@ -34,7 +34,7 @@ from retail_forecasting.data.dataset import panel_cache_filename
 
 SOURCE_PANEL = Path("data/processed/train.parquet")
 OUTPUT_DIR = Path("data/processed/ops_sim")
-SIM_CONFIG = Path("configs/simulation.yaml")
+SIM_CONFIG = Path("configs/simulate_ops/default.yaml")
 
 
 def build_parser() -> argparse.ArgumentParser:
