@@ -586,16 +586,26 @@ def tune_imputation_lgbm(
         params_path.write_text(json.dumps(best_params.model_dump(), indent=2), encoding="utf-8")
         print(f"\nTuned imputation hyperparameters written to: {params_path}\n")
 
-    _log_study_to_mlflow(
-        study=study,
-        metadata=metadata,
-        metadata_path=metadata_path,
-        params_path=params_path,
-        beats_default=beats_default,
-        panel=panel,
-        panel_source=settings.dataset.processed_panel_dir
-        / panel_cache_filename(settings.dataset, "train"),
-        config_hash=build_config_hash(settings),
-        config_path=config_path,
-    )
+    # Everything this run produces is already on disk by now, and the caller is about to be
+    # handed the path to it. A tracking store that is locked, missing or out of disk would
+    # otherwise take a search of half an hour down with it at its last step, having lost
+    # nothing but the record. Broad on purpose: no failure to write a log is worth the run.
+    try:
+        _log_study_to_mlflow(
+            study=study,
+            metadata=metadata,
+            metadata_path=metadata_path,
+            params_path=params_path,
+            beats_default=beats_default,
+            panel=panel,
+            panel_source=settings.dataset.processed_panel_dir
+            / panel_cache_filename(settings.dataset, "train"),
+            config_hash=build_config_hash(settings),
+            config_path=config_path,
+        )
+    except Exception as exc:  # noqa: BLE001 - see above
+        print(
+            f"MLflow tracking failed, and the search is unaffected: {type(exc).__name__}: {exc}\n"
+            f"    Everything it produced is on disk, starting at: {metadata_path}\n"
+        )
     return params_path if should_persist else metadata_path

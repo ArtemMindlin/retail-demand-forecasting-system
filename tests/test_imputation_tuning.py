@@ -680,6 +680,37 @@ def test_mlflow_gives_every_trial_its_own_nested_run(
     assert {c.info.run_name for c in children} == {"trial-0000", "trial-0001", "trial-0002"}
 
 
+def test_a_broken_tracking_store_does_not_take_the_search_down_with_it(
+    tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """By the time MLflow is touched the run's output is already written.
+
+    A store that is locked, missing or out of disk would otherwise end half an hour of search
+    on a traceback, having cost it nothing but the record of itself.
+    """
+    _stub_holdout_maes(monkeypatch, default_maes=[1.0, 1.0], other_maes=[0.5, 0.5])
+
+    def explode(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("no space left on device")
+
+    monkeypatch.setattr(
+        "retail_forecasting.forecasting.imputation_tuning._log_study_to_mlflow", explode
+    )
+
+    returned = tune_imputation_lgbm(
+        _settings(tmp_path),
+        n_trials=2,
+        seed=42,
+        n_selection_holdouts=2,
+        n_validation_holdouts=2,
+    )
+
+    # The winner was persisted and the caller still gets its path.
+    assert returned == tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
+    assert json.loads(returned.read_text(encoding="utf-8"))["n_estimators"]
+    assert (tmp_path / METADATA_FILENAME).exists()
+
+
 def test_censoring_draws_its_severity_from_the_same_window_it_censors() -> None:
     """A faked stockout must borrow its severity from a REAL stockout of its own window.
 

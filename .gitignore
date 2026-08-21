@@ -2,9 +2,10 @@
 /models/
 
 # MLflow tracking store for the imputation tuning entry point. Local-only, like reports/: a
-# record of past searches, not a source input.
-/mlflow.db
-/mlruns/
+# record of past searches, not a source input. Unanchored because both paths are relative to
+# the working directory, so a search launched from a subdirectory leaves them there instead.
+mlflow.db
+mlruns/
 
 # Byte-compiled Python
 __pycache__/
