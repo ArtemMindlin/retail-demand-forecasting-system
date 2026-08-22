@@ -1,0 +1,159 @@
+% !TEX root = ../main.tex
+\chapter[Búsqueda de hiperparámetros del imputador]{Búsqueda de Hiperparámetros del Imputador Supervisado}
+\label{anx:tuning_imputador}
+
+La estrategia de imputación supervisada descrita en la Sección~\ref{sec:demanda_censurada} se
+apoya en un regresor LightGBM auxiliar. Este anexo documenta la búsqueda de hiperparámetros de
+ese modelo, que constituye un procedimiento independiente del ajuste del modelo de
+\textit{forecasting} y que se ejecuta como un modo de ejecución propio del sistema
+(\texttt{run\_mode = tune\_imputation}). Se recoge aquí, y no en el cuerpo de la memoria, porque
+su resultado no modifica la configuración del sistema final: lo que aporta es una lección
+metodológica sobre la validez de una búsqueda de hiperparámetros, y el material que la sostiene.
+
+\section{Protocolo}
+
+La dificultad de fondo es que la demanda latente de un día con rotura real es un contrafactual
+no observable, de modo que no existe verdad-terreno contra la que medir. La búsqueda opera por
+tanto sobre el mismo protocolo de censura sintética de la
+Sección~\ref{sec:imputacion_censura_sintetica}: se censura artificialmente una fracción de los
+días limpios, se reconstruyen y se compara la estimación con la demanda conocida.
+
+El espacio de búsqueda comprende \textbf{trece hiperparámetros}, con cotas acotadas en la
+Tabla~\ref{tab:tuning_espacio}, recorridos por 300 \textit{trials} del muestreador gaussiano de
+Optuna. Dos decisiones de diseño gobiernan el procedimiento:
+
+\begin{itemize}
+    \item \textbf{Promediado sobre múltiples extracciones.} En una sola extracción de censura
+    sintética, la dispersión del error entre \textit{trials} (entre el 12\% y el 40\% según la
+    medición) es un orden de magnitud mayor que las diferencias reales entre conjuntos de
+    hiperparámetros (en torno al 1\%). Una búsqueda de extracción única selecciona por tanto el
+    \textit{trial} afortunado, y su propio valor objetivo no es evidencia de mejora alguna: una
+    ejecución que reportó un $-1{,}4\%$ en la muestra de selección midió $-0{,}32\%$, con
+    intervalo de confianza cruzando el cero, sobre extracciones nuevas. El objetivo promedia
+    en consecuencia sobre 15 extracciones.
+    \item \textbf{Series disjuntas entre selección y validación.} Las semillas de censura
+    disjuntas no bastan: cada extracción censura el 30\% del mismo conjunto de días limpios, de
+    modo que tras $n$ extracciones el solapamiento es de $1 - 0{,}7^n$ y los dos conjuntos
+    convergen sobre las mismas filas (se midió un 82{,}4\% de solapamiento con 5 y 10
+    extracciones). La separación se hace por tanto sobre series: 35 series para seleccionar y
+    15 reservadas para validar, con 25 extracciones sobre estas últimas.
+\end{itemize}
+
+El ganador solo se persiste si el intervalo de confianza al 95\% de la mejora media sobre las
+extracciones de validación queda \textbf{íntegramente por debajo de cero}, y además solo si bate
+tanto a los hiperparámetros por defecto como al campeón que ya estuviera en disco.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{llll}
+        \toprule
+        \textbf{Hiperparámetro} & \textbf{Cotas} & \textbf{Hiperparámetro} & \textbf{Cotas} \\
+        \midrule
+        \texttt{n\_estimators} & 50 -- 3.000 & \texttt{subsample} & 0,4 -- 1,0 \\
+        \texttt{max\_depth} & 2 -- 12 & \texttt{learning\_rate} & 0,005 -- 0,3 (log) \\
+        \texttt{num\_leaves} & 2 -- 1.024 & \texttt{colsample\_bytree} & 0,3 -- 1,0 \\
+        \texttt{min\_child\_samples} & 2 -- 100 & \texttt{reg\_alpha} & $10^{-8}$ -- 100 (log) \\
+        \texttt{min\_data\_per\_group} & 1 -- 100 & \texttt{reg\_lambda} & $10^{-8}$ -- 100 (log) \\
+        \texttt{max\_bin} & 8 -- 255 & \texttt{cat\_smooth} & 0 -- 50 \\
+        \texttt{subsample\_freq} & 0 -- 1 & & \\
+        \bottomrule
+    \end{tabular}
+    \caption{Espacio de búsqueda de la sintonización del imputador supervisado. La cota superior
+    de \texttt{n\_estimators} responde a una restricción de cómputo y está justificada por
+    medición: a 500 series un ajuste de 8.000 árboles cuesta unos 34 segundos, lo que situaría
+    una búsqueda de 300 \textit{trials} en torno a las 43 horas. Lo que se sacrifica al recortar
+    a 3.000 son 0{,}0037 de MAE, cifra inferior a los 0{,}0059 de anchura del intervalo de
+    validación que decide la persistencia, de modo que el recorte no puede alterar el veredicto.}
+    \label{tab:tuning_espacio}
+\end{table}
+
+\section{Resultado: la ganancia se invierte con la escala}
+
+Sobre el protocolo descrito, la búsqueda encuentra una configuración que mejora el error de
+reconstrucción un \textbf{5{,}33\%} frente a los hiperparámetros por defecto, con un intervalo
+de confianza al 95\% de $[-0{,}0199,\ -0{,}0120]$, enteramente por debajo de cero.
+
+Ese resultado, sin embargo, no es transferible. Al repetir la medición variando únicamente el
+número de días limpios con los que se ajusta el imputador, y manteniendo todo lo demás
+constante, la ganancia se reduce de forma monótona y termina cambiando de signo
+(Tabla~\ref{tab:tuning_reversion}).
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{rlr}
+        \toprule
+        \textbf{Filas limpias de ajuste} & \textbf{Periodo de evaluación} & \textbf{Ganancia} \\
+        \midrule
+        467 (15 series reservadas) & series disjuntas & $-5{,}33\%$ \\
+        595 (últimos 30 días de 50 series) & tiempo disjunto & $-4{,}34\%$ \\
+        1.930 (50 series completas) & tiempo disjunto & $-1{,}72\%$ \\
+        14.243 (500 series) & tiempo disjunto & $\mathbf{+12{,}44\%}$ \\
+        18.310 (500 series más holdout) & semana de holdout & $\mathbf{+13{,}20\%}$ \\
+        \bottomrule
+    \end{tabular}
+    \caption{Efecto del tamaño del conjunto de ajuste del imputador sobre la ganancia de la
+    sintonización. Signo negativo indica mejora. Las dos últimas filas coinciden sobre periodos
+    de evaluación distintos, lo que descarta el calendario como explicación y señala a la escala.}
+    \label{tab:tuning_reversion}
+\end{table}
+
+La lectura es que \textbf{el tamaño del conjunto con el que se ajusta el imputador no es un
+detalle del montaje experimental, sino la variable que decide la respuesta}. Los mismos
+hiperparámetros que mejoran un 5\% con 467 filas de ajuste resultan un 12\% \emph{peores} que no
+sintonizar a la escala de 500 series, que es precisamente la escala a la que el sistema ejecuta
+la comparación de estrategias del Capítulo~\ref{chap:resultados}. La causa es reconocible: un
+conjunto de ajuste pequeño premia configuraciones fuertemente regularizadas que dejan de ser
+ventajosas cuando hay datos suficientes.
+
+De ahí se derivan dos consecuencias prácticas. La primera es que un fichero de hiperparámetros
+sintonizados solo es válido en el entorno del tamaño de ajuste con el que se obtuvo, y esa
+condición no puede expresarse en el propio fichero, por lo que se registra explícitamente en los
+metadatos de la búsqueda. La segunda, y es la que justifica la decisión del sistema final, es
+que \textbf{las cifras de reconstrucción del Capítulo~\ref{chap:resultados} se obtienen con los
+hiperparámetros por defecto}, no con los sintonizados: a la escala a la que se publican, los
+defectos son la mejor opción disponible.
+
+\section{Validación del buscador}
+
+Un resultado como el anterior invita a una objeción legítima: que la reversión sea un artefacto
+del muestreador empleado y no una propiedad del problema. Para acotarla se repitió la búsqueda
+completa con los dos muestreadores disponibles, el basado en procesos gaussianos y el
+\textit{Tree-structured Parzen Estimator}, sobre tres semillas comunes y 300 \textit{trials}
+cada uno, en un total de unas 14 horas de cómputo (Tabla~\ref{tab:tuning_samplers}).
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{rrrrrr}
+        \toprule
+        \textbf{Semilla} & \textbf{GP} & \textbf{TPE} & \textbf{Diferencia} & \textbf{GP (min)} & \textbf{TPE (min)} \\
+        \midrule
+        7 & $-6{,}32\%$ & $-6{,}69\%$ & $+0{,}37$ pp & 116 & 198 \\
+        42 & $-7{,}62\%$ & $-4{,}56\%$ & $-3{,}06$ pp & 86 & 121 \\
+        1.234 & $-6{,}29\%$ & $-7{,}48\%$ & $+1{,}19$ pp & 127 & 177 \\
+        \midrule
+        \textbf{Media} & $\mathbf{-6{,}74\%}$ & $\mathbf{-6{,}24\%}$ & $\mathbf{-0{,}50}$ \textbf{pp} & \textbf{110} & \textbf{165} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Comparación pareada de muestreadores sobre semillas comunes. La diferencia media
+    entre ambos (0{,}50 puntos porcentuales) es cuatro veces menor que su desviación entre
+    semillas (2{,}26 puntos), y el signo se invierte según la semilla.}
+    \label{tab:tuning_samplers}
+\end{table}
+
+La conclusión es un \textbf{resultado nulo}: con tres semillas, el ruido entre extracciones
+domina por completo la elección de muestreador, de modo que ambos conducen al mismo sitio y la
+reversión de la sección anterior no es atribuible a ninguno de los dos. Lo que sí resulta
+concluyente, y es la razón por la que el sistema emplea el muestreador gaussiano, es que este
+resulta un 34\% más rápido y gana en las tres semillas sin excepción.
+
+Dos observaciones adicionales del mismo experimento. Las seis búsquedas baten a los
+hiperparámetros por defecto con el intervalo de confianza íntegramente por debajo de cero, entre
+el $-4{,}56\%$ y el $-7{,}62\%$, lo que confirma que a esa escala de ajuste la ganancia es real
+con independencia del muestreador. Y las configuraciones ganadoras \emph{no se parecen entre sí}:
+\texttt{num\_leaves} recorre de 40 a 219, \texttt{n\_estimators} de 687 a 3.000 y
+\texttt{learning\_rate} de 0{,}015 a 0{,}052, produciendo mejoras casi idénticas. La superficie
+de respuesta es plana en la región buena, que es la misma observación con la que se justificó
+promediar sobre múltiples extracciones.
