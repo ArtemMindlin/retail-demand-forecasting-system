@@ -17,6 +17,7 @@ from retail_forecasting.forecasting.pipeline import (
     run_scoring,
 )
 from retail_forecasting.simulation import run_operational_simulation
+from retail_forecasting.utils.logging import configure as configure_logging
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -68,6 +69,11 @@ def main() -> None:
         without modifying the YAML configuration.
     """
     args = build_parser().parse_args()
+
+    # The CLI is the application entry point, so it is the only place that attaches a
+    # handler: importing this package from Django, a test or a notebook must not
+    # reconfigure logging for the host process.
+    configure_logging()
     try:
         settings = load_config(args.config)
     except ValidationError as exc:

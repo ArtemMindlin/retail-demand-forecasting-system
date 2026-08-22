@@ -20,8 +20,10 @@ from retail_forecasting.forecasting.imputation_tuning import (
     _FLOAT_BOUNDS,
     _INT_BOUNDS,
     _MLFLOW_EXPERIMENT,
+    _PRUNING_BLOCK_DRAWS,
     _build_holdout_set,
     _holdout_maes,
+    _objective_mae,
     _split_temporal_windows,
     tune_imputation_lgbm,
 )
@@ -934,3 +936,57 @@ def test_imputer_returns_the_same_columns_whether_or_not_it_corrects_anything() 
     # And the passthrough leaves demand untouched, which is what "not imputed" has to mean.
     assert not nothing_to_correct["is_imputed"].any()
     assert nothing_to_correct["observed_demand"].equals(clean_only["observed_demand"])
+
+
+def test_objective_reports_once_per_block_so_a_trial_can_be_pruned(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The pruner needs one intermediate value per block, at the same step in every trial."""
+    import optuna
+
+    panel = make_synthetic_panel(num_series=3, num_days=90)
+    selection_mask, _ = _split_temporal_windows(panel)
+    draws = _build_holdout_set(
+        panel, seeds=range(2 * _PRUNING_BLOCK_DRAWS), censorable_mask=selection_mask
+    ).draws
+    monkeypatch.setattr(
+        "retail_forecasting.forecasting.imputation_tuning._holdout_maes",
+        lambda holdouts, params: np.full(len(holdouts), 0.5),
+    )
+
+    study = optuna.create_study(direction="minimize")
+    study.optimize(lambda trial: _objective_mae(trial, draws, {}), n_trials=1)
+
+    assert list(study.trials[0].intermediate_values) == [0, 1]
+
+
+def test_objective_stops_at_the_first_block_the_pruner_rejects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A pruned trial must not pay for the blocks it never reached."""
+    import optuna
+
+    panel = make_synthetic_panel(num_series=3, num_days=90)
+    selection_mask, _ = _split_temporal_windows(panel)
+    draws = _build_holdout_set(
+        panel, seeds=range(3 * _PRUNING_BLOCK_DRAWS), censorable_mask=selection_mask
+    ).draws
+    scored: list[int] = []
+
+    def counting_maes(holdouts: list[object], params: dict[str, object]) -> np.ndarray:
+        scored.append(len(holdouts))
+        return np.full(len(holdouts), 0.5)
+
+    monkeypatch.setattr(
+        "retail_forecasting.forecasting.imputation_tuning._holdout_maes", counting_maes
+    )
+
+    class AlwaysPrune(optuna.pruners.BasePruner):
+        def prune(self, study: optuna.Study, trial: optuna.trial.FrozenTrial) -> bool:
+            return True
+
+    study = optuna.create_study(direction="minimize", pruner=AlwaysPrune())
+    study.optimize(lambda trial: _objective_mae(trial, draws, {}), n_trials=1)
+
+    assert study.trials[0].state is optuna.trial.TrialState.PRUNED
+    assert scored == [_PRUNING_BLOCK_DRAWS], "solo debe puntuarse el primer bloque"

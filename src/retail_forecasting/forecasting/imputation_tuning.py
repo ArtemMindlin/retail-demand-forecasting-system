@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 import warnings
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -27,9 +28,24 @@ from retail_forecasting.data.censorship import (
     synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel, panel_cache_filename
+from retail_forecasting.utils.logging import fields, get_logger, progress, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
-N_SELECTION_HOLDOUTS = 15
+logger = get_logger(__name__)
+
+N_SELECTION_HOLDOUTS = 30
+
+# Draws are scored in fixed-size blocks so a trial can be pruned between blocks instead of
+# paying for all of them. The size is a constant and not `cpu_count()` on purpose: the number
+# of pruning steps has to be the same on every machine, or the same search stops being
+# reproducible. Ten saturates the cores this runs on and gives three decision points.
+_PRUNING_BLOCK_DRAWS = 10
+
+# One progress line every this many trials. Optuna's own INFO logging prints a paragraph per
+# trial with the full parameter dict, which at 300 trials buries everything else; it is
+# silenced below and replaced by this. Ten keeps a 2h search to 30 lines, which reads better
+# in a redirected log than a bar that overwrites itself.
+_PROGRESS_EVERY_TRIALS = 10
 
 N_VALIDATION_HOLDOUTS = 25
 
@@ -51,7 +67,12 @@ _MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 # distribution for.
 _INT_BOUNDS: dict[str, tuple[int, int]] = {
     "n_estimators": (50, 3000),
-    "max_depth": (2, 12),
+    # Lower bounds pulled up to where the six searches of reports/sampler_ab agreed: every
+    # winner sat at max_depth 10-11 with colsample 0.55-0.66 and subsample 0.93-1.0. They stop
+    # at the untuned defaults (max_depth 6, colsample 1.0) rather than at the winners' range,
+    # because the defaults have to stay expressible: they are enqueued as a reference trial and
+    # pinned by `test_the_untuned_defaults_sit_inside_the_search_space`.
+    "max_depth": (6, 12),
     "num_leaves": (2, 1024),
     "min_child_samples": (2, 100),
     "min_data_per_group": (1, 100),
@@ -59,9 +80,9 @@ _INT_BOUNDS: dict[str, tuple[int, int]] = {
 }
 
 _FLOAT_BOUNDS: dict[str, tuple[float, float]] = {
-    "subsample": (0.4, 1.0),
+    "subsample": (0.85, 1.0),
     "learning_rate": (0.005, 0.3),
-    "colsample_bytree": (0.3, 1.0),
+    "colsample_bytree": (0.5, 1.0),
     "reg_alpha": (1e-8, 100.0),
     "reg_lambda": (1e-8, 100.0),
     "cat_smooth": (0.0, 50.0),
@@ -170,6 +191,36 @@ def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np
     n_jobs = min(len(holdouts), cpu_count())
     maes = Parallel(n_jobs=n_jobs, prefer="threads")(delayed(holdout_mae)(h) for h in holdouts)
     return np.asarray(maes, dtype=float)
+
+
+def _hhmm(seconds: float) -> str:
+    """Duration as ``1h52m`` or ``12m``, which is all the precision a progress line needs."""
+    minutes = int(seconds // 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h{minutes:02d}m" if hours else f"{minutes}m"
+
+
+def _objective_mae(
+    trial: optuna.Trial, draws: list[Holdout], params: dict[str, int | float]
+) -> float:
+    """Mean reconstruction MAE over the draws, scored block by block so the trial can be pruned.
+
+    Every trial sees the SAME draws in the SAME order, so the running mean at a given block is
+    a paired comparison against the other trials at that block: the between-draw variance that
+    dominates the objective is shared rather than resampled. That is what makes it safe to cut a
+    trial on a partial average -- the noise the pruner would otherwise be fooled by cancels.
+
+    Raises:
+        optuna.TrialPruned: when the pruner rejects the trial at a block boundary.
+    """
+    maes: list[float] = []
+    for step, start in enumerate(range(0, len(draws), _PRUNING_BLOCK_DRAWS)):
+        block = draws[start : start + _PRUNING_BLOCK_DRAWS]
+        maes.extend(_holdout_maes(block, params).tolist())
+        trial.report(float(np.mean(maes)), step=step)
+        if trial.should_prune():
+            raise optuna.TrialPruned()
+    return float(np.mean(maes))
 
 
 def _mean_ci95(deltas: np.ndarray) -> tuple[float, float]:
@@ -371,10 +422,7 @@ def tune_imputation_lgbm(
     n_trials = n_trials if n_trials is not None else settings.models.tuning_trials
     seed = seed if seed is not None else settings.project.random_seed
 
-    print("\n" + "=" * 50)
-    print("IMPUTATION LGBM TUNING")
-    print("=" * 50 + "\n")
-    print("Loading train panel...")
+    rule(logger, "tuning del imputador supervisado")
     panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
@@ -388,18 +436,25 @@ def tune_imputation_lgbm(
     validation_seeds = [seed + _VALIDATION_SEED_OFFSET + i for i in range(n_validation_holdouts)]
     selection = _build_holdout_set(panel, selection_seeds, selection_mask)
     validation = _build_holdout_set(panel, validation_seeds, validation_mask)
-    print(
-        f"Temporal split of {n_series} series over {len(panel):,} rows: selection through "
-        f"{selection.window_end.date().isoformat()}, validation from "
-        f"{validation.window_start.date().isoformat()} ({selection.n_eval_rows:,} vs "
-        f"{validation.n_eval_rows:,} scorable rows per draw)"
-    )
-    print(
-        f"The teacher fits on the FULL panel either way: ~{selection.teacher_fit_rows:,} clean rows"
-    )
-    print(
-        f"{len(selection.draws)} selection holdouts (seeds {selection.seeds}), "
-        f"{len(validation.draws)} validation holdouts (seeds {validation.seeds})"
+    fields(
+        logger,
+        {
+            "panel": f"{n_series} series, {thousands(len(panel))} filas",
+            "ventanas": (
+                f"selección hasta {selection.window_end.date().isoformat()} · "
+                f"validación desde {validation.window_start.date().isoformat()}"
+            ),
+            "puntuables": (
+                f"{thousands(selection.n_eval_rows)} vs "
+                f"{thousands(validation.n_eval_rows)} filas por extracción"
+            ),
+            "teacher": f"~{thousands(selection.teacher_fit_rows)} filas limpias (panel completo)",
+            "extracciones": (
+                f"{len(selection.draws)} selección · {len(validation.draws)} validación"
+            ),
+            "presupuesto": (f"{n_trials} trials · pruning en bloques de {_PRUNING_BLOCK_DRAWS}"),
+            "semillas": f"selección {seed}+ · validación {seed + _VALIDATION_SEED_OFFSET}+",
+        },
     )
 
     def objective(trial: optuna.Trial) -> float:
@@ -427,7 +482,7 @@ def tune_imputation_lgbm(
             "cat_smooth": trial.suggest_float("cat_smooth", *_FLOAT_BOUNDS["cat_smooth"]),
             "max_bin": trial.suggest_int("max_bin", *_INT_BOUNDS["max_bin"]),
         }
-        return float(np.mean(_holdout_maes(selection.draws, params)))
+        return _objective_mae(trial, selection.draws, params)
 
     try:
         import torch
@@ -457,6 +512,13 @@ def tune_imputation_lgbm(
 
     study_name = f"imputation_lgbm_seed{seed}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
 
+    # Its INFO handler emits one paragraph per trial. Ours reports every
+    # `_PROGRESS_EVERY_TRIALS` instead, so warnings from Optuna still get through.
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    # Known and accepted: the sampler choice is measured in reports/sampler_ab. Left to fire
+    # once per import would still put it in the middle of the setup block on every run.
+    warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
+
     study = optuna.create_study(
         direction="minimize",
         sampler=optuna.samplers.GPSampler(
@@ -464,17 +526,43 @@ def tune_imputation_lgbm(
             n_startup_trials=_N_STARTUP_TRIALS,
             deterministic_objective=True,
         ),
+        # Prunes a trial whose partial average is worse than the median of the trials that
+        # reached the same block. `n_startup_trials` matches the sampler's: there is no median
+        # worth comparing against before that, and it also keeps the two enqueued reference
+        # trials (defaults and incumbent) from being cut. No warmup steps, so the first block of
+        # ten draws is already a decision point and a hopeless trial costs a third of a full one.
+        pruner=optuna.pruners.MedianPruner(n_startup_trials=_N_STARTUP_TRIALS, n_warmup_steps=0),
         storage=f"sqlite:///{models_dir / 'imputation_tuning_studies.db'}",
         study_name=study_name,
     )
 
     study.enqueue_trial(dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
-    print("Enqueued the untuned defaults as a reference trial")
+    logger.info("  referencia      defaults sin sintonizar, encolados como trial")
     if incumbent_params is not None:
         study.enqueue_trial(dict(incumbent_params))
-        print("Enqueued the incumbent params on disk as a reference trial")
+        logger.info("  referencia      campeón en disco, encolado como trial")
 
-    study.optimize(objective, n_trials=n_trials)
+    started = time.monotonic()
+
+    def report_progress(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
+        done = trial.number + 1
+        if done % _PROGRESS_EVERY_TRIALS and done != n_trials:
+            return
+        pruned = len(study.get_trials(deepcopy=False, states=(optuna.trial.TrialState.PRUNED,)))
+        elapsed = time.monotonic() - started
+        remaining = elapsed / done * (n_trials - done)
+        progress(
+            logger,
+            {
+                "trial": f"{done}/{n_trials}",
+                "mejor": f"{study.best_value:.4f}",
+                "podados": f"{pruned}",
+                "transcurrido": _hhmm(elapsed),
+                "restante": _hhmm(remaining),
+            },
+        )
+
+    study.optimize(objective, n_trials=n_trials, callbacks=[report_progress])
 
     subsample_best = float(study.best_params["subsample"])
     best_params = ImputationBoostingParams(
@@ -492,18 +580,31 @@ def tune_imputation_lgbm(
         cat_smooth=float(study.best_params["cat_smooth"]),
         max_bin=int(study.best_params["max_bin"]),
     )
-    print(
-        f"Best trial: selection MAE={study.best_value:.4f} "
-        f"(n_estimators={best_params.n_estimators}, "
-        f"learning_rate={best_params.learning_rate:.4f}, max_depth={best_params.max_depth}, "
-        f"num_leaves={best_params.num_leaves}, min_child_samples={best_params.min_child_samples}, "
-        f"colsample_bytree={best_params.colsample_bytree:.3f}, subsample={best_params.subsample:.3f}, "
-        f"reg_alpha={best_params.reg_alpha:.4e}, reg_lambda={best_params.reg_lambda:.4e}, "
-        f"min_data_per_group={best_params.min_data_per_group}, cat_smooth={best_params.cat_smooth:.2f}, "
-        f"max_bin={best_params.max_bin})"
+    rule(logger, "mejor trial")
+    fields(
+        logger,
+        {
+            "MAE selección": f"{study.best_value:.4f}",
+            "árboles": (
+                f"{best_params.n_estimators} · lr {best_params.learning_rate:.4f} · "
+                f"profundidad {best_params.max_depth} · hojas {best_params.num_leaves}"
+            ),
+            "muestreo": (
+                f"filas {best_params.subsample:.3f} · columnas {best_params.colsample_bytree:.3f} · "
+                f"min_child {best_params.min_child_samples}"
+            ),
+            "regularización": (
+                f"alpha {best_params.reg_alpha:.2e} · lambda {best_params.reg_lambda:.2e}"
+            ),
+            "categóricas": (
+                f"min_data {best_params.min_data_per_group} · smooth {best_params.cat_smooth:.2f} · "
+                f"bins {best_params.max_bin}"
+            ),
+        },
     )
 
-    print("Scoring the winner and the untuned defaults on the validation holdouts...")
+    logger.info("")
+    logger.info("Puntuando al ganador y a los defaults sobre las extracciones de validación")
     tuned_maes = _holdout_maes(validation.draws, best_params.model_dump())
     default_maes = _holdout_maes(validation.draws, dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
     best_mae_validation = float(np.mean(tuned_maes))
@@ -519,7 +620,7 @@ def tune_imputation_lgbm(
     incumbent_ci95: list[float] | None = None
     beats_incumbent: bool | None = None
     if incumbent_params is not None:
-        print("Scoring the incumbent params already on disk on the same draws...")
+        logger.info("Puntuando al campeón en disco sobre las mismas extracciones")
         incumbent_maes = _holdout_maes(validation.draws, incumbent_params)
         incumbent_mae_validation = float(np.mean(incumbent_maes))
         inc_lo, inc_hi = _mean_ci95(tuned_maes - incumbent_maes)
@@ -527,7 +628,7 @@ def tune_imputation_lgbm(
 
         beats_incumbent = bool(np.mean(tuned_maes - incumbent_maes) < 0.0)
         decisive = inc_hi < 0.0 or inc_lo > 0.0
-        print(
+        logger.info(
             f"   challenger={best_mae_validation:.4f} vs incumbent="
             f"{incumbent_mae_validation:.4f}, CI95 [{inc_lo:+.4f}, {inc_hi:+.4f}] "
             f"({'decisive' if decisive else 'indistinguishable, decided on the mean'}) -> "
@@ -566,32 +667,35 @@ def tune_imputation_lgbm(
     metadata_path = models_dir / "imputation_lgbm_tuning_metadata.json"
     metadata_path.write_text(json.dumps(metadata.model_dump(), indent=2), encoding="utf-8")
 
-    print(
-        f"\nValidation: tuned={best_mae_validation:.4f} vs "
-        f"default={default_mae_validation:.4f} ({improvement_pct:+.2f}%), "
-        f"CI95 of the difference [{ci_lo:+.4f}, {ci_hi:+.4f}]"
+    rule(logger, "veredicto")
+    fields(
+        logger,
+        {
+            "ganador": f"MAE {best_mae_validation:.4f} en validación",
+            "defaults": f"MAE {default_mae_validation:.4f} en validación",
+            "mejora": f"{improvement_pct:+.2f}%",
+            "IC95": f"[{ci_lo:+.4f}, {ci_hi:+.4f}] sobre la diferencia pareada",
+        },
     )
 
     if not beats_default:
-        print(
-            "The tuned hyperparameters do NOT beat the untuned defaults by a margin the "
-            "validation draws can distinguish from zero, so they were NOT persisted -- the "
-            "pipeline keeps using the defaults.\n"
-            f"    Decision recorded in: {metadata_path}\n"
+        logger.info(
+            "  NO persistido: la mejora no se distingue de cero en las extracciones de "
+            "validación, así que el pipeline sigue con los defaults"
         )
+        logger.info("  decisión        %s", metadata_path)
 
         if params_path.exists():
             params_path.unlink()
-            print(f"Removed the superseded params file: {params_path}\n")
+            logger.info("  retirado        %s", params_path)
     elif beats_incumbent is False:
-        print(
-            "The tuned hyperparameters beat the untuned defaults but NOT the incumbent "
-            "already on disk, so the incumbent was KEPT and this run's winner discarded.\n"
-            f"    Decision recorded in: {metadata_path}\n"
+        logger.info(
+            "  NO persistido: bate a los defaults pero no al campeón en disco, que se mantiene"
         )
+        logger.info("  decisión        %s", metadata_path)
     else:
         params_path.write_text(json.dumps(best_params.model_dump(), indent=2), encoding="utf-8")
-        print(f"\nTuned imputation hyperparameters written to: {params_path}\n")
+        logger.info("  persistido      %s", params_path)
 
     # Everything this run produces is already on disk by now, and the caller is about to be
     # handed the path to it. A tracking store that is locked, missing or out of disk would
@@ -611,8 +715,11 @@ def tune_imputation_lgbm(
             config_path=config_path,
         )
     except Exception as exc:  # noqa: BLE001 - see above
-        print(
-            f"MLflow tracking failed, and the search is unaffected: {type(exc).__name__}: {exc}\n"
-            f"    Everything it produced is on disk, starting at: {metadata_path}\n"
+        logger.warning(
+            "el registro en MLflow falló y la búsqueda no se ve afectada: %s: %s. Todo lo que "
+            "produjo está en disco, empezando por %s",
+            type(exc).__name__,
+            exc,
+            metadata_path,
         )
     return params_path if should_persist else metadata_path

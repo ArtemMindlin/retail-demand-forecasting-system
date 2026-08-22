@@ -30,7 +30,7 @@ ALLOWED_LAYER_IMPORTS = {
     },
     "inventory": {"config"},
     "models": {"config", "contracts", "utils"},
-    "run": {"config", "contracts", "eda", "forecasting", "simulation"},
+    "run": {"config", "contracts", "eda", "forecasting", "simulation", "utils"},
     "simulation": {
         "config",
         "data",
