@@ -48,6 +48,36 @@ MEMORIA_FIGURE_EXPORTS: list[dict[str, str]] = [
         ),
     },
     {
+        "filename": "category_seasonality_high.png",
+        "caption": "Estacionalidad semanal: categorías de demanda alta.",
+        "label": "fig:eda_category_heatmap_high",
+        "interpretation": (
+            "Interpretación. La heterogeneidad de los patrones semanales dentro del mismo "
+            "nivel de demanda muestra que asumir un único ciclo semanal para todo el panel "
+            "sería un error sistemático, y respalda calibrar la cobertura por categoría."
+        ),
+    },
+    {
+        "filename": "category_seasonality_medium.png",
+        "caption": "Estacionalidad semanal: categorías de demanda media.",
+        "label": "fig:eda_category_heatmap_medium",
+        "interpretation": (
+            "Interpretación. La heterogeneidad de los patrones semanales dentro del mismo "
+            "nivel de demanda muestra que asumir un único ciclo semanal para todo el panel "
+            "sería un error sistemático, y respalda calibrar la cobertura por categoría."
+        ),
+    },
+    {
+        "filename": "category_seasonality_low.png",
+        "caption": "Estacionalidad semanal: categorías de demanda baja.",
+        "label": "fig:eda_category_heatmap_low",
+        "interpretation": (
+            "Interpretación. La heterogeneidad de los patrones semanales dentro del mismo "
+            "nivel de demanda muestra que asumir un único ciclo semanal para todo el panel "
+            "sería un error sistemático, y respalda calibrar la cobertura por categoría."
+        ),
+    },
+    {
         "filename": "acf_demand.png",
         "caption": (
             "Función de autocorrelación (ACF) de la demanda diaria agregada. Los retardos "

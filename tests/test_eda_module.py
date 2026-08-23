@@ -221,3 +221,65 @@ def test_eda_alignment_raises_on_stale_processed_panel_shape() -> None:
 
     with pytest.raises(RuntimeError, match="EDA aborted"):
         raise_on_alignment_warnings(warnings)
+
+
+def test_category_heatmaps_land_in_the_run_directory(tmp_path: Path) -> None:
+    """The three figures chapter 3 cites have to come out of the EDA run itself.
+
+    They used to be produced by running a script by hand, so nothing tied them to the panel
+    the rest of the report describes and they could go stale in silence.
+    """
+    from retail_forecasting.eda.category_heatmap import render_category_seasonality_heatmaps
+
+    # Enough rows per category to clear the minimum, which is what the real panel has.
+    panel = make_synthetic_panel(num_series=12, num_days=120)
+    render_category_seasonality_heatmaps(panel, tmp_path, min_observations=50)
+
+    written = sorted(path.name for path in tmp_path.glob("category_seasonality_*.png"))
+    assert written == [
+        "category_seasonality_high.png",
+        "category_seasonality_low.png",
+        "category_seasonality_medium.png",
+    ]
+
+
+def test_category_heatmaps_are_skipped_rather_than_invented_on_a_thin_panel(
+    tmp_path: Path,
+) -> None:
+    """No category with enough observations means no figure, not a confident one from noise."""
+    from retail_forecasting.eda.category_heatmap import render_category_seasonality_heatmaps
+
+    panel = make_synthetic_panel(num_series=2, num_days=30)
+    render_category_seasonality_heatmaps(panel, tmp_path, min_observations=10_000)
+
+    assert list(tmp_path.glob("category_seasonality_*.png")) == []
+
+
+def test_category_heatmaps_survive_a_panel_with_no_category_column(tmp_path: Path) -> None:
+    """`third_category_id` is a static id column, not part of the canonical panel contract."""
+    from retail_forecasting.eda.category_heatmap import render_category_seasonality_heatmaps
+
+    panel = make_synthetic_panel(num_series=4, num_days=90).drop(columns=["third_category_id"])
+    render_category_seasonality_heatmaps(panel, tmp_path, min_observations=1)
+
+    assert list(tmp_path.glob("category_seasonality_*.png")) == []
+
+
+def test_every_figure_the_thesis_includes_is_exported_by_the_eda_run() -> None:
+    """A figure in the memoria that the run does not export can only be refreshed by hand."""
+    from retail_forecasting.eda.figure_exports import MEMORIA_FIGURE_EXPORTS
+
+    chapter = Path("memoria/chapters/03_analisis_datos.tex")
+    if not chapter.exists():  # pragma: no cover - the thesis is not always checked out
+        pytest.skip("memoria not present")
+
+    included = {
+        line.split("figures/eda/")[1].split("}")[0]
+        for line in chapter.read_text(encoding="utf-8").splitlines()
+        if "figures/eda/" in line
+    }
+    exported = {figure["filename"] for figure in MEMORIA_FIGURE_EXPORTS}
+
+    assert not included - exported, (
+        f"en la memoria pero sin exportar: {sorted(included - exported)}"
+    )

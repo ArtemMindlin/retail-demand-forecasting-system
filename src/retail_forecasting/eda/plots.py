@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from retail_forecasting.eda.category_heatmap import render_category_seasonality_heatmaps
+
 TOP_SERIES_PLOT_COUNT = 12
 MAX_HEATMAP_SERIES = 120
 SCATTER_SAMPLE_SIZE = 5000
@@ -81,6 +83,7 @@ def render_eda_plots(
         panel,
         target_dir / "acf_demand.png",
     )
+    render_category_seasonality_heatmaps(panel, target_dir)
 
 
 def _plot_observed_demand_distribution(panel: pd.DataFrame, output_path: Path) -> None:
