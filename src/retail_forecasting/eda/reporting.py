@@ -8,10 +8,7 @@ import pandas as pd
 
 from retail_forecasting.eda.figure_exports import MEMORIA_FIGURE_EXPORTS
 from retail_forecasting.eda.plots import render_eda_plots
-from retail_forecasting.utils.io import (
-    dataframe_to_markdown,
-    make_run_directory,
-)
+from retail_forecasting.utils.io import make_run_directory
 
 __all__ = ["MEMORIA_FIGURE_EXPORTS", "EdaArtifacts"]
 
@@ -40,7 +37,7 @@ def write_eda_artifacts(
     make_plots: bool,
     memoria_dir: str | Path | None = None,
 ) -> EdaArtifacts:
-    """Persist EDA summaries, plots, and a Markdown report."""
+    """Write the summary tables and the figures, and copy the thesis ones into memoria."""
     run_dir = make_run_directory(output_dir, run_name)
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -68,9 +65,6 @@ def write_eda_artifacts(
             output_dir=run_dir,
         )
 
-    report_text = build_eda_report(artifacts)
-    (run_dir / "eda_report.md").write_text(report_text, encoding="utf-8")
-
     if memoria_dir is not None:
         export_figures_to_memoria(
             run_directory=run_dir,
@@ -81,110 +75,17 @@ def write_eda_artifacts(
     return artifacts
 
 
-def build_eda_report(artifacts: EdaArtifacts) -> str:
-    """Render the Markdown report for an EDA run."""
-    report = [
-        "# Exploratory Data Analysis Report",
-        "",
-        "## Dataset Summary",
-        "",
-        dataframe_to_markdown(artifacts.dataset_summary),
-        "",
-        "## Temporal Coverage",
-        "",
-        dataframe_to_markdown(artifacts.temporal_summary),
-        "",
-        "## Missingness Summary",
-        "",
-        dataframe_to_markdown(artifacts.missingness_summary.head(12)),
-        "",
-        "## Weekly Seasonality",
-        "",
-        dataframe_to_markdown(artifacts.weekday_summary),
-        "",
-        "## Stockout Summary",
-        "",
-        dataframe_to_markdown(artifacts.stockout_summary),
-        "",
-        "## Demand by Stockout Band",
-        "",
-        dataframe_to_markdown(artifacts.stockout_demand_bands),
-        "",
-        "## Top Series by Observed Demand",
-        "",
-        dataframe_to_markdown(
-            artifacts.series_summary.head(10),
-            columns=[
-                "series_id",
-                "history_days",
-                "observed_demand_sum",
-                "observed_demand_mean",
-                "stockout_day_rate",
-            ],
-        ),
-        "",
-        "## Correlation Summary",
-        "",
-        dataframe_to_markdown(artifacts.correlation_summary.head(12)),
-        "",
-        "## Generated Figures",
-        "",
-        "- `coverage_heatmap.png`: continuity and date coverage by series.",
-        "- `observed_demand_distribution.png`: full and positive-demand histograms.",
-        "- `observed_demand_boxplot_top_series.png`: demand dispersion for the top-demand series.",
-        "- `weekday_demand_profile.png`: mean and median demand by weekday.",
-        "- `zero_demand_rate_by_series.png`: most intermittent series.",
-        "- `stockout_hours_distribution.png`: full and positive stockout-hour distributions.",
-        "- `stockout_band_demand.png`: demand and count by stockout intensity band.",
-        "- `stockout_vs_demand_scatter.png`: raw relation and mean trend for stockout hours.",
-        "- `correlation_heatmap.png`: pairwise numeric correlation structure.",
-        "- `covariate_vs_demand_grid.png`: sampled relations for key exogenous variables.",
-        "- `top_series_total_demand.png`: aggregate ranking of the highest-volume series.",
-        "- `representative_series_panels.png`: small multiples of demand with stockout overlay.",
-        "",
-        "## Interpretation Notes",
-        "",
-        "- The EDA is computed on the canonical prepared panel, not on raw column names.",
-        "- Demand and stockout summaries are descriptive only and do not alter target semantics.",
-        "- Weekly and stockout diagnostics are intended to guide feature and experiment design.",
-    ]
-    return "\n".join(report)
-
-
 def export_figures_to_memoria(
     run_directory: str | Path,
     memoria_dir: str | Path,
 ) -> None:
-    """Copy selected EDA figures into the memoria tree and emit a LaTeX fragment."""
+    """Copy the figures the thesis includes into its tree."""
     run_dir = Path(run_directory)
     memoria_root = Path(memoria_dir)
     target_dir = memoria_root / "figures" / "eda"
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    for figure in MEMORIA_FIGURE_EXPORTS:
-        source = run_dir / figure["filename"]
+    for filename in MEMORIA_FIGURE_EXPORTS:
+        source = run_dir / filename
         if source.exists():
-            shutil.copy2(source, target_dir / figure["filename"])
-
-    latex_fragment = build_memoria_eda_figures_tex()
-    (target_dir / "eda_figures.tex").write_text(latex_fragment, encoding="utf-8")
-
-
-def build_memoria_eda_figures_tex() -> str:
-    """Build the generated LaTeX fragment for the EDA chapter."""
-    blocks: list[str] = []
-    for figure in MEMORIA_FIGURE_EXPORTS:
-        blocks.extend(
-            [
-                r"\begin{figure}[htbp]",
-                r"    \centering",
-                f"    \\includegraphics[width=0.95\\textwidth]{{figures/eda/{figure['filename']}}}",
-                f"    \\caption{{{figure['caption']}}}",
-                f"    \\label{{{figure['label']}}}",
-                r"\end{figure}",
-                figure["interpretation"],
-                "",
-            ]
-        )
-
-    return "\n".join(blocks).strip() + "\n"
+            shutil.copy2(source, target_dir / filename)

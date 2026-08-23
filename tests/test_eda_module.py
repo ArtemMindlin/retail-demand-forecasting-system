@@ -85,7 +85,6 @@ def test_eda_artifacts_are_written_as_expected(tmp_path: Path) -> None:
     )
 
     assert written.run_directory is not None
-    assert (written.run_directory / "eda_report.md").exists()
     assert (written.run_directory / "dataset_summary.csv").exists()
     assert (written.run_directory / "stockout_summary.csv").exists()
     assert (written.run_directory / "correlation_summary.csv").exists()
@@ -157,11 +156,12 @@ def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
         memoria_dir=memoria_dir,
     )
 
-    tex_fragment = memoria_dir / "figures" / "eda" / "eda_figures.tex"
-    assert tex_fragment.exists()
-    assert (memoria_dir / "figures" / "eda" / "coverage_heatmap.png").exists()
-    assert (memoria_dir / "figures" / "eda" / "representative_series_panels.png").exists()
-    assert "Interpretación." in tex_fragment.read_text(encoding="utf-8")
+    exported = memoria_dir / "figures" / "eda"
+    assert (exported / "coverage_heatmap.png").exists()
+    assert (exported / "representative_series_panels.png").exists()
+    # Only what the list names: a figure the run draws but the thesis does not include stays
+    # in reports/ rather than piling up in the thesis tree.
+    assert not (exported / "top_series_total_demand.png").exists()
 
 
 def test_category_heatmaps_land_in_the_run_directory(tmp_path: Path) -> None:
@@ -219,7 +219,7 @@ def test_every_figure_the_thesis_includes_is_exported_by_the_eda_run() -> None:
         for line in chapter.read_text(encoding="utf-8").splitlines()
         if "figures/eda/" in line
     }
-    exported = {figure["filename"] for figure in MEMORIA_FIGURE_EXPORTS}
+    exported = set(MEMORIA_FIGURE_EXPORTS)
 
     assert not included - exported, (
         f"en la memoria pero sin exportar: {sorted(included - exported)}"

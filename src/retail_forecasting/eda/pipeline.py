@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from retail_forecasting.config import Settings
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.eda.profiling import (
@@ -58,5 +56,5 @@ def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
         output_dir=settings.reporting.output_dir,
         run_name=f"eda_{settings.reporting.run_name}",
         make_plots=settings.reporting.make_plots,
-        memoria_dir=Path("memoria"),
+        memoria_dir=settings.reporting.memoria_dir,
     )
