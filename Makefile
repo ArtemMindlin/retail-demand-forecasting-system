@@ -45,7 +45,7 @@ backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common gro
 tune-imputation: ## Tune LGBM hyperparameters for the supervised imputer, persist to disk
 	$(PYTHON) -m retail_forecasting.run --config $(TUNE_CONFIG)
 
-mlflow-ui: ## Browse past imputation tuning searches at http://localhost:5000
+mlflow-ui: ## Browse past runs and imputation searches at http://localhost:5000
 	uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 
 eda: ## Run the reproducible EDA module on the prepared panel

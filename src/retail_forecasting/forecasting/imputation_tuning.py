@@ -28,6 +28,7 @@ from retail_forecasting.data.censorship import (
     synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel, panel_cache_filename
+from retail_forecasting.evaluation.tracking import MLFLOW_TRACKING_URI
 from retail_forecasting.utils.logging import Table, fields, get_logger, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
@@ -60,7 +61,6 @@ _N_STARTUP_TRIALS = 10
 # MLflow experiment collecting every imputation search, so runs stay comparable across time.
 _MLFLOW_EXPERIMENT = "imputation_lgbm_tuning"
 
-_MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 
 # What `objective` actually suggests. `subsample_freq` is absent on purpose: it is derived from
 # `subsample` rather than searched, so enqueueing it would name a parameter the space has no
@@ -290,7 +290,7 @@ def _log_study_to_mlflow(
     config_path: Path | None,
 ) -> None:
     """Record one completed search in MLflow: winner, validation verdict, and its artifacts."""
-    mlflow.set_tracking_uri(_MLFLOW_TRACKING_URI)
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(_MLFLOW_EXPERIMENT)
 
     # Digest of the panel this search actually read, alongside the parquet it came from.

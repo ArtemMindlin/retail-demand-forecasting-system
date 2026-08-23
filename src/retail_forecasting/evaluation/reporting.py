@@ -20,6 +20,7 @@ from retail_forecasting.utils.io import (
     dataframe_to_markdown,
     make_run_directory,
 )
+from retail_forecasting.utils.logging import get_logger
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 
@@ -119,6 +120,9 @@ class BacktestMetadata(BaseModel):
     drift: DriftDetectorMetadata
     promotion: PromotionDecisionMetadata | None = None
     data_quality: DataQualityReport | None = None
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -271,6 +275,26 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
             encoding="utf-8",
         )
     artifacts.run_directory = run_dir
+
+    # Everything above is already on disk, and the caller is about to be handed the path to it.
+    # A tracking store that is locked, missing or out of disk would otherwise take a run of
+    # half an hour down at its last step, having lost nothing but the record. Broad on purpose,
+    # for the same reason the imputation search does it: no failure to write a log is worth a
+    # run. Imported here rather than at module scope so mlflow, an optional `ml` extra, is not
+    # required to import the reporting layer.
+    try:
+        from retail_forecasting.evaluation.tracking import log_run_to_mlflow
+
+        log_run_to_mlflow(artifacts=artifacts, settings=settings, run_dir=run_dir)
+    except Exception as exc:  # noqa: BLE001 - see above
+        logger.warning(
+            "el registro en MLflow falló y la corrida no se ve afectada: %s: %s. "
+            "Todo lo que produjo está en %s",
+            type(exc).__name__,
+            exc,
+            run_dir,
+        )
+
     return artifacts
 
 

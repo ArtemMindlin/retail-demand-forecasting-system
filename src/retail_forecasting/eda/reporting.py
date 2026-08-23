@@ -54,10 +54,6 @@ def write_eda_artifacts(
     for filename, frame in outputs.items():
         frame.to_csv(run_dir / filename, index=False)
 
-    # Always, with no flag to turn it off: the figures ARE the EDA. A run that wrote the
-    # tables and no figures would look like a successful one while producing nothing the
-    # thesis or the dashboard can use, and the only caller that ever asked for it was a test
-    # saving three seconds.
     render_eda_plots(
         panel=artifacts.panel,
         weekday_summary=artifacts.weekday_summary,

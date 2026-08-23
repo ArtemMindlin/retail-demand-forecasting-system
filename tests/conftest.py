@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 from retail_forecasting.contracts.contracts_config import ModelConfig, ReportingConfig
+from retail_forecasting.evaluation import tracking
 
 # Configure Django before any test imports a view or the ORM-free settings.
 # Values here are test-only: a throwaway password and non-secure cookies so the
@@ -97,3 +98,17 @@ def _memoria_dir_never_points_at_the_repo(tmp_path_factory, monkeypatch) -> None
     ReportingConfig.model_rebuild(force=True)
     yield
     ReportingConfig.model_rebuild(force=True)
+
+
+@pytest.fixture(autouse=True)
+def _mlflow_never_lands_in_the_repo(tmp_path_factory, monkeypatch) -> None:
+    """Point the tracking store at a scratch database, artifacts included.
+
+    `write_run_artifacts` records every run in MLflow, so without this the suite would write
+    into the repo's own `mlflow.db` and `mlruns/`. Redirecting the store is enough BECAUSE
+    `tracking._artifact_root` derives the artifact directory from it; MLflow's own default
+    resolves `mlruns/` against the working directory instead, independently, which is the trap
+    `tests/test_imputation_tuning.py` works around by moving the cwd.
+    """
+    store = tmp_path_factory.mktemp("mlflow_store") / "mlflow.db"
+    monkeypatch.setattr(tracking, "MLFLOW_TRACKING_URI", f"sqlite:///{store}")
