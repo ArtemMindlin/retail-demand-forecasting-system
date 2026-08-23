@@ -127,40 +127,6 @@ def test_eda_plots_are_written_as_expected(tmp_path: Path) -> None:
     assert (written.run_directory / "representative_series_panels.png").exists()
 
 
-def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
-    panel = make_synthetic_panel(num_series=3, num_days=90)
-    memoria_dir = tmp_path / "memoria"
-
-    artifacts = EdaArtifacts(
-        panel=panel,
-        dataset_summary=build_dataset_summary(panel),
-        missingness_summary=build_missingness_summary(panel),
-        numeric_summary=build_numeric_summary(panel),
-        series_summary=build_series_summary(panel),
-        temporal_summary=build_temporal_summary(panel),
-        weekday_summary=build_weekday_summary(panel),
-        series_gap_summary=build_series_gap_summary(panel),
-        stockout_summary=build_stockout_summary(panel),
-        stockout_by_series_summary=build_stockout_by_series_summary(panel),
-        stockout_demand_bands=build_stockout_demand_bands(panel),
-        correlation_summary=build_correlation_summary(panel),
-    )
-
-    write_eda_artifacts(
-        artifacts=artifacts,
-        output_dir=tmp_path,
-        run_name="eda_memoria_test",
-        memoria_dir=memoria_dir,
-    )
-
-    exported = memoria_dir / "figures" / "eda"
-    assert (exported / "coverage_heatmap.png").exists()
-    assert (exported / "representative_series_panels.png").exists()
-    # Only what the list names: a figure the run draws but the thesis does not include stays
-    # in reports/ rather than piling up in the thesis tree.
-    assert not (exported / "top_series_total_demand.png").exists()
-
-
 def test_category_heatmaps_land_in_the_run_directory(tmp_path: Path) -> None:
     """The three figures chapter 3 cites have to come out of the EDA run itself.
 
@@ -201,26 +167,6 @@ def test_category_heatmaps_survive_a_panel_with_no_category_column(tmp_path: Pat
     render_category_seasonality_heatmaps(panel, tmp_path, min_observations=1)
 
     assert list(tmp_path.glob("category_seasonality_*.png")) == []
-
-
-def test_every_figure_the_thesis_includes_is_exported_by_the_eda_run() -> None:
-    """A figure in the memoria that the run does not export can only be refreshed by hand."""
-    from retail_forecasting.eda.figure_exports import MEMORIA_FIGURE_EXPORTS
-
-    chapter = Path("memoria/chapters/03_analisis_datos.tex")
-    if not chapter.exists():  # pragma: no cover - the thesis is not always checked out
-        pytest.skip("memoria not present")
-
-    included = {
-        line.split("figures/eda/")[1].split("}")[0]
-        for line in chapter.read_text(encoding="utf-8").splitlines()
-        if "figures/eda/" in line
-    }
-    exported = set(MEMORIA_FIGURE_EXPORTS)
-
-    assert not included - exported, (
-        f"en la memoria pero sin exportar: {sorted(included - exported)}"
-    )
 
 
 def _eda_settings(tmp_path: Path, top_n_series: int | None) -> object:

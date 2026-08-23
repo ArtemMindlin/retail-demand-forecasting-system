@@ -250,11 +250,6 @@ class ReportingConfig(BaseModel):
     output_dir: Path = Path("reports")
     run_name: str = "fresh_retailnet_v2"
     make_plots: bool = True
-    # Where the EDA copies the figures the thesis includes. Configurable and not hardcoded in
-    # `run_eda`, because a hardcoded path is one no caller can steer away: two tests that
-    # exercised `run_eda` overwrote the real thesis figures with plots of a 3-series synthetic
-    # panel, and those figures are gitignored, so there was nothing to restore them from.
-    memoria_dir: Path = Path("memoria")
 
     @field_validator("output_dir")
     @classmethod

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,7 +7,6 @@ import pandas as pd
 
 from retail_forecasting.config import Settings
 from retail_forecasting.data.dataset import load_prepared_panel
-from retail_forecasting.eda.figure_exports import MEMORIA_FIGURE_EXPORTS
 from retail_forecasting.eda.plots import render_eda_plots
 from retail_forecasting.eda.profiling import (
     build_correlation_summary,
@@ -74,7 +72,6 @@ def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
         artifacts=artifacts,
         output_dir=settings.reporting.output_dir,
         run_name=f"eda_{settings.reporting.run_name}",
-        memoria_dir=settings.reporting.memoria_dir,
     )
 
 
@@ -82,9 +79,8 @@ def write_eda_artifacts(
     artifacts: EdaArtifacts,
     output_dir: str | Path,
     run_name: str,
-    memoria_dir: str | Path | None = None,
 ) -> EdaArtifacts:
-    """Write the summary tables and the figures, and copy the thesis ones into memoria."""
+    """Write the summary tables and the figures into a fresh run directory."""
     run_dir = make_run_directory(output_dir, run_name)
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -111,27 +107,5 @@ def write_eda_artifacts(
         output_dir=run_dir,
     )
 
-    if memoria_dir is not None:
-        export_figures_to_memoria(
-            run_directory=run_dir,
-            memoria_dir=memoria_dir,
-        )
-
     artifacts.run_directory = run_dir
     return artifacts
-
-
-def export_figures_to_memoria(
-    run_directory: str | Path,
-    memoria_dir: str | Path,
-) -> None:
-    """Copy the figures the thesis includes into its tree."""
-    run_dir = Path(run_directory)
-    memoria_root = Path(memoria_dir)
-    target_dir = memoria_root / "figures" / "eda"
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    for filename in MEMORIA_FIGURE_EXPORTS:
-        source = run_dir / filename
-        if source.exists():
-            shutil.copy2(source, target_dir / filename)

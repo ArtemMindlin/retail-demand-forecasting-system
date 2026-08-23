@@ -2,8 +2,8 @@
 
 Kept out of ``plots.py`` because it is the only figure set here that reasons about product
 categories rather than series, and the only one that needs seaborn. It is called from
-``render_eda_plots`` like every other figure, so ``make eda`` produces it and
-``figure_exports`` carries it to the thesis.
+``render_eda_plots`` like every other figure, so ``make eda`` produces it into the run
+directory alongside the rest.
 """
 
 from __future__ import annotations
