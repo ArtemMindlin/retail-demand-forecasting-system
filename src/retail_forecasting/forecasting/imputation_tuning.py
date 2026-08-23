@@ -703,10 +703,10 @@ def tune_imputation_lgbm(
         beats_incumbent = bool(np.mean(tuned_maes - incumbent_maes) < 0.0)
         decisive = inc_hi < 0.0 or inc_lo > 0.0
         logger.info(
-            f"   challenger={best_mae_validation:.4f} vs incumbent="
-            f"{incumbent_mae_validation:.4f}, CI95 [{inc_lo:+.4f}, {inc_hi:+.4f}] "
-            f"({'decisive' if decisive else 'indistinguishable, decided on the mean'}) -> "
-            f"{'replaces it' if beats_incumbent else 'does NOT replace it'}"
+            f"   ganador={best_mae_validation:.4f} vs campeón="
+            f"{incumbent_mae_validation:.4f}, IC95 [{inc_lo:+.4f}, {inc_hi:+.4f}] "
+            f"({'decisivo' if decisive else 'indistinguible, decidido por la media'}) -> "
+            f"{'lo sustituye' if beats_incumbent else 'NO lo sustituye'}"
         )
 
     should_persist = beats_default and beats_incumbent is not False
