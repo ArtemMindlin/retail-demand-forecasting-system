@@ -4,23 +4,25 @@ from pathlib import Path
 
 from retail_forecasting.config import Settings
 from retail_forecasting.data.dataset import load_prepared_panel
-from retail_forecasting.eda.plots import render_eda_plots
 from retail_forecasting.eda.profiling import (
     build_correlation_summary,
     build_dataset_summary,
     build_missingness_summary,
     build_numeric_summary,
-    build_series_summary,
+    render_profiling_figures,
 )
+from retail_forecasting.eda.series import build_series_summary, render_series_figures
 from retail_forecasting.eda.stockout import (
     build_stockout_by_series_summary,
     build_stockout_demand_bands,
     build_stockout_summary,
+    render_stockout_figures,
 )
 from retail_forecasting.eda.temporal import (
     build_series_gap_summary,
     build_temporal_summary,
     build_weekday_summary,
+    render_temporal_figures,
 )
 from retail_forecasting.utils.io import make_run_directory
 
@@ -56,11 +58,10 @@ def run_eda(settings: Settings, split: str = "train") -> Path:
     for filename, frame in summaries.items():
         frame.to_csv(run_dir / filename, index=False)
 
-    render_eda_plots(
-        panel=panel,
-        weekday_summary=weekday_summary,
-        series_summary=series_summary,
-        stockout_demand_bands=stockout_demand_bands,
-        output_dir=run_dir,
-    )
+    # Each module draws its own figures from its own summaries, so a figure and the table
+    # beside it in the run directory come from one calculation rather than two.
+    render_profiling_figures(panel, run_dir)
+    render_series_figures(panel, series_summary, run_dir)
+    render_temporal_figures(panel, weekday_summary, series_summary, run_dir)
+    render_stockout_figures(panel, stockout_demand_bands, run_dir)
     return run_dir

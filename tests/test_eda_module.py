@@ -9,8 +9,8 @@ from retail_forecasting.eda.profiling import (
     build_dataset_summary,
     build_missingness_summary,
     build_numeric_summary,
-    build_series_summary,
 )
+from retail_forecasting.eda.series import build_series_summary
 from retail_forecasting.eda.stockout import (
     build_stockout_by_series_summary,
     build_stockout_demand_bands,
@@ -64,7 +64,7 @@ def test_category_heatmaps_land_in_the_run_directory(tmp_path: Path) -> None:
     They used to be produced by running a script by hand, so nothing tied them to the panel
     the rest of the report describes and they could go stale in silence.
     """
-    from retail_forecasting.eda.category_heatmap import render_category_seasonality_heatmaps
+    from retail_forecasting.eda.temporal import render_category_seasonality_heatmaps
 
     # Enough rows per category to clear the minimum, which is what the real panel has.
     panel = make_synthetic_panel(num_series=12, num_days=120)
@@ -82,7 +82,7 @@ def test_category_heatmaps_are_skipped_rather_than_invented_on_a_thin_panel(
     tmp_path: Path,
 ) -> None:
     """No category with enough observations means no figure, not a confident one from noise."""
-    from retail_forecasting.eda.category_heatmap import render_category_seasonality_heatmaps
+    from retail_forecasting.eda.temporal import render_category_seasonality_heatmaps
 
     panel = make_synthetic_panel(num_series=2, num_days=30)
     render_category_seasonality_heatmaps(panel, tmp_path, min_observations=10_000)
@@ -92,7 +92,7 @@ def test_category_heatmaps_are_skipped_rather_than_invented_on_a_thin_panel(
 
 def test_category_heatmaps_survive_a_panel_with_no_category_column(tmp_path: Path) -> None:
     """`third_category_id` is a static id column, not part of the canonical panel contract."""
-    from retail_forecasting.eda.category_heatmap import render_category_seasonality_heatmaps
+    from retail_forecasting.eda.temporal import render_category_seasonality_heatmaps
 
     panel = make_synthetic_panel(num_series=4, num_days=90).drop(columns=["third_category_id"])
     render_category_seasonality_heatmaps(panel, tmp_path, min_observations=1)

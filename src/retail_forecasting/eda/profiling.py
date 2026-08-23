@@ -1,5 +1,19 @@
+"""The panel as a whole: its shape, its gaps, its numeric columns and how they relate.
+
+Per-series profiling lives in `series.py`; this module answers questions about the panel,
+not about individual series.
+"""
+
 from __future__ import annotations
 
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 
@@ -55,33 +69,6 @@ def build_missingness_summary(panel: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def build_series_summary(panel: pd.DataFrame) -> pd.DataFrame:
-    """Summarize each series for ranking and inspection."""
-    series_summary = (
-        panel.groupby("series_id")
-        .agg(
-            start_date=("date", "min"),
-            end_date=("date", "max"),
-            history_days=("date", "nunique"),
-            observed_demand_sum=("observed_demand", "sum"),
-            observed_demand_mean=("observed_demand", "mean"),
-            observed_demand_std=("observed_demand", "std"),
-            zero_demand_rate=("observed_demand", lambda values: (values == 0).mean()),
-            stockout_day_rate=("stockout_hours", lambda values: (values > 0).mean()),
-            mean_stockout_hours=("stockout_hours", "mean"),
-        )
-        .reset_index()
-        .sort_values(
-            ["observed_demand_sum", "series_id"],
-            ascending=[False, True],
-        )
-        .reset_index(drop=True)
-    )
-
-    series_summary["observed_demand_std"] = series_summary["observed_demand_std"].fillna(0.0)
-    return series_summary
-
-
 def build_numeric_summary(panel: pd.DataFrame) -> pd.DataFrame:
     """Render descriptive statistics for numeric columns."""
     numeric_panel = panel.select_dtypes(include=["number"])
@@ -132,3 +119,158 @@ def build_correlation_summary(panel: pd.DataFrame) -> pd.DataFrame:
         ["absolute_correlation", "feature_name"],
         ascending=[False, True],
     ).reset_index(drop=True)
+
+
+_MEANINGFUL_NUMERIC = [
+    "observed_demand",
+    "stockout_hours",
+    "discount",
+    "holiday_flag",
+    "activity_flag",
+    "precpt",
+    "avg_temperature",
+    "avg_humidity",
+    "avg_wind_level",
+]
+
+
+def render_profiling_figures(panel: pd.DataFrame, output_dir: Path) -> None:
+    """Every figure about the panel as a whole rather than about its series."""
+    _plot_observed_demand_distribution(panel, output_dir / "observed_demand_distribution.png")
+    _plot_correlation_heatmap(panel, output_dir / "correlation_heatmap.png")
+    _plot_covariate_vs_demand_grid(panel, output_dir / "covariate_vs_demand_grid.png")
+
+
+def make_grid(
+    n_items: int,
+    n_cols: int,
+    width: float,
+    row_height: float,
+    sharex: bool = False,
+) -> tuple[plt.Figure, np.ndarray]:
+    """Create a grid of subplots sized for ``n_items`` and hide the unused cells.
+
+    Public and living here because `series.py` needs it too, and it is pure matplotlib layout
+    with no data semantics of its own -- so any module would be an arbitrary home. Here rather
+    than in a module of its own to avoid a file for fourteen lines.
+    """
+    n_rows = int(np.ceil(n_items / n_cols))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(width, row_height * n_rows), sharex=sharex)
+    axes_flat = np.atleast_1d(axes).flatten()
+    for axis in axes_flat[n_items:]:
+        axis.axis("off")
+    return fig, axes_flat
+
+
+def _plot_observed_demand_distribution(panel: pd.DataFrame, output_path: Path) -> None:
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+    axes[0].hist(
+        panel["observed_demand"],
+        bins=50,
+        color="#1f77b4",
+        edgecolor="white",
+    )
+    axes[0].set_xlabel("Observed demand")
+    axes[0].set_ylabel("Frequency")
+    axes[0].set_title("Observed demand distribution (linear scale)")
+
+    axes[1].hist(
+        panel["observed_demand"],
+        bins=50,
+        color="#1f77b4",
+        edgecolor="white",
+    )
+    axes[1].set_yscale("log")
+    axes[1].set_xlabel("Observed demand")
+    axes[1].set_ylabel("Frequency (log scale)")
+    axes[1].set_title("Observed demand distribution (log scale)")
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
+
+
+def _plot_correlation_heatmap(panel: pd.DataFrame, output_path: Path) -> None:
+    cols = [c for c in _MEANINGFUL_NUMERIC if c in panel.columns]
+    if not cols:
+        return
+
+    variable_numeric = panel[cols].dropna(how="all")
+    variable_numeric = variable_numeric.loc[:, variable_numeric.nunique(dropna=True) > 1]
+    if variable_numeric.empty:
+        return
+
+    correlation = variable_numeric.corr()
+    fig, ax = plt.subplots(figsize=(10, 8))
+    image = ax.imshow(
+        correlation.to_numpy(),
+        cmap="coolwarm",
+        vmin=-1,
+        vmax=1,
+        interpolation="nearest",
+    )
+    ax.set_xticks(np.arange(len(correlation.columns)))
+    ax.set_xticklabels(correlation.columns, rotation=45, ha="right")
+    ax.set_yticks(np.arange(len(correlation.index)))
+    ax.set_yticklabels(correlation.index)
+    ax.set_title("Correlation heatmap")
+    fig.colorbar(image, ax=ax, fraction=0.02, pad=0.02, label="Correlation")
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
+
+
+def _plot_covariate_vs_demand_grid(panel: pd.DataFrame, output_path: Path) -> None:
+    candidate_columns = [
+        "discount",
+        "avg_temperature",
+        "precpt",
+        "avg_humidity",
+        "avg_wind_level",
+    ]
+    columns = [c for c in candidate_columns if c in panel.columns]
+    if not columns:
+        return
+
+    n_bins = 20
+    n_cols = 3
+    fig, axes_flat = make_grid(len(columns), n_cols, width=14, row_height=4)
+
+    for axis, column in zip(axes_flat, columns, strict=False):
+        col_data = panel[[column, "observed_demand"]].dropna()
+        col_data = col_data[col_data[column] > col_data[column].quantile(0.01)]
+        col_data = col_data[col_data[column] < col_data[column].quantile(0.99)]
+
+        if col_data.empty or col_data[column].nunique() < 2:
+            axis.set_visible(False)
+            continue
+
+        col_data["_bin"] = pd.cut(col_data[column], bins=n_bins)
+        binned = (
+            col_data.groupby("_bin", observed=True)["observed_demand"]
+            .agg(mean="mean", sem=lambda x: x.std() / np.sqrt(len(x)))
+            .reset_index()
+        )
+        binned["x_mid"] = binned["_bin"].apply(lambda b: b.mid)
+
+        axis.fill_between(
+            binned["x_mid"],
+            binned["mean"] - 1.96 * binned["sem"],
+            binned["mean"] + 1.96 * binned["sem"],
+            alpha=0.25,
+            color="#1f77b4",
+            label="95% CI",
+        )
+        axis.plot(
+            binned["x_mid"], binned["mean"], color="#1f77b4", linewidth=2, label="Mean demand"
+        )
+        axis.set_xlabel(column)
+        axis.set_ylabel("Mean observed demand")
+        axis.set_title(f"{column} vs observed demand")
+        axis.legend(fontsize=8)
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
