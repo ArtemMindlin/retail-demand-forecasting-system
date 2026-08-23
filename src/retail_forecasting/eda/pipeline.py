@@ -36,9 +36,11 @@ def run_eda(settings: Settings, split: str = "train") -> Path:
         settings.reporting.output_dir, f"eda_{settings.reporting.run_name}"
     )
 
-    # These two are the ones the figures need as well as the CSVs, so they get a name.
+    # The summaries a figure draws as well as writes, so they get a name here and are handed
+    # to the renderer instead of being derived a second time inside it.
     series_summary = build_series_summary(panel)
     weekday_summary = build_weekday_summary(panel)
+    stockout_demand_bands = build_stockout_demand_bands(panel)
 
     summaries = {
         "dataset_summary.csv": build_dataset_summary(panel),
@@ -50,7 +52,7 @@ def run_eda(settings: Settings, split: str = "train") -> Path:
         "series_gap_summary.csv": build_series_gap_summary(panel),
         "stockout_summary.csv": build_stockout_summary(panel),
         "stockout_by_series_summary.csv": build_stockout_by_series_summary(panel),
-        "stockout_demand_bands.csv": build_stockout_demand_bands(panel),
+        "stockout_demand_bands.csv": stockout_demand_bands,
         "correlation_summary.csv": build_correlation_summary(panel),
     }
     for filename, frame in summaries.items():
@@ -60,6 +62,7 @@ def run_eda(settings: Settings, split: str = "train") -> Path:
         panel=panel,
         weekday_summary=weekday_summary,
         series_summary=series_summary,
+        stockout_demand_bands=stockout_demand_bands,
         output_dir=run_dir,
     )
     return run_dir

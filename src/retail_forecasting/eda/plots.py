@@ -22,9 +22,15 @@ def render_eda_plots(
     panel: pd.DataFrame,
     weekday_summary: pd.DataFrame,
     series_summary: pd.DataFrame,
+    stockout_demand_bands: pd.DataFrame,
     output_dir: str | Path,
 ) -> None:
-    """Render a comprehensive static plot set for EDA runs."""
+    """Render a comprehensive static plot set for EDA runs.
+
+    Every summary a figure DRAWS is passed in, never recomputed here: that is what makes each
+    figure a view of the table beside it in the run directory instead of a parallel
+    calculation that can disagree with it.
+    """
     target_dir = Path(output_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -59,7 +65,7 @@ def render_eda_plots(
         target_dir / "zero_demand_rate_by_series.png",
     )
     _plot_stockout_band_demand(
-        panel,
+        stockout_demand_bands,
         target_dir / "stockout_band_demand.png",
     )
     _plot_stockout_vs_demand_scatter(
@@ -320,24 +326,20 @@ def _plot_zero_demand_rate_by_series(
     plt.close(fig)
 
 
-def _plot_stockout_band_demand(panel: pd.DataFrame, output_path: Path) -> None:
-    stockout_band_frame = (
-        panel.assign(
-            stockout_band=pd.cut(
-                panel["stockout_hours"],
-                bins=[-0.01, 0.0, 2.0, 6.0, float("inf")],
-                labels=["0", "0-2", "3-6", "7+"],
-            )
-        )
-        .groupby("stockout_band", observed=False)["observed_demand"]
-        .agg(["mean", "median", "count"])
-        .reset_index()
-    )
+def _plot_stockout_band_demand(stockout_demand_bands: pd.DataFrame, output_path: Path) -> None:
+    """Draw the band summary rather than recomputing it.
+
+    The bands and their cut points used to be built a second time here, from the panel, with
+    the same `pd.cut` literal that `build_stockout_demand_bands` uses. Two derivations of one
+    statistic drift silently: move a cut point in one place and chapter 3 ends up with a
+    figure and a table that disagree, with nothing failing.
+    """
+    stockout_band_frame = stockout_demand_bands
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     axes[0].bar(
         stockout_band_frame["stockout_band"].astype(str),
-        stockout_band_frame["mean"],
+        stockout_band_frame["observed_demand_mean"],
         color="#ff7f0e",
     )
     axes[0].set_xlabel("Stockout band")
@@ -346,7 +348,7 @@ def _plot_stockout_band_demand(panel: pd.DataFrame, output_path: Path) -> None:
 
     axes[1].bar(
         stockout_band_frame["stockout_band"].astype(str),
-        stockout_band_frame["count"],
+        stockout_band_frame["observations"],
         color="#bcbd22",
     )
     axes[1].set_xlabel("Stockout band")
