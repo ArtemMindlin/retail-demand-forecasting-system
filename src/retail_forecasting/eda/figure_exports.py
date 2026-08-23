@@ -48,6 +48,20 @@ MEMORIA_FIGURE_EXPORTS: list[dict[str, str]] = [
         ),
     },
     {
+        "filename": "acf_demand.png",
+        "caption": (
+            "Función de autocorrelación (ACF) de la demanda diaria agregada. Los retardos "
+            "múltiplos de 7 aparecen destacados en rojo; la banda sombreada indica el "
+            "intervalo de confianza al 95\\%."
+        ),
+        "label": "fig:eda_acf_demand",
+        "interpretation": (
+            "Interpretación. Los picos en los retardos múltiplos de 7 superan el intervalo de "
+            "confianza con amplitud decreciente, lo que confirma una dependencia temporal de "
+            "periodo exactamente semanal y justifica los retardos estacionales de 7 días."
+        ),
+    },
+    {
         "filename": "zero_demand_rate_by_series.png",
         "caption": "Series más intermitentes según su proporción de demanda cero.",
         "label": "fig:eda_zero_demand_rate",
