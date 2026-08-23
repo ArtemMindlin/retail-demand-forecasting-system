@@ -109,14 +109,11 @@ def test_eda_plots_are_written_as_expected(tmp_path: Path) -> None:
         correlation_summary=build_correlation_summary(panel),
     )
 
-    from retail_forecasting.eda.plots import render_eda_plots
-
     written = write_eda_artifacts(
         artifacts=artifacts,
         output_dir=tmp_path,
         run_name="eda_plot_test",
         make_plots=True,
-        render_plots=render_eda_plots,
     )
 
     assert written.run_directory is not None
@@ -152,14 +149,11 @@ def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
         correlation_summary=build_correlation_summary(panel),
     )
 
-    from retail_forecasting.eda.plots import render_eda_plots
-
     write_eda_artifacts(
         artifacts=artifacts,
         output_dir=tmp_path,
         run_name="eda_memoria_test",
         make_plots=True,
-        render_plots=render_eda_plots,
         memoria_dir=memoria_dir,
     )
 

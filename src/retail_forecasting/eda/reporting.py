@@ -3,17 +3,17 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
 
 import pandas as pd
 
 from retail_forecasting.eda.figure_exports import MEMORIA_FIGURE_EXPORTS
+from retail_forecasting.eda.plots import render_eda_plots
 from retail_forecasting.utils.io import (
     dataframe_to_markdown,
     make_run_directory,
 )
 
-__all__ = ["MEMORIA_FIGURE_EXPORTS", "EdaArtifacts", "EdaPlotRenderer"]
+__all__ = ["MEMORIA_FIGURE_EXPORTS", "EdaArtifacts"]
 
 
 @dataclass
@@ -33,23 +33,11 @@ class EdaArtifacts:
     run_directory: Path | None = None
 
 
-class EdaPlotRenderer(Protocol):
-    def __call__(
-        self,
-        *,
-        panel: pd.DataFrame,
-        weekday_summary: pd.DataFrame,
-        series_summary: pd.DataFrame,
-        output_dir: Path,
-    ) -> None: ...
-
-
 def write_eda_artifacts(
     artifacts: EdaArtifacts,
     output_dir: str | Path,
     run_name: str,
     make_plots: bool,
-    render_plots: EdaPlotRenderer | None = None,
     memoria_dir: str | Path | None = None,
 ) -> EdaArtifacts:
     """Persist EDA summaries, plots, and a Markdown report."""
@@ -72,8 +60,8 @@ def write_eda_artifacts(
     for filename, frame in outputs.items():
         frame.to_csv(run_dir / filename, index=False)
 
-    if make_plots and render_plots is not None:
-        render_plots(
+    if make_plots:
+        render_eda_plots(
             panel=artifacts.panel,
             weekday_summary=artifacts.weekday_summary,
             series_summary=artifacts.series_summary,

@@ -4,7 +4,6 @@ from pathlib import Path
 
 from retail_forecasting.config import Settings
 from retail_forecasting.data.dataset import load_prepared_panel
-from retail_forecasting.eda.plots import render_eda_plots
 from retail_forecasting.eda.profiling import (
     build_correlation_summary,
     build_dataset_summary,
@@ -59,6 +58,5 @@ def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
         output_dir=settings.reporting.output_dir,
         run_name=f"eda_{settings.reporting.run_name}",
         make_plots=settings.reporting.make_plots,
-        render_plots=render_eda_plots,
         memoria_dir=Path("memoria"),
     )
