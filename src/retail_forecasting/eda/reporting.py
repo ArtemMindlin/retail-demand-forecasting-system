@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -20,7 +20,6 @@ __all__ = ["MEMORIA_FIGURE_EXPORTS", "EdaArtifacts", "EdaPlotRenderer"]
 class EdaArtifacts:
     panel: pd.DataFrame
     dataset_summary: pd.DataFrame
-    config_alignment_summary: pd.DataFrame
     missingness_summary: pd.DataFrame
     numeric_summary: pd.DataFrame
     series_summary: pd.DataFrame
@@ -31,7 +30,6 @@ class EdaArtifacts:
     stockout_by_series_summary: pd.DataFrame
     stockout_demand_bands: pd.DataFrame
     correlation_summary: pd.DataFrame
-    warnings: list[str] = field(default_factory=list)
     run_directory: Path | None = None
 
 
@@ -60,7 +58,6 @@ def write_eda_artifacts(
 
     outputs = {
         "dataset_summary.csv": artifacts.dataset_summary,
-        "config_alignment_summary.csv": artifacts.config_alignment_summary,
         "missingness_summary.csv": artifacts.missingness_summary,
         "numeric_summary.csv": artifacts.numeric_summary,
         "series_summary.csv": artifacts.series_summary,
@@ -104,18 +101,6 @@ def build_eda_report(artifacts: EdaArtifacts) -> str:
         "## Dataset Summary",
         "",
         dataframe_to_markdown(artifacts.dataset_summary),
-        "",
-        "## Configuration Alignment",
-        "",
-        dataframe_to_markdown(artifacts.config_alignment_summary),
-        "",
-        "## Alerts",
-        "",
-        *(
-            [f"- **ALERT**: {warning}" for warning in artifacts.warnings]
-            if artifacts.warnings
-            else ["- No configuration-alignment issues detected."]
-        ),
         "",
         "## Temporal Coverage",
         "",

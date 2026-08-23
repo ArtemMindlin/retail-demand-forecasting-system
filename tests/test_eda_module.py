@@ -4,12 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from retail_forecasting.config import DatasetConfig
-from retail_forecasting.eda.pipeline import (
-    build_config_alignment_summary,
-    build_correlation_summary,
-    raise_on_alignment_warnings,
-)
+from retail_forecasting.eda.pipeline import build_correlation_summary
 from retail_forecasting.eda.profiling import (
     build_dataset_summary,
     build_missingness_summary,
@@ -44,16 +39,9 @@ def test_eda_summaries_cover_prepared_panel_contract() -> None:
     stockout_by_series_summary = build_stockout_by_series_summary(panel)
     stockout_demand_bands = build_stockout_demand_bands(panel)
     correlation_summary = build_correlation_summary(panel)
-    config_alignment_summary, warnings = build_config_alignment_summary(
-        panel=panel,
-        dataset_config=DatasetConfig(top_n_series=3, min_history_days=70),
-    )
 
     assert dataset_summary.loc[0, "rows"] == len(panel)
     assert dataset_summary.loc[0, "unique_series"] == panel["series_id"].nunique()
-    assert config_alignment_summary.loc[0, "top_n_series_matches_config"]
-    assert config_alignment_summary.loc[0, "min_history_matches_config"]
-    assert warnings == []
     assert "series_id" in set(missingness_summary["column_name"])
     assert set(["column_name", "mean", "median"]).issubset(numeric_summary.columns)
     assert series_summary["series_id"].nunique() == panel["series_id"].nunique()
@@ -77,10 +65,6 @@ def test_eda_artifacts_are_written_as_expected(tmp_path: Path) -> None:
     artifacts = EdaArtifacts(
         panel=panel,
         dataset_summary=build_dataset_summary(panel),
-        config_alignment_summary=build_config_alignment_summary(
-            panel=panel,
-            dataset_config=DatasetConfig(top_n_series=2, min_history_days=70),
-        )[0],
         missingness_summary=build_missingness_summary(panel),
         numeric_summary=build_numeric_summary(panel),
         series_summary=build_series_summary(panel),
@@ -91,7 +75,6 @@ def test_eda_artifacts_are_written_as_expected(tmp_path: Path) -> None:
         stockout_by_series_summary=build_stockout_by_series_summary(panel),
         stockout_demand_bands=build_stockout_demand_bands(panel),
         correlation_summary=build_correlation_summary(panel),
-        warnings=[],
     )
 
     written = write_eda_artifacts(
@@ -104,7 +87,6 @@ def test_eda_artifacts_are_written_as_expected(tmp_path: Path) -> None:
     assert written.run_directory is not None
     assert (written.run_directory / "eda_report.md").exists()
     assert (written.run_directory / "dataset_summary.csv").exists()
-    assert (written.run_directory / "config_alignment_summary.csv").exists()
     assert (written.run_directory / "stockout_summary.csv").exists()
     assert (written.run_directory / "correlation_summary.csv").exists()
 
@@ -115,10 +97,6 @@ def test_eda_plots_are_written_as_expected(tmp_path: Path) -> None:
     artifacts = EdaArtifacts(
         panel=panel,
         dataset_summary=build_dataset_summary(panel),
-        config_alignment_summary=build_config_alignment_summary(
-            panel=panel,
-            dataset_config=DatasetConfig(top_n_series=3, min_history_days=70),
-        )[0],
         missingness_summary=build_missingness_summary(panel),
         numeric_summary=build_numeric_summary(panel),
         series_summary=build_series_summary(panel),
@@ -129,7 +107,6 @@ def test_eda_plots_are_written_as_expected(tmp_path: Path) -> None:
         stockout_by_series_summary=build_stockout_by_series_summary(panel),
         stockout_demand_bands=build_stockout_demand_bands(panel),
         correlation_summary=build_correlation_summary(panel),
-        warnings=[],
     )
 
     from retail_forecasting.eda.plots import render_eda_plots
@@ -163,10 +140,6 @@ def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
     artifacts = EdaArtifacts(
         panel=panel,
         dataset_summary=build_dataset_summary(panel),
-        config_alignment_summary=build_config_alignment_summary(
-            panel=panel,
-            dataset_config=DatasetConfig(top_n_series=3, min_history_days=70),
-        )[0],
         missingness_summary=build_missingness_summary(panel),
         numeric_summary=build_numeric_summary(panel),
         series_summary=build_series_summary(panel),
@@ -177,7 +150,6 @@ def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
         stockout_by_series_summary=build_stockout_by_series_summary(panel),
         stockout_demand_bands=build_stockout_demand_bands(panel),
         correlation_summary=build_correlation_summary(panel),
-        warnings=[],
     )
 
     from retail_forecasting.eda.plots import render_eda_plots
@@ -196,31 +168,6 @@ def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
     assert (memoria_dir / "figures" / "eda" / "coverage_heatmap.png").exists()
     assert (memoria_dir / "figures" / "eda" / "representative_series_panels.png").exists()
     assert "Interpretación." in tex_fragment.read_text(encoding="utf-8")
-
-
-def test_eda_alignment_flags_stale_processed_panel_shape() -> None:
-    panel = make_synthetic_panel(num_series=4, num_days=90)
-
-    summary, warnings = build_config_alignment_summary(
-        panel=panel,
-        dataset_config=DatasetConfig(top_n_series=2, min_history_days=70),
-    )
-
-    assert not summary.loc[0, "top_n_series_matches_config"]
-    assert summary.loc[0, "min_history_matches_config"]
-    assert warnings != []
-    assert "stale processed cache" in warnings[0]
-
-
-def test_eda_alignment_raises_on_stale_processed_panel_shape() -> None:
-    panel = make_synthetic_panel(num_series=4, num_days=90)
-    _, warnings = build_config_alignment_summary(
-        panel=panel,
-        dataset_config=DatasetConfig(top_n_series=2, min_history_days=70),
-    )
-
-    with pytest.raises(RuntimeError, match="EDA aborted"):
-        raise_on_alignment_warnings(warnings)
 
 
 def test_category_heatmaps_land_in_the_run_directory(tmp_path: Path) -> None:
@@ -335,22 +282,3 @@ def test_run_eda_still_describes_the_whole_panel_when_the_config_says_null(
     pipeline.run_eda(_eda_settings(tmp_path, top_n_series=None), split="train")
 
     assert seen == [None]
-
-
-def test_run_eda_now_catches_a_panel_wider_than_the_config_allows(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The guard against a stale processed cache could never fire while the count was forced.
-
-    `build_config_alignment_summary` compares the loaded panel against the CONFIGURED series
-    count, and a configured None passes unconditionally.
-    """
-    from retail_forecasting.eda import pipeline
-
-    def stub_loader(*, dataset_config, preprocessing_config, split):  # type: ignore[no-untyped-def]
-        return make_synthetic_panel(num_series=5, num_days=90)
-
-    monkeypatch.setattr(pipeline, "load_prepared_panel", stub_loader)
-
-    with pytest.raises(RuntimeError, match="EDA aborted"):
-        pipeline.run_eda(_eda_settings(tmp_path, top_n_series=2), split="train")

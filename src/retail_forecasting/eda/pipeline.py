@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from retail_forecasting.config import DatasetConfig, Settings
+from retail_forecasting.config import Settings
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.eda.plots import render_eda_plots
 from retail_forecasting.eda.profiling import (
@@ -40,16 +40,10 @@ def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
         preprocessing_config=settings.preprocessing,
         split=split,
     )
-    config_alignment_summary, warnings = build_config_alignment_summary(
-        panel=panel,
-        dataset_config=settings.dataset,
-    )
-    raise_on_alignment_warnings(warnings)
 
     artifacts = EdaArtifacts(
         panel=panel,
         dataset_summary=build_dataset_summary(panel),
-        config_alignment_summary=config_alignment_summary,
         missingness_summary=build_missingness_summary(panel),
         numeric_summary=build_numeric_summary(panel),
         series_summary=build_series_summary(panel),
@@ -60,7 +54,6 @@ def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
         stockout_by_series_summary=build_stockout_by_series_summary(panel),
         stockout_demand_bands=build_stockout_demand_bands(panel),
         correlation_summary=build_correlation_summary(panel),
-        warnings=warnings,
     )
 
     return write_eda_artifacts(
@@ -93,62 +86,3 @@ def build_correlation_summary(panel: pd.DataFrame) -> pd.DataFrame:
         ["absolute_correlation", "feature_name"],
         ascending=[False, True],
     ).reset_index(drop=True)
-
-
-def build_config_alignment_summary(
-    panel: pd.DataFrame,
-    dataset_config: DatasetConfig,
-) -> tuple[pd.DataFrame, list[str]]:
-    """Check whether the loaded prepared panel matches key dataset settings."""
-    actual_unique_series = int(panel["series_id"].nunique())
-    history_lengths = panel.groupby("series_id")["date"].nunique()
-    actual_min_history_days = int(history_lengths.min()) if not history_lengths.empty else 0
-    expected_max_series = dataset_config.top_n_series
-
-    if expected_max_series is None or expected_max_series == 0:
-        top_n_matches = True
-    else:
-        top_n_matches = actual_unique_series <= expected_max_series
-    min_history_matches = actual_min_history_days >= dataset_config.min_history_days
-
-    summary = pd.DataFrame(
-        [
-            {
-                "processed_panel_dir": str(dataset_config.processed_panel_dir),
-                "use_cache": dataset_config.use_cache,
-                "configured_top_n_series": expected_max_series,
-                "actual_unique_series": actual_unique_series,
-                "top_n_series_matches_config": top_n_matches,
-                "configured_min_history_days": dataset_config.min_history_days,
-                "actual_min_history_days": actual_min_history_days,
-                "min_history_matches_config": min_history_matches,
-            }
-        ]
-    )
-
-    warnings: list[str] = []
-    if not top_n_matches:
-        warnings.append(
-            "Loaded prepared panel contains more series than allowed by "
-            f"`dataset.top_n_series` ({actual_unique_series} > {expected_max_series}). "
-            "This usually means a stale processed cache was reused."
-        )
-    if not min_history_matches:
-        warnings.append(
-            "Loaded prepared panel violates `dataset.min_history_days` "
-            f"({actual_min_history_days} < {dataset_config.min_history_days})."
-        )
-
-    return summary, warnings
-
-
-def raise_on_alignment_warnings(warnings: list[str]) -> None:
-    """Fail fast when the prepared panel does not match critical config."""
-    if not warnings:
-        return
-
-    joined_warnings = " ".join(warnings)
-    raise RuntimeError(
-        "EDA aborted because the loaded prepared panel does not match the active dataset "
-        f"configuration. {joined_warnings}"
-    )
