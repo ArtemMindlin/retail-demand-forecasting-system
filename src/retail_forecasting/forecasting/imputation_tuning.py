@@ -28,7 +28,7 @@ from retail_forecasting.data.censorship import (
     synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel, panel_cache_filename
-from retail_forecasting.utils.logging import fields, get_logger, progress, rule, thousands
+from retail_forecasting.utils.logging import Table, fields, get_logger, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 logger = get_logger(__name__)
@@ -587,15 +587,31 @@ def tune_imputation_lgbm(
     if already_done:
         # The reference trials are only enqueued for a fresh study. Enqueueing them again on
         # every resume would re-measure two configurations the study already scored.
-        logger.info("  reanudando      %s trials ya en el estudio %s", already_done, study_name)
+        fields(logger, {"reanudando": f"{already_done} trials ya en el estudio {study_name}"})
     else:
         study.enqueue_trial(dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
-        logger.info("  referencia      defaults sin sintonizar, encolados como trial")
+        fields(logger, {"referencia": "defaults sin sintonizar, encolados como trial"})
         if incumbent_params is not None:
             study.enqueue_trial(dict(incumbent_params))
-            logger.info("  referencia      campeón en disco, encolado como trial")
+            fields(logger, {"referencia": "campeón en disco, encolado como trial"})
 
     started = time.monotonic()
+    # Widths chosen so the whole row fits a narrow terminal pane without wrapping, which is
+    # the only thing that actually separates one trial from the next.
+    table = Table(
+        logger,
+        {
+            "trial": len(f"{n_trials}/{n_trials}"),
+            "estado": 8,
+            "MAE": 6,
+            "mejor": 6,
+            "podados": 7,
+            "s/trial": 7,
+            "pasado": 6,
+            "queda": 6,
+        },
+    )
+    table.header()
 
     def report_progress(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
         # `trial.number` counts from the start of the study, resumed trials included, so it is
@@ -605,19 +621,17 @@ def tune_imputation_lgbm(
             return
         pruned = len(study.get_trials(deepcopy=False, states=(optuna.trial.TrialState.PRUNED,)))
         pace = _pace_seconds(study)
-        progress(
-            logger,
+        table.row(
             {
-                # Padded, or the columns shift the moment the counter gains a digit.
-                "trial": f"{done:>{len(str(n_trials))}}/{n_trials}",
-                "": f"{'podado' if trial.state is optuna.trial.TrialState.PRUNED else 'completo':8}",
-                "valor": "-" if trial.value is None else f"{trial.value:.4f}",
+                "trial": f"{done}/{n_trials}",
+                "estado": "podado" if trial.state is optuna.trial.TrialState.PRUNED else "completo",
+                "MAE": "-" if trial.value is None else f"{trial.value:.4f}",
                 "mejor": f"{study.best_value:.4f}",
-                "podados": f"{pruned:>3}",
-                "ritmo": "-" if pace is None else f"{pace:.0f}s/trial",
-                "transcurrido": _hhmm(time.monotonic() - started),
-                "restante": ("-" if pace is None else _hhmm(pace * max(n_trials - done, 0))),
-            },
+                "podados": pruned,
+                "s/trial": "-" if pace is None else f"{pace:.0f}",
+                "pasado": _hhmm(time.monotonic() - started),
+                "queda": "-" if pace is None else _hhmm(pace * max(n_trials - done, 0)),
+            }
         )
 
     study.optimize(objective, n_trials=trials_todo, callbacks=[report_progress])
@@ -748,19 +762,19 @@ def tune_imputation_lgbm(
         logger.info(
             "  NO persistido: la mejora %s, así que el pipeline sigue con los defaults", verdict
         )
-        logger.info("  decisión        %s", metadata_path)
+        fields(logger, {"decisión": metadata_path})
 
         if params_path.exists():
             params_path.unlink()
-            logger.info("  retirado        %s", params_path)
+            fields(logger, {"retirado": params_path})
     elif beats_incumbent is False:
         logger.info(
             "  NO persistido: bate a los defaults pero no al campeón en disco, que se mantiene"
         )
-        logger.info("  decisión        %s", metadata_path)
+        fields(logger, {"decisión": metadata_path})
     else:
         params_path.write_text(json.dumps(best_params.model_dump(), indent=2), encoding="utf-8")
-        logger.info("  persistido      %s", params_path)
+        fields(logger, {"persistido": params_path})
 
     # Everything this run produces is already on disk by now, and the caller is about to be
     # handed the path to it. A tracking store that is locked, missing or out of disk would

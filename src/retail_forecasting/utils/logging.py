@@ -10,9 +10,9 @@ reconfigure logging for Django, for the test suite or for a notebook, yet
 Library code only ever calls ``get_logger(__name__)`` and emits. ``configure()`` is called
 from the CLI entry point and nowhere else.
 
-The three helpers below exist so the shape of a run is the same whichever mode produced
-it: a rule with the title, aligned ``key   value`` lines for the setup, and a progress line
-whose columns line up from one call to the next.
+The helpers below exist so the shape of a run is the same whichever mode produced it: a
+rule with the title, aligned ``key   value`` lines for the setup, and a `Table` for the one
+line a long run repeats hundreds of times.
 """
 
 from __future__ import annotations
@@ -24,6 +24,10 @@ from collections.abc import Mapping
 _LIBRARY_ROOT = "retail_forecasting"
 _RULE_WIDTH = 74
 _FIELD_WIDTH = 16
+
+# Rows between one heading and the next. A long search is read as blocks, and a repeated
+# heading both breaks it into them and saves scrolling back up to name a column.
+_HEADER_EVERY_ROWS = 25
 
 _handler: logging.Handler | None = None
 
@@ -85,11 +89,45 @@ def fields(logger: logging.Logger, values: Mapping[str, object]) -> None:
         logger.info("  %-*s %s", _FIELD_WIDTH, key, value)
 
 
-def progress(logger: logging.Logger, values: Mapping[str, object]) -> None:
-    """One progress line, columns aligned across calls.
+class Table:
+    """Aligned columns for the line a run repeats, with the labels hoisted into a heading.
 
-    Deliberately a new line rather than a carriage return over the previous one: with
-    `logging` every call is its own record, and a long run is usually read afterwards in a
-    redirected file, where overwriting leaves the carriage returns behind.
+    Labelling every field on every row is right for a block read once and wrong for a line
+    logged three hundred times: at eight labelled fields the row runs past the width of a
+    terminal pane, and once it wraps, the second half of one row sits against the first half
+    of the next, so the reader loses the very row boundary the labels were meant to give.
+    Hoisting the labels buys back roughly a third of the width.
+
+    Rows are new lines rather than a carriage return over the previous one: with `logging`
+    every call is its own record, and a long run is usually read afterwards in a redirected
+    file, where overwriting leaves the carriage returns behind.
     """
-    logger.info("  " + "   ".join(f"{key} {value}" for key, value in values.items()))
+
+    _GAP = "  "
+
+    def __init__(self, logger: logging.Logger, columns: Mapping[str, int]) -> None:
+        self._logger = logger
+        self._columns = dict(columns)
+        self._rows = 0
+
+    def _heading(self) -> None:
+        heading = self._GAP.join(f"{name:>{width}}" for name, width in self._columns.items())
+        self._logger.info("")
+        self._logger.info("  %s", heading)
+        self._logger.info("  %s", "-" * len(heading))
+
+    def header(self) -> None:
+        """Open the table. Separate from `row` so the caller controls where it lands."""
+        self._heading()
+
+    def row(self, values: Mapping[str, object]) -> None:
+        """One row. A column with no value is left blank rather than shifting the rest."""
+        if self._rows and not self._rows % _HEADER_EVERY_ROWS:
+            self._heading()
+        self._logger.info(
+            "  %s",
+            self._GAP.join(
+                f"{str(values.get(name, '')):>{width}}" for name, width in self._columns.items()
+            ),
+        )
+        self._rows += 1
