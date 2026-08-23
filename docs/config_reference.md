@@ -812,7 +812,10 @@ reports/fresh_retailnet_v2_YYYYMMDD_HHMMSS/
 
 Si es `true`, genera plots estandar ademas de CSVs y `report.md`.
 
-Si es `false`, solo escribe artefactos tabulares y Markdown.
+Si es `false`, solo escribe artefactos tabulares.
+
+El modo `eda` no lo lee: sus figuras son el resultado, no un extra, asi que las
+escribe siempre. Por eso `configs/eda/default.yaml` no declara este campo.
 
 ## Reglas de validacion
 

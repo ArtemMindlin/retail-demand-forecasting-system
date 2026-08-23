@@ -55,6 +55,5 @@ def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
         artifacts=artifacts,
         output_dir=settings.reporting.output_dir,
         run_name=f"eda_{settings.reporting.run_name}",
-        make_plots=settings.reporting.make_plots,
         memoria_dir=settings.reporting.memoria_dir,
     )

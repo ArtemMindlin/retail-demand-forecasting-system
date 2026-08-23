@@ -81,7 +81,6 @@ def test_eda_artifacts_are_written_as_expected(tmp_path: Path) -> None:
         artifacts=artifacts,
         output_dir=tmp_path,
         run_name="eda_test",
-        make_plots=False,
     )
 
     assert written.run_directory is not None
@@ -112,7 +111,6 @@ def test_eda_plots_are_written_as_expected(tmp_path: Path) -> None:
         artifacts=artifacts,
         output_dir=tmp_path,
         run_name="eda_plot_test",
-        make_plots=True,
     )
 
     assert written.run_directory is not None
@@ -152,7 +150,6 @@ def test_eda_exports_selected_figures_to_memoria(tmp_path: Path) -> None:
         artifacts=artifacts,
         output_dir=tmp_path,
         run_name="eda_memoria_test",
-        make_plots=True,
         memoria_dir=memoria_dir,
     )
 

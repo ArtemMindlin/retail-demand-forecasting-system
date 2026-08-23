@@ -32,7 +32,6 @@ def write_eda_artifacts(
     artifacts: EdaArtifacts,
     output_dir: str | Path,
     run_name: str,
-    make_plots: bool,
     memoria_dir: str | Path | None = None,
 ) -> EdaArtifacts:
     """Write the summary tables and the figures, and copy the thesis ones into memoria."""
@@ -55,13 +54,16 @@ def write_eda_artifacts(
     for filename, frame in outputs.items():
         frame.to_csv(run_dir / filename, index=False)
 
-    if make_plots:
-        render_eda_plots(
-            panel=artifacts.panel,
-            weekday_summary=artifacts.weekday_summary,
-            series_summary=artifacts.series_summary,
-            output_dir=run_dir,
-        )
+    # Always, with no flag to turn it off: the figures ARE the EDA. A run that wrote the
+    # tables and no figures would look like a successful one while producing nothing the
+    # thesis or the dashboard can use, and the only caller that ever asked for it was a test
+    # saving three seconds.
+    render_eda_plots(
+        panel=artifacts.panel,
+        weekday_summary=artifacts.weekday_summary,
+        series_summary=artifacts.series_summary,
+        output_dir=run_dir,
+    )
 
     if memoria_dir is not None:
         export_figures_to_memoria(
