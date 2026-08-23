@@ -27,19 +27,23 @@ from retail_forecasting.eda.temporal import (
 
 
 def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
-    """Run EDA on the canonical prepared panel and persist artifacts."""
-    eda_dataset_config = settings.dataset.model_copy(
-        update={"top_n_series": None, "max_rows": None}
-    )
+    """Run EDA on the canonical prepared panel and persist artifacts.
+
+    The dataset config is honoured as written, `top_n_series` and `max_rows` included, so the
+    mode can describe either the whole panel or the exact subset a model trains on. Those two
+    used to be forced to None here, which cost more than it bought: the alignment guard below
+    exists to catch a stale processed cache, and it can only compare the panel against a
+    configured series count, so forcing that count to None left half of it unable to fire.
+    """
     panel = load_prepared_panel(
-        dataset_config=eda_dataset_config,
+        dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
         split=split,
     )
     panel = panel.sort_values(["series_id", "date"]).reset_index(drop=True)
     config_alignment_summary, warnings = build_config_alignment_summary(
         panel=panel,
-        dataset_config=eda_dataset_config,
+        dataset_config=settings.dataset,
     )
     raise_on_alignment_warnings(warnings)
 

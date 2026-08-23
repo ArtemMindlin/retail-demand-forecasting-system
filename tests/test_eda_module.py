@@ -283,3 +283,74 @@ def test_every_figure_the_thesis_includes_is_exported_by_the_eda_run() -> None:
     assert not included - exported, (
         f"en la memoria pero sin exportar: {sorted(included - exported)}"
     )
+
+
+def _eda_settings(tmp_path: Path, top_n_series: int | None) -> object:
+    """Settings for an EDA run whose panel comes from a stub, not from disk."""
+    from retail_forecasting.config import ReportingConfig, Settings
+
+    settings = Settings()
+    return settings.model_copy(
+        update={
+            "dataset": settings.dataset.model_copy(
+                update={"top_n_series": top_n_series, "min_history_days": 1}
+            ),
+            "reporting": ReportingConfig(output_dir=tmp_path, run_name="eda_test"),
+        }
+    )
+
+
+def test_run_eda_honours_the_series_count_the_config_asks_for(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`top_n_series` used to be forced to None here, so the config could not choose."""
+    from retail_forecasting.eda import pipeline
+
+    panel = make_synthetic_panel(num_series=3, num_days=90)
+    seen: list[int | None] = []
+
+    def stub_loader(*, dataset_config, preprocessing_config, split):  # type: ignore[no-untyped-def]
+        seen.append(dataset_config.top_n_series)
+        return panel
+
+    monkeypatch.setattr(pipeline, "load_prepared_panel", stub_loader)
+    pipeline.run_eda(_eda_settings(tmp_path, top_n_series=3), split="train")
+
+    assert seen == [3], "run_eda debe pasar la config tal cual, sin forzar top_n_series"
+
+
+def test_run_eda_still_describes_the_whole_panel_when_the_config_says_null(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The EDA config declares null, so the default behaviour is unchanged by the switch."""
+    from retail_forecasting.eda import pipeline
+
+    seen: list[int | None] = []
+
+    def stub_loader(*, dataset_config, preprocessing_config, split):  # type: ignore[no-untyped-def]
+        seen.append(dataset_config.top_n_series)
+        return make_synthetic_panel(num_series=3, num_days=90)
+
+    monkeypatch.setattr(pipeline, "load_prepared_panel", stub_loader)
+    pipeline.run_eda(_eda_settings(tmp_path, top_n_series=None), split="train")
+
+    assert seen == [None]
+
+
+def test_run_eda_now_catches_a_panel_wider_than_the_config_allows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The guard against a stale processed cache could never fire while the count was forced.
+
+    `build_config_alignment_summary` compares the loaded panel against the CONFIGURED series
+    count, and a configured None passes unconditionally.
+    """
+    from retail_forecasting.eda import pipeline
+
+    def stub_loader(*, dataset_config, preprocessing_config, split):  # type: ignore[no-untyped-def]
+        return make_synthetic_panel(num_series=5, num_days=90)
+
+    monkeypatch.setattr(pipeline, "load_prepared_panel", stub_loader)
+
+    with pytest.raises(RuntimeError, match="EDA aborted"):
+        pipeline.run_eda(_eda_settings(tmp_path, top_n_series=2), split="train")

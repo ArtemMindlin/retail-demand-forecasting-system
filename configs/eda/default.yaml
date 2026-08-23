@@ -1,8 +1,10 @@
 # Exploratory analysis of the prepared panel.
 #
-# `dataset.top_n_series` and `dataset.max_rows` are deliberately absent: `run_eda` forces both
-# to None so the analysis describes the WHOLE panel, not the subset a model trains on. Setting
-# them here would look like it narrowed the analysis and would do nothing.
+# `top_n_series: null` is what makes this describe the WHOLE panel rather than the subset a
+# model trains on, and it is declared rather than forced in code so the choice is visible in
+# the file that makes it. Set it to 50 or 500 to explore exactly the panel an experiment runs
+# on, which is a different and equally legitimate question: the figures in chapter 3 describe
+# the full dataset, and the results in chapter 6 come from a subset of it.
 project:
   random_seed: 42
   run_mode: eda
@@ -15,7 +17,9 @@ dataset:
   local_cache_dir: data/raw/fresh_retailnet
   processed_panel_dir: data/processed
   use_cache: true
+  top_n_series: null
   min_history_days: 70
+  max_rows: null
   horizon: 7
 
 preprocessing:
