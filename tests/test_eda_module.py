@@ -219,3 +219,11 @@ def test_a_run_records_what_it_analysed(tmp_path: Path, monkeypatch: pytest.Monk
     # whether the panel on disk is the panel the config wanted.
     assert metadata["configured_top_n_series"] is None
     assert metadata["imputation_strategy"] == "supervised"
+
+
+def test_an_unknown_split_says_so_instead_of_failing_in_the_loader(tmp_path: Path) -> None:
+    """`--split` cannot be validated by the CLI parser, which is built before the config."""
+    from retail_forecasting.eda import pipeline
+
+    with pytest.raises(ValueError, match="No hay un split llamado 'validacion'"):
+        pipeline.run_eda(_eda_settings(tmp_path, top_n_series=None), split="validacion")

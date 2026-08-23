@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -30,10 +31,17 @@ from retail_forecasting.eda.temporal import (
 )
 from retail_forecasting.tracking import log_eda_run_to_mlflow
 from retail_forecasting.utils.io import make_run_directory
-from retail_forecasting.utils.logging import get_logger
+from retail_forecasting.utils.logging import Table, fields, get_logger, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 logger = get_logger(__name__)
+
+
+def _elapsed(seconds: float) -> str:
+    """`45s` or `2m10s`, the precision a stage line needs."""
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    return f"{int(seconds // 60)}m{int(seconds % 60):02d}s"
 
 
 def build_run_metadata(
@@ -64,6 +72,17 @@ def build_run_metadata(
 
 def run_eda(settings: Settings, split: str = "train", config_path: Path | None = None) -> Path:
     """Read the panel, summarise it, draw it, and return the directory it all landed in."""
+    # Checked here rather than in the CLI parser, which is built before the config is read and
+    # so cannot know the valid names. An unchecked split failed deep inside the loader, with a
+    # message that never mentioned the flag that caused it.
+    if split not in settings.dataset.splits:
+        raise ValueError(
+            f"No hay un split llamado '{split}' en dataset.splits. "
+            f"Disponibles: {', '.join(sorted(settings.dataset.splits))}."
+        )
+
+    rule(logger, "análisis exploratorio del panel")
+    started = time.monotonic()
     panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
@@ -72,6 +91,29 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
     run_dir = make_run_directory(
         settings.reporting.output_dir, f"eda_{settings.reporting.run_name}"
     )
+    fields(
+        logger,
+        {
+            "panel": f"{thousands(panel['series_id'].nunique())} series, "
+            f"{thousands(len(panel))} filas",
+            "ventana": f"{panel['date'].min().date()} → {panel['date'].max().date()}",
+            "split": split,
+            "fuente": settings.dataset.processed_panel_dir
+            / panel_cache_filename(settings.dataset, split),
+            "carpeta": run_dir,
+        },
+    )
+
+    # One row per stage: on the full panel each of these is tens of seconds, and the mode used
+    # to say nothing at all until it was done.
+    # 18 is the width of the longest label, `figuras · stockout`: a value wider than its column
+    # pushes the rest of the row out of true, since Table pads but never truncates.
+    stages = Table(logger, {"etapa": 18, "salidas": 7, "tiempo": 6})
+    stages.header()
+
+    def done(stage: str, count: int, since: float) -> float:
+        stages.row({"etapa": stage, "salidas": count, "tiempo": _elapsed(time.monotonic() - since)})
+        return time.monotonic()
 
     series_summary = build_series_summary(panel)
     weekday_summary = build_weekday_summary(panel)
@@ -92,13 +134,26 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
     }
     for filename, frame in summaries.items():
         frame.to_csv(run_dir / filename, index=False)
+    mark = done("resúmenes", len(summaries), started)
 
     # Each module draws its own figures from its own summaries, so a figure and the table
     # beside it in the run directory come from one calculation rather than two.
-    render_profiling_figures(panel, run_dir)
-    render_series_figures(panel, series_summary, run_dir)
-    render_temporal_figures(panel, weekday_summary, series_summary, run_dir)
-    render_stockout_figures(panel, stockout_demand_bands, run_dir)
+    drawn = 0
+    for stage, render in (
+        ("panel", lambda: render_profiling_figures(panel, run_dir)),
+        ("series", lambda: render_series_figures(panel, series_summary, run_dir)),
+        (
+            "temporal",
+            lambda: render_temporal_figures(panel, weekday_summary, series_summary, run_dir),
+        ),
+        ("stockout", lambda: render_stockout_figures(panel, stockout_demand_bands, run_dir)),
+    ):
+        render()
+        # Counted off disk rather than assumed: a figure can decline to draw itself, as the
+        # category heatmaps do when no category clears the minimum observations.
+        total = len(list(run_dir.glob("*.png")))
+        mark = done(f"figuras · {stage}", total - drawn, mark)
+        drawn = total
 
     metadata = build_run_metadata(settings, panel, split, config_path)
     (run_dir / "eda_metadata.json").write_text(
@@ -117,4 +172,12 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
             exc,
             run_dir,
         )
+
+    fields(
+        logger,
+        {
+            "total": f"{drawn} figuras y {len(summaries)} tablas "
+            f"en {_elapsed(time.monotonic() - started)}"
+        },
+    )
     return run_dir

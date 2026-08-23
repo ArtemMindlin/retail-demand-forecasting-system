@@ -56,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--split",
         default="train",
-        help="Dataset split to analyze. Only the eda run mode reads it.",
+        help="Dataset split to analyze, validated against dataset.splits. Only eda reads it.",
     )
     return parser
 
