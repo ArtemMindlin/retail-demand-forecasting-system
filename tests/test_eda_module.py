@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from retail_forecasting.eda.pipeline import EdaArtifacts, write_eda_artifacts
 from retail_forecasting.eda.profiling import (
     build_correlation_summary,
     build_dataset_summary,
@@ -11,7 +12,6 @@ from retail_forecasting.eda.profiling import (
     build_numeric_summary,
     build_series_summary,
 )
-from retail_forecasting.eda.reporting import EdaArtifacts, write_eda_artifacts
 from retail_forecasting.eda.stockout import (
     build_stockout_by_series_summary,
     build_stockout_demand_bands,
