@@ -25,7 +25,12 @@ def make_run_directory(base_dir: str | Path, run_name: str) -> Path:
 
     Notes:
         The directory name includes a UTC timestamp to provide stable,
-        time-based uniqueness across runs.
+        time-based uniqueness across runs. That format is a shared convention and not a
+        detail of any one caller: `api.services.runs.list_eda_runs` sorts EDA runs by NAME,
+        so the lexicographic order of the timestamp is what makes newest-first work.
+
+        The directory is created here, so callers do not need to. Four of them used to call
+        `mkdir` again right after, which reads as if this function only computed a path.
     """
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     run_dir = Path(base_dir) / f"{run_name}_{timestamp}"

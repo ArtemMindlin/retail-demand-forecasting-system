@@ -82,7 +82,6 @@ def write_eda_artifacts(
 ) -> EdaArtifacts:
     """Write the summary tables and the figures into a fresh run directory."""
     run_dir = make_run_directory(output_dir, run_name)
-    run_dir.mkdir(parents=True, exist_ok=True)
 
     outputs = {
         "dataset_summary.csv": artifacts.dataset_summary,

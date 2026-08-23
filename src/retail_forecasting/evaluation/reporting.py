@@ -211,7 +211,6 @@ def _persist_experiment_artifacts(
 
 def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtifacts:
     run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
-    run_dir.mkdir(parents=True, exist_ok=True)
 
     reorder_recommendations = build_reorder_recommendations(artifacts, settings)
     exceptions = build_exceptions_frame(reorder_recommendations)

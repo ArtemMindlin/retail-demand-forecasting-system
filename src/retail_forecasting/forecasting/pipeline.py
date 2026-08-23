@@ -237,7 +237,6 @@ def run_imputation_comparison(settings: Settings) -> Path:
     )
 
     run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
-    run_dir.mkdir(parents=True, exist_ok=True)
     long_df.to_csv(run_dir / "latent_strategies.csv", index=False)
     quality_df.to_csv(run_dir / "imputation_quality.csv", index=False)
 
@@ -389,7 +388,6 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
     result.insert(2, "sampled_series", n_kept)
 
     run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
-    run_dir.mkdir(parents=True, exist_ok=True)
     out_path = run_dir / "fair_cost_backtest.csv"
     result.to_csv(out_path, index=False)
 
