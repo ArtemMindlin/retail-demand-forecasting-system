@@ -22,8 +22,10 @@ from retail_forecasting.forecasting.imputation_tuning import (
     _MLFLOW_EXPERIMENT,
     _PRUNING_BLOCK_DRAWS,
     _build_holdout_set,
+    _hhmm,
     _holdout_maes,
     _objective_mae,
+    _pace_seconds,
     _split_temporal_windows,
     tune_imputation_lgbm,
 )
@@ -990,3 +992,70 @@ def test_objective_stops_at_the_first_block_the_pruner_rejects(
 
     assert study.trials[0].state is optuna.trial.TrialState.PRUNED
     assert scored == [_PRUNING_BLOCK_DRAWS], "solo debe puntuarse el primer bloque"
+
+
+def _timed_trial(number: int, seconds: float) -> object:
+    """A finished trial that took `seconds`, which is all `_pace_seconds` reads off one."""
+    import datetime as dt
+
+    import optuna
+
+    start = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    return optuna.trial.FrozenTrial(
+        number=number,
+        state=optuna.trial.TrialState.COMPLETE,
+        value=0.5,
+        datetime_start=start,
+        datetime_complete=start + dt.timedelta(seconds=seconds),
+        params={},
+        distributions={},
+        user_attrs={},
+        system_attrs={},
+        intermediate_values={},
+        trial_id=number,
+    )
+
+
+class _StudyOfTrials:
+    """Just enough study for `_pace_seconds`, which only ever asks for the finished trials."""
+
+    def __init__(self, trials: list[object]) -> None:
+        self._trials = trials
+
+    def get_trials(self, deepcopy: bool = True, states: object = None) -> list[object]:
+        return self._trials
+
+
+def test_pace_ignores_the_startup_trials_it_cannot_extrapolate_from() -> None:
+    """The ETA must be read off the trials the sampler actually converged on.
+
+    The random startup draws are the cheap ones (1s against 61s over the first six of a real
+    search), so a rate that averages them in projects an ETA far below the truth.
+    """
+    from retail_forecasting.forecasting.imputation_tuning import _N_STARTUP_TRIALS
+
+    cheap = [_timed_trial(n, 1.0) for n in range(_N_STARTUP_TRIALS)]
+    dear = [_timed_trial(_N_STARTUP_TRIALS + n, 100.0) for n in range(2)]
+
+    # 100s, the pace of the two trials past startup -- not the 17.5s an average over all
+    # twelve would give, which would understate the remaining time by a factor of six.
+    assert _pace_seconds(_StudyOfTrials([*cheap, *dear])) == pytest.approx(100.0)
+
+
+def test_pace_falls_back_to_the_startup_trials_before_there_is_anything_better() -> None:
+    """Early in a search there are no post-startup trials, and the line still needs a number."""
+    import optuna
+
+    empty = optuna.create_study(direction="minimize")
+    assert _pace_seconds(empty) is None
+
+    empty.optimize(lambda trial: trial.suggest_float("x", 0.0, 1.0), n_trials=2)
+    assert _pace_seconds(empty) is not None
+
+
+def test_durations_below_a_minute_are_reported_in_seconds() -> None:
+    """A search whose trials cost seconds must not report `restante 0m` from start to finish."""
+    assert _hhmm(0.4) == "0s"
+    assert _hhmm(45.0) == "45s"
+    assert _hhmm(60.0) == "1m"
+    assert _hhmm(3600.0 + 120.0) == "1h02m"

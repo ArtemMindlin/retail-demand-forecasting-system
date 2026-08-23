@@ -197,10 +197,41 @@ def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np
 
 
 def _hhmm(seconds: float) -> str:
-    """Duration as ``1h52m`` or ``12m``, which is all the precision a progress line needs."""
+    """Duration as ``1h52m``, ``12m`` or ``45s``, all the precision a progress line needs.
+
+    Seconds below the minute and not just ``0m``: a trial here can cost one second, and a
+    search that reports ``restante 0m`` from start to finish reports nothing.
+    """
+    if seconds < 60:
+        return f"{int(seconds)}s"
     minutes = int(seconds // 60)
     hours, minutes = divmod(minutes, 60)
     return f"{hours}h{minutes:02d}m" if hours else f"{minutes}m"
+
+
+def _pace_seconds(study: optuna.Study) -> float | None:
+    """Seconds per trial, measured on the trials PAST the sampler's random startup.
+
+    The startup trials are drawn uniformly and are not representative of the pace: measured
+    across the first six, the cheapest cost 1s and the dearest 61s, and the GP then converges
+    on the expensive corner of the space, so a rate that includes them projects an ETA far
+    below the truth. Read from the durations the study itself stores rather than from this
+    process's clock, so the pace survives a resume. None until there is anything to measure.
+    """
+    all_seconds: list[float] = []
+    past_startup: list[float] = []
+    for trial in study.get_trials(deepcopy=False, states=_FINISHED_STATES):
+        if trial.duration is None:
+            continue
+        seconds = trial.duration.total_seconds()
+        all_seconds.append(seconds)
+        if trial.number >= _N_STARTUP_TRIALS:
+            past_startup.append(seconds)
+
+    timed = past_startup or all_seconds
+    if not timed:
+        return None
+    return sum(timed) / len(timed)
 
 
 def _objective_mae(
@@ -572,21 +603,20 @@ def tune_imputation_lgbm(
         done = trial.number + 1
         if done % _PROGRESS_EVERY_TRIALS and done != n_trials:
             return
-        this_run = done - already_done
         pruned = len(study.get_trials(deepcopy=False, states=(optuna.trial.TrialState.PRUNED,)))
-        elapsed = time.monotonic() - started
-        # Rate from THIS run's trials only: the resumed ones were not timed here.
-        remaining = elapsed / max(this_run, 1) * max(n_trials - done, 0)
+        pace = _pace_seconds(study)
         progress(
             logger,
             {
-                "trial": f"{done}/{n_trials}",
+                # Padded, or the columns shift the moment the counter gains a digit.
+                "trial": f"{done:>{len(str(n_trials))}}/{n_trials}",
                 "": f"{'podado' if trial.state is optuna.trial.TrialState.PRUNED else 'completo':8}",
                 "valor": "-" if trial.value is None else f"{trial.value:.4f}",
                 "mejor": f"{study.best_value:.4f}",
-                "podados": f"{pruned}",
-                "transcurrido": _hhmm(elapsed),
-                "restante": _hhmm(remaining),
+                "podados": f"{pruned:>3}",
+                "ritmo": "-" if pace is None else f"{pace:.0f}s/trial",
+                "transcurrido": _hhmm(time.monotonic() - started),
+                "restante": ("-" if pace is None else _hhmm(pace * max(n_trials - done, 0))),
             },
         )
 
@@ -707,9 +737,16 @@ def tune_imputation_lgbm(
     )
 
     if not beats_default:
+        # Two different failures share this gate, and calling both of them a tie misreports
+        # one: a CI that straddles zero is a coin flip, but a CI entirely above it means the
+        # winner is measurably WORSE than the defaults it was supposed to beat.
+        verdict = (
+            "es peor que los defaults, y el intervalo no toca el cero"
+            if ci_lo > 0
+            else "no se distingue de cero en las extracciones de validación"
+        )
         logger.info(
-            "  NO persistido: la mejora no se distingue de cero en las extracciones de "
-            "validación, así que el pipeline sigue con los defaults"
+            "  NO persistido: la mejora %s, así que el pipeline sigue con los defaults", verdict
         )
         logger.info("  decisión        %s", metadata_path)
 
