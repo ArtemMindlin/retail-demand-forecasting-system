@@ -18,6 +18,9 @@ from retail_forecasting.forecasting.pipeline import (
 )
 from retail_forecasting.simulation import run_operational_simulation
 from retail_forecasting.utils.logging import configure as configure_logging
+from retail_forecasting.utils.logging import fields, get_logger
+
+logger = get_logger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -101,18 +104,18 @@ def main() -> None:
     mode = settings.project.run_mode
     if mode == "experiment" and settings.preprocessing.compare_imputation:
         run_dir = run_imputation_comparison(settings)
-        print(f"Imputation comparison written to: {run_dir / 'latent_strategies.csv'}")
+        fields(logger, {"escrito": run_dir / "latent_strategies.csv"})
         return
     if mode == "retrain":
         run_retrain(settings)
         return
     if mode == "simulate_ops":
         sim_artifacts = run_operational_simulation(settings)
-        print(f"Simulation outputs written to: {sim_artifacts.run_directory}")
+        fields(logger, {"escrito": sim_artifacts.run_directory})
         return
     if mode == "fair_cost_backtest":
         run_dir = run_fair_cost_backtest(settings)
-        print(f"Fair-cost backtest written to: {run_dir / 'fair_cost_backtest.csv'}")
+        fields(logger, {"escrito": run_dir / "fair_cost_backtest.csv"})
         return
     if mode == "tune_imputation":
         # Imported here, not at module scope: `imputation_tuning` pulls in mlflow and (through
@@ -121,24 +124,21 @@ def main() -> None:
         from retail_forecasting.forecasting.imputation_tuning import tune_imputation_lgbm
 
         params_path = tune_imputation_lgbm(settings, config_path=Path(args.config))
-        print(f"Imputation tuning written to: {params_path}")
+        fields(logger, {"escrito": params_path})
         return
     if mode == "eda":
         eda_artifacts = run_eda(settings, split=args.split)
         assert eda_artifacts.run_directory is not None
-        print(f"EDA report written to: {eda_artifacts.run_directory / 'eda_report.md'}")
+        fields(logger, {"escrito": eda_artifacts.run_directory / "eda_report.md"})
         return
     if mode == "score_daily":
         artifacts = run_scoring(settings)
         assert artifacts.run_directory is not None
-        print(
-            "Operational outputs written to: "
-            f"{artifacts.run_directory / 'reorder_recommendations.csv'}"
-        )
+        fields(logger, {"escrito": artifacts.run_directory / "reorder_recommendations.csv"})
     else:
         artifacts = run_experiment(settings)
         assert artifacts.run_directory is not None
-        print(f"Report written to: {artifacts.run_directory / 'report.md'}")
+        fields(logger, {"escrito": artifacts.run_directory / "report.md"})
 
 
 def _format_validation_error(exc: ValidationError) -> str:

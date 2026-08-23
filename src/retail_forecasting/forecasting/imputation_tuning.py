@@ -67,22 +67,35 @@ _MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 # distribution for.
 _INT_BOUNDS: dict[str, tuple[int, int]] = {
     "n_estimators": (50, 3000),
-    # Lower bounds pulled up to where the six searches of reports/sampler_ab agreed: every
-    # winner sat at max_depth 10-11 with colsample 0.55-0.66 and subsample 0.93-1.0. They stop
-    # at the untuned defaults (max_depth 6, colsample 1.0) rather than at the winners' range,
-    # because the defaults have to stay expressible: they are enqueued as a reference trial and
-    # pinned by `test_the_untuned_defaults_sit_inside_the_search_space`.
+    # Lower bound pulled up to where the six searches of reports/sampler_ab agreed, every
+    # winner sitting at 10-11. It stops at the untuned defaults rather than at the winners'
+    # range because the defaults have to stay expressible: they are enqueued as a reference
+    # trial and pinned by `test_the_untuned_defaults_sit_inside_the_search_space`. The 300-trial
+    # winner picked 8, inside the range, so the floor is not binding.
     "max_depth": (6, 12),
+    # The ceiling is not reachable and does not need raising: `max_depth` caps a tree at
+    # 2**depth leaves, so at the winner's depth of 8 anything above 256 is the same tree. The
+    # 300-trial winner landing on 1024 is a flat region, not a truncated one.
     "num_leaves": (2, 1024),
-    "min_child_samples": (2, 100),
-    "min_data_per_group": (1, 100),
+    # Floor at 1, LightGBM's own minimum: the 300-trial winner sat on the old floor of 2.
+    "min_child_samples": (1, 100),
+    # Ceiling raised from 100, which is LightGBM's default and where the 300-trial winner
+    # landed: a range whose top is the default cannot say whether more smoothing would help.
+    "min_data_per_group": (1, 500),
     "max_bin": (8, 255),
 }
 
 _FLOAT_BOUNDS: dict[str, tuple[float, float]] = {
+    # The 300-trial winner sat at 1.0, which is a fraction of rows and so the definitional
+    # maximum rather than a wall this range put there. Nothing outside to reach, and the floor
+    # is not binding, so it stays where reports/sampler_ab's winners put it.
     "subsample": (0.85, 1.0),
     "learning_rate": (0.005, 0.3),
-    "colsample_bytree": (0.5, 1.0),
+    # Widened BELOW the 0.3 it started at, because the 300-trial winner landed exactly on the
+    # 0.5 floor a narrowing had raised it to. That narrowing was justified by the winners of
+    # reports/sampler_ab, which ran under the starved-teacher regime b7900cb replaced, so its
+    # evidence no longer applies to this objective.
+    "colsample_bytree": (0.1, 1.0),
     "reg_alpha": (1e-8, 100.0),
     "reg_lambda": (1e-8, 100.0),
     "cat_smooth": (0.0, 50.0),
