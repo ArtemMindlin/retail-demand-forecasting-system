@@ -282,7 +282,7 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
     # run. Imported here rather than at module scope so mlflow, an optional `ml` extra, is not
     # required to import the reporting layer.
     try:
-        from retail_forecasting.evaluation.tracking import log_run_to_mlflow
+        from retail_forecasting.tracking import log_run_to_mlflow
 
         log_run_to_mlflow(artifacts=artifacts, settings=settings, run_dir=run_dir)
     except Exception as exc:  # noqa: BLE001 - see above

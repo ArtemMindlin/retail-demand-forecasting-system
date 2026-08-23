@@ -28,7 +28,7 @@ from retail_forecasting.data.censorship import (
     synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel, panel_cache_filename
-from retail_forecasting.evaluation.tracking import MLFLOW_TRACKING_URI
+from retail_forecasting.tracking import MLFLOW_TRACKING_URI
 from retail_forecasting.utils.logging import Table, fields, get_logger, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 

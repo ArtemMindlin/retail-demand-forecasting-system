@@ -13,8 +13,8 @@ ALLOWED_LAYER_IMPORTS = {
     "contracts": set(),
     "data": {"config", "contracts", "utils"},
     "drift": {"contracts"},
-    "eda": {"config", "contracts", "data", "eda", "utils"},
-    "evaluation": {"config", "contracts", "drift", "utils", "visualization"},
+    "eda": {"config", "contracts", "data", "eda", "tracking", "utils"},
+    "evaluation": {"config", "contracts", "drift", "tracking", "utils", "visualization"},
     "features": {"config", "contracts"},
     "forecasting": {
         "config",
@@ -26,11 +26,15 @@ ALLOWED_LAYER_IMPORTS = {
         "forecasting",
         "inventory",
         "models",
+        "tracking",
         "utils",
     },
     "inventory": {"config"},
     "models": {"config", "contracts", "utils"},
     "run": {"config", "contracts", "eda", "forecasting", "simulation", "utils"},
+    # Cross-cutting: every mode records itself, so this cannot live inside any one of them.
+    # It was born in `evaluation` and the EDA could not reach it from there.
+    "tracking": {"config", "contracts", "utils"},
     "simulation": {
         "config",
         "data",

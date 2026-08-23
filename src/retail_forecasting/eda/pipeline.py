@@ -28,8 +28,12 @@ from retail_forecasting.eda.temporal import (
     build_weekday_summary,
     render_temporal_figures,
 )
+from retail_forecasting.tracking import log_eda_run_to_mlflow
 from retail_forecasting.utils.io import make_run_directory
+from retail_forecasting.utils.logging import get_logger
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
+
+logger = get_logger(__name__)
 
 
 def build_run_metadata(
@@ -100,4 +104,17 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
     (run_dir / "eda_metadata.json").write_text(
         json.dumps(metadata.model_dump(), indent=2), encoding="utf-8"
     )
+
+    # Everything above is on disk by now, so a tracking store that is locked or missing costs
+    # the record and not the run. Same guard, and same reason, as the experiment path.
+    try:
+        log_eda_run_to_mlflow(metadata=metadata, run_dir=run_dir)
+    except Exception as exc:  # noqa: BLE001 - see above
+        logger.warning(
+            "el registro en MLflow falló y la corrida no se ve afectada: %s: %s. "
+            "Todo lo que produjo está en %s",
+            type(exc).__name__,
+            exc,
+            run_dir,
+        )
     return run_dir

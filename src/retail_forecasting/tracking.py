@@ -1,4 +1,9 @@
-"""MLflow tracking for experiment runs, alongside the artifacts written under ``reports/``.
+"""MLflow tracking for every run mode, alongside the artifacts written under ``reports/``.
+
+Its own layer and not part of `evaluation`, where it started: recording a run is something
+every mode does, and `eda` is forbidden from importing `evaluation` -- correctly, since the
+EDA has nothing to do with summarising predictions and costs. A cross-cutting concern parked
+inside one consumer is one the others cannot reach.
 
 What goes here and what stays a file is a size question, not a taste one. Metrics, parameters
 and decisions are aggregates -- a few numbers each -- and they are what `mlflow.search_runs`
@@ -14,22 +19,44 @@ called, and half an hour of forecasting is not worth losing to a locked tracking
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol
 
 import mlflow
 import pandas as pd
+from pydantic import BaseModel
 
 from retail_forecasting.config import Settings, build_config_hash
 from retail_forecasting.utils.provenance import get_git_commit
 
-if TYPE_CHECKING:  # pragma: no cover - import cycle at runtime, types only
-    from retail_forecasting.evaluation.reporting import RunArtifacts
+
+class LoggableRun(Protocol):
+    """What this module needs off a finished run, named here rather than imported.
+
+    `evaluation.RunArtifacts` satisfies it, but importing that class would invert the layers:
+    recording a run is a concern of every mode, so it cannot depend on the one that summarises
+    predictions and costs. Structural typing lets this state its requirement instead of
+    borrowing a class, and the list doubles as the record of what actually reaches MLflow.
+    """
+
+    prepared_panel: pd.DataFrame
+    supervised_frame: pd.DataFrame
+    metrics_summary: pd.DataFrame
+    cost_summary: pd.DataFrame
+    promotion_decision: Any
+    data_quality_report: Any
+    backtest_metadata: Any
+    drifts: list[Any]
+
 
 # Same store the imputation search writes to, so every run of every mode is comparable in one
 # UI. Module-level and not a literal at the call site: the tests point it at a scratch path.
 MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 
 EXPERIMENT_RUNS = "retail_forecasting_runs"
+
+# The EDA gets its own experiment rather than sharing the one above: it logs no metrics at all,
+# and metric-less runs beside metric-heavy ones make one sparse, unreadable table in the UI.
+EXPERIMENT_EDA = "retail_forecasting_eda"
 
 # Columns of `metrics_summary` and `cost_summary` that name the row rather than measure it.
 # They become part of each metric's name instead of a metric of their own.
@@ -89,13 +116,17 @@ def _flat_params(settings: Settings) -> dict[str, Any]:
     return params
 
 
-def log_run_to_mlflow(artifacts: RunArtifacts, settings: Settings, run_dir: Path) -> None:
-    """Record one finished experiment run: its config, its metrics and its decisions."""
+def _open_experiment(name: str) -> None:
+    """Point MLflow at the store and make sure `name` exists with the right artifact root."""
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    root = _artifact_root(MLFLOW_TRACKING_URI)
-    if mlflow.get_experiment_by_name(EXPERIMENT_RUNS) is None:
-        mlflow.create_experiment(EXPERIMENT_RUNS, artifact_location=root)
-    mlflow.set_experiment(EXPERIMENT_RUNS)
+    if mlflow.get_experiment_by_name(name) is None:
+        mlflow.create_experiment(name, artifact_location=_artifact_root(MLFLOW_TRACKING_URI))
+    mlflow.set_experiment(name)
+
+
+def log_run_to_mlflow(artifacts: LoggableRun, settings: Settings, run_dir: Path) -> None:
+    """Record one finished experiment run: its config, its metrics and its decisions."""
+    _open_experiment(EXPERIMENT_RUNS)
 
     with mlflow.start_run(run_name=run_dir.name):
         mlflow.log_params(_flat_params(settings))
@@ -137,3 +168,21 @@ def log_run_to_mlflow(artifacts: RunArtifacts, settings: Settings, run_dir: Path
 
         for figure in sorted(run_dir.glob("*.png")):
             mlflow.log_artifact(str(figure), artifact_path="figures")
+
+
+def log_eda_run_to_mlflow(metadata: BaseModel, run_dir: Path) -> None:
+    """Index one EDA run, so its runs are searchable the way every other mode's are.
+
+    Everything it records is already in `eda_metadata.json` beside the figures. The duplication
+    is deliberate and the two answer different questions: the file makes a directory
+    self-describing ("what is this?"), and this makes the set of them searchable ("which run
+    was it?"). Neither substitutes for the other.
+    """
+    _open_experiment(EXPERIMENT_EDA)
+
+    fields = metadata.model_dump()
+    with mlflow.start_run(run_name=run_dir.name):
+        # Params rather than metrics because the EDA measures nothing it could compare: the
+        # panel's shape is what identifies a run here, not a score.
+        mlflow.log_params({key: value for key, value in fields.items() if value is not None})
+        mlflow.set_tags({"run_mode": "eda", "reports_run_dir": str(run_dir)})

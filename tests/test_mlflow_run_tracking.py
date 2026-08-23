@@ -8,8 +8,8 @@ import mlflow
 import pandas as pd
 import pytest
 
+from retail_forecasting import tracking
 from retail_forecasting.config import ReportingConfig, Settings
-from retail_forecasting.evaluation import tracking
 from retail_forecasting.evaluation.reporting import RunArtifacts
 
 

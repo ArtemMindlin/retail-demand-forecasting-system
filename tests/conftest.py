@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from retail_forecasting import tracking
 from retail_forecasting.contracts.contracts_config import ModelConfig
-from retail_forecasting.evaluation import tracking
 
 # Configure Django before any test imports a view or the ORM-free settings.
 # Values here are test-only: a throwaway password and non-secure cookies so the
