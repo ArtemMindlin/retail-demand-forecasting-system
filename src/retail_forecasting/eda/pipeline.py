@@ -40,7 +40,6 @@ def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
         preprocessing_config=settings.preprocessing,
         split=split,
     )
-    panel = panel.sort_values(["series_id", "date"]).reset_index(drop=True)
     config_alignment_summary, warnings = build_config_alignment_summary(
         panel=panel,
         dataset_config=settings.dataset,

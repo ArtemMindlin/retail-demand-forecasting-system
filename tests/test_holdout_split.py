@@ -14,7 +14,11 @@ import pandas as pd
 import pytest
 
 from retail_forecasting.config import DatasetConfig, PreprocessingConfig, ReportingConfig, Settings
-from retail_forecasting.data.dataset import load_prepared_panel, prepare_daily_panel
+from retail_forecasting.data.dataset import (
+    load_prepared_panel,
+    panel_cache_filename,
+    prepare_daily_panel,
+)
 from retail_forecasting.forecasting.pipeline import run_experiment_from_frame
 from tests import make_synthetic_panel
 
@@ -153,7 +157,6 @@ def test_eval_split_raises_when_it_shares_no_series_with_train(tmp_path: Path) -
 
 def test_an_empty_cached_holdout_is_rebuilt_rather_than_served(tmp_path: Path) -> None:
     """Stale empty caches are the artifact of the bug, so they must not survive the fix."""
-    from retail_forecasting.data.dataset import panel_cache_filename
 
     config = _write_raw_splits(tmp_path, eval_series=[(1, 101), (2, 102), (3, 103)])
     preprocessing = PreprocessingConfig()
@@ -194,3 +197,26 @@ def test_no_holdout_requested_is_not_an_error(tmp_path: Path) -> None:
     artifacts = run_experiment_from_frame(panel, settings, holdout_panel=None, save_artifacts=False)
 
     assert not artifacts.predictions.empty
+
+
+def test_a_cached_panel_comes_back_in_canonical_order(tmp_path: Path) -> None:
+    """The cache path returned the parquet's own order, and callers re-sorted to make up for it.
+
+    Row order is a documented property of the prepared panel, so the loader owns it on every
+    path rather than leaving it to whoever wrote the file. The OPS plane writes its split
+    directly under the cache name, which is exactly a path that never went through the
+    rebuilding code.
+    """
+    config = _write_raw_splits(tmp_path, eval_series=[(1, 101), (2, 102)])
+    preprocessing = PreprocessingConfig()
+
+    panel = load_prepared_panel(config, preprocessing, split="train")
+    target = config.processed_panel_dir / panel_cache_filename(config, "train")
+    shuffled = panel.sample(frac=1.0, random_state=0)
+    shuffled.to_parquet(target, index=False)
+    assert not shuffled["series_id"].is_monotonic_increasing, "el fixture debe estar desordenado"
+
+    reloaded = load_prepared_panel(config, preprocessing, split="train")
+
+    expected = panel.sort_values(["series_id", "date"]).reset_index(drop=True)
+    pd.testing.assert_frame_equal(reloaded, expected)

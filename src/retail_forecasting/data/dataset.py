@@ -199,6 +199,18 @@ def _panel_cache_key(dataset_config: DatasetConfig) -> str:
     return hashlib.sha1(repr(shape).encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
 
 
+def _sorted_panel(panel: pd.DataFrame) -> pd.DataFrame:
+    """The canonical row order, applied on every path out of ``load_prepared_panel``.
+
+    Ordering used to be inherited rather than guaranteed: ``prepare_daily_panel`` sorts, and
+    the filters after it preserve that order, so the rebuild path came out sorted by accident
+    of construction while the cache path returned whatever order the parquet happened to hold.
+    Callers made up the difference by re-sorting, which is the shape of an assumption nobody
+    owns. Cheap enough not to think about: 4ms against the 4ms the read itself costs.
+    """
+    return panel.sort_values(["series_id", "date"]).reset_index(drop=True)
+
+
 def load_prepared_panel(
     dataset_config: DatasetConfig,
     preprocessing_config: PreprocessingConfig,
@@ -217,7 +229,7 @@ def load_prepared_panel(
         split: Dataset split to materialize.
 
     Returns:
-        The processed panel as a DataFrame.
+        The processed panel as a DataFrame, sorted by ``series_id`` then ``date``.
 
     Raises:
         ValueError: If a non-train split prepares to zero rows. Silently returning an empty
@@ -234,7 +246,7 @@ def load_prepared_panel(
         # the fix applies without invalidating the cache key -- bumping the key would orphan the
         # pre-built OPS split, whose `.built` sentinel would stop `make simulate` regenerating it.
         if split == "train" or not cached.empty:
-            return cached
+            return _sorted_panel(cached)
 
     restrict_to_series: set[str] | None = None
     if split != "train":
@@ -262,4 +274,4 @@ def load_prepared_panel(
         )
 
     panel.to_parquet(target_path, index=False)
-    return panel
+    return _sorted_panel(panel)

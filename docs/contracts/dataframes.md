@@ -68,7 +68,7 @@ Required columns:
 Expected properties:
 
 - one row per `series_id` and `date`
-- sorted by `series_id`, then `date` before temporal feature construction
+- sorted by `series_id`, then `date` — guaranteed by `load_prepared_panel` on every path, cache included, so callers never have to re-establish it
 - no negative `observed_demand` when `drop_negative_sales = true`
 - only series with at least `dataset.min_history_days` unique dates
 
