@@ -10,8 +10,6 @@ from retail_forecasting.eda.figure_exports import MEMORIA_FIGURE_EXPORTS
 from retail_forecasting.eda.plots import render_eda_plots
 from retail_forecasting.utils.io import make_run_directory
 
-__all__ = ["MEMORIA_FIGURE_EXPORTS", "EdaArtifacts"]
-
 
 @dataclass
 class EdaArtifacts:
