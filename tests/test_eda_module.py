@@ -193,3 +193,29 @@ def test_a_run_writes_its_figures(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert "weekday_demand_profile.png" in drawn
     assert "acf_demand.png" in drawn
     assert len(drawn) >= 12
+
+
+def test_a_run_records_what_it_analysed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A directory of figures with no record of its commit is not citable under docs/runs.md.
+
+    Every other run mode leaves one; the EDA left none, and chapter 3 cites numbers out of its
+    figures.
+    """
+    import json
+
+    panel = make_synthetic_panel(num_series=3, num_days=90)
+    run_dir = _run_eda_on(panel, tmp_path, monkeypatch)
+
+    metadata = json.loads((run_dir / "eda_metadata.json").read_text(encoding="utf-8"))
+
+    assert metadata["split"] == "train"
+    assert metadata["n_series"] == 3
+    assert metadata["rows"] == len(panel)
+    # The parquet the run actually read: the cache key covers four dataset fields only, not the
+    # preprocessing config nor the code version, so the panel on disk can predate the commit.
+    assert metadata["panel_source"].endswith(".parquet")
+    assert "git_commit" in metadata and "created_at" in metadata
+    # What the config asked for sits beside what was measured, which is the pair that says
+    # whether the panel on disk is the panel the config wanted.
+    assert metadata["configured_top_n_series"] is None
+    assert metadata["imputation_strategy"] == "supervised"

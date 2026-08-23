@@ -121,7 +121,10 @@ def main() -> None:
         fields(logger, {"escrito": params_path})
         return
     if mode == "eda":
-        fields(logger, {"escrito": run_eda(settings, split=args.split)})
+        fields(
+            logger,
+            {"escrito": run_eda(settings, split=args.split, config_path=Path(args.config))},
+        )
         return
     if mode == "score_daily":
         artifacts = run_scoring(settings)
