@@ -20,7 +20,6 @@ from retail_forecasting.forecasting.imputation_tuning import (
     _FLOAT_BOUNDS,
     _INT_BOUNDS,
     _MLFLOW_EXPERIMENT,
-    _PRUNING_BLOCK_DRAWS,
     _build_holdout_set,
     _hhmm,
     _holdout_maes,
@@ -940,45 +939,25 @@ def test_imputer_returns_the_same_columns_whether_or_not_it_corrects_anything() 
     assert nothing_to_correct["observed_demand"].equals(clean_only["observed_demand"])
 
 
-def test_objective_reports_once_per_block_so_a_trial_can_be_pruned(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The pruner needs one intermediate value per block, at the same step in every trial."""
+def test_the_objective_scores_every_draw_it_is_given() -> None:
+    """No pruning, so a trial's value has to be the mean over the whole holdout set.
+
+    A MedianPruner here deadlocked the search: Optuna's pruner and its GPSampler both read
+    COMPLETE trials only, so a pruned trial taught the sampler nothing and the deterministic
+    GP re-proposed the point it had just had cut. See the comment at the `create_study` call.
+    """
     import optuna
 
     panel = make_synthetic_panel(num_series=3, num_days=90)
     selection_mask, _ = _split_temporal_windows(panel)
-    draws = _build_holdout_set(
-        panel, seeds=range(2 * _PRUNING_BLOCK_DRAWS), censorable_mask=selection_mask
-    ).draws
-    monkeypatch.setattr(
-        "retail_forecasting.forecasting.imputation_tuning._holdout_maes",
-        lambda holdouts, params: np.full(len(holdouts), 0.5),
-    )
-
-    study = optuna.create_study(direction="minimize")
-    study.optimize(lambda trial: _objective_mae(trial, draws, {}), n_trials=1)
-
-    assert list(study.trials[0].intermediate_values) == [0, 1]
-
-
-def test_objective_stops_at_the_first_block_the_pruner_rejects(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A pruned trial must not pay for the blocks it never reached."""
-    import optuna
-
-    panel = make_synthetic_panel(num_series=3, num_days=90)
-    selection_mask, _ = _split_temporal_windows(panel)
-    draws = _build_holdout_set(
-        panel, seeds=range(3 * _PRUNING_BLOCK_DRAWS), censorable_mask=selection_mask
-    ).draws
+    draws = _build_holdout_set(panel, seeds=range(6), censorable_mask=selection_mask).draws
     scored: list[int] = []
 
     def counting_maes(holdouts: list[object], params: dict[str, object]) -> np.ndarray:
         scored.append(len(holdouts))
         return np.full(len(holdouts), 0.5)
 
+    monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(
         "retail_forecasting.forecasting.imputation_tuning._holdout_maes", counting_maes
     )
@@ -987,11 +966,28 @@ def test_objective_stops_at_the_first_block_the_pruner_rejects(
         def prune(self, study: optuna.Study, trial: optuna.trial.FrozenTrial) -> bool:
             return True
 
-    study = optuna.create_study(direction="minimize", pruner=AlwaysPrune())
-    study.optimize(lambda trial: _objective_mae(trial, draws, {}), n_trials=1)
+    try:
+        # Even handed a pruner that rejects everything: the objective never asks it.
+        study = optuna.create_study(direction="minimize", pruner=AlwaysPrune())
+        study.optimize(lambda trial: _objective_mae(trial, draws, {}), n_trials=1)
+    finally:
+        monkeypatch.undo()
 
-    assert study.trials[0].state is optuna.trial.TrialState.PRUNED
-    assert scored == [_PRUNING_BLOCK_DRAWS], "solo debe puntuarse el primer bloque"
+    assert scored == [len(draws)]
+    assert study.trials[0].state is optuna.trial.TrialState.COMPLETE
+    assert study.trials[0].value == pytest.approx(0.5)
+
+
+def test_a_pruned_trial_from_an_older_study_does_not_retire_the_budget() -> None:
+    """Studies predating the pruner's removal hold PRUNED trials with no value attached.
+
+    Counting those as done would end a resumed search early, having never sampled them.
+    """
+    import optuna
+
+    from retail_forecasting.forecasting.imputation_tuning import _FINISHED_STATES
+
+    assert _FINISHED_STATES == (optuna.trial.TrialState.COMPLETE,)
 
 
 def _timed_trial(number: int, seconds: float) -> object:

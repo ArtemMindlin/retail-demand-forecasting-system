@@ -20,7 +20,7 @@ flowchart TD
     BVAL["_build_holdout_set(panel, 25 seeds, validation mask)<br/>HoldoutSet · 25 draws · 2.455 scorable rows each"]
 
     BSEL --> SEARCH
-    SEARCH["Optuna GPSampler · 300 trials · 13 hyperparameters<br/>objective = mean MAE over the 30 selection draws,<br/>scored in blocks of 10 so MedianPruner can cut a trial early"]
+    SEARCH["Optuna GPSampler · 300 trials · 13 hyperparameters<br/>objective = mean MAE over the 30 selection draws<br/>NopPruner: every trial is scored in full"]
     SEARCH --> BEST["best_params<br/>"]
 
     BEST --> SCORE
@@ -107,6 +107,15 @@ overfitting, invisible to a defaults-only gate.
 | `models_dir/imputation_lgbm_tuning_metadata.json` | always                    | both comparisons, the decision and why                               |
 | `models_dir/imputation_tuning_studies.db`         | always                    | every trial, one study per (seed, panel size, search space)          |
 | `mlflow.db`                                       | always                    | params, metrics, convergence curve, the two files above as artifacts |
+
+There is no pruner, and not for want of trying. A `MedianPruner` deadlocked the search: both
+halves of Optuna read COMPLETE trials only, the pruner for its median and GPSampler for its fit,
+so a pruned trial teaches the sampler nothing and a deterministic GP with no new data
+re-proposes the point it just had cut. Measured over one 300-trial run: 76 of the first 91
+trials pruned, the last COMPLETE at trial 52, and 31 consecutive trials covering 8 distinct
+parameter vectors, with the incumbent still the one a random startup draw had found. The median
+only ever tightens as well, since a trial joins the reference set only by beating it. None of
+that bought anything that was needed: 300 unpruned trials cost two to three hours.
 
 The study name is stable rather than timestamped, so an interrupted search RESUMES on the next
 launch instead of starting over: at minutes per trial, losing the work to a closed lid is not an

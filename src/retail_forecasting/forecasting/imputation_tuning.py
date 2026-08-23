@@ -35,20 +35,17 @@ logger = get_logger(__name__)
 
 N_SELECTION_HOLDOUTS = 30
 
-# Draws are scored in fixed-size blocks so a trial can be pruned between blocks instead of
-# paying for all of them. The size is a constant and not `cpu_count()` on purpose: the number
-# of pruning steps has to be the same on every machine, or the same search stops being
-# reproducible. Ten saturates the cores this runs on and gives three decision points.
-_PRUNING_BLOCK_DRAWS = 10
-
 # One progress line per trial. Optuna's own INFO logging prints a paragraph per trial with the
 # full parameter dict, which buries everything else; it is silenced below and replaced by this.
-# Every trial and not every tenth: a trial here costs minutes, so a coarser interval leaves the
-# log silent for hours with no way to tell a working search from a hung one. At the search's own
-# scale 300 lines is nothing.
+# Every trial and not every tenth: measured at 10-35s a trial on average but with a 60x spread
+# between the cheapest and dearest, a coarser interval leaves no way to tell a working search
+# from a hung one. At the search's own scale 300 lines is nothing.
 _PROGRESS_EVERY_TRIALS = 1
 
-_FINISHED_STATES = (optuna.trial.TrialState.COMPLETE, optuna.trial.TrialState.PRUNED)
+# Only COMPLETE counts as a trial the search got something out of. Studies from before the
+# pruner was removed hold PRUNED trials, and counting those against the budget would retire
+# it without the sampler ever having seen a value for them.
+_FINISHED_STATES = (optuna.trial.TrialState.COMPLETE,)
 
 N_VALIDATION_HOLDOUTS = 25
 
@@ -237,24 +234,17 @@ def _pace_seconds(study: optuna.Study) -> float | None:
 def _objective_mae(
     trial: optuna.Trial, draws: list[Holdout], params: dict[str, int | float]
 ) -> float:
-    """Mean reconstruction MAE over the draws, scored block by block so the trial can be pruned.
+    """Mean reconstruction MAE over every draw.
 
-    Every trial sees the SAME draws in the SAME order, so the running mean at a given block is
-    a paired comparison against the other trials at that block: the between-draw variance that
-    dominates the objective is shared rather than resampled. That is what makes it safe to cut a
-    trial on a partial average -- the noise the pruner would otherwise be fooled by cancels.
+    Every trial sees the SAME draws, so the mean is a paired comparison against the other
+    trials: the between-draw variance that dominates the objective is shared rather than
+    resampled, which is what makes two trial values comparable at all.
 
-    Raises:
-        optuna.TrialPruned: when the pruner rejects the trial at a block boundary.
+    `trial` is unused, and kept because Optuna hands the objective a trial and because the
+    signature is what the search calls through.
     """
-    maes: list[float] = []
-    for step, start in enumerate(range(0, len(draws), _PRUNING_BLOCK_DRAWS)):
-        block = draws[start : start + _PRUNING_BLOCK_DRAWS]
-        maes.extend(_holdout_maes(block, params).tolist())
-        trial.report(float(np.mean(maes)), step=step)
-        if trial.should_prune():
-            raise optuna.TrialPruned()
-    return float(np.mean(maes))
+    del trial
+    return float(np.mean(_holdout_maes(draws, params)))
 
 
 def _mean_ci95(deltas: np.ndarray) -> tuple[float, float]:
@@ -486,7 +476,7 @@ def tune_imputation_lgbm(
             "extracciones": (
                 f"{len(selection.draws)} selección · {len(validation.draws)} validación"
             ),
-            "presupuesto": (f"{n_trials} trials · pruning en bloques de {_PRUNING_BLOCK_DRAWS}"),
+            "presupuesto": f"{n_trials} trials · sin pruning",
             "semillas": f"selección {seed}+ · validación {seed + _VALIDATION_SEED_OFFSET}+",
         },
     )
@@ -568,12 +558,16 @@ def tune_imputation_lgbm(
             n_startup_trials=_N_STARTUP_TRIALS,
             deterministic_objective=True,
         ),
-        # Prunes a trial whose partial average is worse than the median of the trials that
-        # reached the same block. `n_startup_trials` matches the sampler's: there is no median
-        # worth comparing against before that, and it also keeps the two enqueued reference
-        # trials (defaults and incumbent) from being cut. No warmup steps, so the first block of
-        # ten draws is already a decision point and a hopeless trial costs a third of a full one.
-        pruner=optuna.pruners.MedianPruner(n_startup_trials=_N_STARTUP_TRIALS, n_warmup_steps=0),
+        # No pruning, and not for want of trying: a MedianPruner here deadlocked the search.
+        # Both halves of Optuna read COMPLETE trials only -- the pruner takes its median over
+        # them (`pruners/_percentile.py`) and GPSampler fits on them (`samplers/_gp/sampler.py`)
+        # -- so a pruned trial teaches the sampler nothing, and a deterministic GP with no new
+        # data re-proposes the point it just had cut. Measured on a 300-trial run: 76 of the
+        # first 91 trials pruned, the last COMPLETE at trial 52, and 31 consecutive trials
+        # covering 8 distinct parameter vectors. The median only tightens too, since a trial
+        # joins the reference set only by beating it. The saving was never needed: 300 unpruned
+        # trials cost two to three hours.
+        pruner=optuna.pruners.NopPruner(),
         storage=f"sqlite:///{models_dir / 'imputation_tuning_studies.db'}",
         study_name=study_name,
         load_if_exists=True,
@@ -602,10 +596,8 @@ def tune_imputation_lgbm(
         logger,
         {
             "trial": len(f"{n_trials}/{n_trials}"),
-            "estado": 8,
             "MAE": 6,
             "mejor": 6,
-            "podados": 7,
             "s/trial": 7,
             "pasado": 6,
             "queda": 6,
@@ -619,15 +611,12 @@ def tune_imputation_lgbm(
         done = trial.number + 1
         if done % _PROGRESS_EVERY_TRIALS and done != n_trials:
             return
-        pruned = len(study.get_trials(deepcopy=False, states=(optuna.trial.TrialState.PRUNED,)))
         pace = _pace_seconds(study)
         table.row(
             {
                 "trial": f"{done}/{n_trials}",
-                "estado": "podado" if trial.state is optuna.trial.TrialState.PRUNED else "completo",
                 "MAE": "-" if trial.value is None else f"{trial.value:.4f}",
                 "mejor": f"{study.best_value:.4f}",
-                "podados": pruned,
                 "s/trial": "-" if pace is None else f"{pace:.0f}",
                 "pasado": _hhmm(time.monotonic() - started),
                 "queda": "-" if pace is None else _hhmm(pace * max(n_trials - done, 0)),
