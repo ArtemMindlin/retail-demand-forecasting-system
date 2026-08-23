@@ -36,8 +36,6 @@ def run_eda(settings: Settings, split: str = "train") -> Path:
         settings.reporting.output_dir, f"eda_{settings.reporting.run_name}"
     )
 
-    # The summaries a figure draws as well as writes, so they get a name here and are handed
-    # to the renderer instead of being derived a second time inside it.
     series_summary = build_series_summary(panel)
     weekday_summary = build_weekday_summary(panel)
     stockout_demand_bands = build_stockout_demand_bands(panel)

@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 
 from retail_forecasting.eda.category_heatmap import render_category_seasonality_heatmaps
+from retail_forecasting.eda.stockout import render_stockout_figures
+from retail_forecasting.eda.temporal import render_temporal_figures
 
 TOP_SERIES_PLOT_COUNT = 12
-MAX_HEATMAP_SERIES = 120
-SCATTER_SAMPLE_SIZE = 5000
 REPRESENTATIVE_SERIES_COUNT = 12
 
 
@@ -25,12 +25,7 @@ def render_eda_plots(
     stockout_demand_bands: pd.DataFrame,
     output_dir: str | Path,
 ) -> None:
-    """Render a comprehensive static plot set for EDA runs.
-
-    Every summary a figure DRAWS is passed in, never recomputed here: that is what makes each
-    figure a view of the table beside it in the run directory instead of a parallel
-    calculation that can disagree with it.
-    """
+    """Render a comprehensive static plot set for EDA runs."""
     target_dir = Path(output_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -43,34 +38,13 @@ def render_eda_plots(
         series_summary,
         target_dir / "observed_demand_boxplot_top_series.png",
     )
-    _plot_stockout_hours_distribution(
-        panel,
-        target_dir / "stockout_hours_distribution.png",
-    )
-    _plot_weekday_demand_profile(
-        weekday_summary,
-        target_dir / "weekday_demand_profile.png",
-    )
     _plot_top_series_total_demand(
         series_summary,
         target_dir / "top_series_total_demand.png",
     )
-    _plot_coverage_heatmap(
-        panel,
-        series_summary,
-        target_dir / "coverage_heatmap.png",
-    )
     _plot_zero_demand_rate_by_series(
         series_summary,
         target_dir / "zero_demand_rate_by_series.png",
-    )
-    _plot_stockout_band_demand(
-        stockout_demand_bands,
-        target_dir / "stockout_band_demand.png",
-    )
-    _plot_stockout_vs_demand_scatter(
-        panel,
-        target_dir / "stockout_vs_demand_scatter.png",
     )
     _plot_correlation_heatmap(
         panel,
@@ -85,10 +59,8 @@ def render_eda_plots(
         series_summary,
         target_dir / "representative_series_panels.png",
     )
-    _plot_acf_demand(
-        panel,
-        target_dir / "acf_demand.png",
-    )
+    render_stockout_figures(panel, stockout_demand_bands, target_dir)
+    render_temporal_figures(panel, weekday_summary, series_summary, target_dir)
     render_category_seasonality_heatmaps(panel, target_dir)
 
 
@@ -165,73 +137,6 @@ def _plot_observed_demand_boxplot_top_series(
     plt.close(fig)
 
 
-def _plot_stockout_hours_distribution(panel: pd.DataFrame, output_path: Path) -> None:
-    max_hours = int(panel["stockout_hours"].max()) + 1
-    bins = np.arange(-0.5, max_hours + 0.5, 1)
-
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-
-    axes[0].hist(
-        panel["stockout_hours"],
-        bins=bins,
-        color="#d62728",
-        edgecolor="white",
-    )
-    axes[0].set_yscale("log")
-    axes[0].set_xlabel("Stockout hours")
-    axes[0].set_ylabel("Frequency (log scale)")
-    axes[0].set_title("Stockout hours distribution (log scale)")
-    axes[0].set_xticks(range(0, max_hours, 2))
-
-    positive_stockout = panel.loc[panel["stockout_hours"] > 0, "stockout_hours"]
-    bins_pos = np.arange(0.5, max_hours + 0.5, 1)
-    axes[1].hist(
-        positive_stockout,
-        bins=bins_pos,
-        color="#ff9896",
-        edgecolor="white",
-    )
-    axes[1].set_xlabel("Positive stockout hours")
-    axes[1].set_ylabel("Frequency")
-    axes[1].set_title("Positive stockout-hour distribution")
-    axes[1].set_xticks(range(1, max_hours, 2))
-
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=160)
-    plt.close(fig)
-
-
-def _plot_weekday_demand_profile(
-    weekday_summary: pd.DataFrame,
-    output_path: Path,
-) -> None:
-    fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(
-        weekday_summary["weekday_name"],
-        weekday_summary["observed_demand_mean"],
-        marker="o",
-        linewidth=2,
-        color="#2ca02c",
-        label="Mean",
-    )
-    ax.plot(
-        weekday_summary["weekday_name"],
-        weekday_summary["observed_demand_median"],
-        marker="s",
-        linewidth=2,
-        color="#1f77b4",
-        label="Median",
-    )
-    ax.set_xlabel("Weekday")
-    ax.set_ylabel("Observed demand")
-    ax.set_title("Weekly demand profile")
-    ax.legend()
-
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=160)
-    plt.close(fig)
-
-
 def _plot_top_series_total_demand(
     series_summary: pd.DataFrame,
     output_path: Path,
@@ -249,40 +154,6 @@ def _plot_top_series_total_demand(
     ax.set_xlabel("Total observed demand")
     ax.set_ylabel("Series")
     ax.set_title("Top 10 series by observed demand")
-
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=160)
-    plt.close(fig)
-
-
-def _plot_coverage_heatmap(
-    panel: pd.DataFrame,
-    series_summary: pd.DataFrame,
-    output_path: Path,
-) -> None:
-    selected_series = series_summary.head(MAX_HEATMAP_SERIES)["series_id"].tolist()
-    coverage_frame = (
-        panel.loc[panel["series_id"].isin(selected_series), ["series_id", "date"]]
-        .assign(present=1.0)
-        .pivot(index="series_id", columns="date", values="present")
-        .fillna(0.0)
-    )
-    if coverage_frame.empty:
-        return
-
-    fig, ax = plt.subplots(figsize=(14, 8))
-    image = ax.imshow(
-        coverage_frame.to_numpy(),
-        aspect="auto",
-        interpolation="nearest",
-        cmap="Blues",
-        vmin=0,
-        vmax=1,
-    )
-    ax.set_xlabel("Date index")
-    ax.set_ylabel("Series")
-    ax.set_title(f"Coverage heatmap (top {len(selected_series)} series by demand)")
-    fig.colorbar(image, ax=ax, fraction=0.02, pad=0.02, label="Present (1) / missing (0)")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -319,73 +190,6 @@ def _plot_zero_demand_rate_by_series(
     ax.set_xlabel("Zero-demand rate")
     ax.set_ylabel("Number of series")
     ax.set_title("Distribution of zero-demand rate across all series")
-    ax.legend()
-
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=160)
-    plt.close(fig)
-
-
-def _plot_stockout_band_demand(stockout_demand_bands: pd.DataFrame, output_path: Path) -> None:
-    """Draw the band summary rather than recomputing it.
-
-    The bands and their cut points used to be built a second time here, from the panel, with
-    the same `pd.cut` literal that `build_stockout_demand_bands` uses. Two derivations of one
-    statistic drift silently: move a cut point in one place and chapter 3 ends up with a
-    figure and a table that disagree, with nothing failing.
-    """
-    stockout_band_frame = stockout_demand_bands
-
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-    axes[0].bar(
-        stockout_band_frame["stockout_band"].astype(str),
-        stockout_band_frame["observed_demand_mean"],
-        color="#ff7f0e",
-    )
-    axes[0].set_xlabel("Stockout band")
-    axes[0].set_ylabel("Mean observed demand")
-    axes[0].set_title("Mean demand by stockout band")
-
-    axes[1].bar(
-        stockout_band_frame["stockout_band"].astype(str),
-        stockout_band_frame["observations"],
-        color="#bcbd22",
-    )
-    axes[1].set_xlabel("Stockout band")
-    axes[1].set_ylabel("Observations")
-    axes[1].set_title("Observation count by stockout band")
-
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=160)
-    plt.close(fig)
-
-
-def _plot_stockout_vs_demand_scatter(panel: pd.DataFrame, output_path: Path) -> None:
-    sampled = _sample_panel(panel)
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.scatter(
-        sampled["stockout_hours"],
-        sampled["observed_demand"],
-        alpha=0.15,
-        s=12,
-        color="#1f77b4",
-    )
-
-    grouped = (
-        panel.groupby("stockout_hours", as_index=False)["observed_demand"]
-        .mean()
-        .rename(columns={"observed_demand": "observed_demand_mean"})
-    )
-    ax.plot(
-        grouped["stockout_hours"],
-        grouped["observed_demand_mean"],
-        color="#d62728",
-        linewidth=2,
-        label="Mean by stockout hour",
-    )
-    ax.set_xlabel("Stockout hours")
-    ax.set_ylabel("Observed demand")
-    ax.set_title("Observed demand vs stockout hours")
     ax.legend()
 
     fig.tight_layout()
@@ -607,53 +411,3 @@ def _plot_representative_series_panels(
     fig.tight_layout()
     fig.savefig(output_path, dpi=160, bbox_inches="tight")
     plt.close(fig)
-
-
-def _plot_acf_demand(panel: pd.DataFrame, output_path: Path, max_lags: int = 28) -> None:
-    daily_mean = panel.groupby("date")["observed_demand"].mean().sort_index().to_numpy()
-    n = len(daily_mean)
-    if n < max_lags + 2:
-        return
-
-    mean = daily_mean.mean()
-    centered = daily_mean - mean
-    var = (centered**2).sum()
-    if var == 0:
-        return
-
-    acf_values = np.array(
-        [(centered[: n - lag] * centered[lag:]).sum() / var for lag in range(max_lags + 1)]
-    )
-    confidence_bound = 1.96 / np.sqrt(n)
-    lags = np.arange(max_lags + 1)
-
-    seasonal_lags = {7, 14, 21, 28}
-
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.axhline(0, color="black", linewidth=0.8)
-    ax.axhspan(-confidence_bound, confidence_bound, color="#1f77b4", alpha=0.12, label="95% CI")
-
-    for lag, val in zip(lags, acf_values, strict=False):
-        color = "#d62728" if lag in seasonal_lags else "#1f77b4"
-        ax.vlines(lag, 0, val, colors=color, linewidth=1.8)
-        ax.plot(lag, val, "o", color=color, markersize=4)
-
-    for s_lag in seasonal_lags:
-        if s_lag <= max_lags:
-            ax.axvline(float(s_lag), color="#d62728", linewidth=0.7, linestyle="--", alpha=0.45)
-
-    ax.set_xlabel("Lag (days)")
-    ax.set_ylabel("Autocorrelation")
-    ax.set_title("ACF of daily aggregate demand (lags 0–28)")
-    ax.set_xticks(lags)
-    ax.legend(loc="upper right")
-
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=160)
-    plt.close(fig)
-
-
-def _sample_panel(panel: pd.DataFrame) -> pd.DataFrame:
-    if len(panel) <= SCATTER_SAMPLE_SIZE:
-        return panel
-    return panel.sample(SCATTER_SAMPLE_SIZE, random_state=42)

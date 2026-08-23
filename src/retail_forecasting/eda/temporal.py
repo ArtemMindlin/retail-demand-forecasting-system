@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+import matplotlib
+
+matplotlib.use("Agg")
+
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 
@@ -75,3 +83,132 @@ def build_series_gap_summary(panel: pd.DataFrame) -> pd.DataFrame:
         )
         .reset_index(drop=True)
     )
+
+
+def render_temporal_figures(
+    panel: pd.DataFrame,
+    weekday_summary: pd.DataFrame,
+    series_summary: pd.DataFrame,
+    output_dir: Path,
+) -> None:
+    """Every figure about time: the weekly profile, coverage over the calendar, and the ACF."""
+    _plot_weekday_demand_profile(weekday_summary, output_dir / "weekday_demand_profile.png")
+    _plot_coverage_heatmap(panel, series_summary, output_dir / "coverage_heatmap.png")
+    _plot_acf_demand(panel, output_dir / "acf_demand.png")
+
+
+# ── Figuras ───────────────────────────────────────────────────────────────────
+# Junto a los resúmenes que dibujan, y no en un módulo de figuras aparte: la figura de bandas
+# de stockout llegó a reconstruir las bandas por su cuenta, con el mismo `pd.cut` que el
+# constructor de arriba, porque los dos cálculos vivían a seiscientas líneas de distancia.
+
+MAX_HEATMAP_SERIES = 120
+
+
+def _plot_weekday_demand_profile(
+    weekday_summary: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.plot(
+        weekday_summary["weekday_name"],
+        weekday_summary["observed_demand_mean"],
+        marker="o",
+        linewidth=2,
+        color="#2ca02c",
+        label="Mean",
+    )
+    ax.plot(
+        weekday_summary["weekday_name"],
+        weekday_summary["observed_demand_median"],
+        marker="s",
+        linewidth=2,
+        color="#1f77b4",
+        label="Median",
+    )
+    ax.set_xlabel("Weekday")
+    ax.set_ylabel("Observed demand")
+    ax.set_title("Weekly demand profile")
+    ax.legend()
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
+
+
+def _plot_coverage_heatmap(
+    panel: pd.DataFrame,
+    series_summary: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    selected_series = series_summary.head(MAX_HEATMAP_SERIES)["series_id"].tolist()
+    coverage_frame = (
+        panel.loc[panel["series_id"].isin(selected_series), ["series_id", "date"]]
+        .assign(present=1.0)
+        .pivot(index="series_id", columns="date", values="present")
+        .fillna(0.0)
+    )
+    if coverage_frame.empty:
+        return
+
+    fig, ax = plt.subplots(figsize=(14, 8))
+    image = ax.imshow(
+        coverage_frame.to_numpy(),
+        aspect="auto",
+        interpolation="nearest",
+        cmap="Blues",
+        vmin=0,
+        vmax=1,
+    )
+    ax.set_xlabel("Date index")
+    ax.set_ylabel("Series")
+    ax.set_title(f"Coverage heatmap (top {len(selected_series)} series by demand)")
+    fig.colorbar(image, ax=ax, fraction=0.02, pad=0.02, label="Present (1) / missing (0)")
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
+
+
+def _plot_acf_demand(panel: pd.DataFrame, output_path: Path, max_lags: int = 28) -> None:
+    daily_mean = panel.groupby("date")["observed_demand"].mean().sort_index().to_numpy()
+    n = len(daily_mean)
+    if n < max_lags + 2:
+        return
+
+    mean = daily_mean.mean()
+    centered = daily_mean - mean
+    var = (centered**2).sum()
+    if var == 0:
+        return
+
+    acf_values = np.array(
+        [(centered[: n - lag] * centered[lag:]).sum() / var for lag in range(max_lags + 1)]
+    )
+    confidence_bound = 1.96 / np.sqrt(n)
+    lags = np.arange(max_lags + 1)
+
+    seasonal_lags = {7, 14, 21, 28}
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.axhspan(-confidence_bound, confidence_bound, color="#1f77b4", alpha=0.12, label="95% CI")
+
+    for lag, val in zip(lags, acf_values, strict=False):
+        color = "#d62728" if lag in seasonal_lags else "#1f77b4"
+        ax.vlines(lag, 0, val, colors=color, linewidth=1.8)
+        ax.plot(lag, val, "o", color=color, markersize=4)
+
+    for s_lag in seasonal_lags:
+        if s_lag <= max_lags:
+            ax.axvline(float(s_lag), color="#d62728", linewidth=0.7, linestyle="--", alpha=0.45)
+
+    ax.set_xlabel("Lag (days)")
+    ax.set_ylabel("Autocorrelation")
+    ax.set_title("ACF of daily aggregate demand (lags 0–28)")
+    ax.set_xticks(lags)
+    ax.legend(loc="upper right")
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
