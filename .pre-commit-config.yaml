@@ -25,3 +25,18 @@ repos:
         types: [python]
         pass_filenames: false
         args: ["src"]
+
+      # On push rather than on commit: the suite takes ~3 minutes, which is too much to pay per
+      # commit but the right price before code leaves the machine. ruff and mypy above pass
+      # happily on code the suite rejects, so without this a green commit says nothing about
+      # whether anything still works.
+      #
+      # Needs installing once per clone, since pre-commit only wires the hook types it is told
+      # to: uv run pre-commit install --hook-type pre-push
+      - id: pytest
+        name: pytest
+        entry: uv run pytest -q
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false

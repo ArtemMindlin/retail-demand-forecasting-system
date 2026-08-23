@@ -111,6 +111,18 @@ Install dependencies:
 uv sync --extra dev
 ```
 
+Wire the git hooks. Two stages: `pre-commit` runs ruff, ruff-format and mypy, and `pre-push`
+runs the suite. Needed once per clone, because pre-commit only installs the hook types it is
+told to, and a hook that is not installed fails silently by never running:
+
+```bash
+uv run pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+The suite is on push and not on commit because it takes about three minutes. Note that a green
+commit therefore says nothing about whether the tests pass: ruff and mypy accept plenty of code
+the suite rejects.
+
 Install optional ML backends (required by `run_mode = tune_imputation`, whose Optuna GPSampler
 needs the `torch` backend and whose experiment tracking needs `mlflow`):
 
