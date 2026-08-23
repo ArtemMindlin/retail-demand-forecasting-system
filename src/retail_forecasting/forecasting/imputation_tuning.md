@@ -16,11 +16,11 @@ flowchart TD
     SPLIT --> BSEL
     SPLIT --> BVAL
 
-    BSEL["_build_holdout_set(panel, 15 seeds, selection mask)<br/>HoldoutSet · 15 draws · 2.554 scorable rows each"]
+    BSEL["_build_holdout_set(panel, 30 seeds, selection mask)<br/>HoldoutSet · 30 draws · 2.554 scorable rows each"]
     BVAL["_build_holdout_set(panel, 25 seeds, validation mask)<br/>HoldoutSet · 25 draws · 2.455 scorable rows each"]
 
     BSEL --> SEARCH
-    SEARCH["Optuna GPSampler · 300 trials · 13 hyperparameters<br/>objective = mean MAE over the 15 selection draws"]
+    SEARCH["Optuna GPSampler · 300 trials · 13 hyperparameters<br/>objective = mean MAE over the 30 selection draws,<br/>scored in blocks of 10 so MedianPruner can cut a trial early"]
     SEARCH --> BEST["best_params<br/>"]
 
     BEST --> SCORE
@@ -105,8 +105,16 @@ overfitting, invisible to a defaults-only gate.
 | --------------------------------------------------- | ------------------------- | -------------------------------------------------------------------- |
 | `models_dir/imputation_lgbm_params.json`          | only when both gates pass | the 13 winning hyperparameters, nothing else                         |
 | `models_dir/imputation_lgbm_tuning_metadata.json` | always                    | both comparisons, the decision and why                               |
-| `models_dir/imputation_tuning_studies.db`         | always                    | every trial, one Optuna study per run                                |
+| `models_dir/imputation_tuning_studies.db`         | always                    | every trial, one study per (seed, panel size, search space)          |
 | `mlflow.db`                                       | always                    | params, metrics, convergence curve, the two files above as artifacts |
+
+The study name is stable rather than timestamped, so an interrupted search RESUMES on the next
+launch instead of starting over: at minutes per trial, losing the work to a closed lid is not an
+acceptable failure mode. It is keyed by seed, panel size and a digest of the search space, so
+narrowing a bound starts a fresh study rather than silently resuming one whose trials came from a
+different space, and `tuning_trials` counts as a TARGET, not an increment. One caveat on resuming
+below `_N_STARTUP_TRIALS`: Optuna does not persist its sampler's RNG state, so the random startup
+draws repeat. Past that point the GP conditions on the stored history and it stops happening.
 
 Only hyperparameters are persisted, never fitted weights — the imputer still re-fits on each
 panel it is handed, so a search cannot change imputation's leakage or feature-space properties.

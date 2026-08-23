@@ -4,7 +4,7 @@ import json
 import time
 import warnings
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 from typing import NamedTuple
 
@@ -41,11 +41,14 @@ N_SELECTION_HOLDOUTS = 30
 # reproducible. Ten saturates the cores this runs on and gives three decision points.
 _PRUNING_BLOCK_DRAWS = 10
 
-# One progress line every this many trials. Optuna's own INFO logging prints a paragraph per
-# trial with the full parameter dict, which at 300 trials buries everything else; it is
-# silenced below and replaced by this. Ten keeps a 2h search to 30 lines, which reads better
-# in a redirected log than a bar that overwrites itself.
-_PROGRESS_EVERY_TRIALS = 10
+# One progress line per trial. Optuna's own INFO logging prints a paragraph per trial with the
+# full parameter dict, which buries everything else; it is silenced below and replaced by this.
+# Every trial and not every tenth: a trial here costs minutes, so a coarser interval leaves the
+# log silent for hours with no way to tell a working search from a hung one. At the search's own
+# scale 300 lines is nothing.
+_PROGRESS_EVERY_TRIALS = 1
+
+_FINISHED_STATES = (optuna.trial.TrialState.COMPLETE, optuna.trial.TrialState.PRUNED)
 
 N_VALIDATION_HOLDOUTS = 25
 
@@ -510,7 +513,15 @@ def tune_imputation_lgbm(
         json.loads(params_path.read_text(encoding="utf-8")) if params_path.exists() else None
     )
 
-    study_name = f"imputation_lgbm_seed{seed}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
+    # Stable name, so an interrupted search RESUMES instead of starting over: at minutes per
+    # trial, losing the work to a closed lid is not an acceptable failure mode. The name binds
+    # the study to what makes its trials comparable, the seed, the panel size and the search
+    # space itself, so narrowing a bound starts a fresh study rather than silently resuming one
+    # whose trials came from a different space.
+    space_digest = sha256(
+        json.dumps({"int": _INT_BOUNDS, "float": _FLOAT_BOUNDS}, sort_keys=True).encode()
+    ).hexdigest()[:8]
+    study_name = f"imputation_lgbm_seed{seed}_{n_series}series_{space_digest}"
 
     # Its INFO handler emits one paragraph per trial. Ours reports every
     # `_PROGRESS_EVERY_TRIALS` instead, so warnings from Optuna still get through.
@@ -534,27 +545,44 @@ def tune_imputation_lgbm(
         pruner=optuna.pruners.MedianPruner(n_startup_trials=_N_STARTUP_TRIALS, n_warmup_steps=0),
         storage=f"sqlite:///{models_dir / 'imputation_tuning_studies.db'}",
         study_name=study_name,
+        load_if_exists=True,
     )
 
-    study.enqueue_trial(dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
-    logger.info("  referencia      defaults sin sintonizar, encolados como trial")
-    if incumbent_params is not None:
-        study.enqueue_trial(dict(incumbent_params))
-        logger.info("  referencia      campeón en disco, encolado como trial")
+    # `n_trials` is a TARGET, not an increment: on a resumed study Optuna would otherwise run
+    # that many MORE trials on top of the ones already stored.
+    already_done = len(study.get_trials(deepcopy=False, states=_FINISHED_STATES))
+    trials_todo = max(0, n_trials - already_done)
+
+    if already_done:
+        # The reference trials are only enqueued for a fresh study. Enqueueing them again on
+        # every resume would re-measure two configurations the study already scored.
+        logger.info("  reanudando      %s trials ya en el estudio %s", already_done, study_name)
+    else:
+        study.enqueue_trial(dict(DEFAULT_SUPERVISED_LGBM_PARAMS))
+        logger.info("  referencia      defaults sin sintonizar, encolados como trial")
+        if incumbent_params is not None:
+            study.enqueue_trial(dict(incumbent_params))
+            logger.info("  referencia      campeón en disco, encolado como trial")
 
     started = time.monotonic()
 
     def report_progress(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
+        # `trial.number` counts from the start of the study, resumed trials included, so it is
+        # the right numerator against the target rather than against what is left to run.
         done = trial.number + 1
         if done % _PROGRESS_EVERY_TRIALS and done != n_trials:
             return
+        this_run = done - already_done
         pruned = len(study.get_trials(deepcopy=False, states=(optuna.trial.TrialState.PRUNED,)))
         elapsed = time.monotonic() - started
-        remaining = elapsed / done * (n_trials - done)
+        # Rate from THIS run's trials only: the resumed ones were not timed here.
+        remaining = elapsed / max(this_run, 1) * max(n_trials - done, 0)
         progress(
             logger,
             {
                 "trial": f"{done}/{n_trials}",
+                "": f"{'podado' if trial.state is optuna.trial.TrialState.PRUNED else 'completo':8}",
+                "valor": "-" if trial.value is None else f"{trial.value:.4f}",
                 "mejor": f"{study.best_value:.4f}",
                 "podados": f"{pruned}",
                 "transcurrido": _hhmm(elapsed),
@@ -562,7 +590,7 @@ def tune_imputation_lgbm(
             },
         )
 
-    study.optimize(objective, n_trials=n_trials, callbacks=[report_progress])
+    study.optimize(objective, n_trials=trials_todo, callbacks=[report_progress])
 
     subsample_best = float(study.best_params["subsample"])
     best_params = ImputationBoostingParams(
