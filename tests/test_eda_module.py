@@ -5,6 +5,11 @@ from pathlib import Path
 import pytest
 
 from retail_forecasting.config import DatasetConfig
+from retail_forecasting.eda.pipeline import (
+    build_config_alignment_summary,
+    build_correlation_summary,
+    raise_on_alignment_warnings,
+)
 from retail_forecasting.eda.profiling import (
     build_dataset_summary,
     build_missingness_summary,
@@ -12,11 +17,6 @@ from retail_forecasting.eda.profiling import (
     build_series_summary,
 )
 from retail_forecasting.eda.reporting import EdaArtifacts, write_eda_artifacts
-from retail_forecasting.eda.run import (
-    build_config_alignment_summary,
-    build_correlation_summary,
-    raise_on_alignment_warnings,
-)
 from retail_forecasting.eda.stockout import (
     build_stockout_by_series_summary,
     build_stockout_demand_bands,

@@ -28,7 +28,6 @@ from retail_forecasting.eda.temporal import (
 
 def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
     """Run EDA on the canonical prepared panel and persist artifacts."""
-    # Force loading of the full dataset for EDA reporting, ignoring top_n_series filters
     eda_dataset_config = settings.dataset.model_copy(
         update={"top_n_series": None, "max_rows": None}
     )

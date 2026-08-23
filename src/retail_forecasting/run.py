@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from retail_forecasting.config import load_config
 from retail_forecasting.contracts.contracts_config import RunMode
-from retail_forecasting.eda.run import run_eda
+from retail_forecasting.eda.pipeline import run_eda
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
     run_fair_cost_backtest,
@@ -73,9 +73,6 @@ def main() -> None:
     """
     args = build_parser().parse_args()
 
-    # The CLI is the application entry point, so it is the only place that attaches a
-    # handler: importing this package from Django, a test or a notebook must not
-    # reconfigure logging for the host process.
     configure_logging()
     try:
         settings = load_config(args.config)
@@ -118,9 +115,6 @@ def main() -> None:
         fields(logger, {"escrito": run_dir / "fair_cost_backtest.csv"})
         return
     if mode == "tune_imputation":
-        # Imported here, not at module scope: `imputation_tuning` pulls in mlflow and (through
-        # the search) torch, both from the optional `ml` extra. At module scope every run mode
-        # would need them installed just to reach its own branch.
         from retail_forecasting.forecasting.imputation_tuning import tune_imputation_lgbm
 
         params_path = tune_imputation_lgbm(settings, config_path=Path(args.config))
