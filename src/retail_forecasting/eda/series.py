@@ -16,6 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
 
 from retail_forecasting.eda.profiling import make_grid
 
@@ -83,7 +84,7 @@ def _plot_observed_demand_boxplot_top_series(
     def _distributions(ids: list[str]) -> list[np.ndarray]:
         return [subset.loc[subset["series_id"] == s, "observed_demand"].to_numpy() for s in ids]
 
-    def _draw(ax: plt.Axes, ids: list[str], color: str, title: str) -> None:
+    def _draw(ax: Axes, ids: list[str], color: str, title: str) -> None:
         bp = ax.boxplot(
             _distributions(ids),
             tick_labels=ids,

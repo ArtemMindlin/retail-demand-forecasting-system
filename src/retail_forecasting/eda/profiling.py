@@ -1,8 +1,4 @@
-"""The panel as a whole: its shape, its gaps, its numeric columns and how they relate.
-
-Per-series profiling lives in `series.py`; this module answers questions about the panel,
-not about individual series.
-"""
+"""The panel as a whole: its shape, its gaps, its numeric columns and how they relate."""
 
 from __future__ import annotations
 
@@ -15,6 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.figure import Figure
 
 
 def build_dataset_summary(panel: pd.DataFrame) -> pd.DataFrame:
@@ -147,13 +144,8 @@ def make_grid(
     width: float,
     row_height: float,
     sharex: bool = False,
-) -> tuple[plt.Figure, np.ndarray]:
-    """Create a grid of subplots sized for ``n_items`` and hide the unused cells.
-
-    Public and living here because `series.py` needs it too, and it is pure matplotlib layout
-    with no data semantics of its own -- so any module would be an arbitrary home. Here rather
-    than in a module of its own to avoid a file for fourteen lines.
-    """
+) -> tuple[Figure, np.ndarray]:
+    """Create a grid of subplots sized for ``n_items`` and hide the unused cells."""
     n_rows = int(np.ceil(n_items / n_cols))
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(width, row_height * n_rows), sharex=sharex)
     axes_flat = np.atleast_1d(axes).flatten()
