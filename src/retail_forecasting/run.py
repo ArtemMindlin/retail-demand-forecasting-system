@@ -121,9 +121,7 @@ def main() -> None:
         fields(logger, {"escrito": params_path})
         return
     if mode == "eda":
-        eda_artifacts = run_eda(settings, split=args.split)
-        assert eda_artifacts.run_directory is not None
-        fields(logger, {"escrito": eda_artifacts.run_directory})
+        fields(logger, {"escrito": run_eda(settings, split=args.split)})
         return
     if mode == "score_daily":
         artifacts = run_scoring(settings)

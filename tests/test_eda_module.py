@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from retail_forecasting.eda.pipeline import EdaArtifacts, write_eda_artifacts
 from retail_forecasting.eda.profiling import (
     build_correlation_summary,
     build_dataset_summary,
@@ -57,74 +56,6 @@ def test_eda_summaries_cover_prepared_panel_contract() -> None:
         "7+",
     }
     assert "absolute_correlation" in correlation_summary.columns
-
-
-def test_eda_artifacts_are_written_as_expected(tmp_path: Path) -> None:
-    panel = make_synthetic_panel(num_series=2, num_days=80)
-
-    artifacts = EdaArtifacts(
-        panel=panel,
-        dataset_summary=build_dataset_summary(panel),
-        missingness_summary=build_missingness_summary(panel),
-        numeric_summary=build_numeric_summary(panel),
-        series_summary=build_series_summary(panel),
-        temporal_summary=build_temporal_summary(panel),
-        weekday_summary=build_weekday_summary(panel),
-        series_gap_summary=build_series_gap_summary(panel),
-        stockout_summary=build_stockout_summary(panel),
-        stockout_by_series_summary=build_stockout_by_series_summary(panel),
-        stockout_demand_bands=build_stockout_demand_bands(panel),
-        correlation_summary=build_correlation_summary(panel),
-    )
-
-    written = write_eda_artifacts(
-        artifacts=artifacts,
-        output_dir=tmp_path,
-        run_name="eda_test",
-    )
-
-    assert written.run_directory is not None
-    assert (written.run_directory / "dataset_summary.csv").exists()
-    assert (written.run_directory / "stockout_summary.csv").exists()
-    assert (written.run_directory / "correlation_summary.csv").exists()
-
-
-def test_eda_plots_are_written_as_expected(tmp_path: Path) -> None:
-    panel = make_synthetic_panel(num_series=3, num_days=90)
-
-    artifacts = EdaArtifacts(
-        panel=panel,
-        dataset_summary=build_dataset_summary(panel),
-        missingness_summary=build_missingness_summary(panel),
-        numeric_summary=build_numeric_summary(panel),
-        series_summary=build_series_summary(panel),
-        temporal_summary=build_temporal_summary(panel),
-        weekday_summary=build_weekday_summary(panel),
-        series_gap_summary=build_series_gap_summary(panel),
-        stockout_summary=build_stockout_summary(panel),
-        stockout_by_series_summary=build_stockout_by_series_summary(panel),
-        stockout_demand_bands=build_stockout_demand_bands(panel),
-        correlation_summary=build_correlation_summary(panel),
-    )
-
-    written = write_eda_artifacts(
-        artifacts=artifacts,
-        output_dir=tmp_path,
-        run_name="eda_plot_test",
-    )
-
-    assert written.run_directory is not None
-    assert (written.run_directory / "coverage_heatmap.png").exists()
-    assert (written.run_directory / "observed_demand_distribution.png").exists()
-    assert (written.run_directory / "observed_demand_boxplot_top_series.png").exists()
-    assert (written.run_directory / "stockout_hours_distribution.png").exists()
-    assert (written.run_directory / "weekday_demand_profile.png").exists()
-    assert (written.run_directory / "zero_demand_rate_by_series.png").exists()
-    assert (written.run_directory / "stockout_band_demand.png").exists()
-    assert (written.run_directory / "stockout_vs_demand_scatter.png").exists()
-    assert (written.run_directory / "correlation_heatmap.png").exists()
-    assert (written.run_directory / "covariate_vs_demand_grid.png").exists()
-    assert (written.run_directory / "representative_series_panels.png").exists()
 
 
 def test_category_heatmaps_land_in_the_run_directory(tmp_path: Path) -> None:
@@ -219,3 +150,46 @@ def test_run_eda_still_describes_the_whole_panel_when_the_config_says_null(
     pipeline.run_eda(_eda_settings(tmp_path, top_n_series=None), split="train")
 
     assert seen == [None]
+
+
+def _run_eda_on(panel, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Drive a full EDA run over `panel`, with the loader stubbed out."""
+    from retail_forecasting.eda import pipeline
+
+    monkeypatch.setattr(
+        pipeline,
+        "load_prepared_panel",
+        lambda **_: panel,
+    )
+    return pipeline.run_eda(_eda_settings(tmp_path, top_n_series=None), split="train")
+
+
+def test_a_run_writes_every_summary_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The eleven CSVs are what the dashboard reads, so a missing one is a broken view."""
+    run_dir = _run_eda_on(make_synthetic_panel(num_series=2, num_days=80), tmp_path, monkeypatch)
+
+    written = {path.name for path in run_dir.glob("*.csv")}
+    assert written == {
+        "correlation_summary.csv",
+        "dataset_summary.csv",
+        "missingness_summary.csv",
+        "numeric_summary.csv",
+        "series_gap_summary.csv",
+        "series_summary.csv",
+        "stockout_by_series_summary.csv",
+        "stockout_demand_bands.csv",
+        "stockout_summary.csv",
+        "temporal_summary.csv",
+        "weekday_summary.csv",
+    }
+
+
+def test_a_run_writes_its_figures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Figures are the point of the mode and there is no flag to turn them off."""
+    run_dir = _run_eda_on(make_synthetic_panel(num_series=3, num_days=90), tmp_path, monkeypatch)
+
+    drawn = {path.name for path in run_dir.glob("*.png")}
+    assert "observed_demand_distribution.png" in drawn
+    assert "weekday_demand_profile.png" in drawn
+    assert "acf_demand.png" in drawn
+    assert len(drawn) >= 12
