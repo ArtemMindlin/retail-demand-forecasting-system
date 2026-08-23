@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from retail_forecasting.eda.pipeline import build_correlation_summary
 from retail_forecasting.eda.profiling import (
+    build_correlation_summary,
     build_dataset_summary,
     build_missingness_summary,
     build_numeric_summary,

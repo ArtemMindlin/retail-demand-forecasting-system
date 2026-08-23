@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
-
 from retail_forecasting.config import Settings
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.eda.plots import render_eda_plots
 from retail_forecasting.eda.profiling import (
+    build_correlation_summary,
     build_dataset_summary,
     build_missingness_summary,
     build_numeric_summary,
@@ -30,10 +29,9 @@ def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
     """Run EDA on the canonical prepared panel and persist artifacts.
 
     The dataset config is honoured as written, `top_n_series` and `max_rows` included, so the
-    mode can describe either the whole panel or the exact subset a model trains on. Those two
-    used to be forced to None here, which cost more than it bought: the alignment guard below
-    exists to catch a stale processed cache, and it can only compare the panel against a
-    configured series count, so forcing that count to None left half of it unable to fire.
+    mode describes either the whole panel or the exact subset a model trains on depending on
+    what the config asks for. `configs/eda/default.yaml` sets both to null, which is what makes
+    the default the whole panel.
     """
     panel = load_prepared_panel(
         dataset_config=settings.dataset,
@@ -64,25 +62,3 @@ def run_eda(settings: Settings, split: str = "train") -> EdaArtifacts:
         render_plots=render_eda_plots,
         memoria_dir=Path("memoria"),
     )
-
-
-def build_correlation_summary(panel: pd.DataFrame) -> pd.DataFrame:
-    """Compute numeric correlations against observed demand."""
-    numeric_columns = panel.select_dtypes(include=["number"]).columns.tolist()
-    if "observed_demand" not in numeric_columns:
-        return pd.DataFrame(columns=["feature_name", "correlation_with_observed_demand"])
-
-    correlations = panel.loc[:, numeric_columns].corr(numeric_only=True)["observed_demand"]
-    correlation_summary = (
-        correlations.drop(labels=["observed_demand"])
-        .rename("correlation_with_observed_demand")
-        .reset_index()
-        .rename(columns={"index": "feature_name"})
-    )
-    correlation_summary["absolute_correlation"] = correlation_summary[
-        "correlation_with_observed_demand"
-    ].abs()
-    return correlation_summary.sort_values(
-        ["absolute_correlation", "feature_name"],
-        ascending=[False, True],
-    ).reset_index(drop=True)

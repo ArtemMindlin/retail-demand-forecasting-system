@@ -110,3 +110,25 @@ def build_numeric_summary(panel: pd.DataFrame) -> pd.DataFrame:
     )
     summary.index.name = "column_name"
     return summary.reset_index()
+
+
+def build_correlation_summary(panel: pd.DataFrame) -> pd.DataFrame:
+    """Compute numeric correlations against observed demand."""
+    numeric_columns = panel.select_dtypes(include=["number"]).columns.tolist()
+    if "observed_demand" not in numeric_columns:
+        return pd.DataFrame(columns=["feature_name", "correlation_with_observed_demand"])
+
+    correlations = panel.loc[:, numeric_columns].corr(numeric_only=True)["observed_demand"]
+    correlation_summary = (
+        correlations.drop(labels=["observed_demand"])
+        .rename("correlation_with_observed_demand")
+        .reset_index()
+        .rename(columns={"index": "feature_name"})
+    )
+    correlation_summary["absolute_correlation"] = correlation_summary[
+        "correlation_with_observed_demand"
+    ].abs()
+    return correlation_summary.sort_values(
+        ["absolute_correlation", "feature_name"],
+        ascending=[False, True],
+    ).reset_index(drop=True)
