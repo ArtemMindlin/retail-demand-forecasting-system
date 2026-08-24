@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import (
     BaseModel,
@@ -139,6 +139,24 @@ class PreprocessingConfig(BaseModel):
     drop_negative_sales: bool = True
     fill_missing_values: bool = True
     imputation_strategy: ImputationStrategy = "supervised"
+    # Read only by `run_mode = compare_imputation`. Every strategy except "none", which is the
+    # uncorrected baseline rather than a candidate -- declaring it here is allowed and scores
+    # the do-nothing case.
+    comparison_strategies: list[ImputationStrategy] = Field(
+        default_factory=lambda: cast(
+            "list[ImputationStrategy]", ["supervised", "historical_mean", "clipped_scaling"]
+        ),
+        min_length=1,
+    )
+
+    @field_validator("comparison_strategies")
+    @classmethod
+    def validate_comparison_strategies(
+        cls, v: list[ImputationStrategy]
+    ) -> list[ImputationStrategy]:
+        if len(set(v)) != len(v):
+            raise ValueError("preprocessing.comparison_strategies must be unique.")
+        return v
 
 
 class FeatureConfig(BaseModel):

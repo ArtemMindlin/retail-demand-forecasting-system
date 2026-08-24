@@ -21,6 +21,7 @@ preprocessing:
   drop_negative_sales: true
   fill_missing_values: true
   imputation_strategy: supervised
+  comparison_strategies: [supervised, historical_mean, clipped_scaling]
 
 
 models:

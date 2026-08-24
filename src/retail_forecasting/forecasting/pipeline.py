@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import statistics
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -142,18 +143,14 @@ def _train_conformal_model(
     return model
 
 
-# Every strategy except "none", which is the uncorrected baseline rather than a candidate.
 logger = get_logger(__name__)
-
-IMPUTATION_COMPARISON_STRATEGIES: tuple[ImputationStrategy, ...] = (
-    "supervised",
-    "historical_mean",
-    "clipped_scaling",
-)
 
 
 def _evaluate_imputation_quality(
-    panel: pd.DataFrame, seed: int, imputer_params_path: Path | None = None
+    panel: pd.DataFrame,
+    seed: int,
+    strategies: Sequence[ImputationStrategy],
+    imputer_params_path: Path | None = None,
 ) -> pd.DataFrame:
     """Score each imputation strategy by direct reconstruction error.
 
@@ -170,7 +167,7 @@ def _evaluate_imputation_quality(
     n_eval = len(eval_idx)
 
     records: list[dict[str, Any]] = []
-    for strategy in IMPUTATION_COMPARISON_STRATEGIES:
+    for strategy in strategies:
         imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
             censored
         )
@@ -203,6 +200,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
     Returns:
         The created run directory path.
     """
+    strategies = settings.preprocessing.comparison_strategies
     rule(logger, "comparación de imputación")
     panel = load_prepared_panel(
         dataset_config=settings.dataset,
@@ -215,7 +213,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
         {
             "panel": f"{thousands(n_series)} series, {thousands(len(panel))} filas",
             "ventana": f"{panel['date'].min().date()} → {panel['date'].max().date()}",
-            "estrategias": " · ".join(IMPUTATION_COMPARISON_STRATEGIES),
+            "estrategias": " · ".join(strategies),
         },
     )
 
@@ -225,7 +223,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
     stages.header()
 
     frames: list[pd.DataFrame] = []
-    for strategy in IMPUTATION_COMPARISON_STRATEGIES:
+    for strategy in strategies:
         started = time.monotonic()
         imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
             panel
@@ -256,6 +254,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
     quality_df = _evaluate_imputation_quality(
         panel,
         seed=settings.project.random_seed,
+        strategies=strategies,
         imputer_params_path=imputation_params_path(settings.models.models_dir),
     )
 
@@ -269,7 +268,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
             "created_at": utc_timestamp(),
             "git_commit": get_git_commit(),
             "config_hash": build_config_hash(settings),
-            "strategies": list(IMPUTATION_COMPARISON_STRATEGIES),
+            "strategies": list(strategies),
             "series": int(n_series),
             "rows": int(len(panel)),
         }
