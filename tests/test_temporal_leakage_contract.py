@@ -13,6 +13,7 @@ from retail_forecasting.config import (
     Settings,
     ValidationConfig,
 )
+from retail_forecasting.drift import label_all_regimes
 from retail_forecasting.features.engineering import build_supervised_frame
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
 from retail_forecasting.forecasting.pipeline import (
@@ -115,6 +116,36 @@ def test_realized_context_enters_model_only_as_lagged_features() -> None:
             "avg_temperature",
         ]
     )
+
+
+def test_regime_labels_never_become_features() -> None:
+    """The regime labels ride in the panel as metadata and must stay out of the model.
+
+    `run_experiment` and `run_scoring` label the panel before building features, so these
+    four columns ARE present when the supervised frame is built. Two of them would leak if
+    picked up: `stockout_regime` thresholds the same day's `stockout_hours`, which the hard
+    rules say may only enter lagged, and `velocity_regime` thresholds a per-series mean taken
+    over the whole frame, future dates included -- the shape invariant 8 forbids.
+
+    What keeps them out is the allowlist in `build_feature_frame`, which names every feature
+    it adds. That was a convention no test held: the sibling check above only blocks the raw
+    same-day columns, so adding the labels as categoricals passed green with a leak inside.
+    """
+    panel = label_all_regimes(make_synthetic_panel(num_series=2, num_days=40))
+    regime_columns = {
+        "stockout_regime",
+        "velocity_regime",
+        "promo_regime",
+        "seasonal_regime",
+    }
+    assert regime_columns.issubset(panel.columns), "the panel is meant to carry the labels"
+
+    _, metadata = build_supervised_frame(
+        panel=panel,
+        feature_config=FeatureConfig(lags=[1, 2], rolling_windows=[3]),
+        horizon=3,
+    )
+    assert regime_columns.isdisjoint(metadata.feature_columns)
 
 
 def test_walk_forward_folds_leave_horizon_gap_before_validation() -> None:
