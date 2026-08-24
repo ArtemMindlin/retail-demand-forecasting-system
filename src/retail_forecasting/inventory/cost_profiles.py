@@ -59,7 +59,11 @@ def build_series_cost_profile(
         )
         .reset_index()
     )
-    series_summary["demand_std"] = series_summary["demand_std"].fillna(0.0)
+    # `replace(0.0, nan)` and not a plain division: with `drop_negative_sales: false` a
+    # series whose negatives cancel its positives has mean 0 and std > 0, and x/0 is `inf`,
+    # which `fillna` does not catch. That `inf` reaches the category mean and hands the whole
+    # category the top cv rank. The `fillna(0.0)` alone covers every NaN case, including the
+    # single-row group whose std is NaN.
     denominator = series_summary["mean_observed_demand"].replace(0.0, np.nan)
     series_summary["coefficient_variation"] = (series_summary["demand_std"] / denominator).fillna(
         0.0
@@ -90,6 +94,10 @@ def build_series_cost_profile(
         how="left",
     )
 
+    profile["demand_rank"] = _percentile_rank(profile["mean_observed_demand"])
+    profile["intermittency_rank"] = _percentile_rank(profile["zero_demand_rate"])
+    profile["stockout_rank"] = _percentile_rank(profile["stockout_day_rate"])
+
     profile = _score_dimensions(profile)
     profile = _apply_cost_factors(profile, inventory_config)
 
@@ -107,10 +115,6 @@ def build_series_cost_profile(
 
 def _score_dimensions(profile: pd.DataFrame) -> pd.DataFrame:
     """Combine the percentile ranks into perishability/slow-moving/criticality scores."""
-    profile["demand_rank"] = _percentile_rank(profile["mean_observed_demand"])
-    profile["intermittency_rank"] = _percentile_rank(profile["zero_demand_rate"])
-    profile["stockout_rank"] = _percentile_rank(profile["stockout_day_rate"])
-
     pw = PERISHABILITY_WEIGHTS
     profile["synthetic_perishability_score"] = (
         pw[0] * profile["category_zero_rank"]
