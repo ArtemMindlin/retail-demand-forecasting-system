@@ -160,6 +160,18 @@ Interpretacion:
 - si tiene valor, una corrida operacional falla cuando el `date` maximo del
   panel supera ese numero de dias respecto a la fecha actual.
 
+Esta en `null` en `retrain/` y `score_daily/`, que son los dos modos donde aplicaria, y
+es deliberado: `FreshRetailNet-50K` termina el 2024-06-25, de modo que cualquier valor
+por debajo de su antiguedad ---790 dias a fecha de agosto de 2026, y creciendo--- aborta
+esos modos siempre. Y ponerlo por encima no vigila nada: no detectaria un feed parado y
+empezaria a fallar solo por calendario. La comprobacion mide contra `datetime.now()`, asi
+que solo es armable sobre datos vivos; con un dataset academico congelado la eleccion es
+entre desarmada e inservible. Es el primer valor que hay que poner al conectar una fuente
+real, y por eso el check se queda en su sitio.
+
+`run_mode = experiment` se la salta ademas por diseno: un backtest sobre datos historicos
+no debe fallar por antiguos.
+
 ### `splits`
 
 Mapa entre nombres logicos de splits y rutas parquet dentro del dataset remoto.

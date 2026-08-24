@@ -114,6 +114,10 @@ def validate_prepared_panel(panel: pd.DataFrame, settings: Settings) -> DataQual
             )
         )
 
+    # Unarmed on every shipped config, deliberately: the age is measured against
+    # `datetime.now()` and the v1 dataset ends 2024-06-25, so any threshold below its
+    # (growing) age aborts the operational modes and any threshold above it watches
+    # nothing. See `max_data_age_days` in docs/config_reference.md.
     if (
         settings.data_quality.max_data_age_days is not None
         and settings.project.run_mode != "experiment"
