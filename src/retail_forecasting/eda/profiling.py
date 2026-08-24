@@ -11,7 +11,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.figure import Figure
+
+from retail_forecasting.utils.plotting import make_grid
 
 
 def build_dataset_summary(panel: pd.DataFrame) -> pd.DataFrame:
@@ -136,22 +137,6 @@ def render_profiling_figures(panel: pd.DataFrame, output_dir: Path) -> None:
     _plot_observed_demand_distribution(panel, output_dir / "observed_demand_distribution.png")
     _plot_correlation_heatmap(panel, output_dir / "correlation_heatmap.png")
     _plot_covariate_vs_demand_grid(panel, output_dir / "covariate_vs_demand_grid.png")
-
-
-def make_grid(
-    n_items: int,
-    n_cols: int,
-    width: float,
-    row_height: float,
-    sharex: bool = False,
-) -> tuple[Figure, np.ndarray]:
-    """Create a grid of subplots sized for ``n_items`` and hide the unused cells."""
-    n_rows = int(np.ceil(n_items / n_cols))
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(width, row_height * n_rows), sharex=sharex)
-    axes_flat = np.atleast_1d(axes).flatten()
-    for axis in axes_flat[n_items:]:
-        axis.axis("off")
-    return fig, axes_flat
 
 
 def _plot_observed_demand_distribution(panel: pd.DataFrame, output_path: Path) -> None:

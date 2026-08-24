@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 
-from retail_forecasting.eda.profiling import make_grid
+from retail_forecasting.utils.plotting import make_grid
 
 TOP_SERIES_PLOT_COUNT = 12
 REPRESENTATIVE_SERIES_COUNT = 12
