@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from retail_forecasting.utils.latex_exporter import _panel_series, export_to_latex
+from retail_forecasting.evaluation.latex_exporter import _panel_series, export_to_latex
 
 METRICS = pd.DataFrame(
     {

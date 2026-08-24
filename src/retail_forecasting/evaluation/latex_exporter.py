@@ -6,12 +6,17 @@ Both tables are generated, never hand-edited: `memoria/tables/table_predictive.t
 The runs are passed in, deliberately. This module used to pin them in `__main__`, so
 regenerating a table silently republished whichever run was hardcoded there — that is
 how both tables drifted to runs predating the August 2026 audit fixes while
-`docs/runs.md` declared newer ones. Pass the run that `docs/runs.md` declares.
+`docs/runs.md` declared newer ones. Pass the run that `docs/runs.md` declares -- by the
+name it is cited under, which `resolve_run_dir` looks up in MLflow, or by directory.
+
+It lives in `evaluation` and not in `utils` for that lookup: `utils` imports no
+first-party layer, and `tracking` imports `utils`, so reaching the run index from there
+would have closed a cycle.
 
 Usage:
-    python -m retail_forecasting.utils.latex_exporter \
-        --metrics-run reports/fresh_retailnet_large_20260811_125735 \
-        --fair-cost-run reports/fresh_retailnet_large_20260811_184959
+    python -m retail_forecasting.evaluation.latex_exporter \
+        --metrics-run fresh_retailnet_large_20260811_125735 \
+        --fair-cost-run fresh_retailnet_large_20260811_184959
 """
 
 from __future__ import annotations
@@ -22,6 +27,8 @@ from pathlib import Path
 from typing import Literal
 
 import pandas as pd
+
+from retail_forecasting.tracking import resolve_run_dir
 
 CostMode = Literal["fair", "summary"]
 
@@ -214,15 +221,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--metrics-run",
-        type=Path,
+        type=resolve_run_dir,
         required=True,
-        help="Run directory holding metrics_summary.csv (backs tab:metrics_predictive).",
+        help="Run name or directory holding metrics_summary.csv (backs tab:metrics_predictive).",
     )
     parser.add_argument(
         "--fair-cost-run",
-        type=Path,
+        type=resolve_run_dir,
         required=True,
-        help="Run directory holding fair_cost_backtest.csv (backs tab:metrics_cost).",
+        help="Run name or directory holding fair_cost_backtest.csv (backs tab:metrics_cost).",
     )
     parser.add_argument("--output-dir", type=Path, default=Path("memoria/tables"))
     return parser

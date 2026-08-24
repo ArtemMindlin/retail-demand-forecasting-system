@@ -80,7 +80,7 @@ ml = [
   "greenlet>=3.0.0",
   # Experiment tracking for the imputation tuning entry point. Declared here, not as a core
   # dependency, because only that entry point logs to it -- the forecasting pipeline still
-  # writes its artifacts to reports/, which the dashboard and utils/latex_exporter.py read.
+  # writes its artifacts to reports/, which the dashboard and evaluation/latex_exporter.py read.
   "mlflow>=2.16.0",
 ]
 

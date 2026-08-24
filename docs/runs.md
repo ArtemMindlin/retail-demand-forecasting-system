@@ -33,14 +33,13 @@ neither was listed here at all.
 by hand. Regenerate both together:
 
 ```bash
-uv run python -m retail_forecasting.utils.latex_exporter \
-    --metrics-run reports/fresh_retailnet_large_20260811_125735 \
-    --fair-cost-run reports/fresh_retailnet_large_20260811_184959
+uv run python -m retail_forecasting.evaluation.latex_exporter \
+    --metrics-run fresh_retailnet_large_20260811_125735 \
+    --fair-cost-run fresh_retailnet_large_20260811_184959
 ```
 
-The exporter still takes directories. The figure scripts below take either a directory or
-the name of a run recorded in MLflow, which is what this table already cites — the exporter
-cannot, because it lives in `utils`, and `utils` sits below `tracking` in the import layers.
+Those are run names, resolved through MLflow — the same names this table cites. A directory
+still works.
 
 The runs are arguments, not defaults: the exporter used to pin them in `__main__`, which
 is how it kept republishing June runs. It also could not execute at all between `14ad8b4`
