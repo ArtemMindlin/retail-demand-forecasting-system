@@ -206,18 +206,21 @@ def run_imputation_comparison(settings: Settings) -> Path:
         split="train",
     )
     n_series = panel["series_id"].nunique()
+    n_censored = int((panel["stockout_hours"] > 0).sum())
     fields(
         logger,
         {
             "panel": f"{thousands(n_series)} series, {thousands(len(panel))} filas",
             "ventana": f"{panel['date'].min().date()} → {panel['date'].max().date()}",
+            "por reconstruir": f"{thousands(n_censored)} días con rotura "
+            f"({n_censored / len(panel):.1%})",
             "estrategias": " · ".join(strategies),
         },
     )
 
     imputer_params_path = settings.models.models_dir / settings.models.imputation_params_filename
 
-    stages = Table(logger, {"estrategia": 18, "filas": 10, "imputadas": 10, "tiempo": 6})
+    stages = Table(logger, {"estrategia": 18, "reconstruido": 12, "+demanda": 10, "tiempo": 6})
 
     frames: list[pd.DataFrame] = []
     for strategy in strategies:
@@ -237,11 +240,15 @@ def run_imputation_comparison(settings: Settings) -> Path:
             }
         )
         frames.append(frame)
+        added = (
+            frame.loc[frame["is_imputed"], "latent_demand_est"]
+            - frame.loc[frame["is_imputed"], "observed"]
+        )
         stages.row(
             {
                 "estrategia": strategy,
-                "filas": thousands(len(frame)),
-                "imputadas": thousands(int(frame["is_imputed"].sum())),
+                "reconstruido": thousands(int(frame["is_imputed"].sum())),
+                "+demanda": f"{added.mean():.3f}" if len(added) else "—",
                 "tiempo": f"{time.monotonic() - started:.0f}s",
             }
         )
@@ -252,7 +259,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
         panel,
         seed=settings.project.random_seed,
         strategies=strategies,
-        imputer_params_path=settings.models.models_dir / settings.models.imputation_params_filename,
+        imputer_params_path=imputer_params_path,
     )
 
     with open_run_directory(settings.reporting.run_name, EXPERIMENT_RUNS) as run_dir:
@@ -260,7 +267,6 @@ def run_imputation_comparison(settings: Settings) -> Path:
         quality_df.to_csv(run_dir / "imputation_quality.csv", index=False)
 
         metadata = {
-            "kind": "impute_compare",
             "run_name": settings.reporting.run_name,
             "created_at": utc_timestamp(),
             "git_commit": get_git_commit(),
@@ -415,7 +421,9 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
         panel,
         settings.inventory,
         seed=settings.project.random_seed,
-        imputer_params_path=settings.models.models_dir / settings.models.imputation_params_filename,
+        imputer_params_path=(
+            settings.models.models_dir / settings.models.imputation_params_filename
+        ),
     )
     # Provenance: the ranking flips with the source panel, so the artifact must say
     # which one it came from rather than leaving it to the reader's memory.

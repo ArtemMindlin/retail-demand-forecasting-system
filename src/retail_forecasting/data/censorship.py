@@ -212,9 +212,6 @@ class LatentDemandImputer:
             ).model_dump()
 
         lgbm_kwargs: dict[str, Any] = dict(params)
-        # `n_jobs=1` measured 16x FASTER than -1 here (1.6s vs 25.5s): ~17k clean rows over 11
-        # features is too little work per tree to pay for thread coordination, times 1827 trees.
-        # It is also what the tuning needs, calling this inside a 10-thread `Parallel`.
         lgbm_kwargs.update({"random_state": 42, "verbosity": -1, "n_jobs": 1})
         self.model = lgb.LGBMRegressor(**lgbm_kwargs)
         self.model.fit(X_train, y_train)
