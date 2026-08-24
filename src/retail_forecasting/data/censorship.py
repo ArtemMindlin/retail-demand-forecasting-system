@@ -23,9 +23,6 @@ DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
     "colsample_bytree": 1.0,
     "subsample": 1.0,
     "subsample_freq": 0,
-    # 1e-8 rather than LightGBM's own 0.0, so this baseline is a point the imputation search
-    # can express: its regularizers are drawn log-uniformly from 1e-8, and no log scale reaches
-    # zero. The two are the same model in practice -- measured at 1.4e-11 of reconstruction MAE.
     "reg_alpha": 1e-8,
     "reg_lambda": 1e-8,
     "min_data_per_group": 100,
@@ -34,22 +31,9 @@ DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
 }
 
 # Shared filename convention for persisted tuned imputation hyperparameters.
-IMPUTATION_LGBM_PARAMS_FILENAME = "imputation_lgbm_params.json"
-
 
 SYNTHETIC_CENSORING_EVAL_FRACTION = 0.30
 
-# Feature space of the supervised teacher, in the order LightGBM receives it. Columns absent
-# from the panel are dropped rather than required: the imputer also runs on panels that carry
-# no covariates (the synthetic panels in the tests, the OPS split).
-#
-# This list is a contract, not a convenience. The teacher fits on clean days and predicts on
-# censored ones, two populations that differ systematically, so a column correlated with
-# censorship poisons it -- `stockout_hours` is constant at 0 across every training row and
-# arrives at 1..16 in prediction, which is why severity is applied when reconciling instead.
-# Handing the teacher whatever the panel happens to hold would let a new panel column change
-# imputation silently, and would break invariant 40's guarantee that tuning cannot move the
-# feature space.
 SUPERVISED_CANDIDATE_FEATURES = [
     "month",
     "day_of_week",
@@ -95,14 +79,6 @@ def synthetic_censor_holdout(
 
     Returns:
         ``(censored_panel, eval_idx, true_demand)``, always non-empty.
-
-    Raises:
-        ValueError: If the panel (within ``censorable_mask``) has no clean rows to censor, or no
-            real stockouts to draw a severity from. This used to return empty and let each
-            caller decide, which meant the imputation study wrote an `imputation_quality.csv`
-            holding headers and no rows -- an empty artifact that reads as "no result" rather
-            than "this failed", the exact pattern invariants 14 and 32 exist to prevent. There
-            is no caller for whom scoring zero rows is a legitimate outcome.
     """
     rng = np.random.default_rng(seed)
     clean_mask = panel["stockout_hours"] == 0

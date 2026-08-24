@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
+from retail_forecasting.config import load_config
 from retail_forecasting.contracts.contracts_config import MODE_SECTIONS, RunMode
 
 CONFIGS = Path("configs")
@@ -21,6 +22,7 @@ SHARED_FIELDS = (
     ("dataset", "splits"),
     ("dataset", "local_cache_dir"),
     ("models", "models_dir"),
+    ("models", "imputation_params_filename"),
 )
 
 
@@ -59,12 +61,22 @@ def test_config_run_mode_matches_its_folder(path: Path) -> None:
 
 
 def test_shared_dataset_and_model_fields_do_not_drift() -> None:
-    """One config per mode duplicates these; nothing else stops them diverging."""
-    seen: dict[tuple[str, str], set[str]] = {}
+    """One config per mode duplicates these; nothing else stops them diverging.
+
+    Compared as EFFECTIVE values, so a config that omits the field counts as declaring the
+    default. Comparing only what is written down missed the dangerous case: one config
+    declaring a value while the others silently take the default is divergence, and for
+    `imputation_params_filename` it sends the readers to a file the writer never wrote.
+    """
+    seen: dict[tuple[str, str], dict[str, str]] = {}
     for path in _config_files():
         payload = _load(path)
+        settings = load_config(path)
         for section, field in SHARED_FIELDS:
-            if section in payload and field in payload[section]:
-                seen.setdefault((section, field), set()).add(repr(payload[section][field]))
-    divergentes = {key: values for key, values in seen.items() if len(values) > 1}
-    assert not divergentes, f"valores divergentes entre configs: {divergentes}"
+            if section not in MODE_SECTIONS[payload["project"]["run_mode"]]:
+                continue
+            effective = getattr(getattr(settings, section), field)
+            seen.setdefault((section, field), {})[str(path)] = repr(effective)
+
+    divergentes = {key: values for key, values in seen.items() if len(set(values.values())) > 1}
+    assert not divergentes, f"valores efectivos divergentes entre configs: {divergentes}"

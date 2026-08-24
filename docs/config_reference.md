@@ -785,6 +785,25 @@ Interpretacion:
 
 Controla los artefactos generados.
 
+### `imputation_params_filename`
+
+Nombre del fichero donde `tune_imputation` persiste su ganador y de donde lo leen los
+tres modos que usan el imputador supervisado (`experiment`, `compare_imputation`,
+`fair_cost_backtest`). Se resuelve dentro de `models.models_dir`.
+
+Ejemplo:
+
+```yaml
+imputation_params_filename: imputation_lgbm_params.json
+```
+
+Tiene que ser un nombre de fichero pelado: un separador lo rechaza al cargar, para que
+no pueda escapar de `models_dir`. Y esta pinchado en `SHARED_FIELDS` de
+`tests/test_config_layout.py` por valor EFECTIVO, no declarado: el que escribe y los que
+leen cargan configs distintas, y un valor que solo declarase uno de ellos mandaria a los
+demas a un fichero que no existe --- lo que no da error, degrada a los defaults sin
+afinar.
+
 ### `comparison_strategies`
 
 Que estrategias compara `run_mode = compare_imputation`. Solo ese modo la lee.

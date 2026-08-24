@@ -195,6 +195,11 @@ class DataQualityConfig(BaseModel):
 class ModelConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     models_dir: Path = Field(default=Path("models"))
+    # Where `tune_imputation` persists its winner and the three modes that use the supervised
+    # imputer read it from. Pinned by `SHARED_FIELDS`: writer and readers each load their own
+    # config, and a value that differed between them would send the readers to a file that is
+    # not there, which degrades to the untuned defaults without an error.
+    imputation_params_filename: str = "imputation_lgbm_params.json"
     quantiles: list[float] = Field(default_factory=lambda: [0.1, 0.5, 0.9], min_length=1)
     seasonal_period: int = Field(default=7, gt=0)
     n_estimators: int = Field(default=200, gt=0)
@@ -202,6 +207,13 @@ class ModelConfig(BaseModel):
     max_depth: int = Field(default=6, gt=0)
     use_tuning: bool = True
     tuning_trials: int = Field(default=20, gt=0)
+
+    @field_validator("imputation_params_filename")
+    @classmethod
+    def validate_imputation_params_filename(cls, v: str) -> str:
+        if Path(v).name != v:
+            raise ValueError("models.imputation_params_filename must be a bare file name.")
+        return v
 
     @field_validator("quantiles")
     @classmethod

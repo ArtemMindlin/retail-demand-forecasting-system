@@ -12,7 +12,6 @@ from mlflow.data.pandas_dataset import from_pandas
 from retail_forecasting.config import ModelConfig, Settings, build_config_hash
 from retail_forecasting.data.censorship import (
     DEFAULT_SUPERVISED_LGBM_PARAMS,
-    IMPUTATION_LGBM_PARAMS_FILENAME,
     LatentDemandImputer,
     synthetic_censor_holdout,
 )
@@ -31,6 +30,8 @@ from retail_forecasting.forecasting.imputation_tuning import (
 from tests import make_synthetic_panel
 
 METADATA_FILENAME = "imputation_lgbm_tuning_metadata.json"
+# El default del campo, no un literal: si cambia, estos tests lo siguen.
+PARAMS_FILENAME = ModelConfig().imputation_params_filename
 
 
 @pytest.fixture(autouse=True)
@@ -77,7 +78,7 @@ def _write_incumbent(tmp_path: Path, params_path: Path | None = None) -> Path:
     Marked by a sentinel ``n_estimators`` so ``_stub_holdout_maes`` can tell it apart from both
     the untuned defaults and the challenger the search produces.
     """
-    target = params_path if params_path is not None else tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
+    target = params_path if params_path is not None else tmp_path / PARAMS_FILENAME
     incumbent = dict(DEFAULT_SUPERVISED_LGBM_PARAMS) | {"n_estimators": INCUMBENT_MARKER_ESTIMATORS}
     target.write_text(json.dumps(incumbent), encoding="utf-8")
     return target
@@ -209,7 +210,7 @@ def test_tune_imputation_lgbm_persists_params_when_winner_beats_defaults(
         n_validation_holdouts=2,
     )
 
-    assert params_path == tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
+    assert params_path == tmp_path / PARAMS_FILENAME
     params = json.loads(params_path.read_text(encoding="utf-8"))
     assert set(params) == set(DEFAULT_SUPERVISED_LGBM_PARAMS)
 
@@ -245,7 +246,7 @@ def test_tune_imputation_lgbm_skips_persisting_when_the_gain_could_be_a_coin_fli
     assert metadata["improvement_pct"] < 0, "the mean improvement is negative..."
     assert metadata["improvement_ci95"][1] > 0, "...but the interval straddles zero"
     assert metadata["persisted"] is False
-    assert not (tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME).exists()
+    assert not (tmp_path / PARAMS_FILENAME).exists()
 
 
 def test_tune_imputation_lgbm_returns_the_defaults_when_nothing_beats_them(
@@ -270,7 +271,7 @@ def test_tune_imputation_lgbm_returns_the_defaults_when_nothing_beats_them(
 
     # No params file: persisting a loser would silently switch the pipeline to hyperparameters
     # chosen by selection noise.
-    assert not (tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME).exists()
+    assert not (tmp_path / PARAMS_FILENAME).exists()
     assert returned == tmp_path / METADATA_FILENAME
 
     metadata = json.loads(returned.read_text(encoding="utf-8"))
@@ -283,7 +284,7 @@ def test_tune_imputation_lgbm_removes_a_superseded_params_file_when_the_gate_fai
     tmp_path: Path, patched_train_only_loader: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A rejected search must not leave an earlier winner in charge of the pipeline."""
-    stale = tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
+    stale = tmp_path / PARAMS_FILENAME
     stale.write_text(json.dumps(dict(DEFAULT_SUPERVISED_LGBM_PARAMS)), encoding="utf-8")
 
     _stub_holdout_maes(monkeypatch, default_maes=[0.5, 0.5], other_maes=[1.0, 1.0])
@@ -386,7 +387,7 @@ def test_tune_imputation_lgbm_has_no_incumbent_to_beat_on_a_first_run(
         n_validation_holdouts=2,
     )
 
-    assert returned == tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
+    assert returned == tmp_path / PARAMS_FILENAME
     metadata = json.loads((tmp_path / METADATA_FILENAME).read_text(encoding="utf-8"))
     assert metadata["beats_incumbent"] is None
     assert metadata["incumbent_mae_validation"] is None
@@ -709,7 +710,7 @@ def test_a_broken_tracking_store_does_not_take_the_search_down_with_it(
     )
 
     # The winner was persisted and the caller still gets its path.
-    assert returned == tmp_path / IMPUTATION_LGBM_PARAMS_FILENAME
+    assert returned == tmp_path / PARAMS_FILENAME
     assert json.loads(returned.read_text(encoding="utf-8"))["n_estimators"]
     assert (tmp_path / METADATA_FILENAME).exists()
 
