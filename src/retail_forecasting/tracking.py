@@ -200,6 +200,11 @@ def log_imputation_comparison_metadata(
         "bias": "reconstruction_bias",
         "mape": "reconstruction_mape",
     }
+    # On the parent too, keyed by strategy. The children exist so the charts can overlay them;
+    # this is so opening the run answers "what did it measure?" without navigating into three
+    # of them. Same numbers, two indexes -- not two sources.
+    mlflow.log_metrics(_numeric_metrics(quality.rename(columns=renamed)))
+
     for _, row in quality.iterrows():
         with mlflow.start_run(run_name=str(row["strategy"]), nested=True):
             # The name stays the strategy, which is what makes the within-run comparison
