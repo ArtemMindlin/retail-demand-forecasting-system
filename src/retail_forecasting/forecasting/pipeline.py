@@ -248,34 +248,42 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
 
 def run_experiment(settings: Settings) -> RunArtifacts:
     """Run the end-to-end experiment comparing Observed vs Latent demand."""
+    rule(logger, "experimento walk-forward")
+    started = time.monotonic()
+
     # 1. Load Original Panel
-    print("\n" + "=" * 50)
-    print("🚀 STARTING RETAIL DEMAND FORECASTING EXPERIMENT")
-    print("=" * 50 + "\n")
-    print("📂 Loading train panel...")
     raw_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
         split="train",
     )
-    n_series = raw_panel["series_id"].nunique() if "series_id" in raw_panel.columns else "?"
-    print(f"✅ Train panel loaded: {len(raw_panel):,} rows, {n_series} series")
     quality_report = validate_prepared_panel(raw_panel, settings)
     raise_on_blocking_data_quality(quality_report)
-    print("✅ Data quality checks passed")
 
     # Load external holdout (eval) split
-    print("\n📥 Loading external holdout (eval) split...")
     holdout_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
         split="eval",
     )
 
+    strategy_name = settings.preprocessing.imputation_strategy
+    fields(
+        logger,
+        {
+            "panel": f"{thousands(quality_report.checked_series)} series, "
+            f"{thousands(len(raw_panel))} filas",
+            "ventana": f"{raw_panel['date'].min().date()} → {raw_panel['date'].max().date()}",
+            "holdout": f"{thousands(len(holdout_panel))} filas "
+            f"({holdout_panel['date'].min().date()} → {holdout_panel['date'].max().date()})",
+            "calidad": f"{quality_report.warning_count} avisos",
+            "estrategias": f"Observed · Latent_{strategy_name}",
+            "folds": f"{settings.validation.n_folds} × {settings.validation.fold_size_days}d, "
+            f"horizonte {settings.dataset.horizon}d",
+        },
+    )
+
     # 2. Run Strategy A: Observed Demand (Baseline)
-    print("\n" + "-" * 40)
-    print("📊 Strategy A: Observed Demand")
-    print("-" * 40)
     artifacts_obs = run_experiment_from_frame(
         raw_panel,
         settings,
@@ -285,10 +293,6 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     )
 
     # 3. Run Strategy B: Latent Demand (Imputed)
-    strategy_name = settings.preprocessing.imputation_strategy
-    print("\n" + "-" * 40)
-    print(f"📊 Strategy B: Latent Demand (Imputation: {strategy_name})")
-    print("-" * 40)
     imputer = LatentDemandImputer(
         strategy=strategy_name,
         model_path=settings.models.models_dir / settings.models.imputation_params_filename,
@@ -363,10 +367,14 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         shap_values=artifacts_obs.shap_values,
     )
 
-    print("\n💾 Writing run artifacts...")
     artifacts_with_files = write_run_artifacts(final_artifacts, settings)
-    print(f"✅ Artifacts saved to: {artifacts_with_files.run_directory}\n")
-
+    fields(
+        logger,
+        {
+            "escrito": artifacts_with_files.run_directory,
+            "tiempo": f"{time.monotonic() - started:.0f}s",
+        },
+    )
     return artifacts_with_files
 
 
@@ -389,7 +397,6 @@ def _build_supervised_frames(
     prepared_panel: pd.DataFrame,
     holdout_panel: pd.DataFrame | None,
     settings: Settings,
-    data_strategy: str,
 ) -> tuple[pd.DataFrame, Any, pd.DataFrame | None]:
     """Build the supervised modeling frame and (optionally) the holdout frame.
 
@@ -397,13 +404,11 @@ def _build_supervised_frames(
     get correct lag history, but only holdout-date rows are kept — preventing
     holdout demand from leaking into training targets via shift(-horizon).
     """
-    print(f"  🔧 [{data_strategy}] Building supervised frame (feature engineering)...")
     supervised_frame, feature_metadata = build_supervised_frame(
         panel=prepared_panel,
         feature_config=settings.features,
         horizon=settings.dataset.horizon,
     )
-    print(f"  ✅ [{data_strategy}] {len(feature_metadata.feature_columns)} features built")
 
     holdout_supervised_frame: pd.DataFrame | None = None
     if holdout_panel is not None:
@@ -437,9 +442,15 @@ def _run_tuning_phase(
     if not settings.models.use_tuning:
         return best_params, None, None
 
-    print(f"\n🔍 Starting Optuna Tuning for [{data_strategy}] strategy...")
     # Tuning only uses data available in the first fold's training set.
     tuning_train_frame = supervised_frame[supervised_frame["date"] <= folds[0].train_end_date]
+    fields(
+        logger,
+        {
+            "tuning": f"Optuna, {settings.models.tuning_trials} pruebas",
+            "sobre": f"{thousands(len(tuning_train_frame))} filas hasta {folds[0].train_end_date.date()}",
+        },
+    )
     tuner = HyperparameterTuner(settings, n_trials=settings.models.tuning_trials)
     tuning_result = tuner.tune_boosting(tuning_train_frame, feature_columns)
 
@@ -470,12 +481,13 @@ def _run_fold_loop(
     )
     force_retrain = False
 
-    print(f"\n  📅 [{data_strategy}] Starting {len(folds)} walk-forward folds...")
+    # One row per fold: the line this loop repeats. Labels hoisted into the heading,
+    # since eight labelled fields per fold wrap a terminal pane.
+    progress = Table(
+        logger,
+        {"fold": 5, "train hasta": 12, "validación": 23, "filas": 8, "entrena": 9, "MAE": 8},
+    )
     for fold in folds:
-        print(f"\n  ▶ [{data_strategy}] Fold {fold.fold_id}/{len(folds)}")
-        print(
-            f"    Train: up to {fold.train_end_date.date()} | Val: {fold.validation_start_date.date()} → {fold.validation_end_date.date()}"
-        )
         train_mask = supervised_frame["date"] <= fold.train_end_date
         validation_mask = (supervised_frame["date"] >= fold.validation_start_date) & (
             supervised_frame["date"] <= fold.validation_end_date
@@ -505,6 +517,7 @@ def _run_fold_loop(
 
         current_fold_retrained = force_retrain
         force_retrain = False
+        trained: list[str] = []
 
         # 1. Seasonal Naive Baseline
         result.fold_predictions.append(
@@ -524,7 +537,7 @@ def _run_fold_loop(
             or settings.validation.retrain_each_fold
             or current_fold_retrained
         ):
-            print(f"    🌲 [{data_strategy}] Training LightGBM (fold {fold.fold_id})...")
+            trained.append("lgbm")
             result.boosting_model = _train_conformal_model(
                 _instantiate_boosting_base(LightGBMModel, settings, best_boosting_params),
                 sub_train_frame,
@@ -551,7 +564,7 @@ def _run_fold_loop(
             or settings.validation.retrain_each_fold
             or current_fold_retrained
         ):
-            print(f"    🐱 [{data_strategy}] Training CatBoost (fold {fold.fold_id})...")
+            trained.append("cat")
             result.cat_model = _train_conformal_model(
                 _instantiate_boosting_base(CatBoostingModel, settings, best_boosting_params),
                 sub_train_frame,
@@ -579,6 +592,18 @@ def _run_fold_loop(
         result.last_drift_score = drift_status.score
         result.max_drift_score = max(result.max_drift_score, drift_status.score)
 
+        progress.row(
+            {
+                "fold": f"{fold.fold_id}/{len(folds)}",
+                "train hasta": fold.train_end_date.date(),
+                "validación": f"{fold.validation_start_date.date()} → "
+                f"{fold.validation_end_date.date()}",
+                "filas": thousands(len(validation_frame)),
+                "entrena": "+".join(trained) if trained else "reusa",
+                "MAE": f"{fold_mae:.3f}",
+            }
+        )
+
         if drift_status.is_drift:
             result.detected_drifts.append(
                 DriftEvent(
@@ -588,8 +613,14 @@ def _run_fold_loop(
                     fold_id=fold.fold_id,
                 )
             )
+            logger.warning(
+                "drift en el fold %s (score %.2f > umbral %.2f)%s",
+                fold.fold_id,
+                drift_status.score,
+                drift_status.threshold,
+                ", se fuerza reentreno" if settings.validation.drift_triggered_retrain else "",
+            )
             if settings.validation.drift_triggered_retrain:
-                print(f"⚠️ DRIFT DETECTED in Fold {fold.fold_id}. Forcing retrain for next fold.")
                 force_retrain = True
 
     result.drift_observations = drift_detector.observations_seen
@@ -625,7 +656,7 @@ def _evaluate_on_holdout(
             "survive feature engineering and that its series overlap the training panel."
         )
 
-    print(f"📊 Retraining on full train set before holdout evaluation ({data_strategy})...")
+    fields(logger, {"holdout": "reentrenando sobre el train completo antes de evaluar"})
     full_sub_train, full_calib, full_calib_group_ids = _split_train_calibration(
         supervised_frame, settings
     )
@@ -755,7 +786,7 @@ def run_experiment_from_frame(
         series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)
 
     supervised_frame, feature_metadata, holdout_supervised_frame = _build_supervised_frames(
-        panel, prepared_panel, holdout_panel, settings, data_strategy
+        panel, prepared_panel, holdout_panel, settings
     )
     feature_columns = feature_metadata.feature_columns
 
@@ -764,6 +795,17 @@ def run_experiment_from_frame(
         panel=panel,
         validation_config=settings.validation,
         horizon=settings.dataset.horizon,
+    )
+
+    rule(logger, f"estrategia · {data_strategy}")
+    fields(
+        logger,
+        {
+            "features": f"{len(feature_columns)} columnas",
+            "supervisado": f"{thousands(len(supervised_frame))} filas de "
+            f"{thousands(feature_metadata.input_rows)}",
+            "folds": thousands(len(folds)),
+        },
     )
 
     best_boosting_params, tuning_metadata, tuning_pareto = _run_tuning_phase(
@@ -852,7 +894,7 @@ def run_experiment_from_frame(
     if settings.reporting.make_plots:
         model_to_explain = loop.cat_model if loop.cat_model is not None else loop.boosting_model
         if model_to_explain is not None:
-            print(f"--- Calculating SHAP values for {model_to_explain.model_name} ---")
+            fields(logger, {"SHAP": model_to_explain.model_name})
             shap_values = calculate_shap_values(
                 model=model_to_explain,
                 X=supervised_frame[feature_columns],
