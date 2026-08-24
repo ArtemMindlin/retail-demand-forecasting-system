@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,29 +12,9 @@ import pandas as pd
 HOLDOUT_FOLD_ID = 999
 
 
-def make_run_directory(base_dir: str | Path, run_name: str) -> Path:
-    """Create a timestamped run directory below a base output path.
-
-    Args:
-        base_dir: Parent directory where run folders are stored.
-        run_name: Prefix used in the generated run directory name.
-
-    Returns:
-        The created run directory path.
-
-    Notes:
-        The directory name includes a UTC timestamp to provide stable,
-        time-based uniqueness across runs. That format is a shared convention and not a
-        detail of any one caller: `api.services.runs.list_eda_runs` sorts EDA runs by NAME,
-        so the lexicographic order of the timestamp is what makes newest-first work.
-
-        The directory is created here, so callers do not need to. Four of them used to call
-        `mkdir` again right after, which reads as if this function only computed a path.
-    """
-    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-    run_dir = Path(base_dir) / f"{run_name}_{timestamp}"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir
+def model_file_path(models_dir: Path | str, backend_name: str) -> Path:
+    """Where a trained backend's pickle lives. In `utils` because `evaluation` needs it too."""
+    return Path(models_dir) / f"{backend_name}.pkl"
 
 
 def quantile_column_name(quantile: float) -> str:

@@ -23,6 +23,7 @@ from retail_forecasting.tracking import (
 )
 from retail_forecasting.utils.io import (
     dataframe_to_markdown,
+    model_file_path,
 )
 from retail_forecasting.utils.logging import get_logger
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
@@ -660,7 +661,7 @@ def update_champion_registry(
             reason = promotion_decision.decision_reason
 
     backend = str(promoted_row["backend_name"])
-    model_file = Path(settings.models.models_dir) / f"{backend}.pkl"
+    model_file = model_file_path(settings.models.models_dir, backend)
     return ChampionRegistry(
         updated_at=utc_timestamp(),
         current_champion=ChampionRecord(

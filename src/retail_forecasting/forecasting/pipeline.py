@@ -16,9 +16,9 @@ from retail_forecasting.contracts.contracts_config import ImputationStrategy
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_tuning import BoostingParams
 from retail_forecasting.data.censorship import (
-    IMPUTATION_LGBM_PARAMS_FILENAME,
     SYNTHETIC_CENSORING_EVAL_FRACTION,
     LatentDemandImputer,
+    imputation_params_path,
     synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel
@@ -62,6 +62,7 @@ from retail_forecasting.tracking import (
 )
 from retail_forecasting.utils.io import (
     HOLDOUT_FOLD_ID,
+    model_file_path,
     quantile_column_name,
     quantile_level_from_column,
 )
@@ -208,7 +209,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
         preprocessing_config=settings.preprocessing,
         split="train",
     )
-    n_series = panel["series_id"].nunique() if "series_id" in panel.columns else 0
+    n_series = panel["series_id"].nunique()
     fields(
         logger,
         {
@@ -218,7 +219,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
         },
     )
 
-    imputer_params_path = settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
+    imputer_params_path = imputation_params_path(settings.models.models_dir)
 
     stages = Table(logger, {"estrategia": 18, "filas": 10, "imputadas": 10, "tiempo": 6})
     stages.header()
@@ -255,7 +256,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
     quality_df = _evaluate_imputation_quality(
         panel,
         seed=settings.project.random_seed,
-        imputer_params_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
+        imputer_params_path=imputation_params_path(settings.models.models_dir),
     )
 
     with open_run_directory(settings.reporting.run_name, EXPERIMENT_RUNS) as run_dir:
@@ -419,7 +420,7 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
         panel,
         settings.inventory,
         seed=settings.project.random_seed,
-        imputer_params_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
+        imputer_params_path=imputation_params_path(settings.models.models_dir),
     )
     # Provenance: the ranking flips with the source panel, so the artifact must say
     # which one it came from rather than leaving it to the reader's memory.
@@ -481,7 +482,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     print("-" * 40)
     imputer = LatentDemandImputer(
         strategy=strategy_name,
-        model_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
+        model_path=imputation_params_path(settings.models.models_dir),
     )
     imputed_panel = imputer.impute(raw_panel)
 
@@ -1002,7 +1003,7 @@ def run_experiment_from_frame(
     models_dir.mkdir(parents=True, exist_ok=True)
     for model_to_save in [lgb_to_save, cat_to_save]:
         if model_to_save is not None:
-            model_to_save.save(models_dir / f"{model_to_save.backend_name}.pkl")
+            model_to_save.save(model_file_path(models_dir, model_to_save.backend_name))
 
     if not fold_predictions:
         raise ValueError("Backtest did not produce any validation predictions.")
@@ -1228,7 +1229,7 @@ def train_and_save_champion(
 
     resolved_dir = models_dir if models_dir is not None else settings.models.models_dir
     resolved_dir.mkdir(parents=True, exist_ok=True)
-    model_path = resolved_dir / f"{conformal.backend_name}.pkl"
+    model_path = model_file_path(resolved_dir, conformal.backend_name)
     conformal.save(model_path)
     return model_path
 
@@ -1277,7 +1278,7 @@ def run_scoring(
     if model_path is None:
         models_dir = settings.models.models_dir
         champion_backend = settings.business.champion_backend_name
-        model_path = models_dir / f"{champion_backend}.pkl"
+        model_path = model_file_path(models_dir, champion_backend)
     if not model_path.exists():
         raise FileNotFoundError(f"No saved model at {model_path}. Run a backtest or retrain first.")
     model = ConformalForecaster.load(model_path)

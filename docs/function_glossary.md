@@ -614,14 +614,26 @@ y las vistas solo leen parametros, llaman a un servicio y renderizan.
 - Devuelve: `Path`.
 - Se usa en: carga de datos y reporting.
 
-### `make_run_directory`
+### `model_file_path`
 - Archivo: `src/retail_forecasting/utils/io.py`
-- Que hace: crea una carpeta de ejecucion con timestamp.
+- Que hace: ruta del pickle de un backend entrenado dentro de un directorio de modelos.
 - Recibe:
-  - `base_dir`;
-  - `run_name`.
+  - `models_dir`;
+  - `backend_name`.
 - Devuelve: `Path`.
-- Se usa en: `write_run_artifacts()`.
+- Se usa en: `train_and_save_champion()`, `update_champion_registry()`, guardado del campeon.
+
+### `open_run_directory`
+- Archivo: `src/retail_forecasting/tracking.py`
+- Que hace: abre una corrida de MLflow y cede el directorio donde viven sus artefactos, para
+  escribir dentro directamente. Reemplaza a `make_run_directory`, que creaba una carpeta bajo
+  `reports/`.
+- Recibe:
+  - `run_name`;
+  - `experiment_name`.
+- Devuelve: `Iterator[Path]` (gestor de contexto).
+- Se usa en: los cuatro escritores de corrida (`write_run_artifacts()`, `run_eda()`,
+  `run_imputation_comparison()`, `run_fair_cost_backtest()`, `run_operational_simulation()`).
 
 ### `quantile_column_name`
 - Archivo: `src/retail_forecasting/utils/io.py`
