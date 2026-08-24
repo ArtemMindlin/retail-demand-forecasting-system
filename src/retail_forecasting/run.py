@@ -75,8 +75,6 @@ def main() -> None:
     args = build_parser().parse_args()
 
     configure_logging()
-    # Before anything long starts, so every artifact this run writes names the code that is
-    # about to execute rather than whatever HEAD has become by the time it finishes.
     freeze_git_commit()
     try:
         settings = load_config(args.config)
@@ -85,7 +83,6 @@ def main() -> None:
     except ValueError as exc:
         raise SystemExit(str(exc)) from None
 
-    # Handle Reporting overrides (output_dir and run_name)
     reporting_updates = {}
     project_updates = {}
     if args.output_dir is not None:
