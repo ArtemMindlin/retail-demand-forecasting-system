@@ -247,30 +247,16 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
 
 
 def run_experiment(settings: Settings) -> RunArtifacts:
-    """Run the walk-forward experiment for ONE demand strategy.
-
-    `preprocessing.imputation_strategy` picks the arm: ``none`` leaves the censored sale
-    untouched and labels the run ``Observed``, anything else reconstructs latent demand
-    and labels it ``Latent_<strategy>``.
-
-    One arm per run, deliberately. This used to run both and merge them into a single
-    `cost_summary`, which let `build_promotion_decision` rank one arm against the other --
-    on costs measured against different targets (censored sale for Observed, reconstructed
-    demand for Latent). `evaluate_fair_inventory_cost` exists precisely because that
-    comparison is apples-to-oranges and flatters Observed, and `tab:metrics_predictive`
-    says as much in its own caption. Ranking strategies is `run_fair_cost_backtest`'s job,
-    against a common ground truth; promotion now compares models within one arm, where the
-    target is shared and the costs mean the same thing.
-    """
+    """Run the walk-forward experiment for ONE demand strategy."""
     rule(logger, "experimento walk-forward")
     started = time.monotonic()
 
-    raw_panel = load_prepared_panel(
+    panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
         split="train",
     )
-    quality_report = validate_prepared_panel(raw_panel, settings)
+    quality_report = validate_prepared_panel(panel, settings)
     raise_on_blocking_data_quality(quality_report)
 
     holdout_panel = load_prepared_panel(
@@ -285,8 +271,8 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         logger,
         {
             "panel": f"{thousands(quality_report.checked_series)} series, "
-            f"{thousands(len(raw_panel))} filas",
-            "ventana": f"{raw_panel['date'].min().date()} → {raw_panel['date'].max().date()}",
+            f"{thousands(len(panel))} filas",
+            "ventana": f"{panel['date'].min().date()} → {panel['date'].max().date()}",
             "holdout": f"{thousands(len(holdout_panel))} filas "
             f"({holdout_panel['date'].min().date()} → {holdout_panel['date'].max().date()})",
             "calidad": f"{quality_report.warning_count} avisos",
@@ -296,18 +282,17 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         },
     )
 
-    panel = raw_panel
     if strategy != "none":
         imputer = LatentDemandImputer(
             strategy=strategy,
             model_path=settings.models.models_dir / settings.models.imputation_params_filename,
         )
-        panel = imputer.impute(raw_panel)
+        panel = imputer.impute(panel)
         holdout_panel = imputer.impute(holdout_panel)
 
     artifacts = run_experiment_from_frame(
-        panel,
-        settings,
+        panel=panel,
+        settings=settings,
         data_strategy=data_strategy,
         holdout_panel=holdout_panel,
     )
