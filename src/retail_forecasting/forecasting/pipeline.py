@@ -247,11 +247,24 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
 
 
 def run_experiment(settings: Settings) -> RunArtifacts:
-    """Run the end-to-end experiment comparing Observed vs Latent demand."""
+    """Run the walk-forward experiment for ONE demand strategy.
+
+    `preprocessing.imputation_strategy` picks the arm: ``none`` leaves the censored sale
+    untouched and labels the run ``Observed``, anything else reconstructs latent demand
+    and labels it ``Latent_<strategy>``.
+
+    One arm per run, deliberately. This used to run both and merge them into a single
+    `cost_summary`, which let `build_promotion_decision` rank one arm against the other --
+    on costs measured against different targets (censored sale for Observed, reconstructed
+    demand for Latent). `evaluate_fair_inventory_cost` exists precisely because that
+    comparison is apples-to-oranges and flatters Observed, and `tab:metrics_predictive`
+    says as much in its own caption. Ranking strategies is `run_fair_cost_backtest`'s job,
+    against a common ground truth; promotion now compares models within one arm, where the
+    target is shared and the costs mean the same thing.
+    """
     rule(logger, "experimento walk-forward")
     started = time.monotonic()
 
-    # 1. Load Original Panel
     raw_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
@@ -260,14 +273,14 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     quality_report = validate_prepared_panel(raw_panel, settings)
     raise_on_blocking_data_quality(quality_report)
 
-    # Load external holdout (eval) split
     holdout_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
         split="eval",
     )
 
-    strategy_name = settings.preprocessing.imputation_strategy
+    strategy = settings.preprocessing.imputation_strategy
+    data_strategy = "Observed" if strategy == "none" else f"Latent_{strategy}"
     fields(
         logger,
         {
@@ -277,105 +290,35 @@ def run_experiment(settings: Settings) -> RunArtifacts:
             "holdout": f"{thousands(len(holdout_panel))} filas "
             f"({holdout_panel['date'].min().date()} → {holdout_panel['date'].max().date()})",
             "calidad": f"{quality_report.warning_count} avisos",
-            "estrategias": f"Observed · Latent_{strategy_name}",
+            "estrategia": data_strategy,
             "folds": f"{settings.validation.n_folds} × {settings.validation.fold_size_days}d, "
             f"horizonte {settings.dataset.horizon}d",
         },
     )
 
-    # 2. Run Strategy A: Observed Demand (Baseline)
-    artifacts_obs = run_experiment_from_frame(
-        raw_panel,
-        settings,
-        data_strategy="Observed",
-        holdout_panel=holdout_panel,
-        save_artifacts=False,
-    )
-
-    # 3. Run Strategy B: Latent Demand (Imputed)
-    imputer = LatentDemandImputer(
-        strategy=strategy_name,
-        model_path=settings.models.models_dir / settings.models.imputation_params_filename,
-    )
-    imputed_panel = imputer.impute(raw_panel)
-
-    imputed_holdout = None
-    if holdout_panel is not None:
-        imputed_holdout = imputer.impute(holdout_panel)
-
-    artifacts_latent = run_experiment_from_frame(
-        imputed_panel,
-        settings,
-        data_strategy=f"Latent_{strategy_name}",
-        holdout_panel=imputed_holdout,
-        save_artifacts=False,
-    )
-
-    # 4. Merge Artifacts
-    merged_validation = pd.concat(
-        [
-            frame
-            for frame in (
-                artifacts_obs.validation_predictions,
-                artifacts_latent.validation_predictions,
-            )
-            if frame is not None
-        ],
-        ignore_index=True,
-    )
-
-    merged_predictions = merged_validation
-
-    merged_metrics, merged_folds = summarize_predictions(merged_validation)
-    merged_costs = summarize_costs(merged_predictions)
-    merged_sens = run_sensitivity_analysis(merged_predictions, settings.inventory)
-    tuning_fronts = [
-        front
-        for front in (artifacts_obs.tuning_pareto, artifacts_latent.tuning_pareto)
-        if front is not None
-    ]
-    merged_tuning_pareto = pd.concat(tuning_fronts, ignore_index=True) if tuning_fronts else None
-
-    combined_metadata = None
-    if artifacts_obs.backtest_metadata is not None:
-        combined_metadata = artifacts_obs.backtest_metadata.model_copy(
-            update={
-                "data_strategy": f"Observed+Latent_{strategy_name}",
-                "created_at": utc_timestamp(),
-                "models": ModelRunMetadata(
-                    models_run=sorted(merged_predictions["model_name"].dropna().unique().tolist()),
-                    quantiles=settings.models.quantiles,
-                    use_tuning=settings.models.use_tuning,
-                    retrain_each_fold=settings.validation.retrain_each_fold,
-                ),
-            }
+    panel = raw_panel
+    if strategy != "none":
+        imputer = LatentDemandImputer(
+            strategy=strategy,
+            model_path=settings.models.models_dir / settings.models.imputation_params_filename,
         )
+        panel = imputer.impute(raw_panel)
+        holdout_panel = imputer.impute(holdout_panel)
 
-    final_artifacts = RunArtifacts(
-        prepared_panel=raw_panel,
-        supervised_frame=artifacts_obs.supervised_frame,
-        predictions=merged_predictions,
-        validation_predictions=merged_validation,
-        metrics_summary=merged_metrics,
-        fold_metrics=merged_folds,
-        cost_summary=merged_costs,
-        sensitivity_summary=merged_sens,
-        tuning_pareto=merged_tuning_pareto,
-        data_quality_report=quality_report,
-        drifts=artifacts_obs.drifts,
-        backtest_metadata=combined_metadata,
-        shap_values=artifacts_obs.shap_values,
+    artifacts = run_experiment_from_frame(
+        panel,
+        settings,
+        data_strategy=data_strategy,
+        holdout_panel=holdout_panel,
     )
-
-    artifacts_with_files = write_run_artifacts(final_artifacts, settings)
     fields(
         logger,
         {
-            "escrito": artifacts_with_files.run_directory,
+            "escrito": artifacts.run_directory,
             "tiempo": f"{time.monotonic() - started:.0f}s",
         },
     )
-    return artifacts_with_files
+    return artifacts
 
 
 @dataclass

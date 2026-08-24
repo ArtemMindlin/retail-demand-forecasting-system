@@ -7,7 +7,7 @@ from typing import get_args
 from pydantic import ValidationError
 
 from retail_forecasting.config import load_config
-from retail_forecasting.contracts.contracts_config import RunMode
+from retail_forecasting.contracts.contracts_config import ImputationStrategy, RunMode
 from retail_forecasting.eda.pipeline import run_eda
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
@@ -56,6 +56,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional override for the execution mode.",
     )
     parser.add_argument(
+        "--imputation-strategy",
+        default=None,
+        choices=list(get_args(ImputationStrategy)),
+        help="Optional override for preprocessing.imputation_strategy. It picks which arm "
+        'an experiment runs: "none" scores Observed demand, anything else the '
+        "reconstructed Latent demand.",
+    )
+    parser.add_argument(
         "--split",
         default="train",
         help="Dataset split to analyze, validated against dataset.splits. Only eda reads it.",
@@ -86,12 +94,15 @@ def main() -> None:
 
     reporting_updates = {}
     project_updates = {}
+    preprocessing_updates = {}
     if args.run_name is not None:
         reporting_updates["run_name"] = args.run_name
     if args.run_mode is not None:
         project_updates["run_mode"] = args.run_mode
     if args.seed is not None:
         project_updates["random_seed"] = args.seed
+    if args.imputation_strategy is not None:
+        preprocessing_updates["imputation_strategy"] = args.imputation_strategy
 
     if reporting_updates:
         new_reporting = settings.reporting.model_copy(update=reporting_updates)
@@ -99,6 +110,9 @@ def main() -> None:
     if project_updates:
         new_project = settings.project.model_copy(update=project_updates)
         settings = settings.model_copy(update={"project": new_project})
+    if preprocessing_updates:
+        new_preprocessing = settings.preprocessing.model_copy(update=preprocessing_updates)
+        settings = settings.model_copy(update={"preprocessing": new_preprocessing})
 
     mode = settings.project.run_mode
     if mode == "retrain":

@@ -317,7 +317,13 @@ Actualmente:
 
 ### `imputation_strategy`
 
-Estrategia usada por `LatentDemandImputer`.
+Estrategia usada por `LatentDemandImputer`, y con ella el BRAZO que corre un
+`run_mode = experiment`: `none` deja la venta censurada como esta y etiqueta la corrida
+`Observed`, cualquier otra reconstruye y la etiqueta `Latent_<estrategia>`. Una corrida
+puntua un solo brazo --- antes corria los dos y los fusionaba, lo que dejaba a la logica
+de promocion comparar costes medidos contra targets distintos. Quien ordena estrategias es
+`fair_cost_backtest`, contra una verdad comun. Para el otro brazo sin duplicar el YAML:
+`--imputation-strategy none`.
 
 Opciones implementadas:
 

@@ -202,7 +202,7 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
 El sistema distingue explícitamente entre operaciones de investigación y operaciones de producción mediante cuatro modos de ejecución configurables a través del parámetro \texttt{run\_mode}:
 
 \begin{enumerate}
-    \item \textbf{\texttt{experiment}}: Modo de investigación completo. Ejecuta el \textit{backtesting walk-forward} con múltiples \textit{folds} temporales, compara las estrategias de demanda observada y latente, selecciona el modelo \textit{champion} mediante \textit{promotion logic} y genera artefactos de análisis exhaustivos (\texttt{metrics\_summary.csv}, \texttt{cost\_summary.csv}, \texttt{champion\_registry.json}, gráficos de Pareto). Es el modo utilizado para validar el sistema antes de su despliegue.
+    \item \textbf{\texttt{experiment}}: Modo de investigación completo. Ejecuta el \textit{backtesting walk-forward} con múltiples \textit{folds} temporales para una estrategia de demanda ---observada o latente, según \texttt{imputation\_strategy}---, selecciona el modelo \textit{champion} entre los de esa misma estrategia mediante \textit{promotion logic} y genera artefactos de análisis exhaustivos (\texttt{metrics\_summary.csv}, \texttt{cost\_summary.csv}, \texttt{champion\_registry.json}, gráficos de Pareto). Es el modo utilizado para validar el sistema antes de su despliegue.
 
     \item \textbf{\texttt{retrain}}: Modo de refresco operacional. Entrena el modelo \textit{champion} sobre la totalidad de los datos disponibles sin realizar evaluación por \textit{folds}. Guarda el modelo en disco en formato \texttt{.pkl}. Se ejecuta periódicamente en producción para mantener el modelo actualizado con los datos más recientes.
 

@@ -43,7 +43,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 
 The v1 pipeline supports only `FreshRetailNet-50K` through `dataset.source = fresh_retailnet`.
 
-Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/censorship.py`), compared against the raw observed-demand baseline by `run_fair_cost_backtest` -- the only comparison that ranks strategies, since invariant 42 rules out the reconstruction-MAE route. Model selection and champion evaluation run on a base subset of the 50 highest-rotation series; a separate 500-series run validates conformal-calibration stability at scale, and a 30-series fair-cost backtest isolates the imputation signal from the rest of the pipeline under a common ground truth. Each subset answers a different question, so do not average metrics across them as if they were the same experiment.
+Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/censorship.py`), compared against the raw observed-demand baseline by `run_fair_cost_backtest` -- the only comparison that ranks strategies, since invariant 42 rules out the reconstruction-MAE route and an experiment scores one arm per run against its own target. Model selection and champion evaluation run on a base subset of the 50 highest-rotation series; a separate 500-series run validates conformal-calibration stability at scale, and a 30-series fair-cost backtest isolates the imputation signal from the rest of the pipeline under a common ground truth. Each subset answers a different question, so do not average metrics across them as if they were the same experiment.
 
 CatBoost is the current champion model, selected by simulated logistic cost, not by MAE or Winkler Score alone — point-error and logistic-cost rankings can (and do) invert.
 
@@ -57,7 +57,8 @@ run.py
  -> run_experiment()
  -> load_prepared_panel()
  -> label_stockout_regime()
- -> [optional] LatentDemandImputer reconstruction
+ -> [optional] LatentDemandImputer reconstruction (one arm per run: `imputation_strategy`
+    picks it, `none` = Observed)
  -> build_supervised_frame()
  -> build_walk_forward_folds()
  -> SeasonalNaiveModel / LightGBMModel / CatBoostingModel

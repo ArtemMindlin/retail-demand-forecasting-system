@@ -241,14 +241,18 @@ main()
 
 ### `run_experiment`
 - Archivo: `src/retail_forecasting/forecasting/pipeline.py`
-- Que hace: punto de entrada del pipeline experimental.
+- Que hace: punto de entrada del pipeline experimental, para UN brazo de demanda.
 - Recibe:
   - `settings`.
 - Devuelve: `RunArtifacts`.
 - Flujo:
   - valida compatibilidad de configuracion;
-  - carga el panel preparado;
+  - carga el panel preparado y el holdout `eval`;
+  - si `preprocessing.imputation_strategy` no es `none`, reconstruye la demanda latente
+    (etiqueta `Latent_<estrategia>`); si lo es, deja la venta observada (`Observed`);
   - delega en `run_experiment_from_frame()`.
+- Corria los dos brazos y los fusionaba; ordenar estrategias es de
+  `run_fair_cost_backtest`, contra una verdad comun.
 - Se usa en: `main()`.
 
 ### `run_experiment_from_frame`

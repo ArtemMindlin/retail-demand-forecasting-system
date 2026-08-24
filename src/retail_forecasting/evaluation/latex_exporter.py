@@ -15,7 +15,7 @@ would have closed a cycle.
 
 Usage:
     python -m retail_forecasting.evaluation.latex_exporter \
-        --metrics-run fresh_retailnet_large_20260811_125735 \
+        --metrics-run <corrida Observed> <corrida Latent> \
         --fair-cost-run fresh_retailnet_large_20260811_184959
 """
 
@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -153,7 +154,7 @@ def _cost_summary_table(costs_df: pd.DataFrame) -> str:
 
 
 def export_to_latex(
-    metrics_path: str | Path,
+    metrics_path: str | Path | Sequence[str | Path],
     costs_path: str | Path,
     output_dir: str | Path,
     cost_mode: CostMode = "fair",
@@ -168,11 +169,17 @@ def export_to_latex(
     ``panel_series`` is stated in the predictive caption. The base subset and the scale
     run produce very different errors, so a table that does not name its panel invites
     the reader to attribute it to whichever one the surrounding section describes.
+
+    ``metrics_path`` accepts several runs and concatenates them. An experiment scores one
+    demand strategy per run, so the arms of `tab:metrics_predictive` arrive as separate
+    runs; the table still lists them together because it reports each against its own
+    target, which is what its caption says.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    metrics_df = pd.read_csv(metrics_path)
+    metrics_paths = [metrics_path] if isinstance(metrics_path, str | Path) else list(metrics_path)
+    metrics_df = pd.concat([pd.read_csv(path) for path in metrics_paths], ignore_index=True)
     costs_df = pd.read_csv(costs_path)
 
     # 1. Predictive Metrics Table (MAE/RMSE) — keep only representative models.
@@ -223,7 +230,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--metrics-run",
         type=resolve_run_dir,
         required=True,
-        help="Run name or directory holding metrics_summary.csv (backs tab:metrics_predictive).",
+        nargs="+",
+        help="One run name or directory per demand strategy, each holding a metrics_summary.csv "
+        "(backs tab:metrics_predictive). An experiment scores one strategy per run, so pass "
+        "the Observed run and the Latent one.",
     )
     parser.add_argument(
         "--fair-cost-run",
@@ -238,11 +248,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     export_to_latex(
-        args.metrics_run / "metrics_summary.csv",
+        [run / "metrics_summary.csv" for run in args.metrics_run],
         args.fair_cost_run / "fair_cost_backtest.csv",
         args.output_dir,
         cost_mode="fair",
-        panel_series=_panel_series(args.metrics_run),
+        panel_series=_panel_series(args.metrics_run[0]),
     )
 
 

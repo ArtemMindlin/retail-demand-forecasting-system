@@ -15,12 +15,12 @@ citable — re-run it before citing.
 
 | Result in chapter 6 | Run | Panel | Notes |
 | --- | --- | --- | --- |
-| `tab:metrics_predictive` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | Generated; see "Generated tables" below |
+| `tab:metrics_predictive` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | Generated; see "Generated tables" below. **Predates the one-arm-per-run split: that run holds both arms in one `metrics_summary.csv`. Re-running it now needs two runs, one per arm.** |
 | `tab:conformal_metrics`, `tab:fold_coverage` | `fresh_retailnet_v2_20260811_123002` | 50 series, 4 500 rows | 1 050 evaluation origins |
 | `tab:embargo_control` (embargo off) | `fresh_retailnet_v2_20260811_123106` | 50 series, 4 500 rows | Control: only the calibration embargo differs |
 | `tab:scale_coverage`, simulated costs, `fig:mae_vs_servicio` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | 10 500 evaluation origins |
 | `tab:metrics_cost` (fair cost) | `fresh_retailnet_large_20260811_184959` | 30 sampled from 500 | Generated. Ranking depends on the source panel — see below |
-| `tab:imputation_reconstruction` | `imputation_compare_20260811_174500` | 500 series | Bit-identical to the June run: no forecasting involved |
+| `tab:imputation_reconstruction` | `imputation_compare_20260811_174500` | 500 series | **NOT REPRODUCIBLE and not citable.** The `compare_imputation` mode that wrote it is deleted, and invariant 42 forbids the ranking it shows anyway. Either restore the mode or drop the table from chapter 6 |
 
 Every numbered table in chapter 6 is listed above. A table that is not in this list has
 no declared provenance, which is the state that produced the August 13 findings: both
@@ -34,7 +34,7 @@ by hand. Regenerate both together:
 
 ```bash
 uv run python -m retail_forecasting.evaluation.latex_exporter \
-    --metrics-run fresh_retailnet_large_20260811_125735 \
+    --metrics-run <corrida Observed> <corrida Latent> \
     --fair-cost-run fresh_retailnet_large_20260811_184959
 ```
 
@@ -81,8 +81,13 @@ that it cannot tell them apart.
 
 ## Reproducing
 
+An experiment scores ONE demand strategy, so each arm is its own run. `imputation_strategy`
+in the YAML picks it, `--imputation-strategy` overrides it per invocation.
+
 ```bash
-make run                 # base subset      → configs/experiment/default.yaml
+make run                 # base subset, Latent arm → configs/experiment/default.yaml
+uv run python -m retail_forecasting.run --config configs/experiment/default.yaml \
+    --imputation-strategy none   # the Observed arm of the same panel
 make simulate            # OPS plane        → configs/simulate_ops/default.yaml (builds the split if missing)
 uv run python -m retail_forecasting.run --config configs/experiment/large.yaml
 uv run python -m retail_forecasting.run --config configs/experiment/default.yaml --run-mode fair_cost_backtest
