@@ -218,7 +218,6 @@ def run_imputation_comparison(settings: Settings) -> Path:
     imputer_params_path = settings.models.models_dir / settings.models.imputation_params_filename
 
     stages = Table(logger, {"estrategia": 18, "filas": 10, "imputadas": 10, "tiempo": 6})
-    stages.header()
 
     frames: list[pd.DataFrame] = []
     for strategy in strategies:
@@ -280,7 +279,6 @@ def run_imputation_comparison(settings: Settings) -> Path:
 
         rule(logger, "calidad de reconstrucción")
         scores = Table(logger, {"estrategia": 18, "MAE": 8, "RMSE": 8, "sesgo": 8, "n": 8})
-        scores.header()
         for _, row in quality_df.sort_values("mae").iterrows():
             scores.row(
                 {

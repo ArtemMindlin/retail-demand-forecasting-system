@@ -99,6 +99,9 @@ class Table:
     Rows are new lines rather than a carriage return over the previous one: with `logging`
     every call is its own record, and a long run is usually read afterwards in a redirected
     file, where overwriting leaves the carriage returns behind.
+
+    Widths are the caller's, because a streaming table cannot measure a column it has not
+    printed yet. Padding only: a value wider than its column pushes the rest out of true.
     """
 
     _GAP = "  "
@@ -114,13 +117,9 @@ class Table:
         self._logger.info("  %s", heading)
         self._logger.info("  %s", "-" * len(heading))
 
-    def header(self) -> None:
-        """Open the table. Separate from `row` so the caller controls where it lands."""
-        self._heading()
-
     def row(self, values: Mapping[str, object]) -> None:
         """One row. A column with no value is left blank rather than shifting the rest."""
-        if self._rows and not self._rows % _HEADER_EVERY_ROWS:
+        if not self._rows % _HEADER_EVERY_ROWS:
             self._heading()
         self._logger.info(
             "  %s",

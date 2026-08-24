@@ -99,7 +99,6 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
         )
 
         stages = Table(logger, {"etapa": 18, "salidas": 7, "tiempo": 6})
-        stages.header()
 
         def done(stage: str, count: int, since: float) -> float:
             stages.row(

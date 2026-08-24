@@ -581,7 +581,6 @@ def tune_imputation_lgbm(
             "queda": 6,
         },
     )
-    table.header()
 
     def report_progress(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
         # `trial.number` counts from the start of the study, resumed trials included, so it is

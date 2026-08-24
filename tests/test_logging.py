@@ -33,11 +33,14 @@ def captured(request: pytest.FixtureRequest) -> tuple[logging.Logger, list[str]]
 
 
 def test_rows_line_up_under_their_headings(captured: tuple[logging.Logger, list[str]]) -> None:
-    """The heading is what lets a row drop its labels, so the two must share their columns."""
+    """The heading is what lets a row drop its labels, so the two must share their columns.
+
+    No `header()` call: the first row opens the table. That step was separate and every caller
+    made it immediately, so it was only a step to forget.
+    """
     logger, lines = captured
     table = Table(logger, COLUMNS)
 
-    table.header()
     table.row({"trial": "1/300", "estado": "completo", "MAE": "0.5157"})
 
     heading, divider, row = lines[1], lines[2], lines[3]
@@ -69,7 +72,6 @@ def test_the_heading_comes_back_so_a_long_run_reads_as_blocks(
     logger, lines = captured
     table = Table(logger, COLUMNS)
 
-    table.header()
     for trial in range(_HEADER_EVERY_ROWS + 1):
         table.row({"trial": f"{trial}/300", "estado": "completo", "MAE": "0.5157"})
 
@@ -83,7 +85,6 @@ def test_a_missing_value_leaves_its_column_blank_instead_of_shifting_the_rest(
     logger, lines = captured
     table = Table(logger, COLUMNS)
 
-    table.header()
     table.row({"trial": "1/300", "MAE": "0.5157"})
 
     assert lines[1].index("MAE") + len("MAE") == lines[3].index("0.5157") + len("0.5157")
