@@ -19,6 +19,9 @@ called, and half an hour of forecasting is not worth losing to a locked tracking
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -125,82 +128,53 @@ def _open_experiment(name: str) -> None:
     mlflow.set_experiment(name)
 
 
-def log_run_to_mlflow(artifacts: LoggableRun, settings: Settings, run_dir: Path) -> None:
-    """Record one finished experiment run: its config, its metrics and its decisions."""
-    _open_experiment(EXPERIMENT_RUNS)
+def log_run_metadata(artifacts: LoggableRun, settings: Settings) -> None:
+    """Attach config, metrics and decisions to the run that is already open.
 
-    with mlflow.start_run(run_name=run_dir.name):
-        mlflow.log_params(_flat_params(settings))
-        mlflow.set_tags(
-            {
-                "git_commit": get_git_commit(),
-                "run_mode": settings.project.run_mode,
-                "config_hash": build_config_hash(settings),
-                "reports_run_dir": str(run_dir),
-                "series": artifacts.prepared_panel["series_id"].nunique(),
-                "panel_rows": len(artifacts.prepared_panel),
-                "supervised_rows": len(artifacts.supervised_frame),
-                "drifts_detected": len(artifacts.drifts),
-            }
-        )
-
-        mlflow.log_metrics(_numeric_metrics(artifacts.metrics_summary))
-        mlflow.log_metrics(_numeric_metrics(artifacts.cost_summary))
-
-        # The summaries whole, so a reader gets the identity columns the metric names flatten.
-        # `load_table` reassembles these across runs into one frame.
-        mlflow.log_table(artifacts.metrics_summary, artifact_file="metrics_summary.json")
-        mlflow.log_table(artifacts.cost_summary, artifact_file="cost_summary.json")
-
-        if artifacts.promotion_decision is not None:
-            mlflow.log_dict(
-                artifacts.promotion_decision.model_dump(mode="json"), "promotion_decision.json"
-            )
-        if artifacts.data_quality_report is not None:
-            mlflow.log_dict(
-                artifacts.data_quality_report.model_dump(mode="json"), "data_quality_report.json"
-            )
-        if artifacts.backtest_metadata is not None:
-            mlflow.log_dict(
-                artifacts.backtest_metadata.model_dump(mode="json"), "backtest_metadata.json"
-            )
-
-        # The whole directory, mirrored. Uploading selected files instead would make the
-        # artifact root a different shape from the run directory, and every reader that takes a
-        # run path -- the dashboard, the LaTeX exporter, the figure scripts -- would have to
-        # learn which of the two layouts it was handed. Mirrored, an artifact root IS a run
-        # directory, which is what lets those readers move over untouched.
-        mlflow.log_artifacts(str(run_dir))
-
-
-def log_eda_run_to_mlflow(
-    metadata: BaseModel, run_dir: Path, dataset_summary: pd.DataFrame
-) -> None:
-    """Record one EDA run whole: what it analysed, what it measured, and everything it drew.
-
-    The run directory stays the system of record -- `eda_metadata.json` is what makes a folder
-    self-describing. This makes the set of them searchable and comparable instead, which a
-    directory listing cannot do: `search_runs` ranks EDA runs by the panel statistics below,
-    and the artifacts open in a browser without anyone knowing the folder name.
+    The files are not this function's business: the pipeline wrote them straight into the
+    run's artifact directory, so there is nothing left to upload. What is left is everything
+    a directory cannot answer -- which config produced this, how it scored, what it decided.
     """
-    _open_experiment(EXPERIMENT_EDA)
+    mlflow.log_params(_flat_params(settings))
+    mlflow.set_tags(
+        {
+            "git_commit": get_git_commit(),
+            "run_mode": settings.project.run_mode,
+            "config_hash": build_config_hash(settings),
+            "series": artifacts.prepared_panel["series_id"].nunique(),
+            "panel_rows": len(artifacts.prepared_panel),
+            "supervised_rows": len(artifacts.supervised_frame),
+            "drifts_detected": len(artifacts.drifts),
+        }
+    )
 
+    mlflow.log_metrics(_numeric_metrics(artifacts.metrics_summary))
+    mlflow.log_metrics(_numeric_metrics(artifacts.cost_summary))
+
+    # The summaries whole, so a reader gets the identity columns the metric names flatten.
+    # `load_table` reassembles these across runs into one frame, which is the one thing the
+    # CSVs beside them cannot do. The decision JSONs are NOT logged here: the pipeline writes
+    # them into this same directory, and logging them again would overwrite its own files with
+    # a second serialisation of the same objects.
+    mlflow.log_table(artifacts.metrics_summary, artifact_file="metrics_summary.json")
+    mlflow.log_table(artifacts.cost_summary, artifact_file="cost_summary.json")
+
+
+def log_eda_metadata(metadata: BaseModel, dataset_summary: pd.DataFrame) -> None:
+    """Attach the EDA run's identity and the panel's statistics to the run already open.
+
+    The figures and tables are already in the run's artifact directory, written there by the
+    pipeline. What this adds is what a directory cannot answer: `search_runs` can rank EDA
+    runs by zero-demand rate or stockout incidence, not merely tell them apart.
+    """
     fields = metadata.model_dump()
-    with mlflow.start_run(run_name=run_dir.name):
-        # `None` spelled the way the config spells it. Dropping the null fields instead read as
-        # "not recorded", hiding the most informative value the metadata carries: a null
-        # `configured_top_n_series` is what makes the analysis cover the whole panel rather
-        # than the subset a model trains on.
-        mlflow.log_params(
-            {key: "null" if value is None else value for key, value in fields.items()}
-        )
-        mlflow.set_tags({"run_mode": "eda", "reports_run_dir": str(run_dir)})
-
-        # The panel's own statistics, so two runs over different panels can be compared on
-        # zero-demand rate or stockout incidence rather than only told apart by their config.
-        mlflow.log_metrics(_numeric_metrics(dataset_summary))
-
-        mlflow.log_artifacts(str(run_dir))  # mirrored, for the reason above
+    # `None` spelled the way the config spells it. Dropping the null fields instead read as
+    # "not recorded", hiding the most informative value the metadata carries: a null
+    # `configured_top_n_series` is what makes the analysis cover the whole panel rather than
+    # the subset a model trains on.
+    mlflow.log_params({key: "null" if value is None else value for key, value in fields.items()})
+    mlflow.set_tags({"run_mode": "eda"})
+    mlflow.log_metrics(_numeric_metrics(dataset_summary))
 
 
 def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
@@ -283,3 +257,43 @@ def resolve_run_dir(value: str | Path) -> Path:
         if found is not None:
             return found
     raise FileNotFoundError(f"'{value}' no es un directorio ni una corrida registrada.")
+
+
+# Written into every artifact directory. The tracking store is a gitignored sqlite database
+# with no backup, and with a database store `mlruns/` holds artifacts and nothing else -- so a
+# lost `mlflow.db` would leave a pile of UUIDs with no way to tell which run each one was.
+# The run directories under `reports/` used to carry that identity in their own name.
+RUN_IDENTITY_FILE = "mlflow_run.json"
+
+
+@contextmanager
+def open_run_directory(run_name: str, experiment_name: str) -> Iterator[Path]:
+    """Start a run and yield the directory its artifacts live in, to be written into directly.
+
+    For a local artifact store, writing into that directory *is* logging: MLflow lists and
+    serves whatever the directory holds, nested paths included. So the pipeline writes once,
+    rather than writing a run directory and mirroring it afterwards.
+
+    The run stays open for the duration, which is what lets a caller add params and metrics
+    beside the files. A caller that raises leaves the run FAILED with its partial output
+    attached -- the same diagnostic value an abandoned `reports/` directory had.
+    """
+    _open_experiment(experiment_name)
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    full_name = f"{run_name}_{timestamp}"
+
+    with mlflow.start_run(run_name=full_name) as active:
+        run_dir = Path(active.info.artifact_uri.removeprefix("file://"))
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / RUN_IDENTITY_FILE).write_text(
+            json.dumps(
+                {
+                    "run_name": full_name,
+                    "run_id": active.info.run_id,
+                    "experiment": experiment_name,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        yield run_dir

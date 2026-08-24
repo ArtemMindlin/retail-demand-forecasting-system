@@ -54,9 +54,9 @@ from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.optimization import HyperparameterTuner
+from retail_forecasting.tracking import EXPERIMENT_RUNS, open_run_directory
 from retail_forecasting.utils.io import (
     HOLDOUT_FOLD_ID,
-    make_run_directory,
     quantile_column_name,
     quantile_level_from_column,
 )
@@ -236,26 +236,26 @@ def run_imputation_comparison(settings: Settings) -> Path:
         imputer_params_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
     )
 
-    run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
-    long_df.to_csv(run_dir / "latent_strategies.csv", index=False)
-    quality_df.to_csv(run_dir / "imputation_quality.csv", index=False)
+    with open_run_directory(settings.reporting.run_name, EXPERIMENT_RUNS) as run_dir:
+        long_df.to_csv(run_dir / "latent_strategies.csv", index=False)
+        quality_df.to_csv(run_dir / "imputation_quality.csv", index=False)
 
-    metadata = {
-        "kind": "impute_compare",
-        "run_name": settings.reporting.run_name,
-        "created_at": utc_timestamp(),
-        "git_commit": get_git_commit(),
-        "config_hash": build_config_hash(settings),
-        "strategies": list(IMPUTATION_COMPARISON_STRATEGIES),
-        "series": int(n_series),
-        "rows": int(len(panel)),
-    }
-    (run_dir / "imputation_metadata.json").write_text(
-        json.dumps(metadata, indent=2), encoding="utf-8"
-    )
+        metadata = {
+            "kind": "impute_compare",
+            "run_name": settings.reporting.run_name,
+            "created_at": utc_timestamp(),
+            "git_commit": get_git_commit(),
+            "config_hash": build_config_hash(settings),
+            "strategies": list(IMPUTATION_COMPARISON_STRATEGIES),
+            "series": int(n_series),
+            "rows": int(len(panel)),
+        }
+        (run_dir / "imputation_metadata.json").write_text(
+            json.dumps(metadata, indent=2), encoding="utf-8"
+        )
 
-    print(f"\n✅ Imputation comparison written to: {run_dir}\n")
-    return run_dir
+        print(f"\n✅ Imputation comparison written to: {run_dir}\n")
+        return run_dir
 
 
 def evaluate_fair_inventory_cost(
@@ -387,14 +387,14 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
     result.insert(1, "source_panel_series", source_series)
     result.insert(2, "sampled_series", n_kept)
 
-    run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
-    out_path = run_dir / "fair_cost_backtest.csv"
-    result.to_csv(out_path, index=False)
+    with open_run_directory(settings.reporting.run_name, EXPERIMENT_RUNS) as run_dir:
+        out_path = run_dir / "fair_cost_backtest.csv"
+        result.to_csv(out_path, index=False)
 
-    print("\n── Inventory cost against a COMMON ground truth (lower = better) ──")
-    print(result.to_string(index=False))
-    print(f"\n✅ Fair-cost backtest written to: {out_path}\n")
-    return run_dir
+        print("\n── Inventory cost against a COMMON ground truth (lower = better) ──")
+        print(result.to_string(index=False))
+        print(f"\n✅ Fair-cost backtest written to: {out_path}\n")
+        return run_dir
 
 
 def run_experiment(settings: Settings) -> RunArtifacts:

@@ -19,15 +19,16 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
   suite. The price of the split is that `dataset` and `preprocessing` are duplicated across
   files; the same test pins the identity fields that must not drift apart.
 - `data/`: local raw/interim/processed caches. Do not commit generated datasets.
+- `mlruns/` + `mlflow.db`: the run store. Every mode opens an MLflow run and writes its artifacts straight into that run's directory, so there is one copy and no mirroring step. Both are gitignored, which is why each artifact directory carries an `mlflow_run.json` naming its run: with a database-backed store, `mlruns/` holds artifacts and nothing that identifies them.
 - `docs/`: system of record for architecture, contracts, invariants, and decisions.
 - `notebooks/`: lightweight exploration only. Production pipeline logic belongs in `src/`.
-- `reports/`: generated experiment outputs. Do not edit manually unless documenting a final result.
+- `reports/`: what has not moved into the run store. The OPS plane's `ops_sim/` (whose `simulate_ops` mode is not instrumented yet), `active_run.log` (written while a run is in flight, so not the artifact of a finished one), and the pre-migration run directories that `docs/runs.md` cites. Do not edit manually unless documenting a final result.
 - `scripts/build_ops_sim_split.py`: carves the dedicated train/eval split the OPS plane streams, into `data/processed/ops_sim/`. Invoked by `make simulate` when the split is missing; not something to run by hand.
 - `manage.py`: Django management entrypoint for the dashboard (`src/retail_forecasting/api/`).
 - `src/retail_forecasting/config.py`: typed settings loaded from YAML.
 - `src/retail_forecasting/data/`: raw dataset loading, raw-to-panel preparation, and `censorship.py` (`LatentDemandImputer` — stockout/censored-demand reconstruction strategies).
 - `src/retail_forecasting/features/`: supervised frame creation, temporal features, and target construction.
-- `src/retail_forecasting/forecasting/`: walk-forward validation, conformal calibration, imputation comparison, fair-cost backtesting, and experiment/retrain/scoring orchestration (`pipeline.py`); `imputation_tuning.py` runs a separate Optuna search over the supervised imputer's LGBM hyperparameters and persists the winner (never fitted weights) to `models.models_dir/imputation_lgbm_params.json` — its flow, draws and persist gates are mapped in `src/retail_forecasting/forecasting/imputation_tuning.md`. It logs to MLflow (`mlflow.db`, browsable via `make mlflow-ui`), as does every experiment run through `tracking.py`: metrics, config params, decisions, and the whole run directory mirrored into the artifact store, so `mlflow.search_runs` can compare runs the way a folder listing cannot. The mirror is what lets the dashboard and `evaluation/latex_exporter.py` read runs through MLflow while still seeing plain files — an artifact root has the same shape as the `reports/` folder that produced it.
+- `src/retail_forecasting/forecasting/`: walk-forward validation, conformal calibration, imputation comparison, fair-cost backtesting, and experiment/retrain/scoring orchestration (`pipeline.py`); `imputation_tuning.py` runs a separate Optuna search over the supervised imputer's LGBM hyperparameters and persists the winner (never fitted weights) to `models.models_dir/imputation_lgbm_params.json` — its flow, draws and persist gates are mapped in `src/retail_forecasting/forecasting/imputation_tuning.md`. It logs to MLflow (`mlflow.db`, browsable via `make mlflow-ui`), as does every other mode through `tracking.py`. `open_run_directory` opens the run and hands back the directory its artifacts live in, which the pipeline writes into directly: for a local store, writing into that directory IS logging, so there is no upload step and one copy. On top of the files, `log_run_metadata` records what a directory cannot answer — the config, the metrics keyed by model, the decisions — which is what lets `mlflow.search_runs` compare runs.
 - `src/retail_forecasting/models/`: forecast models only (`naive.py`, `boosting.py` for LightGBM, `catboosting.py` for CatBoost — the current champion).
 - `src/retail_forecasting/inventory/`: newsvendor order quantity and cost profiles. The multi-period Order-Up-To simulation and the LP capacity allocator lived here and were removed; the decision is single-period, one per forecast origin.
 - `src/retail_forecasting/simulation/`: OPS-plane rolling-origin production backtest, reused by the dashboard's `/ops/` view. Independent single-period Newsvendor decisions — no inventory state, no lead time — so its costs rank policies rather than reproduce a replenishment ledger.
@@ -98,7 +99,7 @@ Read these first:
 - `docs/conventions.md`
 - `docs/system_design.md`
 - `docs/web_layer.md` (only when touching `src/retail_forecasting/api/`)
-- `docs/runs.md` (only when a number is going into the thesis, or when reading one out of `reports/`)
+- `docs/runs.md` (only when a number is going into the thesis, or when reading one out of the run store)
 
 Prefer small changes that preserve the pipeline contract. If a change modifies target semantics, fold semantics, dataframe schemas, or inventory policy, update docs and tests in the same change.
 
@@ -125,7 +126,8 @@ commit therefore says nothing about whether the tests pass: ruff and mypy accept
 the suite rejects.
 
 Install optional ML backends (required by `run_mode = tune_imputation`, whose Optuna GPSampler
-needs the `torch` backend and whose experiment tracking needs `mlflow`):
+needs the `torch` backend). `mlflow` is NOT among them: it moved to the core dependencies when
+the run store became where the pipeline writes, so without it there is no run and no dashboard.
 
 ```bash
 uv sync --extra dev --extra ml

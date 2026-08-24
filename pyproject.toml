@@ -55,6 +55,10 @@ dependencies = [
   "lightgbm>=4.5.0",
   "datasets>=4.8.5",
   "seaborn>=0.13.2",
+  # Core, not an optional extra: MLflow is the run store the pipeline writes into and the
+  # dashboard reads from, so without it there is no dashboard and no run index. It was an
+  # extra while `reports/` was the system of record and tracking was best-effort on top.
+  "mlflow>=2.16.0",
 ]
 
 [project.urls]
@@ -78,10 +82,6 @@ ml = [
   # Optuna's GPSampler backend, used only by the offline imputation tuning entry point.
   "torch>=2.2.0",
   "greenlet>=3.0.0",
-  # Experiment tracking for the imputation tuning entry point. Declared here, not as a core
-  # dependency, because only that entry point logs to it -- the forecasting pipeline still
-  # writes its artifacts to reports/, which the dashboard and evaluation/latex_exporter.py read.
-  "mlflow>=2.16.0",
 ]
 
 [project.scripts]

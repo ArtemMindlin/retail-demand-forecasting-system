@@ -102,13 +102,17 @@ Those are run names, resolved through MLflow, not paths. A directory still works
 
 ## Where a finished run lives
 
-`reports/<run>/` is where the pipeline writes, and MLflow mirrors the directory into
-`mlruns/<id>/artifacts/`, which is what the dashboard reads. Runs written before the
-tracking instrumentation existed are not in the index; put them there with
+The pipeline opens an MLflow run and writes into `mlruns/<id>/artifacts/` directly, so
+there is one copy and no `reports/` directory for a new run. Each artifact directory
+carries an `mlflow_run.json` naming the run, because the tracking store is a gitignored
+sqlite database with no backup and, with a database store, `mlruns/` holds artifacts and
+nothing that says which run they belong to.
+
+Runs written before this — the ones this table cites — still live under `reports/`. They
+are in the index because they were put there with
 
 ```bash
 uv run python scripts/index_reports_into_mlflow.py
 ```
 
-which is also how the index is rebuilt if `mlflow.db` is lost, since it is gitignored and
-has no backup while the run directories are the durable copy.
+which is also how a legacy `reports/` directory is brought into the index.

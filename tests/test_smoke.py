@@ -39,7 +39,8 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
     assert (artifacts.run_directory / "reorder_recommendations.csv").exists()
     assert (artifacts.run_directory / "exceptions.csv").exists()
     assert (artifacts.run_directory / "promotion_decision.json").exists()
-    assert (tmp_path / "champion_registry.json").exists()
+    # Beside the models it names, not in the run: the registry outlives every run in it.
+    assert (tmp_path / "models" / "champion_registry.json").exists()
     metadata_path = artifacts.run_directory / "backtest_metadata.json"
     assert metadata_path.exists()
     assert not artifacts.metrics_summary.empty

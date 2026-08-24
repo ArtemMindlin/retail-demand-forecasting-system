@@ -41,10 +41,17 @@ distinguen uno de otro. Descubrir por el indice tambien elimina una clase de
 fallo en lugar de defenderse de ella, porque un nombre de corrida tiene que ser
 una clave que MLflow ya conoce y no hay ruta que recorrer ni nombre que sanear.
 
+El pipeline ya no escribe en `reports/` y espeja despues: abre la corrida de MLflow
+y escribe dentro de su propio directorio de artefactos. Hay una sola copia, y el
+modo de fallo cambio con ella -- un almacen inalcanzable ya no cuesta el registro,
+cuesta la corrida, asi que el `try/except` que lo envolvia se ha ido.
+
 Dos cosas siguen viviendo en `reports/` porque no son artefactos de una corrida
 terminada: `ops_sim/`, cuyo modo `simulate_ops` no esta instrumentado todavia, y
 `active_run.log`, que se escribe mientras la corrida va. Una corrida de MLflow es
-el registro cerrado de algo que ya acabo, no un sitio para estado que cambia.
+el registro cerrado de algo que ya acabo, no un sitio para estado que cambia. Por
+eso `champion_registry.json` se mudo a `models_dir`: es estado mutable que sobrevive
+a las corridas que lo actualizan.
 
 No hay base de datos de aplicacion: la unica pieza de estado propia de la web es
 la sesion del operador, que viaja en una cookie firmada.

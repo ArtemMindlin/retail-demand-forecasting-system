@@ -16,9 +16,13 @@ from retail_forecasting.contracts.contracts_config import RunMode
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_quality import DataQualityReport
 from retail_forecasting.contracts.contracts_tuning import TuningMetadata
+from retail_forecasting.tracking import (
+    EXPERIMENT_RUNS,
+    log_run_metadata,
+    open_run_directory,
+)
 from retail_forecasting.utils.io import (
     dataframe_to_markdown,
-    make_run_directory,
 )
 from retail_forecasting.utils.logging import get_logger
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
@@ -210,91 +214,78 @@ def _persist_experiment_artifacts(
 
 
 def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtifacts:
-    run_dir = make_run_directory(settings.reporting.output_dir, settings.reporting.run_name)
-
-    reorder_recommendations = build_reorder_recommendations(artifacts, settings)
-    exceptions = build_exceptions_frame(reorder_recommendations)
-    registry_path = champion_registry_path(settings)
-    champion_registry = load_champion_registry(registry_path)
-    promotion_decision = build_promotion_decision(artifacts, settings, champion_registry)
-    champion_registry = update_champion_registry(
-        artifacts=artifacts,
-        settings=settings,
-        current_registry=champion_registry,
-        promotion_decision=promotion_decision,
-    )
-    if artifacts.backtest_metadata is not None:
-        artifacts.backtest_metadata = artifacts.backtest_metadata.model_copy(
-            update={
-                "promotion": promotion_decision,
-                "data_quality": artifacts.data_quality_report,
-            }
+    with open_run_directory(settings.reporting.run_name, EXPERIMENT_RUNS) as run_dir:
+        reorder_recommendations = build_reorder_recommendations(artifacts, settings)
+        exceptions = build_exceptions_frame(reorder_recommendations)
+        registry_path = champion_registry_path(settings)
+        champion_registry = load_champion_registry(registry_path)
+        promotion_decision = build_promotion_decision(artifacts, settings, champion_registry)
+        champion_registry = update_champion_registry(
+            artifacts=artifacts,
+            settings=settings,
+            current_registry=champion_registry,
+            promotion_decision=promotion_decision,
         )
-    operational_metadata = build_operational_run_metadata(
-        settings=settings,
-        reorder_recommendations=reorder_recommendations,
-        exceptions=exceptions,
-        champion_registry=champion_registry,
-        promotion_decision=promotion_decision,
-    )
-
-    reorder_recommendations.to_csv(run_dir / "reorder_recommendations.csv", index=False)
-    exceptions.to_csv(run_dir / "exceptions.csv", index=False)
-    if promotion_decision is not None:
-        (run_dir / "promotion_decision.json").write_text(
-            promotion_decision.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-    if champion_registry is not None:
-        registry_path.write_text(
-            champion_registry.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-    if artifacts.data_quality_report is not None:
-        (run_dir / "data_quality_report.json").write_text(
-            artifacts.data_quality_report.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-    if settings.project.run_mode == "score_daily":
-        (run_dir / "operational_run_metadata.json").write_text(
-            operational_metadata.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-    else:
-        _persist_experiment_artifacts(run_dir, artifacts, settings)
-
-    artifacts.reorder_recommendations = reorder_recommendations
-    artifacts.exceptions = exceptions
-    artifacts.promotion_decision = promotion_decision
-    artifacts.champion_registry = champion_registry
-    artifacts.operational_metadata = operational_metadata
-    if artifacts.backtest_metadata is not None and settings.project.run_mode != "score_daily":
-        (run_dir / "backtest_metadata.json").write_text(
-            artifacts.backtest_metadata.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-    artifacts.run_directory = run_dir
-
-    # Everything above is already on disk, and the caller is about to be handed the path to it.
-    # A tracking store that is locked, missing or out of disk would otherwise take a run of
-    # half an hour down at its last step, having lost nothing but the record. Broad on purpose,
-    # for the same reason the imputation search does it: no failure to write a log is worth a
-    # run. Imported here rather than at module scope so mlflow, an optional `ml` extra, is not
-    # required to import the reporting layer.
-    try:
-        from retail_forecasting.tracking import log_run_to_mlflow
-
-        log_run_to_mlflow(artifacts=artifacts, settings=settings, run_dir=run_dir)
-    except Exception as exc:  # noqa: BLE001 - see above
-        logger.warning(
-            "el registro en MLflow falló y la corrida no se ve afectada: %s: %s. "
-            "Todo lo que produjo está en %s",
-            type(exc).__name__,
-            exc,
-            run_dir,
+        if artifacts.backtest_metadata is not None:
+            artifacts.backtest_metadata = artifacts.backtest_metadata.model_copy(
+                update={
+                    "promotion": promotion_decision,
+                    "data_quality": artifacts.data_quality_report,
+                }
+            )
+        operational_metadata = build_operational_run_metadata(
+            settings=settings,
+            reorder_recommendations=reorder_recommendations,
+            exceptions=exceptions,
+            champion_registry=champion_registry,
+            promotion_decision=promotion_decision,
         )
 
-    return artifacts
+        reorder_recommendations.to_csv(run_dir / "reorder_recommendations.csv", index=False)
+        exceptions.to_csv(run_dir / "exceptions.csv", index=False)
+        if promotion_decision is not None:
+            (run_dir / "promotion_decision.json").write_text(
+                promotion_decision.model_dump_json(indent=2),
+                encoding="utf-8",
+            )
+        if champion_registry is not None:
+            registry_path.write_text(
+                champion_registry.model_dump_json(indent=2),
+                encoding="utf-8",
+            )
+        if artifacts.data_quality_report is not None:
+            (run_dir / "data_quality_report.json").write_text(
+                artifacts.data_quality_report.model_dump_json(indent=2),
+                encoding="utf-8",
+            )
+        if settings.project.run_mode == "score_daily":
+            (run_dir / "operational_run_metadata.json").write_text(
+                operational_metadata.model_dump_json(indent=2),
+                encoding="utf-8",
+            )
+        else:
+            _persist_experiment_artifacts(run_dir, artifacts, settings)
+
+        artifacts.reorder_recommendations = reorder_recommendations
+        artifacts.exceptions = exceptions
+        artifacts.promotion_decision = promotion_decision
+        artifacts.champion_registry = champion_registry
+        artifacts.operational_metadata = operational_metadata
+        if artifacts.backtest_metadata is not None and settings.project.run_mode != "score_daily":
+            (run_dir / "backtest_metadata.json").write_text(
+                artifacts.backtest_metadata.model_dump_json(indent=2),
+                encoding="utf-8",
+            )
+        artifacts.run_directory = run_dir
+
+        # No longer guarded, and no longer a late import. This used to be best-effort tracking
+        # layered on top of a `reports/` directory that was the real output, so losing the
+        # record was worth less than losing the run. `run_dir` is now the MLflow run's own
+        # artifact directory: a store that cannot take these params is a store the files above
+        # did not reach either, and swallowing that would report success over an empty run.
+        log_run_metadata(artifacts=artifacts, settings=settings)
+
+        return artifacts
 
 
 def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
@@ -627,7 +618,14 @@ def build_operational_run_metadata(
 
 
 def champion_registry_path(settings: Settings) -> Path:
-    return Path(settings.reporting.output_dir) / "champion_registry.json"
+    """Beside the models it names, not inside a run.
+
+    It used to sit in `reporting.output_dir`, which was fine while that directory outlived
+    every run in it. It cannot live in a run's artifact directory at all: the registry is
+    mutable state carried ACROSS runs, and a run is the closed record of one that finished.
+    `models_dir` already holds the champion's weights, so the file naming them belongs there.
+    """
+    return Path(settings.models.models_dir) / "champion_registry.json"
 
 
 def load_champion_registry(path: Path) -> ChampionRegistry | None:
@@ -667,7 +665,10 @@ def update_champion_registry(
             reason = promotion_decision.decision_reason
 
     backend = str(promoted_row["backend_name"])
-    model_file = settings.reporting.output_dir / "models" / f"{backend}.pkl"
+    # `models_dir`, where `train_and_save_champion` actually writes. This used to read
+    # `reporting.output_dir / "models"`, a directory nothing had written to since May, so the
+    # registry recorded a stale path when it recorded one at all.
+    model_file = Path(settings.models.models_dir) / f"{backend}.pkl"
     return ChampionRegistry(
         updated_at=utc_timestamp(),
         current_champion=ChampionRecord(
