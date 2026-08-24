@@ -285,3 +285,23 @@ def test_the_panels_own_statistics_land_as_metrics() -> None:
     assert run.data.metrics["zero_demand_rate"] == pytest.approx(0.0446)
     assert run.data.metrics["rows"] == pytest.approx(4500000)
     assert "date_min" not in run.data.metrics, "una fecha no es una métrica"
+
+
+def test_a_relative_store_keeps_a_relative_artifact_root() -> None:
+    """Deploy-critical, and invisible until deployed.
+
+    MLflow bakes this location into the experiment row. Resolved to an absolute path it would
+    record whichever checkout created the experiment, and the container that mounts the same
+    `mlflow.db` at /app would look for artifacts under a path that does not exist there.
+    """
+    assert tracking._artifact_root("sqlite:///mlflow.db") == "mlruns"
+
+
+def test_an_absolute_store_keeps_an_absolute_artifact_root() -> None:
+    """The other half, and what keeps this suite out of the repo's own `mlruns/`.
+
+    `tests/conftest.py` isolates the tracking store by pointing it at an absolute scratch
+    path. Were the root always relative, it would resolve against the working directory and
+    every test would write its artifacts into the checkout.
+    """
+    assert tracking._artifact_root("sqlite:////tmp/scratch/mlflow.db") == "/tmp/scratch/mlruns"

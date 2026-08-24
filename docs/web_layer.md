@@ -51,6 +51,15 @@ una corrida mas: sus costes no son costes de walk-forward y `docs/runs.md` dice
 explicitamente que no se citen al lado. Compartir experimento los pondria bajo un
 mismo `search_runs`.
 
+La ubicacion de artefactos que MLflow graba en la base de datos es RELATIVA
+(`mlruns`), no absoluta. Eso es deliberado y tiene un porque de despliegue: MLflow
+la hornea en la fila del experimento, asi que una ruta absoluta grabaria el
+checkout del que la creo, y el contenedor que monta el mismo almacen en `/app`
+buscaria los artefactos donde no estan. El precio es que el almacen queda atado al
+directorio de trabajo: lanzar el pipeline desde un subdirectorio no encuentra sus
+artefactos. Los comandos documentados y el contenedor arrancan los dos desde la
+raiz, asi que en la practica no se nota.
+
 Solo `active_run.log` sigue en `reports/`, porque se escribe mientras la corrida va:
 una corrida de MLflow es el registro cerrado de algo que ya acabo, no un sitio para
 estado que cambia. Por eso `champion_registry.json` se mudo a `models_dir`, que es
