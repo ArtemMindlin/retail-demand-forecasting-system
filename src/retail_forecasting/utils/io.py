@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pandas as pd
 
 # Sentinel fold id marking holdout (non walk-forward) predictions so global
 # summaries can exclude them. Written by the pipeline, read by evaluation.metrics.
@@ -29,38 +27,6 @@ def quantile_level_from_column(column: str) -> float:
     Inverse of :func:`quantile_column_name` (e.g. ``"q_0_9" -> 0.9``).
     """
     return float(column.replace("q_", "").replace("_", "."))
-
-
-def dataframe_to_markdown(frame: pd.DataFrame, columns: Iterable[str] | None = None) -> str:
-    """Render a DataFrame as a simple Markdown table.
-
-    Args:
-        frame: Source DataFrame to render.
-        columns: Optional subset of columns to include in order.
-
-    Returns:
-        A Markdown table string, or ``"_No data available._"`` when the
-        selected frame is empty.
-
-    Notes:
-        Float values are formatted through ``_format_markdown_value`` before
-        rendering.
-    """
-    subset = frame if columns is None else frame.loc[:, list(columns)]
-    if subset.empty:
-        return "_No data available._"
-
-    text_frame = subset.copy()
-    for column in text_frame.columns:
-        text_frame[column] = text_frame[column].map(_format_markdown_value)
-
-    headers = " | ".join(str(column) for column in text_frame.columns)
-    separator = " | ".join(["---"] * len(text_frame.columns))
-    rows = [
-        " | ".join(str(value) for value in row)
-        for row in text_frame.itertuples(index=False, name=None)
-    ]
-    return "\n".join([f"| {headers} |", f"| {separator} |", *[f"| {row} |" for row in rows]])
 
 
 def winkler_score(actual: Any, lower: Any, upper: Any, alpha: float) -> float:

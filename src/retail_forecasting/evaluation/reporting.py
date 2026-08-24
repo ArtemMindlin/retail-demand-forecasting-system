@@ -22,7 +22,6 @@ from retail_forecasting.tracking import (
     open_run_directory,
 )
 from retail_forecasting.utils.io import (
-    dataframe_to_markdown,
     model_file_path,
 )
 from retail_forecasting.utils.logging import get_logger
@@ -210,9 +209,6 @@ def _persist_experiment_artifacts(
     if settings.reporting.make_plots:
         _render_experiment_plots(run_dir, artifacts)
 
-    report_text = build_markdown_report(artifacts=artifacts, settings=settings)
-    (run_dir / "report.md").write_text(report_text, encoding="utf-8")
-
 
 def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtifacts:
     with open_run_directory(settings.reporting.run_name, EXPERIMENT_RUNS) as run_dir:
@@ -282,86 +278,6 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
         log_run_metadata(artifacts=artifacts, settings=settings)
 
         return artifacts
-
-
-def build_markdown_report(artifacts: RunArtifacts, settings: Settings) -> str:
-    serializable_settings = settings.model_dump()
-    settings_lines = [
-        f"- `{section}`: `{values}`" for section, values in serializable_settings.items()
-    ]
-
-    from retail_forecasting.evaluation.post_mortem import generate_post_mortem_report
-
-    post_mortem_text = generate_post_mortem_report(artifacts, settings)
-
-    report = [
-        "# Experiment Report",
-        "",
-        "## Executive Summary",
-        "",
-        "This report compares forecasting systems under predictive, probabilistic, and economic"
-        " criteria. The primary ranking uses total operating cost under a newsvendor policy.",
-        "",
-        "## Post-Mortem Analysis (Top 5 Problematic SKUs)",
-        "",
-        post_mortem_text,
-        "",
-        "## Configuration",
-        "",
-        *settings_lines,
-        "",
-        "## Dataset Summary",
-        "",
-        f"- Rows in prepared panel: `{len(artifacts.prepared_panel)}`",
-        f"- Rows in supervised frame: `{len(artifacts.supervised_frame)}`",
-        f"- Unique series: `{artifacts.prepared_panel['series_id'].nunique()}`",
-        f"- Date range: `{artifacts.prepared_panel['date'].min().date()}`"
-        f" to `{artifacts.prepared_panel['date'].max().date()}`",
-        "",
-        "## Metrics Summary",
-        "",
-        dataframe_to_markdown(artifacts.metrics_summary),
-        "",
-        "## Cost Summary",
-        "",
-        dataframe_to_markdown(artifacts.cost_summary),
-        "",
-        "## Fold Diagnostics",
-        "",
-        dataframe_to_markdown(artifacts.fold_metrics),
-        "",
-        "## Drift Analysis",
-        "",
-        *(
-            [
-                f"- **ALERT**: Detected drift on `{event.date}`"
-                f" (Score: `{event.score:.2f}`, Threshold: `{event.threshold:.2f}`)"
-                for event in artifacts.drifts
-            ]
-            if artifacts.drifts
-            else ["- No statistically significant drift detected during this run."]
-        ),
-        "",
-        "## Economic Sensitivity Analysis",
-        "",
-        "Performance under varying stockout/overstock cost ratios (Cs/Co):",
-        "",
-        dataframe_to_markdown(artifacts.sensitivity_summary)
-        if artifacts.sensitivity_summary is not None
-        else "_No sensitivity analysis available._",
-        "",
-        "## Interpretation Notes",
-        "",
-        "- `MAE` and `RMSE` are included as diagnostics, not as the primary decision criterion.",
-        "- `pinball_*` columns evaluate quantile quality when quantile forecasts are available.",
-        "- `interval_coverage` (PICP): Fraction of observations in the P10-P90 interval. ~0.80.",
-        "- `interval_width` (MPIW): Average width of the prediction interval. Narrower is better.",
-        "- `winkler_score`: Proper scoring rule for intervals. Penalizes width and miscoverage.",
-        "- `total_cost`: Single-period inventory cost (Newsvendor). Main ranking metric.",
-        "- `total_cost` is the main ranking metric because the TFG focuses on inventory decisions.",
-    ]
-
-    return "\n".join(report)
 
 
 def _apply_flag(recommendations: pd.DataFrame, mask: pd.Series, flag: str, note: str) -> None:

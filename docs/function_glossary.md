@@ -31,7 +31,6 @@ main()
        -> summarize_predictions()
        -> summarize_costs()
        -> write_run_artifacts()
-          -> build_markdown_report()
 ```
 
 ## CLI and Configuration
@@ -482,15 +481,6 @@ main()
   - hash de configuracion y commit Git.
 - Se escribe en: `backtest_metadata.json`.
 
-### `build_markdown_report`
-- Archivo: `src/retail_forecasting/evaluation/reporting.py`
-- Que hace: construye el texto del `report.md`.
-- Recibe:
-  - `artifacts`;
-  - `settings`.
-- Devuelve: `str`.
-- Se usa en: `write_run_artifacts()`.
-
 ## Web Layer
 
 Funciones de `src/retail_forecasting/api/`. Ver `docs/web_layer.md` para la
@@ -634,15 +624,6 @@ y las vistas solo leen parametros, llaman a un servicio y renderizan.
   - `quantile`.
 - Devuelve: `str`.
 - Se usa en: modelos y metricas.
-
-### `dataframe_to_markdown`
-- Archivo: `src/retail_forecasting/utils/io.py`
-- Que hace: convierte un `DataFrame` en una tabla Markdown simple.
-- Recibe:
-  - `frame`;
-  - `columns`.
-- Devuelve: `str`.
-- Se usa en: `build_markdown_report()`.
 
 ## Nota de uso
 

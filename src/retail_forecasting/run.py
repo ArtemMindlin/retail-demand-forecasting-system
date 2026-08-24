@@ -131,7 +131,7 @@ def main() -> None:
     else:
         artifacts = run_experiment(settings)
         assert artifacts.run_directory is not None
-        fields(logger, {"escrito": artifacts.run_directory / "report.md"})
+        fields(logger, {"escrito": artifacts.run_directory / "metrics_summary.csv"})
 
 
 def _format_validation_error(exc: ValidationError) -> str:

@@ -34,7 +34,6 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
 
     assert artifacts.run_directory is not None
     assert (artifacts.run_directory / "data_quality_report.json").exists()
-    assert (artifacts.run_directory / "report.md").exists()
     assert (artifacts.run_directory / "reorder_recommendations.csv").exists()
     assert (artifacts.run_directory / "exceptions.csv").exists()
     assert (artifacts.run_directory / "promotion_decision.json").exists()
@@ -169,7 +168,6 @@ def test_score_daily_run_writes_operational_artifacts_only(tmp_path: Path) -> No
     assert (artifacts.run_directory / "data_quality_report.json").exists()
     assert (artifacts.run_directory / "operational_run_metadata.json").exists()
     assert (artifacts.run_directory / "promotion_decision.json").exists()
-    assert not (artifacts.run_directory / "report.md").exists()
     assert not (artifacts.run_directory / "predictions.csv").exists()
     assert not (artifacts.run_directory / "metrics_summary.csv").exists()
     assert not (artifacts.run_directory / "backtest_metadata.json").exists()

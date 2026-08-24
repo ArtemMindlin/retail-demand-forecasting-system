@@ -76,7 +76,7 @@ Semantica:
 - `retrain`: mantiene el mismo conjunto rico de artefactos, pero representa un
   ciclo de reentrenamiento gobernado operacionalmente;
 - `score_daily`: escribe solo artefactos operativos de negocio y metadata
-  ligera, sin `report.md`, sin `predictions.csv` y sin `backtest_metadata.json`.
+  ligera, sin `predictions.csv` y sin `backtest_metadata.json`.
 - `tune_imputation`: no entrena el modelo de forecasting. Busca (via Optuna,
   `forecasting/imputation_tuning.py`) los mejores hiperparametros de LGBM para
   el imputador supervisado. Usa solo `split="train"`. El objetivo promedia el MAE
@@ -819,7 +819,7 @@ que el dashboard, `scripts/plot_*.py` y `evaluation/latex_exporter.py` la resuel
 
 ### `make_plots`
 
-Si es `true`, genera plots estandar ademas de CSVs y `report.md`.
+Si es `true`, genera plots estandar ademas de los CSVs.
 
 Si es `false`, solo escribe artefactos tabulares.
 
