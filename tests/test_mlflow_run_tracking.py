@@ -76,9 +76,7 @@ def _artifacts() -> RunArtifacts:
 
 
 def _settings(tmp_path: Path) -> Settings:
-    return Settings().model_copy(
-        update={"reporting": ReportingConfig(output_dir=tmp_path, run_name="tracking_test")}
-    )
+    return Settings().model_copy(update={"reporting": ReportingConfig(run_name="tracking_test")})
 
 
 def _logged_run(run_dir: Path | None) -> mlflow.entities.Run:
@@ -216,7 +214,7 @@ def test_paths_stay_out_of_the_params(tmp_path: Path) -> None:
 
     run = _logged_run(written.run_directory)
     assert "dataset.top_n_series" in run.data.params
-    for excluded in ("dataset.local_cache_dir", "models.models_dir", "reporting.output_dir"):
+    for excluded in ("dataset.local_cache_dir", "models.models_dir"):
         assert excluded not in run.data.params
 
 

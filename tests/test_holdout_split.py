@@ -177,7 +177,7 @@ def test_an_empty_holdout_frame_fails_the_run_instead_of_being_skipped(tmp_path:
     panel = make_synthetic_panel(num_series=3, num_days=90)
     settings = Settings(
         dataset=DatasetConfig(top_n_series=3, min_history_days=70, horizon=7),
-        reporting=ReportingConfig(output_dir=tmp_path, run_name="empty_holdout", make_plots=False),
+        reporting=ReportingConfig(run_name="empty_holdout", make_plots=False),
     )
 
     with pytest.raises(ValueError, match="supervised frame is empty"):
@@ -191,7 +191,7 @@ def test_no_holdout_requested_is_not_an_error(tmp_path: Path) -> None:
     panel = make_synthetic_panel(num_series=3, num_days=90)
     settings = Settings(
         dataset=DatasetConfig(top_n_series=3, min_history_days=70, horizon=7),
-        reporting=ReportingConfig(output_dir=tmp_path, run_name="no_holdout", make_plots=False),
+        reporting=ReportingConfig(run_name="no_holdout", make_plots=False),
     )
 
     artifacts = run_experiment_from_frame(panel, settings, holdout_panel=None, save_artifacts=False)

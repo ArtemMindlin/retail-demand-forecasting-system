@@ -14,7 +14,6 @@ from retail_forecasting.config import (
     InventoryConfig,
     ModelConfig,
     PreprocessingConfig,
-    ReportingConfig,
     Settings,
     ValidationConfig,
     load_config,
@@ -65,13 +64,6 @@ def test_default_inventory_costs_are_positive() -> None:
     assert isinstance(settings.inventory.use_series_costs, bool)
 
 
-def test_default_reporting_does_not_write_into_data_cache() -> None:
-    settings = load_config(CONFIG_PATH)
-
-    output_dir = settings.reporting.output_dir
-    assert output_dir.parts[0] != "data"
-
-
 def test_settings_instantiation_rejects_invalid_temporal_guardrails() -> None:
     with pytest.raises(ValidationError, match="min_history_days"):
         Settings(
@@ -110,11 +102,6 @@ def test_settings_instantiation_rejects_invalid_business_thresholds() -> None:
 
     with pytest.raises(ValidationError, match="max_missing_fraction_warning"):
         Settings(data_quality=DataQualityConfig(max_missing_fraction_warning=1.1))
-
-
-def test_settings_instantiation_rejects_data_cache_reporting_output() -> None:
-    with pytest.raises(ValidationError, match="output_dir"):
-        Settings(reporting=ReportingConfig(output_dir=Path("data/reports")))
 
 
 def test_settings_instantiation_rejects_invalid_imputation_strategy() -> None:

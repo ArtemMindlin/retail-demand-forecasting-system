@@ -110,7 +110,7 @@ def _eda_settings(tmp_path: Path, top_n_series: int | None) -> object:
             "dataset": settings.dataset.model_copy(
                 update={"top_n_series": top_n_series, "min_history_days": 1}
             ),
-            "reporting": ReportingConfig(output_dir=tmp_path, run_name="eda_test"),
+            "reporting": ReportingConfig(run_name="eda_test"),
         }
     )
 

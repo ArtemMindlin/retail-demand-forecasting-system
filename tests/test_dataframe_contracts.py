@@ -18,7 +18,6 @@ def test_pipeline_artifacts_follow_dataframe_contracts(tmp_path: Path) -> None:
             horizon=7,
         ),
         reporting=ReportingConfig(
-            output_dir=tmp_path,
             run_name="dataframe_contract",
             make_plots=False,
         ),

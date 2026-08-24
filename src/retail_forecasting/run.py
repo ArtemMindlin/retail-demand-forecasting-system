@@ -39,11 +39,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the YAML experiment configuration.",
     )
     parser.add_argument(
-        "--output-dir",
-        default=None,
-        help="Optional override for the reporting output directory.",
-    )
-    parser.add_argument(
         "--run-name",
         default=None,
         help="Optional override for the experiment run name.",
@@ -85,8 +80,6 @@ def main() -> None:
 
     reporting_updates = {}
     project_updates = {}
-    if args.output_dir is not None:
-        reporting_updates["output_dir"] = Path(args.output_dir)
     if args.run_name is not None:
         reporting_updates["run_name"] = args.run_name
     if args.run_mode is not None:

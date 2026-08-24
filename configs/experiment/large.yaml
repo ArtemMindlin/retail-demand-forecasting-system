@@ -86,6 +86,5 @@ business:
 
 
 reporting:
-  output_dir: reports
   run_name: fresh_retailnet_large
   make_plots: false

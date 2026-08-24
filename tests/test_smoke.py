@@ -25,7 +25,6 @@ def test_smoke_run_generates_report(tmp_path: Path) -> None:
         # Keep the smoke run fast and deterministic: no Optuna tuning.
         models=ModelConfig(use_tuning=False, models_dir=tmp_path / "models"),
         reporting=ReportingConfig(
-            output_dir=tmp_path,
             run_name="smoke_test",
             make_plots=False,
         ),
@@ -92,7 +91,6 @@ def test_smoke_run_bootstraps_registry_and_reuses_it(tmp_path: Path) -> None:
             horizon=7,
         ),
         reporting=ReportingConfig(
-            output_dir=tmp_path,
             run_name="smoke_registry",
             make_plots=False,
         ),
@@ -128,7 +126,6 @@ def test_smoke_run_serializes_tuning_metadata(tmp_path: Path) -> None:
             models_dir=tmp_path / "models",
         ),
         reporting=ReportingConfig(
-            output_dir=tmp_path,
             run_name="smoke_test_tuning",
             make_plots=False,
         ),
@@ -159,7 +156,6 @@ def test_score_daily_run_writes_operational_artifacts_only(tmp_path: Path) -> No
             horizon=7,
         ),
         reporting=ReportingConfig(
-            output_dir=tmp_path,
             run_name="score_daily_test",
             make_plots=False,
         ),

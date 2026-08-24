@@ -27,5 +27,4 @@ preprocessing:
   fill_missing_values: true
 
 reporting:
-  output_dir: reports
   run_name: fresh_retailnet_v2

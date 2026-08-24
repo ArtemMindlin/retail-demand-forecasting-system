@@ -36,6 +36,5 @@ models:
 
 
 reporting:
-  output_dir: reports
   run_name: imputation_compare
   make_plots: false

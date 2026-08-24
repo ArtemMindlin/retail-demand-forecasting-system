@@ -247,16 +247,11 @@ class SimulationConfig(BaseModel):
 
 class ReportingConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-    output_dir: Path = Path("reports")
+    # No `output_dir`: runs are written into the MLflow run's own artifact directory, whose
+    # location follows the tracking store rather than a config field. The field survived as a
+    # knob that silently did nothing, which this repo treats as worse than a missing one.
     run_name: str = "fresh_retailnet_v2"
     make_plots: bool = True
-
-    @field_validator("output_dir")
-    @classmethod
-    def validate_output_dir(cls, v: Path) -> Path:
-        if v.parts[:1] == ("data",):
-            raise ValueError("reporting.output_dir must not write into the data cache.")
-        return v
 
 
 class Settings(BaseSettings):

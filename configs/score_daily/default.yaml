@@ -70,6 +70,5 @@ business:
 
 
 reporting:
-  output_dir: reports
   run_name: fresh_retailnet_v2
   make_plots: true

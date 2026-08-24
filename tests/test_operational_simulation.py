@@ -55,7 +55,6 @@ def _fast_settings(tmp_path: Path, simulation_days: int = 8) -> Settings:
         ),
         models=ModelConfig(n_estimators=30, learning_rate=0.1, max_depth=4),
         reporting=ReportingConfig(
-            output_dir=tmp_path,
             run_name="sim_test",
             make_plots=False,
         ),

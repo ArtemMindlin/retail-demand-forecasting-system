@@ -99,7 +99,6 @@ business:
 
 
 reporting:
-  output_dir: reports
   run_name: ops_sim
   make_plots: false
 
