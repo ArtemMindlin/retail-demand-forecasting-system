@@ -86,7 +86,7 @@ make run                 # base subset      → configs/experiment/default.yaml
 make simulate            # OPS plane        → configs/simulate_ops/default.yaml (builds the split if missing)
 uv run python -m retail_forecasting.run --config configs/experiment/large.yaml
 uv run python -m retail_forecasting.run --config configs/experiment/default.yaml --run-mode fair_cost_backtest
-uv run python -m retail_forecasting.run --config configs/experiment/imputation_compare.yaml
+uv run python -m retail_forecasting.run --config configs/compare_imputation/default.yaml
 ```
 
 The figures read finished runs:

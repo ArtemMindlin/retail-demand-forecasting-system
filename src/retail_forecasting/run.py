@@ -93,7 +93,7 @@ def main() -> None:
         settings = settings.model_copy(update={"project": new_project})
 
     mode = settings.project.run_mode
-    if mode == "experiment" and settings.preprocessing.compare_imputation:
+    if mode == "compare_imputation":
         run_dir = run_imputation_comparison(settings)
         fields(logger, {"escrito": run_dir / "latent_strategies.csv"})
         return

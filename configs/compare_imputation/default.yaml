@@ -1,6 +1,6 @@
 project:
   random_seed: 42
-  run_mode: experiment
+  run_mode: compare_imputation
 
 
 dataset:
@@ -21,7 +21,6 @@ preprocessing:
   drop_negative_sales: true
   fill_missing_values: true
   imputation_strategy: supervised
-  compare_imputation: true
 
 
 models:

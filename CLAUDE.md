@@ -8,9 +8,9 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 
 - `configs/`: one folder per run mode, so a config file declares only the `Settings` sections
   its own mode reads. `configs/experiment/default.yaml` is the canonical v1 config;
-  `large.yaml`/`daily.yaml` cover the scale/daily variants and `imputation_compare.yaml` the
-  imputation study, all three still `run_mode = experiment`. The other folders
-  (`retrain/`, `score_daily/`, `simulate_ops/`, `fair_cost_backtest/`, `tune_imputation/`)
+  `large.yaml`/`daily.yaml` cover the scale/daily variants, both still `run_mode = experiment`.
+  The other folders (`retrain/`, `score_daily/`, `simulate_ops/`, `fair_cost_backtest/`,
+  `compare_imputation/`, `tune_imputation/`)
   hold a `default.yaml` each, `eda/` included: exploratory analysis is a run mode like the
   rest, not a second CLI. `project.run_mode` always matches the folder name, so `--run-mode`
   is only for ad-hoc overrides. The map of which sections each mode reads is
@@ -156,6 +156,10 @@ Run the default experiment:
 ```bash
 uv run python -m retail_forecasting.run --config configs/experiment/default.yaml
 ```
+
+Every other mode has a `make` target named after it (`make help` lists them);
+`compare-imputation` replaced the `preprocessing.compare_imputation` flag, which dispatched a
+second mode from inside `run_mode = experiment`.
 
 Run the dashboard:
 

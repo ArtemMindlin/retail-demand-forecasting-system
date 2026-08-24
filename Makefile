@@ -7,13 +7,14 @@ SCORE_CONFIG = configs/score_daily/default.yaml
 FAIRCOST_CONFIG = configs/fair_cost_backtest/default.yaml
 SIM_CONFIG = configs/simulate_ops/default.yaml
 EDA_CONFIG = configs/eda/default.yaml
+COMPARE_CONFIG = configs/compare_imputation/default.yaml
 # The imputation search has its own config on purpose: it must be tuned at the scale the
 # imputation study runs at (500 series), not at experiment.yaml's 50. A winner tuned on 50
 # series measured 12.4% WORSE than the untuned defaults at 500. See docs/invariants.md 41.
 TUNE_CONFIG = configs/tune_imputation/default.yaml
 OPS_SPLIT = data/processed/ops_sim/.built
 SNAPSHOT = current
-.PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf
+.PHONY: help install run retrain score simulate backtest-fair-cost compare-imputation tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -40,6 +41,9 @@ $(OPS_SPLIT):
 
 backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common ground truth (no training)
 	$(PYTHON) -m retail_forecasting.run --config $(FAIRCOST_CONFIG)
+
+compare-imputation: ## Reconstruct latent demand with every strategy, side by side (no training)
+	$(PYTHON) -m retail_forecasting.run --config $(COMPARE_CONFIG)
 
 tune-imputation: ## Tune LGBM hyperparameters for the supervised imputer, persist to disk
 	$(PYTHON) -m retail_forecasting.run --config $(TUNE_CONFIG)

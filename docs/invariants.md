@@ -326,7 +326,7 @@ See `docs/web_layer.md` for the full description.
     The last two agree across different scoring periods, so this is scale, not calendar. An
     earlier design partitioned the panel by series, which shrank the teacher to a third of
     deployment size and produced the -5.33% headline; at the 500-series scale where
-    `configs/experiment/imputation_compare.yaml` actually runs, those same params are 12% WORSE than not
+    `configs/compare_imputation/default.yaml` actually runs, those same params are 12% WORSE than not
     tuning. Hence `teacher_fit_rows` in the metadata: a tuned params file is only valid near the
     teacher size it was tuned at, and the file cannot express that on its own. Tune at the scale
     you deploy.

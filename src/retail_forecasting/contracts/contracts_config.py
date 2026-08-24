@@ -20,6 +20,7 @@ RunMode = Literal[
     "score_daily",
     "simulate_ops",
     "fair_cost_backtest",
+    "compare_imputation",
     "tune_imputation",
     "eda",
 ]
@@ -89,6 +90,7 @@ MODE_SECTIONS: dict[RunMode, frozenset[str]] = {
     "fair_cost_backtest": frozenset(
         {"project", "dataset", "preprocessing", "models", "inventory", "reporting"}
     ),
+    "compare_imputation": frozenset({"project", "dataset", "preprocessing", "models", "reporting"}),
     "tune_imputation": frozenset({"project", "dataset", "preprocessing", "models"}),
     "eda": frozenset({"project", "dataset", "preprocessing", "reporting"}),
 }
@@ -137,10 +139,6 @@ class PreprocessingConfig(BaseModel):
     drop_negative_sales: bool = True
     fill_missing_values: bool = True
     imputation_strategy: ImputationStrategy = "supervised"
-    # When True, the experiment run_mode skips forecasting and runs only the latent-demand
-    # imputation strategies side by side, writing a lightweight comparison artifact for the
-    # dashboard (no models, no folds).
-    compare_imputation: bool = False
 
 
 class FeatureConfig(BaseModel):

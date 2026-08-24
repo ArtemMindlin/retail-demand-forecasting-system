@@ -77,6 +77,12 @@ Semantica:
   ciclo de reentrenamiento gobernado operacionalmente;
 - `score_daily`: escribe solo artefactos operativos de negocio y metadata
   ligera, sin `report.md`, sin `predictions.csv` y sin `backtest_metadata.json`.
+- `compare_imputation`: no entrena ningun modelo ni construye folds. Reconstruye la
+  demanda latente con cada estrategia de `LatentDemandImputer` y las pone una al lado
+  de otra, escribiendo `latent_strategies.csv` e `imputation_quality.csv`. Era un
+  booleano de `preprocessing` sobre `run_mode = experiment`, que es un segundo eje de
+  despacho duplicando lo que `run_mode` ya hace: la carpeta decia `experiment` y el
+  modo no entrenaba nada.
 - `tune_imputation`: no entrena el modelo de forecasting. Busca (via Optuna,
   `forecasting/imputation_tuning.py`) los mejores hiperparametros de LGBM para
   el imputador supervisado. Usa solo `split="train"`. El objetivo promedia el MAE
