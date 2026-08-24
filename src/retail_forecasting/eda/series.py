@@ -1,6 +1,6 @@
 """Per-series profile of the panel: how much each series sells, how idle it is, how it looks.
 
-The summary and the four figures drawn from it live together, so a figure and the table beside
+The summary and the three figures drawn from it live together, so a figure and the table beside
 it in the run directory cannot drift apart -- which is what happened when the stockout band
 statistic was derived once here and once six hundred lines away.
 """
@@ -58,7 +58,6 @@ def render_series_figures(
     _plot_observed_demand_boxplot_top_series(
         panel, series_summary, output_dir / "observed_demand_boxplot_top_series.png"
     )
-    _plot_top_series_total_demand(series_summary, output_dir / "top_series_total_demand.png")
     _plot_zero_demand_rate_by_series(series_summary, output_dir / "zero_demand_rate_by_series.png")
     _plot_representative_series_panels(
         panel, series_summary, output_dir / "representative_series_panels.png"
@@ -103,29 +102,6 @@ def _plot_observed_demand_boxplot_top_series(
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     _draw(axes[0], top, "#2166ac", "High-volume series")
     _draw(axes[1], mid + bottom, "#74add1", "Mid / low-volume series")
-
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=160)
-    plt.close(fig)
-
-
-def _plot_top_series_total_demand(
-    series_summary: pd.DataFrame,
-    output_path: Path,
-) -> None:
-    top_series = series_summary.head(10)
-    if top_series.empty:
-        return
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.barh(
-        top_series["series_id"][::-1],
-        top_series["observed_demand_sum"][::-1],
-        color="#9467bd",
-    )
-    ax.set_xlabel("Total observed demand")
-    ax.set_ylabel("Series")
-    ax.set_title("Top 10 series by observed demand")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
