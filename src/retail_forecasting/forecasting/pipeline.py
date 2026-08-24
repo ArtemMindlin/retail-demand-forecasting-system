@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import statistics
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -62,7 +63,7 @@ from retail_forecasting.utils.io import (
     quantile_column_name,
     quantile_level_from_column,
 )
-from retail_forecasting.utils.logging import get_logger
+from retail_forecasting.utils.logging import Table, fields, get_logger, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 logger = get_logger(__name__)
@@ -1046,21 +1047,49 @@ def train_and_save_champion(
 
 
 def run_retrain(settings: Settings) -> Path:
-    """Load data, train champion on all of it, and write the model to disk."""
-    splits = []
+    """Load every split, train the champion on all of it, and write the model to disk."""
+    rule(logger, "reentreno del campeón")
+    started = time.monotonic()
+
+    loaded = Table(logger, {"split": 10, "series": 8, "filas": 10, "tiempo": 6})
+    splits: list[pd.DataFrame] = []
     for split in settings.dataset.splits:
-        splits.append(
-            load_prepared_panel(
-                dataset_config=settings.dataset,
-                preprocessing_config=settings.preprocessing,
-                split=split,
-            )
+        mark = time.monotonic()
+        panel = load_prepared_panel(
+            dataset_config=settings.dataset,
+            preprocessing_config=settings.preprocessing,
+            split=split,
         )
+        splits.append(panel)
+        loaded.row(
+            {
+                "split": split,
+                "series": thousands(panel["series_id"].nunique()),
+                "filas": thousands(len(panel)),
+                "tiempo": f"{time.monotonic() - mark:.0f}s",
+            }
+        )
+
     raw_panel = pd.concat(splits, ignore_index=True)
     quality_report = validate_prepared_panel(raw_panel, settings)
     raise_on_blocking_data_quality(quality_report)
+
+    fields(
+        logger,
+        {
+            "panel": f"{thousands(raw_panel['series_id'].nunique())} series, "
+            f"{thousands(len(raw_panel))} filas",
+            "ventana": f"{raw_panel['date'].min().date()} → {raw_panel['date'].max().date()}",
+            "campeón": settings.business.champion_backend_name,
+            "calidad": f"{quality_report.warning_count} avisos",
+        },
+    )
+
     model_path = train_and_save_champion(settings, raw_panel)
-    print(f"✅ Champion retrained and saved to {model_path}")
+    fields(
+        logger,
+        {"escrito": model_path, "tiempo": f"{time.monotonic() - started:.0f}s"},
+    )
     return model_path
 
 
