@@ -75,14 +75,6 @@ def _split_train_calibration(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series | None]:
     """Split a supervised frame into (sub_train, calibration, mondrian_group_ids).
 
-    The most recent ``validation.calibration_days`` are reserved for conformal
-    calibration. A ``horizon``-day embargo separates the two: a training row dated
-    ``t`` carries the demand of ``[t, t + horizon - 1]`` as its target, so without
-    the gap the last ``horizon - 1`` training rows would cover days that fall inside
-    the calibration window. The model would then have partly seen the calibration
-    targets, making the conformity scores optimistically small, ``q_hat`` too tight
-    and the resulting intervals systematically undercovered.
-
     Falls back to training on the whole frame (empty calibration) when the split
     would leave no training rows.
     """
@@ -1019,10 +1011,8 @@ def train_and_save_champion(
     models_dir: Path | None = None,
 ) -> Path:
     """Fit the configured champion model on the full panel and persist it to disk."""
-
-    prepared_panel = label_all_regimes(panel)
     supervised_frame, feature_metadata = build_supervised_frame(
-        panel=prepared_panel,
+        panel=panel,
         feature_config=settings.features,
         horizon=settings.dataset.horizon,
     )
