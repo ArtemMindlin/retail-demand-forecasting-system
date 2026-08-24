@@ -72,8 +72,6 @@ class OpsSimulation:
         if self._frame is not None:
             return self._frame
 
-        # Newest first, so the first run holding the artifact is the one to read. Runs are
-        # ordered by MLflow's own start time rather than by file mtime, which a copy resets.
         recorded = [
             (name, path / ARTIFACT_RELATIVE_PATH)
             for name, path in logged_run_dirs(EXPERIMENT_OPS).items()

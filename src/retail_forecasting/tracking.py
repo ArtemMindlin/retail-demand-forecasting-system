@@ -53,24 +53,13 @@ class LoggableRun(Protocol):
     drifts: list[Any]
 
 
-# Same store the imputation search writes to, so every run of every mode is comparable in one
-# UI. Module-level and not a literal at the call site: the tests point it at a scratch path.
 MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 
 EXPERIMENT_RUNS = "retail_forecasting_runs"
 
-# The EDA gets its own experiment rather than sharing the one above: it logs no metrics at all,
-# and metric-less runs beside metric-heavy ones make one sparse, unreadable table in the UI.
 EXPERIMENT_EDA = "retail_forecasting_eda"
-# Its own experiment, not a run alongside the walk-forward ones. The OPS plane answers a
-# different question with a different costing model -- one independent single-period
-# decision per origin, no carried stock, truth censored on stockout days -- and
-# `docs/runs.md` says in as many words not to quote its numbers beside theirs. Sharing an
-# experiment would put both under one `search_runs` and invite exactly that.
 EXPERIMENT_OPS = "retail_forecasting_ops"
 
-# Columns of `metrics_summary` and `cost_summary` that name the row rather than measure it.
-# They become part of each metric's name instead of a metric of their own.
 _IDENTITY_COLUMNS = ("model_name", "backend_name", "data_strategy", "observations")
 
 
@@ -87,20 +76,9 @@ def _artifact_root(tracking_uri: str) -> str | None:
     if not tracking_uri.startswith(prefix):
         return None
     store = Path(tracking_uri.removeprefix(prefix))
-    # Expressed the way the store is expressed, absolute or not -- but MLflow ABSOLUTISES
-    # whatever it is given, against the working directory, and offers no way to store a
-    # relative location (`mlruns`, `./mlruns`, `file:mlruns` all come back absolute; measured).
-    # So this asks; it does not decide. The rows already in the store were rewritten to
-    # relative by hand, which is what makes the same `mlflow.db` work in the repo and mounted
-    # at /app -- and runs DO inherit their experiment's stored location verbatim, so that
-    # rewrite holds for every run to come. A brand-new experiment starts absolute again and
-    # has to be rewritten the same way; `docs/web_layer.md` carries the statement.
     return str(store.parent / "mlruns")
 
 
-# What makes a summary row distinct, in the order it reads best. `cadence` is here for the OPS
-# plane, whose rows are one per retrain policy: without it every cadence would write to the
-# same `total_cost` key and the last one would silently win.
 _ROW_IDENTITY = ("model_name", "data_strategy", "cadence")
 
 
@@ -173,11 +151,6 @@ def log_run_metadata(artifacts: LoggableRun, settings: Settings) -> None:
     mlflow.log_metrics(_numeric_metrics(artifacts.metrics_summary))
     mlflow.log_metrics(_numeric_metrics(artifacts.cost_summary))
 
-    # The summaries whole, so a reader gets the identity columns the metric names flatten.
-    # `load_table` reassembles these across runs into one frame, which is the one thing the
-    # CSVs beside them cannot do. The decision JSONs are NOT logged here: the pipeline writes
-    # them into this same directory, and logging them again would overwrite its own files with
-    # a second serialisation of the same objects.
     mlflow.log_table(artifacts.metrics_summary, artifact_file="metrics_summary.json")
     mlflow.log_table(artifacts.cost_summary, artifact_file="cost_summary.json")
 
@@ -190,10 +163,6 @@ def log_eda_metadata(metadata: BaseModel, dataset_summary: pd.DataFrame) -> None
     runs by zero-demand rate or stockout incidence, not merely tell them apart.
     """
     fields = metadata.model_dump()
-    # `None` spelled the way the config spells it. Dropping the null fields instead read as
-    # "not recorded", hiding the most informative value the metadata carries: a null
-    # `configured_top_n_series` is what makes the analysis cover the whole panel rather than
-    # the subset a model trains on.
     mlflow.log_params({key: "null" if value is None else value for key, value in fields.items()})
     mlflow.set_tags({"run_mode": "eda"})
     mlflow.log_metrics(_numeric_metrics(dataset_summary))
@@ -222,8 +191,6 @@ def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
     dirs: dict[str, Path] = {}
     for run in found:
         name = run.info.run_name
-        # A run can be recorded without its artifacts surviving -- the store and the artifact
-        # tree are separate, and only one of them is a database.
         path = Path(run.info.artifact_uri.removeprefix("file://"))
         if name and name not in dirs and path.is_dir():
             dirs[name] = path
@@ -243,9 +210,6 @@ def index_run_directory(
     if not run_dir.is_dir():
         return None
 
-    # Not derived from the directory unless asked for: rebuilding from the store hands this
-    # `mlruns/<id>/artifacts`, whose name is "artifacts" for every run. Named that way, and
-    # keyed by name, the whole index collapsed to one entry.
     _open_experiment(experiment_name)
     with mlflow.start_run(run_name=run_name or run_dir.name) as active:
         for name in ("backtest_metadata.json", "eda_metadata.json"):
@@ -266,10 +230,6 @@ def index_run_directory(
 
         mlflow.set_tags({"source_dir": str(run_dir), "backfilled": "true"})
         mlflow.log_artifacts(str(run_dir))
-        # The same identity a natively-written run carries, so a run that entered the index
-        # this way is recoverable the next time the index is lost. Written after the upload:
-        # `log_artifacts` copies the directory as it stands, and the artifact root is where the
-        # file has to end up.
         _write_run_identity(
             Path(active.info.artifact_uri.removeprefix("file://")),
             run_name=run_name or run_dir.name,
@@ -296,10 +256,6 @@ def resolve_run_dir(value: str | Path) -> Path:
     raise FileNotFoundError(f"'{value}' no es un directorio ni una corrida registrada.")
 
 
-# Written into every artifact directory. The tracking store is a gitignored sqlite database
-# with no backup, and with a database store `mlruns/` holds artifacts and nothing else -- so a
-# lost `mlflow.db` would leave a pile of UUIDs with no way to tell which run each one was.
-# The run directories under `reports/` used to carry that identity in their own name.
 RUN_IDENTITY_FILE = "mlflow_run.json"
 
 

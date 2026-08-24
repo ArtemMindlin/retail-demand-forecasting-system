@@ -106,11 +106,6 @@ def render_temporal_figures(
     render_category_seasonality_heatmaps(panel, output_dir)
 
 
-# ── Figuras ───────────────────────────────────────────────────────────────────
-# Junto a los resúmenes que dibujan, y no en un módulo de figuras aparte: la figura de bandas
-# de stockout llegó a reconstruir las bandas por su cuenta, con el mismo `pd.cut` que el
-# constructor de arriba, porque los dos cálculos vivían a seiscientas líneas de distancia.
-
 MAX_HEATMAP_SERIES = 120
 
 
@@ -235,9 +230,6 @@ _DAY_ORDER = [
 
 _TIER_COLOR = {"High": "#2166ac", "Medium": "#f4a582", "Low": "#d6604d"}
 
-# A category needs this many observations before its weekly profile means anything: the
-# Z-score is taken within the category, so a handful of rows produces a confident-looking
-# pattern out of noise.
 _MIN_OBSERVATIONS = 500
 
 
@@ -281,9 +273,6 @@ def _weekday_profiles(
 
     tier_map = {category: demand_tier(category) for category in pivot_std.index}
 
-    # Squared distance from the panel's average weekly shape: the figure shows the categories
-    # that depart from it most, since those are what make the case that one weekly cycle for
-    # the whole panel would be a systematic error.
     mean_profile = pivot_std.mean(axis=0)
     deviation = ((pivot_std - mean_profile) ** 2).sum(axis=1)
 

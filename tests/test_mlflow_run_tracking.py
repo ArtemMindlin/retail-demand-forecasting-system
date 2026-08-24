@@ -203,8 +203,6 @@ def test_metrics_carry_the_model_they_belong_to(tmp_path: Path) -> None:
     assert metrics["mae.catboost.Latent_supervised"] == pytest.approx(4.33)
     assert metrics["mae.seasonal_naive.Latent_supervised"] == pytest.approx(3.86)
     assert metrics["total_cost.catboost.Latent_supervised"] == pytest.approx(12154.58)
-    # A metric the model has no value for is absent rather than logged as a NaN, which MLflow
-    # would render as a real measurement.
     assert "winkler_score.seasonal_naive.Latent_supervised" not in metrics
 
 

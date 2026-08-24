@@ -32,8 +32,6 @@ ALLOWED_LAYER_IMPORTS = {
     "inventory": {"config"},
     "models": {"config", "contracts", "utils"},
     "run": {"config", "contracts", "eda", "forecasting", "simulation", "utils"},
-    # Cross-cutting: every mode records itself, so this cannot live inside any one of them.
-    # It was born in `evaluation` and the EDA could not reach it from there.
     "tracking": {"config", "contracts", "utils"},
     "simulation": {
         "config",

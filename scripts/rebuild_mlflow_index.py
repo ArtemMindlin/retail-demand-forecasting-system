@@ -54,8 +54,6 @@ def main() -> None:
         if args.dry_run:
             print(f"  se recuperaría    {name}  ({experiment})")
             continue
-        # A new run id: the old one belonged to the database that was lost, and the identity
-        # file is rewritten with the new one so a second rebuild stays idempotent.
         run_id = index_run_directory(run_dir, experiment, run_name=name)
         print(f"  recuperada        {name}  -> {str(run_id)[:8]}")
 

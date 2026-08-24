@@ -211,12 +211,8 @@ def test_a_run_records_what_it_analysed(tmp_path: Path, monkeypatch: pytest.Monk
     assert metadata["split"] == "train"
     assert metadata["n_series"] == 3
     assert metadata["rows"] == len(panel)
-    # The parquet the run actually read: the cache key covers four dataset fields only, not the
-    # preprocessing config nor the code version, so the panel on disk can predate the commit.
     assert metadata["panel_source"].endswith(".parquet")
     assert "git_commit" in metadata and "created_at" in metadata
-    # What the config asked for sits beside what was measured, which is the pair that says
-    # whether the panel on disk is the panel the config wanted.
     assert metadata["configured_top_n_series"] is None
     assert metadata["imputation_strategy"] == "supervised"
 

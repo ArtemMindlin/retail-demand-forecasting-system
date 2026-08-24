@@ -38,14 +38,8 @@ N_SELECTION_HOLDOUTS = 30
 
 # One progress line per trial. Optuna's own INFO logging prints a paragraph per trial with the
 # full parameter dict, which buries everything else; it is silenced below and replaced by this.
-# Every trial and not every tenth: measured at 10-35s a trial on average but with a 60x spread
-# between the cheapest and dearest, a coarser interval leaves no way to tell a working search
-# from a hung one. At the search's own scale 300 lines is nothing.
 _PROGRESS_EVERY_TRIALS = 1
 
-# Only COMPLETE counts as a trial the search got something out of. Studies from before the
-# pruner was removed hold PRUNED trials, and counting those against the budget would retire
-# it without the sampler ever having seen a value for them.
 _FINISHED_STATES = (optuna.trial.TrialState.COMPLETE,)
 
 N_VALIDATION_HOLDOUTS = 25
@@ -67,34 +61,17 @@ _MLFLOW_EXPERIMENT = "imputation_lgbm_tuning"
 # distribution for.
 _INT_BOUNDS: dict[str, tuple[int, int]] = {
     "n_estimators": (50, 3000),
-    # Lower bound pulled up to where the six searches of `docs/sampler_ab.md` agreed, every
-    # winner sitting at 10-11. It stops at the untuned defaults rather than at the winners'
-    # range because the defaults have to stay expressible: they are enqueued as a reference
-    # trial and pinned by `test_the_untuned_defaults_sit_inside_the_search_space`. The 300-trial
-    # winner picked 8, inside the range, so the floor is not binding.
     "max_depth": (6, 12),
-    # The ceiling is not reachable and does not need raising: `max_depth` caps a tree at
-    # 2**depth leaves, so at the winner's depth of 8 anything above 256 is the same tree. The
-    # 300-trial winner landing on 1024 is a flat region, not a truncated one.
     "num_leaves": (2, 1024),
     # Floor at 1, LightGBM's own minimum: the 300-trial winner sat on the old floor of 2.
     "min_child_samples": (1, 100),
-    # Ceiling raised from 100, which is LightGBM's default and where the 300-trial winner
-    # landed: a range whose top is the default cannot say whether more smoothing would help.
     "min_data_per_group": (1, 500),
     "max_bin": (8, 255),
 }
 
 _FLOAT_BOUNDS: dict[str, tuple[float, float]] = {
-    # The 300-trial winner sat at 1.0, which is a fraction of rows and so the definitional
-    # maximum rather than a wall this range put there. Nothing outside to reach, and the floor
-    # is not binding, so it stays where the `docs/sampler_ab.md` winners put it.
     "subsample": (0.85, 1.0),
     "learning_rate": (0.005, 0.3),
-    # Widened BELOW the 0.3 it started at, because the 300-trial winner landed exactly on the
-    # 0.5 floor a narrowing had raised it to. That narrowing was justified by the winners of
-    # `docs/sampler_ab.md`, which ran under the starved-teacher regime b7900cb replaced, so its
-    # evidence no longer applies to this objective.
     "colsample_bytree": (0.1, 1.0),
     "reg_alpha": (1e-8, 100.0),
     "reg_lambda": (1e-8, 100.0),
@@ -571,15 +548,6 @@ def tune_imputation_lgbm(
             n_startup_trials=_N_STARTUP_TRIALS,
             deterministic_objective=True,
         ),
-        # No pruning, and not for want of trying: a MedianPruner here deadlocked the search.
-        # Both halves of Optuna read COMPLETE trials only -- the pruner takes its median over
-        # them (`pruners/_percentile.py`) and GPSampler fits on them (`samplers/_gp/sampler.py`)
-        # -- so a pruned trial teaches the sampler nothing, and a deterministic GP with no new
-        # data re-proposes the point it just had cut. Measured on a 300-trial run: 76 of the
-        # first 91 trials pruned, the last COMPLETE at trial 52, and 31 consecutive trials
-        # covering 8 distinct parameter vectors. The median only tightens too, since a trial
-        # joins the reference set only by beating it. The saving was never needed: 300 unpruned
-        # trials cost two to three hours.
         pruner=optuna.pruners.NopPruner(),
         storage=f"sqlite:///{models_dir / 'imputation_tuning_studies.db'}",
         study_name=study_name,
@@ -603,8 +571,6 @@ def tune_imputation_lgbm(
             fields(logger, {"referencia": "campeón en disco, encolado como trial"})
 
     started = time.monotonic()
-    # Widths chosen so the whole row fits a narrow terminal pane without wrapping, which is
-    # the only thing that actually separates one trial from the next.
     table = Table(
         logger,
         {
@@ -753,9 +719,6 @@ def tune_imputation_lgbm(
     )
 
     if not beats_default:
-        # Two different failures share this gate, and calling both of them a tie misreports
-        # one: a CI that straddles zero is a coin flip, but a CI entirely above it means the
-        # winner is measurably WORSE than the defaults it was supposed to beat.
         verdict = (
             "es peor que los defaults, y el intervalo no toca el cero"
             if ci_lo > 0

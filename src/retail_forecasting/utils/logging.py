@@ -25,8 +25,6 @@ _LIBRARY_ROOT = "retail_forecasting"
 _RULE_WIDTH = 74
 _FIELD_WIDTH = 16
 
-# Rows between one heading and the next. A long search is read as blocks, and a repeated
-# heading both breaks it into them and saves scrolling back up to name a column.
 _HEADER_EVERY_ROWS = 25
 
 _handler: logging.Handler | None = None

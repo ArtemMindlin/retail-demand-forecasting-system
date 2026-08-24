@@ -332,8 +332,6 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
         raise ValueError("Eval split contained no usable dates for simulation.")
 
     with open_run_directory(settings.reporting.run_name, EXPERIMENT_OPS) as run_dir:
-        # The `simulation/` nesting is kept: the dashboard reads the artifact by that
-        # relative path, and MLflow serves nested artifact paths like any other.
         sim_root = run_dir / "simulation"
         sim_root.mkdir(parents=True, exist_ok=True)
         sim_models_root = sim_root / "models"

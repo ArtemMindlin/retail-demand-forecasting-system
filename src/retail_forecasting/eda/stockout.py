@@ -89,11 +89,6 @@ def render_stockout_figures(
     _plot_stockout_vs_demand_scatter(panel, output_dir / "stockout_vs_demand_scatter.png")
 
 
-# ── Figuras ───────────────────────────────────────────────────────────────────
-# Junto a los resúmenes que dibujan, y no en un módulo de figuras aparte: la figura de bandas
-# de stockout llegó a reconstruir las bandas por su cuenta, con el mismo `pd.cut` que el
-# constructor de arriba, porque los dos cálculos vivían a seiscientas líneas de distancia.
-
 SCATTER_SAMPLE_SIZE = 5000
 
 

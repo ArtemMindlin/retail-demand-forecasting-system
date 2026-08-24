@@ -148,9 +148,6 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
             json.dumps(metadata.model_dump(), indent=2), encoding="utf-8"
         )
 
-        # Unguarded, unlike when this was best-effort tracking on top of `reports/`: the run
-        # directory yielded above IS the MLflow run, so a store that cannot take these params
-        # is a store that could not have taken the figures either.
         log_eda_metadata(metadata=metadata, dataset_summary=summaries["dataset_summary.csv"])
 
         fields(

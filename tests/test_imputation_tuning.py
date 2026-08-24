@@ -1033,8 +1033,6 @@ def test_pace_ignores_the_startup_trials_it_cannot_extrapolate_from() -> None:
     cheap = [_timed_trial(n, 1.0) for n in range(_N_STARTUP_TRIALS)]
     dear = [_timed_trial(_N_STARTUP_TRIALS + n, 100.0) for n in range(2)]
 
-    # 100s, the pace of the two trials past startup -- not the 17.5s an average over all
-    # twelve would give, which would understate the remaining time by a factor of six.
     assert _pace_seconds(_StudyOfTrials([*cheap, *dear])) == pytest.approx(100.0)
 
 

@@ -3,9 +3,6 @@ from __future__ import annotations
 import subprocess
 from datetime import UTC, datetime
 
-# Wrapped in a tuple so that "frozen to None" -- a run launched outside a git checkout -- is
-# distinguishable from "never frozen". A bare None would collapse the two and send every later
-# call back to reading HEAD, which is the behaviour freezing exists to prevent.
 _frozen_commit: tuple[str | None] | None = None
 
 
@@ -37,9 +34,6 @@ def _read_git_commit() -> str | None:
     head = _git("rev-parse", "--short", "HEAD")
     if head is None:
         return None
-    # A commit hash says nothing about uncommitted edits, so a run launched over a modified
-    # worktree would otherwise stamp a clean hash that does not describe the code that ran --
-    # undetectable after the fact, unlike the stale-stamp case above.
     status = _git("status", "--porcelain")
     return f"{head}-dirty" if status else head
 

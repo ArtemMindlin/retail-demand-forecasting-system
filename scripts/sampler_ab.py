@@ -19,8 +19,6 @@ import numpy as np
 import optuna
 import torch
 
-# See the comment at the same call in `tune_imputation_lgbm`: without it the first GP fit
-# segfaults once LightGBM has run under joblib's threads in this process.
 torch.set_num_threads(1)
 
 from retail_forecasting.config import load_config

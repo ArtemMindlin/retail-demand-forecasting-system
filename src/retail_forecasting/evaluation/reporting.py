@@ -278,11 +278,6 @@ def write_run_artifacts(artifacts: RunArtifacts, settings: Settings) -> RunArtif
             )
         artifacts.run_directory = run_dir
 
-        # No longer guarded, and no longer a late import. This used to be best-effort tracking
-        # layered on top of a `reports/` directory that was the real output, so losing the
-        # record was worth less than losing the run. `run_dir` is now the MLflow run's own
-        # artifact directory: a store that cannot take these params is a store the files above
-        # did not reach either, and swallowing that would report success over an empty run.
         log_run_metadata(artifacts=artifacts, settings=settings)
 
         return artifacts
@@ -665,9 +660,6 @@ def update_champion_registry(
             reason = promotion_decision.decision_reason
 
     backend = str(promoted_row["backend_name"])
-    # `models_dir`, where `train_and_save_champion` actually writes. This used to read
-    # `reporting.output_dir / "models"`, a directory nothing had written to since May, so the
-    # registry recorded a stale path when it recorded one at all.
     model_file = Path(settings.models.models_dir) / f"{backend}.pkl"
     return ChampionRegistry(
         updated_at=utc_timestamp(),

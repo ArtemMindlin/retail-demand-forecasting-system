@@ -77,8 +77,6 @@ def main() -> None:
     os.environ["AUTH_USERNAME"] = USERNAME
     os.environ["AUTH_PASSWORD"] = SNAPSHOT_PASSWORD
     os.environ["DJANGO_DEBUG"] = "true"
-    # No artifact directory to point at: the views discover runs through the MLflow store,
-    # so what they render is whatever `RETAIL_MLFLOW_*` resolves to for this process.
 
     import django
 
