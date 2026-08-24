@@ -349,7 +349,9 @@ The repo already supports this through:
 
 - `backtest_metadata.json`
 - `config_hash`
-- `git_commit`
+- `git_commit`, read once when the run starts rather than when each artifact is written, so a
+  commit landing mid-run cannot make a long run report code that never executed; suffixed
+  `-dirty` when the worktree carried uncommitted edits at launch
 - fold metadata
 - tuning metadata
 - drift metadata

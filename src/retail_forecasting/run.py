@@ -19,6 +19,7 @@ from retail_forecasting.forecasting.pipeline import (
 from retail_forecasting.simulation import run_operational_simulation
 from retail_forecasting.utils.logging import configure as configure_logging
 from retail_forecasting.utils.logging import fields, get_logger
+from retail_forecasting.utils.provenance import freeze_git_commit
 
 logger = get_logger(__name__)
 
@@ -74,6 +75,9 @@ def main() -> None:
     args = build_parser().parse_args()
 
     configure_logging()
+    # Before anything long starts, so every artifact this run writes names the code that is
+    # about to execute rather than whatever HEAD has become by the time it finishes.
+    freeze_git_commit()
     try:
         settings = load_config(args.config)
     except ValidationError as exc:
