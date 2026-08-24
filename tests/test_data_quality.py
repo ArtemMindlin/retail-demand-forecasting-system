@@ -47,6 +47,33 @@ def test_validate_prepared_panel_blocks_duplicate_series_dates() -> None:
     assert report.blocking_errors[0].code == "duplicate_series_date_rows"
 
 
+def test_unparseable_dates_are_caught_by_their_own_check() -> None:
+    """A string `date` column is only visible to `invalid_date_format`.
+
+    This check looks redundant next to `null_key_columns` and is not: a null date trips
+    both, but an object-dtype column holding "not-a-date" trips only this one, because a
+    garbage string is not null. Nothing else in the gate inspects the dtype.
+
+    It matters because `run_experiment_from_frame` takes an arbitrary panel. Without the
+    check, strings reach `build_walk_forward_folds`, which compares them against a
+    `Timestamp` and raises deep in the pipeline instead of at the gate.
+    """
+    panel = pd.DataFrame(
+        {
+            "date": ["2024-01-01", "not-a-date", "2024-01-03"],
+            "series_id": ["a", "b", "c"],
+            "observed_demand": [1.0, 2.0, 3.0],
+            "stockout_hours": [0.0, 0.0, 0.0],
+        }
+    )
+
+    report = validate_prepared_panel(panel, Settings())
+
+    assert report.passed is False
+    codes = {issue.code for issue in report.blocking_errors}
+    assert codes == {"invalid_date_format"}, "null_key_columns does not see a garbage string"
+
+
 def test_validate_prepared_panel_blocks_invalid_stockout_hours() -> None:
     panel = make_synthetic_panel(num_series=2, num_days=80)
     panel.loc[0, "stockout_hours"] = 20.0
