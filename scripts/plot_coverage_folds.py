@@ -20,6 +20,8 @@ from pathlib import Path
 
 import matplotlib
 
+from retail_forecasting.tracking import resolve_run_dir
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -30,8 +32,18 @@ OUTPUT = Path("memoria/figures/cobertura_folds.pdf")
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", type=Path, required=True, help="Base-subset run directory.")
-    parser.add_argument("--scale", type=Path, required=True, help="Scale run directory.")
+    parser.add_argument(
+        "--base",
+        type=resolve_run_dir,
+        required=True,
+        help="Base-subset run directory, or the name of a recorded run.",
+    )
+    parser.add_argument(
+        "--scale",
+        type=resolve_run_dir,
+        required=True,
+        help="Scale run directory, or the name of a recorded run.",
+    )
     parser.add_argument("--model", default="catboost", help="Model to plot.")
     parser.add_argument("--strategy", default="Latent_supervised", help="Data strategy to plot.")
     parser.add_argument("--output", type=Path, default=OUTPUT)

@@ -38,6 +38,10 @@ uv run python -m retail_forecasting.utils.latex_exporter \
     --fair-cost-run reports/fresh_retailnet_large_20260811_184959
 ```
 
+The exporter still takes directories. The figure scripts below take either a directory or
+the name of a run recorded in MLflow, which is what this table already cites — the exporter
+cannot, because it lives in `utils`, and `utils` sits below `tracking` in the import layers.
+
 The runs are arguments, not defaults: the exporter used to pin them in `__main__`, which
 is how it kept republishing June runs. It also could not execute at all between `14ad8b4`
 (Jinja2 dropped) and `c274522`, so a stale table could not have been refreshed even
@@ -89,6 +93,23 @@ uv run python -m retail_forecasting.run --config configs/experiment/imputation_c
 The figures read finished runs:
 
 ```bash
-uv run python scripts/plot_coverage_folds.py --base <base-run> --scale <scale-run>
-uv run python scripts/plot_mae_vs_service.py --run <scale-run>
+uv run python scripts/plot_coverage_folds.py \
+    --base fresh_retailnet_v2_20260811_123002 \
+    --scale fresh_retailnet_large_20260811_125735
+uv run python scripts/plot_mae_vs_service.py --run fresh_retailnet_large_20260811_125735
 ```
+
+Those are run names, resolved through MLflow, not paths. A directory still works.
+
+## Where a finished run lives
+
+`reports/<run>/` is where the pipeline writes, and MLflow mirrors the directory into
+`mlruns/<id>/artifacts/`, which is what the dashboard reads. Runs written before the
+tracking instrumentation existed are not in the index; put them there with
+
+```bash
+uv run python scripts/index_reports_into_mlflow.py
+```
+
+which is also how the index is rebuilt if `mlflow.db` is lost, since it is gitignored and
+has no backup while the run directories are the durable copy.

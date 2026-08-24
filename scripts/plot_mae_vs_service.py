@@ -18,6 +18,8 @@ from pathlib import Path
 
 import matplotlib
 
+from retail_forecasting.tracking import resolve_run_dir
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -28,7 +30,12 @@ LABELS = {"seasonal_naive": "Seasonal Naïve", "lightgbm": "LightGBM", "catboost
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run", type=Path, required=True, help="Run directory to read.")
+    parser.add_argument(
+        "--run",
+        type=resolve_run_dir,
+        required=True,
+        help="Run directory, or the name of a recorded run.",
+    )
     parser.add_argument("--strategy", default="Latent_supervised", help="Data strategy to plot.")
     parser.add_argument("--output", type=Path, default=OUTPUT)
     return parser

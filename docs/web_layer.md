@@ -27,12 +27,27 @@ views/           <- finas: leen query params, llaman a services, renderizan
 services/        <- pandas puro, SIN Django. Testeable en aislamiento
   |
   v
-reports/<run>/   <- artefactos en disco (CSV, Parquet, JSON, PNG)
+MLflow           <- indice de que corridas existen (mlflow.db)
+  |
+  v
+mlruns/<id>/artifacts/  <- artefactos en disco (CSV, Parquet, JSON, PNG)
 ```
 
-No hay base de datos. El estado del sistema son los artefactos que el pipeline
-escribe en `reports/`; la unica pieza de estado propia de la web es la sesion
-del operador, que viaja en una cookie firmada.
+`ArtifactStore` descubre las corridas por MLflow y las lee como ficheros del
+directorio de artefactos que este le devuelve. `log_artifacts` espeja el
+directorio de corrida dentro del almacen, asi que ese directorio tiene la misma
+forma que la carpeta de `reports/` que lo produjo: los `services/` de abajo no
+distinguen uno de otro. Descubrir por el indice tambien elimina una clase de
+fallo en lugar de defenderse de ella, porque un nombre de corrida tiene que ser
+una clave que MLflow ya conoce y no hay ruta que recorrer ni nombre que sanear.
+
+Dos cosas siguen viviendo en `reports/` porque no son artefactos de una corrida
+terminada: `ops_sim/`, cuyo modo `simulate_ops` no esta instrumentado todavia, y
+`active_run.log`, que se escribe mientras la corrida va. Una corrida de MLflow es
+el registro cerrado de algo que ya acabo, no un sitio para estado que cambia.
+
+No hay base de datos de aplicacion: la unica pieza de estado propia de la web es
+la sesion del operador, que viaja en una cookie firmada.
 
 ### Modulos
 

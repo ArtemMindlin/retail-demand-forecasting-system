@@ -1,9 +1,13 @@
 """Discovery and caching of pipeline artifacts on disk.
 
-The system has no database: every figure the dashboard shows is read from a run
-directory under ``reports/``. This module owns that access — locating the latest
-run, loading and caching its predictions frame, and validating user-supplied run
-names against path traversal.
+Runs are discovered through MLflow, which is the index of what exists, and read as
+plain files from the artifact directory MLflow hands back. `log_artifacts` mirrors a
+run directory into the store, so that directory is shaped exactly like the ``reports/``
+folder that produced it and every reader below stayed as it was.
+
+Discovery through the index also removes a class of bug rather than guarding against
+it: a run name now has to be a key MLflow already knows, so there is no path to
+traverse and no name to sanitise.
 
 Deliberately free of any web framework. The Django views construct or receive an
 :class:`ArtifactStore` and never touch ``pandas`` file paths themselves, which is
@@ -20,14 +24,11 @@ from typing import Any
 import pandas as pd
 
 from retail_forecasting.config import load_config
+from retail_forecasting.tracking import EXPERIMENT_EDA, EXPERIMENT_RUNS, logged_run_dirs
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_REPORTS_DIR = Path("reports")
 DEFAULT_CONFIG_PATH = Path("configs/experiment/default.yaml")
-
-# Directory-name prefixes that are never experiment runs.
-_NON_RUN_PREFIXES = (".", "models", "ablation")
 
 _PREDICTION_COLUMNS = ["date", "series_id", "y_true", "y_pred", "data_strategy", "model_name"]
 
@@ -53,12 +54,7 @@ class ArtifactStore:
     finishes a new run.
     """
 
-    def __init__(
-        self,
-        reports_dir: Path = DEFAULT_REPORTS_DIR,
-        config_path: Path = DEFAULT_CONFIG_PATH,
-    ) -> None:
-        self.reports_dir = Path(reports_dir)
+    def __init__(self, config_path: Path = DEFAULT_CONFIG_PATH) -> None:
         self.config_path = Path(config_path)
         self._lock = threading.Lock()
         self._cache: dict[str, Any] = {}
@@ -78,111 +74,78 @@ class ArtifactStore:
     # ── Run discovery ─────────────────────────────────────────────────────────
 
     def latest_run_path(self) -> Path:
-        """Newest run directory that contains ``predictions.csv``.
+        """Newest run holding ``predictions.csv``.
 
         Raises:
-            NoPredictionsError: if ``reports/`` is missing or holds no such run.
+            NoPredictionsError: if no recorded run holds one.
         """
         cached = self._cache.get("run_path")
         if isinstance(cached, Path):
             return cached
 
-        if not self.reports_dir.exists():
-            raise NoPredictionsError(f"{self.reports_dir}/ directory does not exist.")
-
-        runs = [
-            d
-            for d in self.reports_dir.iterdir()
-            if d.is_dir()
-            and not d.name.startswith(_NON_RUN_PREFIXES)
-            and (d / "predictions.csv").exists()
-        ]
+        runs = self.runs_with("predictions.csv")
         if not runs:
-            raise NoPredictionsError(f"No runs with predictions.csv found in {self.reports_dir}/.")
+            raise NoPredictionsError("No recorded run holds predictions.csv.")
 
-        # Run directories are timestamp-prefixed, so lexical sort is chronological.
-        latest = max(runs, key=lambda d: d.name)
         with self._lock:
-            self._cache["run_path"] = latest
-        return latest
+            self._cache["run_path"] = runs[0]
+        return runs[0]
 
     def runs_with(self, *required_files: str) -> list[Path]:
-        """Run directories holding all of ``required_files``, newest first."""
-        if not self.reports_dir.exists():
-            return []
+        """Recorded runs holding all of ``required_files``, newest first."""
         return [
-            d
-            for d in sorted(
-                self.reports_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True
-            )
-            if d.is_dir() and all((d / f).exists() for f in required_files)
+            path
+            for path in logged_run_dirs(EXPERIMENT_RUNS).values()
+            if all((path / f).exists() for f in required_files)
         ]
 
     def resolve_run(self, run_name: str, *, requires: str = "predictions.csv") -> Path:
-        """Validate ``run_name`` against path traversal and return its directory.
+        """Return the named run's artifact directory.
 
         Raises:
-            RunNotFoundError: if the name is unsafe, missing, or lacks ``requires``.
+            RunNotFoundError: if no such run is recorded, or it lacks ``requires``.
         """
-        safe_name = Path(run_name).name
-        if not safe_name or safe_name != run_name or run_name.startswith("."):
+        path = logged_run_dirs(EXPERIMENT_RUNS).get(run_name)
+        if path is None or not (path / requires).exists():
             raise RunNotFoundError(f"Run '{run_name}' not found.")
-
-        run_path = self.reports_dir / run_name
-        if not run_path.is_dir() or not (run_path / requires).exists():
-            raise RunNotFoundError(f"Run '{run_name}' not found.")
-        return run_path
+        return path
 
     def list_runs(self) -> list[str]:
         """Experiment runs that carry the full metrics/cost artifact set."""
+        required = ("predictions.csv", "metrics_summary.csv", "cost_summary.csv")
         return [
-            d.name
-            for d in self.runs_with("predictions.csv", "metrics_summary.csv", "cost_summary.csv")
+            name
+            for name, path in logged_run_dirs(EXPERIMENT_RUNS).items()
+            if all((path / f).exists() for f in required)
         ]
 
     # ── EDA runs ──────────────────────────────────────────────────────────────
 
     def latest_eda_path(self) -> Path | None:
-        """Newest ``eda_*`` directory, or None if the EDA module never ran."""
-        if not self.reports_dir.exists():
-            return None
-        eda_dirs = [
-            d for d in self.reports_dir.iterdir() if d.is_dir() and d.name.startswith("eda_")
-        ]
-        return max(eda_dirs, key=lambda d: d.name) if eda_dirs else None
+        """Newest recorded EDA run, or None if the module never ran."""
+        recorded = list(logged_run_dirs(EXPERIMENT_EDA).values())
+        return recorded[0] if recorded else None
 
     def list_eda_runs(self) -> list[str]:
-        """Names of every EDA run, newest first."""
-        if not self.reports_dir.exists():
-            return []
-        return sorted(
-            (
-                d.name
-                for d in self.reports_dir.iterdir()
-                if d.is_dir() and d.name.startswith("eda_")
-            ),
-            reverse=True,
-        )
+        """Names of every recorded EDA run, newest first."""
+        return list(logged_run_dirs(EXPERIMENT_EDA))
 
     def resolve_eda_run(self, run_name: str | None) -> Path:
-        """Return the requested EDA directory, or the latest when unnamed.
+        """Return the named EDA run, or the newest when unnamed.
 
         Raises:
             RunNotFoundError: if nothing matches.
         """
+        recorded = logged_run_dirs(EXPERIMENT_EDA)
         if run_name:
-            safe_name = Path(run_name).name
-            if safe_name != run_name or not run_name.startswith("eda_"):
-                raise RunNotFoundError("EDA run not found.")
-            path = self.reports_dir / run_name
-            if not path.is_dir():
+            path = recorded.get(run_name)
+            if path is None:
                 raise RunNotFoundError("EDA run not found.")
             return path
 
-        latest = self.latest_eda_path()
-        if latest is None:
-            raise RunNotFoundError(f"No EDA report found in {self.reports_dir}/.")
-        return latest
+        if not recorded:
+            raise RunNotFoundError("No EDA run recorded.")
+        return next(iter(recorded.values()))
 
     # ── Predictions ───────────────────────────────────────────────────────────
 

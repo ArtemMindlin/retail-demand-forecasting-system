@@ -16,12 +16,23 @@ import pytest
 from django.test import Client, override_settings
 
 from retail_forecasting.api import store as store_module
+from retail_forecasting.tracking import EXPERIMENT_RUNS, index_run_directory
 
 USERNAME = "test-operator"
 PASSWORD = "test-password"
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
+
+def index_run(run: Path) -> None:
+    """Record `run` in MLflow, which is how the store discovers it at all.
+
+    Called again by the tests that add a file after the fixture built the directory: the
+    store reads the mirrored copy, so a file written afterwards is invisible until the
+    directory is indexed again. Production writes every artifact before logging once.
+    """
+    index_run_directory(run, EXPERIMENT_RUNS)
 
 
 @pytest.fixture
@@ -105,6 +116,7 @@ def run_with_predictions(reports_dir: Path) -> Path:
         }
     )
     frame.to_csv(run / "predictions.csv", index=False)
+    index_run(run)
     return run
 
 
@@ -249,6 +261,7 @@ def test_drift_view_reads_the_real_report(auth_client: Client, run_with_predicti
         }
     ]
     (run_with_predictions / "drift_report.json").write_text(json.dumps(report), encoding="utf-8")
+    index_run(run_with_predictions)
 
     response = auth_client.get("/drift/")
     assert response.status_code == 200
@@ -476,6 +489,7 @@ def test_download_costs_falls_back_to_the_legacy_filename(
     auth_client: Client, run_with_predictions: Path
 ) -> None:
     (run_with_predictions / "costs.csv").write_text("total_cost\n42\n", encoding="utf-8")
+    index_run(run_with_predictions)
     response = auth_client.get("/api/download/costs")
     assert response.status_code == 200
     assert b"42" in b"".join(response.streaming_content)
@@ -540,6 +554,7 @@ def test_alerts_panel_lists_exceptions(auth_client: Client, run_with_predictions
             "order_quantity": [12],
         }
     ).to_csv(run_with_predictions / "exceptions.csv", index=False)
+    index_run(run_with_predictions)
 
     response = auth_client.get("/alertas/")
     assert response.status_code == 200

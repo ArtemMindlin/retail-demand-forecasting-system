@@ -18,7 +18,7 @@ def get_store() -> ArtifactStore:
     """Return the shared store, building it on first use."""
     global _store
     if _store is None:
-        _store = ArtifactStore(settings.REPORTS_DIR, settings.CONFIG_PATH)
+        _store = ArtifactStore(settings.CONFIG_PATH)
     return _store
 
 
