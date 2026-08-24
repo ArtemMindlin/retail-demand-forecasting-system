@@ -161,7 +161,7 @@ def _build_report(
     return DataQualityReport(
         run_mode=settings.project.run_mode,
         checked_rows=len(panel),
-        checked_series=(int(panel["series_id"].count()) if "series_id" in panel.columns else 0),
+        checked_series=(int(panel["series_id"].nunique()) if "series_id" in panel.columns else 0),
         date_min=date_min,
         date_max=date_max,
         warning_count=len(warnings),
