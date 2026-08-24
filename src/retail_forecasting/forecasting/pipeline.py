@@ -56,6 +56,7 @@ from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.optimization import HyperparameterTuner
 from retail_forecasting.tracking import (
+    EXPERIMENT_IMPUTATION,
     EXPERIMENT_RUNS,
     log_imputation_comparison_metadata,
     open_run_directory,
@@ -262,7 +263,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
         imputer_params_path=imputer_params_path,
     )
 
-    with open_run_directory(settings.reporting.run_name, EXPERIMENT_RUNS) as run_dir:
+    with open_run_directory(settings.reporting.run_name, EXPERIMENT_IMPUTATION) as run_dir:
         long_df.to_csv(run_dir / "latent_strategies.csv", index=False)
         quality_df.to_csv(run_dir / "imputation_quality.csv", index=False)
 

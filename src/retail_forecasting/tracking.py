@@ -59,6 +59,10 @@ EXPERIMENT_RUNS = "retail_forecasting_runs"
 
 EXPERIMENT_EDA = "retail_forecasting_eda"
 EXPERIMENT_OPS = "retail_forecasting_ops"
+# Also its own, and for the same reason: reconstruction error against synthetically
+# censored days is not forecast error, and sharing an experiment put 21 comparison runs
+# in front of the 5 that back chapter 6.
+EXPERIMENT_IMPUTATION = "retail_forecasting_imputation"
 
 _IDENTITY_COLUMNS = ("model_name", "backend_name", "data_strategy", "observations")
 

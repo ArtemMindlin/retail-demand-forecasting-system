@@ -12,6 +12,7 @@ from retail_forecasting.api.services import experiments as service
 from retail_forecasting.api.services.runs import RunNotFoundError
 from retail_forecasting.api.store import get_store
 from retail_forecasting.api.views.empty import empty_state
+from retail_forecasting.tracking import EXPERIMENT_IMPUTATION
 
 
 def _pick_run(available: list[str], requested: str | None) -> str | None:
@@ -24,7 +25,7 @@ def _pick_run(available: list[str], requested: str | None) -> str | None:
 def latent(request: HttpRequest) -> HttpResponse:
     """Compare latent-demand reconstruction strategies for one series."""
     store = get_store()
-    runs = list(store.runs_with("latent_strategies.csv"))
+    runs = list(store.runs_with("latent_strategies.csv", experiment=EXPERIMENT_IMPUTATION))
     run_name = _pick_run(runs, request.GET.get("run"))
 
     if run_name is None:
@@ -39,12 +40,14 @@ def latent(request: HttpRequest) -> HttpResponse:
             ),
             hint=(
                 "Genérala con: uv run python -m retail_forecasting.run "
-                "--config configs/experiment/imputation_compare.yaml"
+                "--config configs/compare_imputation/default.yaml"
             ),
         )
 
     try:
-        run_path = store.resolve_run(run_name, requires="latent_strategies.csv")
+        run_path = store.resolve_run(
+            run_name, requires="latent_strategies.csv", experiment=EXPERIMENT_IMPUTATION
+        )
     except RunNotFoundError as exc:
         return empty_state(
             request,

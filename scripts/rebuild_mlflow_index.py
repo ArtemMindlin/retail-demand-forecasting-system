@@ -23,6 +23,7 @@ from pathlib import Path
 
 from retail_forecasting.tracking import (
     EXPERIMENT_EDA,
+    EXPERIMENT_IMPUTATION,
     EXPERIMENT_OPS,
     EXPERIMENT_RUNS,
     RUN_IDENTITY_FILE,
@@ -39,7 +40,7 @@ def main() -> None:
 
     known = {
         name
-        for experiment in (EXPERIMENT_RUNS, EXPERIMENT_EDA, EXPERIMENT_OPS)
+        for experiment in (EXPERIMENT_RUNS, EXPERIMENT_EDA, EXPERIMENT_OPS, EXPERIMENT_IMPUTATION)
         for name in logged_run_dirs(experiment)
     }
 

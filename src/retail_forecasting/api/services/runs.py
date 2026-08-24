@@ -23,7 +23,11 @@ from typing import Any
 import pandas as pd
 
 from retail_forecasting.config import load_config
-from retail_forecasting.tracking import EXPERIMENT_EDA, EXPERIMENT_RUNS, logged_run_dirs
+from retail_forecasting.tracking import (
+    EXPERIMENT_EDA,
+    EXPERIMENT_RUNS,
+    logged_run_dirs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +95,7 @@ class ArtifactStore:
             self._cache["run_path"] = latest
         return latest
 
-    def runs_with(self, *required_files: str) -> dict[str, Path]:
+    def runs_with(self, *required_files: str, experiment: str = EXPERIMENT_RUNS) -> dict[str, Path]:
         """Recorded runs holding all of ``required_files``, newest first, keyed by name.
 
         Keyed rather than a bare list because an artifact directory is called `artifacts`
@@ -99,17 +103,23 @@ class ArtifactStore:
         """
         return {
             name: path
-            for name, path in logged_run_dirs(EXPERIMENT_RUNS).items()
+            for name, path in logged_run_dirs(experiment).items()
             if all((path / f).exists() for f in required_files)
         }
 
-    def resolve_run(self, run_name: str, *, requires: str = "predictions.csv") -> Path:
+    def resolve_run(
+        self,
+        run_name: str,
+        *,
+        requires: str = "predictions.csv",
+        experiment: str = EXPERIMENT_RUNS,
+    ) -> Path:
         """Return the named run's artifact directory.
 
         Raises:
             RunNotFoundError: if no such run is recorded, or it lacks ``requires``.
         """
-        path = logged_run_dirs(EXPERIMENT_RUNS).get(run_name)
+        path = logged_run_dirs(experiment).get(run_name)
         if path is None or not (path / requires).exists():
             raise RunNotFoundError(f"Run '{run_name}' not found.")
         return path
