@@ -18,18 +18,24 @@ from pathlib import Path
 
 from retail_forecasting.tracking import (
     EXPERIMENT_EDA,
+    EXPERIMENT_OPS,
     EXPERIMENT_RUNS,
     index_run_directory,
     logged_run_dirs,
 )
 
-# Directories under reports/ that are not runs: the OPS plane keeps its own layout, and
-# `sampler_ab` is a closed side study kept only as evidence for a code comment.
-_NOT_RUNS = ("ops_sim", "sampler_ab")
+# `sampler_ab` is a closed side study kept only as evidence for a code comment, not a run.
+_NOT_RUNS = ("sampler_ab",)
 
 
 def _experiment_for(run_dir: Path) -> str:
-    return EXPERIMENT_EDA if run_dir.name.startswith("eda_") else EXPERIMENT_RUNS
+    if run_dir.name.startswith("eda_"):
+        return EXPERIMENT_EDA
+    # The OPS plane has its own experiment: its costs are not walk-forward costs and must not
+    # land in one `search_runs` beside them.
+    if (run_dir / "simulation").is_dir():
+        return EXPERIMENT_OPS
+    return EXPERIMENT_RUNS
 
 
 def main() -> None:

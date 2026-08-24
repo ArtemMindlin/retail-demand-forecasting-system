@@ -61,6 +61,12 @@ EXPERIMENT_RUNS = "retail_forecasting_runs"
 # The EDA gets its own experiment rather than sharing the one above: it logs no metrics at all,
 # and metric-less runs beside metric-heavy ones make one sparse, unreadable table in the UI.
 EXPERIMENT_EDA = "retail_forecasting_eda"
+# Its own experiment, not a run alongside the walk-forward ones. The OPS plane answers a
+# different question with a different costing model -- one independent single-period
+# decision per origin, no carried stock, truth censored on stockout days -- and
+# `docs/runs.md` says in as many words not to quote its numbers beside theirs. Sharing an
+# experiment would put both under one `search_runs` and invite exactly that.
+EXPERIMENT_OPS = "retail_forecasting_ops"
 
 # Columns of `metrics_summary` and `cost_summary` that name the row rather than measure it.
 # They become part of each metric's name instead of a metric of their own.
@@ -82,9 +88,15 @@ def _artifact_root(tracking_uri: str) -> str | None:
     return str(Path(tracking_uri.removeprefix(prefix)).resolve().parent / "mlruns")
 
 
+# What makes a summary row distinct, in the order it reads best. `cadence` is here for the OPS
+# plane, whose rows are one per retrain policy: without it every cadence would write to the
+# same `total_cost` key and the last one would silently win.
+_ROW_IDENTITY = ("model_name", "data_strategy", "cadence")
+
+
 def _metric_name(prefix: str, row: pd.Series) -> str:
     """`mae` plus the row's identity, since one run scores several models and strategies."""
-    parts = [str(row[column]) for column in ("model_name", "data_strategy") if column in row]
+    parts = [str(row[column]) for column in _ROW_IDENTITY if column in row]
     return ".".join([prefix, *(part for part in parts if part and part != "nan")])
 
 
@@ -297,3 +309,38 @@ def open_run_directory(run_name: str, experiment_name: str) -> Iterator[Path]:
             encoding="utf-8",
         )
         yield run_dir
+
+
+def log_ops_metadata(
+    settings: Settings,
+    cadence_summary: pd.DataFrame,
+    cadence_comparison: pd.DataFrame,
+    n_origins: int,
+    n_retrain_events: int,
+) -> None:
+    """Attach the OPS plane's config and per-cadence results to the run already open.
+
+    The cadence comparison is logged with its `conclusive` and `underpowered` flags beside the
+    percentages, because the percentage alone is not citable: `docs/runs.md` allows quoting the
+    retrain saving only when the comparison says conclusive, and a metric store that kept the
+    number and dropped the caveat would make the unciteable figure the easiest one to find.
+    """
+    mlflow.log_params(_flat_params(settings))
+    mlflow.set_tags(
+        {
+            "git_commit": get_git_commit(),
+            "run_mode": settings.project.run_mode,
+            "config_hash": build_config_hash(settings),
+            "origins": n_origins,
+            "retrain_events": n_retrain_events,
+        }
+    )
+    mlflow.log_metrics(_numeric_metrics(cadence_summary))
+    mlflow.log_metrics(_numeric_metrics(cadence_comparison))
+    if not cadence_comparison.empty and "conclusive" in cadence_comparison:
+        mlflow.set_tags(
+            {
+                "cadence_conclusive": bool(cadence_comparison["conclusive"].all()),
+                "cadence_underpowered": bool(cadence_comparison["underpowered"].any()),
+            }
+        )

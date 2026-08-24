@@ -16,7 +16,7 @@ import pytest
 from django.test import Client, override_settings
 
 from retail_forecasting.api import store as store_module
-from retail_forecasting.tracking import EXPERIMENT_RUNS, index_run_directory
+from retail_forecasting.tracking import EXPERIMENT_OPS, EXPERIMENT_RUNS, index_run_directory
 
 USERNAME = "test-operator"
 PASSWORD = "test-password"
@@ -47,7 +47,7 @@ def reports_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def ops_backtest_artifact(reports_dir: Path) -> Path:
+def ops_backtest_artifact(reports_dir: Path, tmp_path: Path) -> Path:
     """A tiny OPS backtest artifact: two cadences, two weekly origins, one partial.
 
     Mirrors what ``run_operational_simulation`` writes, including the paired
@@ -55,7 +55,8 @@ def ops_backtest_artifact(reports_dir: Path) -> Path:
     """
     from retail_forecasting.api.views import ops as ops_view
 
-    sim_dir = reports_dir / "ops_sim" / "simulation"
+    run_dir = tmp_path / "ops_run"
+    sim_dir = run_dir / "simulation"
     sim_dir.mkdir(parents=True)
 
     rows = []
@@ -95,6 +96,7 @@ def ops_backtest_artifact(reports_dir: Path) -> Path:
         ]
     ).to_csv(sim_dir / "cadence_comparison.csv", index=False)
 
+    index_run_directory(run_dir, EXPERIMENT_OPS)
     ops_view._simulation = None
     yield sim_dir
     ops_view._simulation = None

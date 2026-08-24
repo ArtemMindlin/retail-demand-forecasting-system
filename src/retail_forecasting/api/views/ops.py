@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
@@ -31,7 +30,7 @@ def get_simulation() -> OpsSimulation:
     """Shared simulation reader, built from settings on first use."""
     global _simulation
     if _simulation is None:
-        _simulation = OpsSimulation(settings.REPORTS_DIR)
+        _simulation = OpsSimulation()
     return _simulation
 
 

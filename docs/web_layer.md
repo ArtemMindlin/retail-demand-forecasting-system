@@ -46,12 +46,15 @@ y escribe dentro de su propio directorio de artefactos. Hay una sola copia, y el
 modo de fallo cambio con ella -- un almacen inalcanzable ya no cuesta el registro,
 cuesta la corrida, asi que el `try/except` que lo envolvia se ha ido.
 
-Dos cosas siguen viviendo en `reports/` porque no son artefactos de una corrida
-terminada: `ops_sim/`, cuyo modo `simulate_ops` no esta instrumentado todavia, y
-`active_run.log`, que se escribe mientras la corrida va. Una corrida de MLflow es
-el registro cerrado de algo que ya acabo, no un sitio para estado que cambia. Por
-eso `champion_registry.json` se mudo a `models_dir`: es estado mutable que sobrevive
-a las corridas que lo actualizan.
+El plano OPS escribe en su propio experimento, `retail_forecasting_ops`, y no como
+una corrida mas: sus costes no son costes de walk-forward y `docs/runs.md` dice
+explicitamente que no se citen al lado. Compartir experimento los pondria bajo un
+mismo `search_runs`.
+
+Solo `active_run.log` sigue en `reports/`, porque se escribe mientras la corrida va:
+una corrida de MLflow es el registro cerrado de algo que ya acabo, no un sitio para
+estado que cambia. Por eso `champion_registry.json` se mudo a `models_dir`, que es
+estado mutable que sobrevive a las corridas que lo actualizan.
 
 No hay base de datos de aplicacion: la unica pieza de estado propia de la web es
 la sesion del operador, que viaja en una cookie firmada.

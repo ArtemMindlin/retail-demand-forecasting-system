@@ -49,6 +49,7 @@ from retail_forecasting.forecasting.pipeline import (
 from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
 from retail_forecasting.inventory.newsvendor import attach_inventory_costs
 from retail_forecasting.models.conformal import ConformalForecaster
+from retail_forecasting.tracking import EXPERIMENT_OPS, log_ops_metadata, open_run_directory
 
 
 @dataclass
@@ -330,69 +331,80 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
     if not eval_dates:
         raise ValueError("Eval split contained no usable dates for simulation.")
 
-    sim_root = Path(settings.reporting.output_dir) / settings.reporting.run_name / "simulation"
-    sim_root.mkdir(parents=True, exist_ok=True)
-    sim_models_root = sim_root / "models"
-    sim_models_root.mkdir(parents=True, exist_ok=True)
+    with open_run_directory(settings.reporting.run_name, EXPERIMENT_OPS) as run_dir:
+        # The `simulation/` nesting is kept: the dashboard reads the artifact by that
+        # relative path, and MLflow serves nested artifact paths like any other.
+        sim_root = run_dir / "simulation"
+        sim_root.mkdir(parents=True, exist_ok=True)
+        sim_models_root = sim_root / "models"
+        sim_models_root.mkdir(parents=True, exist_ok=True)
 
-    cadence_paths, cadence_int = _setup_cadence_models(settings, train_panel, sim_models_root)
+        cadence_paths, cadence_int = _setup_cadence_models(settings, train_panel, sim_models_root)
 
-    # Combined panel keeps lag continuity across the train→eval boundary.
-    combined_panel = pd.concat([train_panel, eval_panel], ignore_index=True)
-    combined_panel = combined_panel.sort_values(["series_id", "date"]).reset_index(drop=True)
+        # Combined panel keeps lag continuity across the train→eval boundary.
+        combined_panel = pd.concat([train_panel, eval_panel], ignore_index=True)
+        combined_panel = combined_panel.sort_values(["series_id", "date"]).reset_index(drop=True)
 
-    series_cost_profile = None
-    if settings.inventory.use_series_costs:
-        series_cost_profile = build_series_cost_profile(
-            label_all_regimes(train_panel), settings.inventory
+        series_cost_profile = None
+        if settings.inventory.use_series_costs:
+            series_cost_profile = build_series_cost_profile(
+                label_all_regimes(train_panel), settings.inventory
+            )
+
+        predictions_by_day, retrain_events = _run_streaming_loop(
+            eval_dates=eval_dates,
+            combined_panel=combined_panel,
+            eval_panel=eval_panel,
+            cadence_paths=cadence_paths,
+            cadence_int=cadence_int,
+            horizon=horizon,
+            settings=settings,
+            series_cost_profile=series_cost_profile,
+        )
+        cadence_summary = _summarize_cadences(predictions_by_day, retrain_events, horizon)
+        cadence_comparison = _compare_cadences(
+            predictions_by_day, horizon, random_seed=settings.project.random_seed
         )
 
-    predictions_by_day, retrain_events = _run_streaming_loop(
-        eval_dates=eval_dates,
-        combined_panel=combined_panel,
-        eval_panel=eval_panel,
-        cadence_paths=cadence_paths,
-        cadence_int=cadence_int,
-        horizon=horizon,
-        settings=settings,
-        series_cost_profile=series_cost_profile,
-    )
-    cadence_summary = _summarize_cadences(predictions_by_day, retrain_events, horizon)
-    cadence_comparison = _compare_cadences(
-        predictions_by_day, horizon, random_seed=settings.project.random_seed
-    )
+        plot_path, report_path = _persist_simulation_outputs(
+            sim_root,
+            predictions_by_day,
+            cadence_summary,
+            cadence_comparison,
+            retrain_events,
+            settings,
+            eval_dates,
+        )
 
-    plot_path, report_path = _persist_simulation_outputs(
-        sim_root,
-        predictions_by_day,
-        cadence_summary,
-        cadence_comparison,
-        retrain_events,
-        settings,
-        eval_dates,
-    )
-
-    print(
-        f"✅ Rolling-origin backtest complete. Outputs in {sim_root} "
-        f"({len(retrain_events)} retrain events)"
-    )
-    if not cadence_comparison.empty and bool(cadence_comparison["underpowered"].any()):
         print(
-            "⚠️  Only "
-            f"{int(cadence_comparison['n_origins'].max())} independent origins: the "
-            "cadence comparison is descriptive, not conclusive."
+            f"✅ Rolling-origin backtest complete. Outputs in {sim_root} "
+            f"({len(retrain_events)} retrain events)"
+        )
+        if not cadence_comparison.empty and bool(cadence_comparison["underpowered"].any()):
+            print(
+                "⚠️  Only "
+                f"{int(cadence_comparison['n_origins'].max())} independent origins: the "
+                "cadence comparison is descriptive, not conclusive."
+            )
+
+        log_ops_metadata(
+            settings=settings,
+            cadence_summary=cadence_summary,
+            cadence_comparison=cadence_comparison,
+            n_origins=len(eval_dates),
+            n_retrain_events=len(retrain_events),
         )
 
-    return OperationalSimulationArtifacts(
-        predictions_by_day=predictions_by_day,
-        cadence_summary=cadence_summary,
-        cadence_comparison=cadence_comparison,
-        retrain_events=retrain_events,
-        run_directory=sim_root,
-        cumulative_cost_plot=plot_path,
-        report_path=report_path,
-        cadence_models=cadence_paths,
-    )
+        return OperationalSimulationArtifacts(
+            predictions_by_day=predictions_by_day,
+            cadence_summary=cadence_summary,
+            cadence_comparison=cadence_comparison,
+            retrain_events=retrain_events,
+            run_directory=sim_root,
+            cumulative_cost_plot=plot_path,
+            report_path=report_path,
+            cadence_models=cadence_paths,
+        )
 
 
 def _summarize_cadences(

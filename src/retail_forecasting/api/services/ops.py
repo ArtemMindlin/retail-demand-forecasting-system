@@ -20,27 +20,29 @@ from typing import Any
 
 import pandas as pd
 
+from retail_forecasting.tracking import EXPERIMENT_OPS, logged_run_dirs
+
 # The conformal band [q_0_1, q_0_9] is a nominal 80% interval (models.quantiles).
 TARGET_COVERAGE = 0.80
 LOWER_COLUMN = "q_0_1"
 UPPER_COLUMN = "q_0_9"
 HORIZON_DAYS = 7
 
-ARTIFACT_GLOB = "*/simulation/predictions_by_day.parquet"
+# Relative to a run's artifact directory. The writer keeps the `simulation/` nesting, so
+ARTIFACT_RELATIVE_PATH = Path("simulation") / "predictions_by_day.parquet"
 # Paired cadence-vs-baseline comparison with its bootstrap interval, written next
 # to the predictions by ``_compare_cadences``. Absent in older runs.
 COMPARISON_FILENAME = "cadence_comparison.csv"
 
 
 class SimulationNotFoundError(Exception):
-    """No operational-simulation artifact exists under ``reports/``."""
+    """No recorded OPS run holds a simulation artifact."""
 
 
 class OpsSimulation:
     """Cached access to the walk-forward simulation artifact."""
 
-    def __init__(self, reports_dir: Path) -> None:
-        self.reports_dir = Path(reports_dir)
+    def __init__(self) -> None:
         self._lock = threading.Lock()
         self._frame: pd.DataFrame | None = None
         self._run_name: str | None = None
@@ -70,13 +72,17 @@ class OpsSimulation:
         if self._frame is not None:
             return self._frame
 
-        if not self.reports_dir.exists():
-            raise SimulationNotFoundError("No operational backtest artifact found.")
-        candidates = sorted(self.reports_dir.glob(ARTIFACT_GLOB))
-        if not candidates:
+        # Newest first, so the first run holding the artifact is the one to read. Runs are
+        # ordered by MLflow's own start time rather than by file mtime, which a copy resets.
+        recorded = [
+            (name, path / ARTIFACT_RELATIVE_PATH)
+            for name, path in logged_run_dirs(EXPERIMENT_OPS).items()
+        ]
+        found = next(((name, path) for name, path in recorded if path.exists()), None)
+        if found is None:
             raise SimulationNotFoundError("No operational backtest artifact found.")
 
-        artifact = max(candidates, key=lambda p: p.stat().st_mtime)
+        run_name, artifact = found
         df = pd.read_parquet(artifact)
         df["decision_date"] = pd.to_datetime(df["decision_date"])
         # Weekly playback: origins sit on a 7-day grid, the retrain boundary.
@@ -86,7 +92,7 @@ class OpsSimulation:
 
         with self._lock:
             self._frame = df
-            self._run_name = artifact.parent.parent.name
+            self._run_name = run_name
             self._comparison = _load_comparison(artifact.parent / COMPARISON_FILENAME)
         return df
 

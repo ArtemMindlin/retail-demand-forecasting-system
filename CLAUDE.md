@@ -22,7 +22,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 - `mlruns/` + `mlflow.db`: the run store. Every mode opens an MLflow run and writes its artifacts straight into that run's directory, so there is one copy and no mirroring step. Both are gitignored, which is why each artifact directory carries an `mlflow_run.json` naming its run: with a database-backed store, `mlruns/` holds artifacts and nothing that identifies them.
 - `docs/`: system of record for architecture, contracts, invariants, and decisions.
 - `notebooks/`: lightweight exploration only. Production pipeline logic belongs in `src/`.
-- `reports/`: what has not moved into the run store. The OPS plane's `ops_sim/` (whose `simulate_ops` mode is not instrumented yet), `active_run.log` (written while a run is in flight, so not the artifact of a finished one), and the pre-migration run directories that `docs/runs.md` cites. Do not edit manually unless documenting a final result.
+- `reports/`: what has not moved into the run store. `active_run.log`, written while a run is in flight and so not the artifact of a finished one, and the pre-migration run directories that `docs/runs.md` cites. Do not edit manually unless documenting a final result.
 - `scripts/build_ops_sim_split.py`: carves the dedicated train/eval split the OPS plane streams, into `data/processed/ops_sim/`. Invoked by `make simulate` when the split is missing; not something to run by hand.
 - `manage.py`: Django management entrypoint for the dashboard (`src/retail_forecasting/api/`).
 - `src/retail_forecasting/config.py`: typed settings loaded from YAML.
