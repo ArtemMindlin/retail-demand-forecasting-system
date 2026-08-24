@@ -72,9 +72,6 @@ def build_run_metadata(
 
 def run_eda(settings: Settings, split: str = "train", config_path: Path | None = None) -> Path:
     """Read the panel, summarise it, draw it, and return the directory it all landed in."""
-    # Checked here rather than in the CLI parser, which is built before the config is read and
-    # so cannot know the valid names. An unchecked split failed deep inside the loader, with a
-    # message that never mentioned the flag that caused it.
     if split not in settings.dataset.splits:
         raise ValueError(
             f"No hay un split llamado '{split}' en dataset.splits. "
@@ -104,10 +101,6 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
         },
     )
 
-    # One row per stage: on the full panel each of these is tens of seconds, and the mode used
-    # to say nothing at all until it was done.
-    # 18 is the width of the longest label, `figuras · stockout`: a value wider than its column
-    # pushes the rest of the row out of true, since Table pads but never truncates.
     stages = Table(logger, {"etapa": 18, "salidas": 7, "tiempo": 6})
     stages.header()
 
@@ -136,8 +129,6 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
         frame.to_csv(run_dir / filename, index=False)
     mark = done("resúmenes", len(summaries), started)
 
-    # Each module draws its own figures from its own summaries, so a figure and the table
-    # beside it in the run directory come from one calculation rather than two.
     drawn = 0
     for stage, render in (
         ("panel", lambda: render_profiling_figures(panel, run_dir)),
@@ -149,8 +140,6 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
         ("stockout", lambda: render_stockout_figures(panel, stockout_demand_bands, run_dir)),
     ):
         render()
-        # Counted off disk rather than assumed: a figure can decline to draw itself, as the
-        # category heatmaps do when no category clears the minimum observations.
         total = len(list(run_dir.glob("*.png")))
         mark = done(f"figuras · {stage}", total - drawn, mark)
         drawn = total
@@ -160,8 +149,6 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
         json.dumps(metadata.model_dump(), indent=2), encoding="utf-8"
     )
 
-    # Everything above is on disk by now, so a tracking store that is locked or missing costs
-    # the record and not the run. Same guard, and same reason, as the experiment path.
     try:
         log_eda_run_to_mlflow(metadata=metadata, run_dir=run_dir)
     except Exception as exc:  # noqa: BLE001 - see above
