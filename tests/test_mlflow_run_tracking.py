@@ -10,6 +10,7 @@ import pytest
 
 from retail_forecasting import tracking
 from retail_forecasting.config import ReportingConfig, Settings
+from retail_forecasting.contracts.contracts_quality import EdaRunMetadata
 from retail_forecasting.evaluation.reporting import RunArtifacts
 
 
@@ -159,3 +160,101 @@ def test_a_broken_tracking_store_does_not_take_the_run_down(
 
     assert written.run_directory is not None
     assert (written.run_directory / "metrics_summary.csv").exists()
+
+
+def _eda_run_dir(tmp_path: Path) -> Path:
+    """A run directory shaped like the EDA's: figures, summaries, and nothing else."""
+    run_dir = tmp_path / "eda_run"
+    run_dir.mkdir()
+    (run_dir / "observed_demand_distribution.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    (run_dir / "coverage_heatmap.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    pd.DataFrame({"series_id": ["1_101"], "observed_demand_sum": [4.0]}).to_csv(
+        run_dir / "series_summary.csv", index=False
+    )
+    return run_dir
+
+
+def _eda_metadata() -> EdaRunMetadata:
+    return EdaRunMetadata(
+        split="train",
+        panel_source="data/processed/train_abc.parquet",
+        n_series=50000,
+        rows=4500000,
+        date_min="2024-03-28",
+        date_max="2024-06-25",
+        configured_top_n_series=None,
+        configured_min_history_days=70,
+        configured_max_rows=None,
+        imputation_strategy="supervised",
+        drop_negative_sales=True,
+        fill_missing_values=True,
+        config_hash="f6417b",
+        config_path="configs/eda/default.yaml",
+        created_at="2026-08-23T21:44:14+00:00",
+        git_commit="925a5d8",
+    )
+
+
+def _logged_eda_run(run_dir: Path) -> mlflow.entities.Run:
+    mlflow.set_tracking_uri(tracking.MLFLOW_TRACKING_URI)
+    found = mlflow.search_runs(
+        experiment_names=[tracking.EXPERIMENT_EDA],
+        filter_string=f"attributes.run_name = '{run_dir.name}'",
+        output_format="list",
+    )
+    assert found, "la corrida de EDA no quedó registrada"
+    return found[0]
+
+
+def test_an_eda_run_uploads_its_figures_and_its_summaries(tmp_path: Path) -> None:
+    """Both, so the run can be read in a browser without knowing the folder name."""
+    run_dir = _eda_run_dir(tmp_path)
+    tracking.log_eda_run_to_mlflow(
+        metadata=_eda_metadata(),
+        run_dir=run_dir,
+        dataset_summary=pd.DataFrame({"rows": [4500000]}),
+    )
+
+    client = mlflow.tracking.MlflowClient()
+    run_id = _logged_eda_run(run_dir).info.run_id
+    figures = {item.path.split("/")[-1] for item in client.list_artifacts(run_id, "figures")}
+    summaries = {item.path.split("/")[-1] for item in client.list_artifacts(run_id, "summaries")}
+
+    assert figures == {"observed_demand_distribution.png", "coverage_heatmap.png"}
+    assert summaries == {"series_summary.csv"}
+
+
+def test_an_unset_dataset_limit_is_recorded_rather_than_dropped(tmp_path: Path) -> None:
+    """A null `top_n_series` is what makes the EDA cover the whole panel, so its absence lies."""
+    run_dir = _eda_run_dir(tmp_path)
+    tracking.log_eda_run_to_mlflow(
+        metadata=_eda_metadata(),
+        run_dir=run_dir,
+        dataset_summary=pd.DataFrame({"rows": [4500000]}),
+    )
+
+    params = _logged_eda_run(run_dir).data.params
+    assert params["configured_top_n_series"] == "null"
+    assert params["configured_max_rows"] == "null"
+    assert params["configured_min_history_days"] == "70"
+
+
+def test_the_panels_own_statistics_land_as_metrics(tmp_path: Path) -> None:
+    """Params only tell runs apart; metrics let `search_runs` rank them."""
+    run_dir = _eda_run_dir(tmp_path)
+    tracking.log_eda_run_to_mlflow(
+        metadata=_eda_metadata(),
+        run_dir=run_dir,
+        dataset_summary=pd.DataFrame(
+            {
+                "rows": [4500000],
+                "date_min": pd.to_datetime(["2024-03-28"]),
+                "zero_demand_rate": [0.0446],
+            }
+        ),
+    )
+
+    metrics = _logged_eda_run(run_dir).data.metrics
+    assert metrics["zero_demand_rate"] == pytest.approx(0.0446)
+    assert metrics["rows"] == pytest.approx(4500000)
+    assert "date_min" not in metrics, "una fecha no es una métrica"

@@ -135,8 +135,6 @@ def log_run_to_mlflow(artifacts: LoggableRun, settings: Settings, run_dir: Path)
                 "git_commit": get_git_commit(),
                 "run_mode": settings.project.run_mode,
                 "config_hash": build_config_hash(settings),
-                # The bridge back to the bytes this run left behind, which is where the
-                # row-level predictions and the figures live.
                 "reports_run_dir": str(run_dir),
                 "series": artifacts.prepared_panel["series_id"].nunique(),
                 "panel_rows": len(artifacts.prepared_panel),
@@ -170,19 +168,37 @@ def log_run_to_mlflow(artifacts: LoggableRun, settings: Settings, run_dir: Path)
             mlflow.log_artifact(str(figure), artifact_path="figures")
 
 
-def log_eda_run_to_mlflow(metadata: BaseModel, run_dir: Path) -> None:
-    """Index one EDA run, so its runs are searchable the way every other mode's are.
+def log_eda_run_to_mlflow(
+    metadata: BaseModel, run_dir: Path, dataset_summary: pd.DataFrame
+) -> None:
+    """Record one EDA run whole: what it analysed, what it measured, and everything it drew.
 
-    Everything it records is already in `eda_metadata.json` beside the figures. The duplication
-    is deliberate and the two answer different questions: the file makes a directory
-    self-describing ("what is this?"), and this makes the set of them searchable ("which run
-    was it?"). Neither substitutes for the other.
+    The run directory stays the system of record -- `eda_metadata.json` is what makes a folder
+    self-describing. This makes the set of them searchable and comparable instead, which a
+    directory listing cannot do: `search_runs` ranks EDA runs by the panel statistics below,
+    and the artifacts open in a browser without anyone knowing the folder name.
     """
     _open_experiment(EXPERIMENT_EDA)
 
     fields = metadata.model_dump()
     with mlflow.start_run(run_name=run_dir.name):
-        # Params rather than metrics because the EDA measures nothing it could compare: the
-        # panel's shape is what identifies a run here, not a score.
-        mlflow.log_params({key: value for key, value in fields.items() if value is not None})
+        # `None` spelled the way the config spells it. Dropping the null fields instead read as
+        # "not recorded", hiding the most informative value the metadata carries: a null
+        # `configured_top_n_series` is what makes the analysis cover the whole panel rather
+        # than the subset a model trains on.
+        mlflow.log_params(
+            {key: "null" if value is None else value for key, value in fields.items()}
+        )
         mlflow.set_tags({"run_mode": "eda", "reports_run_dir": str(run_dir)})
+
+        # The panel's own statistics, so two runs over different panels can be compared on
+        # zero-demand rate or stockout incidence rather than only told apart by their config.
+        mlflow.log_metrics(_numeric_metrics(dataset_summary))
+
+        for figure in sorted(run_dir.glob("*.png")):
+            mlflow.log_artifact(str(figure), artifact_path="figures")
+        # Summaries included, per-series tables and all. This is not the reasoning that keeps
+        # `predictions.csv` out of the store: that one is written by every experiment and runs
+        # to 1.9 GB across ninety-odd of them, where the EDA is rerun when the panel changes.
+        for summary in sorted(run_dir.glob("*.csv")):
+            mlflow.log_artifact(str(summary), artifact_path="summaries")

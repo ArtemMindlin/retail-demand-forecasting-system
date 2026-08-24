@@ -150,7 +150,11 @@ def run_eda(settings: Settings, split: str = "train", config_path: Path | None =
     )
 
     try:
-        log_eda_run_to_mlflow(metadata=metadata, run_dir=run_dir)
+        log_eda_run_to_mlflow(
+            metadata=metadata,
+            run_dir=run_dir,
+            dataset_summary=summaries["dataset_summary.csv"],
+        )
     except Exception as exc:  # noqa: BLE001 - see above
         logger.warning(
             "el registro en MLflow falló y la corrida no se ve afectada: %s: %s. "
