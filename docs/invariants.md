@@ -414,6 +414,11 @@ See `docs/web_layer.md` for the full description.
     merit: `observed / (1 - r)` measures MAE 0.02 against 0.74 for the rule it replaces.
     Hyperparameter comparisons stay valid because every candidate shares one reconciliation
     rule, so the assumption cancels. Reconciliation changes must be argued on modelling
-    grounds and must never quote a reconstruction-MAE gain from this holdout -- including in
-    `imputation_quality.csv`, which measures agreement with the generator rather than
-    imputation quality in the field.
+    grounds and must never quote a reconstruction-MAE gain from this holdout.
+
+    `compare_imputation` used to write exactly that ranking to `imputation_quality.csv`, and
+    the dashboard crowned its lowest-MAE strategy "★ MEJOR" -- a verdict on agreement with the
+    generator, presented as imputation quality in the field. Both are gone: the mode is now
+    descriptive (`latent_strategies.csv` only, which shows WHAT each strategy reconstructs
+    without scoring it) and `run_fair_cost_backtest` is what ranks strategies, by cost against
+    a common ground truth.

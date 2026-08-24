@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import statistics
 import time
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -145,56 +144,14 @@ def _train_conformal_model(
     return model
 
 
-def _evaluate_imputation_quality(
-    panel: pd.DataFrame,
-    seed: int,
-    strategies: Sequence[ImputationStrategy],
-    imputer_params_path: Path | None = None,
-) -> pd.DataFrame:
-    """Score each imputation strategy by direct reconstruction error.
-
-    See ``synthetic_censor_holdout`` for how the ground-truth evaluation set is built.
-
-    ``imputer_params_path`` must be the same tuned-params file the rest of the pipeline
-    uses, or ``supervised`` here would be a different model from the one that runs in
-    production and the comparison would not answer the question it appears to.
-
-    Returns a DataFrame: strategy, mae, rmse, bias, mape, n_eval (lower MAE/RMSE = better,
-    bias near 0 = unbiased).
-    """
-    censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed)
-    n_eval = len(eval_idx)
-
-    records: list[dict[str, Any]] = []
-    for strategy in strategies:
-        imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
-            censored
-        )
-        pred = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
-        err = pred - true_demand
-        nonzero = true_demand > 0
-        mape = (
-            float(np.mean(np.abs(err[nonzero]) / true_demand[nonzero]) * 100)
-            if nonzero.any()
-            else float("nan")
-        )
-        records.append(
-            {
-                "strategy": strategy,
-                "mae": float(np.mean(np.abs(err))),
-                "rmse": float(np.sqrt(np.mean(err**2))),
-                "bias": float(np.mean(err)),
-                "mape": mape,
-                "n_eval": int(n_eval),
-            }
-        )
-    return pd.DataFrame(records)
-
-
 def run_imputation_comparison(settings: Settings) -> Path:
     """Run only the latent-demand imputation strategies side by side (no forecasting).
 
     This is a lightweight pre-model pass: it loads the daily panel and applies each imputation strategy to reconstruct latent demand, then writes a long-format ``latent_strategies.csv`` plus an ``imputation_metadata.json`` marker. The dashboard uses this to compare strategies in the Demanda Latente tab. No models are trained and no walk-forward folds are run.
+
+    Descriptive only: it shows WHAT each strategy reconstructs, and deliberately scores
+    nothing. Invariant 42 forbids ranking reconciliation rules on the synthetic-censoring
+    holdout, so the strategy that wins is settled by `run_fair_cost_backtest`.
 
     Returns:
         The created run directory path.
@@ -256,16 +213,8 @@ def run_imputation_comparison(settings: Settings) -> Path:
 
     long_df = pd.concat(frames, ignore_index=True).sort_values(["series_id", "date", "strategy"])
 
-    quality_df = _evaluate_imputation_quality(
-        panel,
-        seed=settings.project.random_seed,
-        strategies=strategies,
-        imputer_params_path=imputer_params_path,
-    )
-
     with open_run_directory(settings.reporting.run_name, EXPERIMENT_IMPUTATION) as run_dir:
         long_df.to_csv(run_dir / "latent_strategies.csv", index=False)
-        quality_df.to_csv(run_dir / "imputation_quality.csv", index=False)
 
         metadata = {
             "run_name": settings.reporting.run_name,
@@ -281,21 +230,9 @@ def run_imputation_comparison(settings: Settings) -> Path:
         )
 
         log_imputation_comparison_metadata(
-            settings=settings, quality=quality_df, n_series=int(n_series), rows=len(panel)
+            settings=settings, n_series=int(n_series), rows=len(panel)
         )
 
-        rule(logger, "calidad de reconstrucción")
-        scores = Table(logger, {"estrategia": 18, "MAE": 8, "RMSE": 8, "sesgo": 8, "n": 8})
-        for _, row in quality_df.sort_values("mae").iterrows():
-            scores.row(
-                {
-                    "estrategia": row["strategy"],
-                    "MAE": f"{row['mae']:.4f}",
-                    "RMSE": f"{row['rmse']:.4f}",
-                    "sesgo": f"{row['bias']:+.4f}",
-                    "n": thousands(int(row["n_eval"])),
-                }
-            )
         fields(logger, {"escrito": run_dir})
         return run_dir
 
@@ -309,25 +246,8 @@ def evaluate_fair_inventory_cost(
 ) -> pd.DataFrame:
     """Compare strategies on inventory cost against a COMMON ground truth.
 
-    The naive pipeline scores each strategy against its own target (censored sale for
-    Observed, reconstructed demand for Latent), which is apples-to-oranges and unfairly
-    favours Observed. Here we reuse the synthetic-censoring trick of
-    ``_evaluate_imputation_quality``: hold out clean days (true demand known), censor them
-    with empirically-sampled stockout ratios, let each strategy build a demand SIGNAL,
-    derive an order-up-to quantity, and charge the newsvendor cost against the SAME true
-    demand for every strategy.
-
-    The order policy is identical across strategies (normal-approx order-up-to with a
-    shared safety term); only the demand signal differs, so any cost gap is attributable
-    to the censoring effect alone.
-
     Returns one row per strategy: signal_mae, total_cost, fill_rate, mean_order, n_eval.
     """
-    # The same holdout `_evaluate_imputation_quality` scores, from the same function rather than
-    # a second copy of it. This was reimplemented here, and the docstring above already claimed
-    # it was reused -- two implementations of "the common ground truth" is the one thing this
-    # backtest cannot afford, since its whole claim is that every strategy faces an identical
-    # truth. Verified bit-identical to the copy it replaces on the v1 panel, down to draw order.
     censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed, eval_fraction)
     n_eval = len(eval_idx)
 
@@ -384,17 +304,6 @@ def evaluate_fair_inventory_cost(
 
 def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
     """Lightweight backtest (no training) validating the fair inventory-cost comparison.
-
-    Loads the train panel, subsamples ``n_series`` series for speed, scores every strategy's
-    inventory cost against a common synthetically-censored ground truth, and writes
-    ``fair_cost_backtest.csv``. Use this to sanity-check the methodology before integrating.
-
-    The sample is drawn from whatever panel the config loads, and the result is sensitive
-    to that choice: 30 series taken from the 500-series panel reproduce the published
-    ranking (Latent_supervised cheapest), while 30 taken from the 50-series panel invert
-    it, because the top-rotation subset has too few severe-stockout series for the
-    correction to show up over sampling noise. The panel actually used is therefore
-    recorded in the artifact so the number is never read without its provenance.
 
     Returns:
         The created run directory path.
@@ -503,9 +412,6 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     )
 
     # 4. Merge Artifacts
-    # Merged at two granularities, mirroring what each one is for: every validation
-    # origin (forecast metrics) and one decision per series and fold (inventory
-    # economics).
     merged_validation = pd.concat(
         [
             frame
@@ -518,8 +424,6 @@ def run_experiment(settings: Settings) -> RunArtifacts:
         ignore_index=True,
     )
 
-    # Every validation origin already carries its order quantity and its inventory
-    # costs: the per-fold builders close each frame with attach_inventory_costs.
     merged_predictions = merged_validation
 
     merged_metrics, merged_folds = summarize_predictions(merged_validation)

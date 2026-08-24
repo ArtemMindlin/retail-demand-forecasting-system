@@ -79,10 +79,14 @@ Semantica:
   ligera, sin `report.md`, sin `predictions.csv` y sin `backtest_metadata.json`.
 - `compare_imputation`: no entrena ningun modelo ni construye folds. Reconstruye la
   demanda latente con cada estrategia de `LatentDemandImputer` y las pone una al lado
-  de otra, escribiendo `latent_strategies.csv` e `imputation_quality.csv`. Era un
+  de otra, escribiendo `latent_strategies.csv`. Era un
   booleano de `preprocessing` sobre `run_mode = experiment`, que es un segundo eje de
   despacho duplicando lo que `run_mode` ya hace: la carpeta decia `experiment` y el
   modo no entrenaba nada.
+  Es descriptivo y no puntua nada: escribia tambien un `imputation_quality.csv` con
+  MAE/RMSE de reconstruccion por estrategia, y el invariante 42 prohibe rankear reglas
+  de reconciliacion con ese holdout. Quien decide la estrategia ganadora es
+  `fair_cost_backtest`.
 - `tune_imputation`: no entrena el modelo de forecasting. Busca (via Optuna,
   `forecasting/imputation_tuning.py`) los mejores hiperparametros de LGBM para
   el imputador supervisado. Usa solo `split="train"`. El objetivo promedia el MAE

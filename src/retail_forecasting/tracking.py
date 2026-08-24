@@ -172,19 +172,13 @@ def log_eda_metadata(metadata: BaseModel, dataset_summary: pd.DataFrame) -> None
     mlflow.log_metrics(_numeric_metrics(dataset_summary))
 
 
-def log_imputation_comparison_metadata(
-    settings: Settings, quality: pd.DataFrame, n_series: int, rows: int
-) -> None:
-    """Config and tags on the open run; each strategy's scores on a nested run of its own.
+def log_imputation_comparison_metadata(settings: Settings, n_series: int, rows: int) -> None:
+    """Config and tags for a comparison run. No metrics: the mode scores nothing.
 
-    Nested because MLflow compares RUNS, not metric names: three keys named
-    `reconstruction_mae.<strategy>` are three separate one-bar charts, while three runs sharing
-    the key `reconstruction_mae` overlay in one. The suffix was doing by hand what the run axis
-    does natively, and doing it worse.
-
-    Renamed from plain `mae`: this is reconstruction error against synthetically censored days,
-    and the forecast MAE of an experiment run lives in the same experiment. `docs/runs.md`
-    forbids quoting one beside the other.
+    It used to log a reconstruction MAE/RMSE per strategy, on a nested run each so MLflow
+    would overlay them. Invariant 42 rules that ranking out -- the synthetic-censoring
+    holdout cannot compare reconciliation rules -- so the charts ranked strategies on a
+    number that was an artefact of the generator. `run_fair_cost_backtest` settles it.
     """
     mlflow.log_params(_flat_params(settings))
     mlflow.set_tags(
@@ -196,33 +190,6 @@ def log_imputation_comparison_metadata(
             "panel_rows": rows,
         }
     )
-    mlflow.log_table(quality, artifact_file="imputation_quality.json")
-
-    renamed = {
-        "mae": "reconstruction_mae",
-        "rmse": "reconstruction_rmse",
-        "bias": "reconstruction_bias",
-        "mape": "reconstruction_mape",
-    }
-    # On the parent too, keyed by strategy. The children exist so the charts can overlay them;
-    # this is so opening the run answers "what did it measure?" without navigating into three
-    # of them. Same numbers, two indexes -- not two sources.
-    mlflow.log_metrics(_numeric_metrics(quality.rename(columns=renamed)))
-
-    for _, row in quality.iterrows():
-        with mlflow.start_run(run_name=str(row["strategy"]), nested=True):
-            # The name stays the strategy, which is what makes the within-run comparison
-            # readable; the seed is a tag so the same strategy stays queryable across draws.
-            mlflow.set_tags(
-                {"strategy": str(row["strategy"]), "seed": settings.project.random_seed}
-            )
-            mlflow.log_metrics(
-                {
-                    renamed.get(str(column), str(column)): float(value)
-                    for column, value in row.items()
-                    if isinstance(value, int | float) and not pd.isna(value)
-                }
-            )
 
 
 def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
