@@ -18,6 +18,7 @@ called, and half an hour of forecasting is not worth losing to a locked tracking
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -164,8 +165,12 @@ def log_run_to_mlflow(artifacts: LoggableRun, settings: Settings, run_dir: Path)
                 artifacts.backtest_metadata.model_dump(mode="json"), "backtest_metadata.json"
             )
 
-        for figure in sorted(run_dir.glob("*.png")):
-            mlflow.log_artifact(str(figure), artifact_path="figures")
+        # The whole directory, mirrored. Uploading selected files instead would make the
+        # artifact root a different shape from the run directory, and every reader that takes a
+        # run path -- the dashboard, the LaTeX exporter, the figure scripts -- would have to
+        # learn which of the two layouts it was handed. Mirrored, an artifact root IS a run
+        # directory, which is what lets those readers move over untouched.
+        mlflow.log_artifacts(str(run_dir))
 
 
 def log_eda_run_to_mlflow(
@@ -195,10 +200,86 @@ def log_eda_run_to_mlflow(
         # zero-demand rate or stockout incidence rather than only told apart by their config.
         mlflow.log_metrics(_numeric_metrics(dataset_summary))
 
-        for figure in sorted(run_dir.glob("*.png")):
-            mlflow.log_artifact(str(figure), artifact_path="figures")
-        # Summaries included, per-series tables and all. This is not the reasoning that keeps
-        # `predictions.csv` out of the store: that one is written by every experiment and runs
-        # to 1.9 GB across ninety-odd of them, where the EDA is rerun when the panel changes.
-        for summary in sorted(run_dir.glob("*.csv")):
-            mlflow.log_artifact(str(summary), artifact_path="summaries")
+        mlflow.log_artifacts(str(run_dir))  # mirrored, for the reason above
+
+
+def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
+    """Every run under `experiment_name`, newest first, mapped to its artifact directory.
+
+    The directory is the point. `log_artifacts` mirrors a run directory into the store, so what
+    comes back here is shaped exactly like the `reports/` folder that produced it -- which is
+    what lets a reader move from one to the other without learning a second layout.
+
+    Returns an empty mapping when the experiment does not exist yet, rather than creating it:
+    reading the store must not write to it.
+    """
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        return {}
+
+    found = mlflow.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        order_by=["attributes.start_time DESC"],
+        output_format="list",
+    )
+    dirs: dict[str, Path] = {}
+    for run in found:
+        name = run.info.run_name
+        # A run can be recorded without its artifacts surviving -- the store and the artifact
+        # tree are separate, and only one of them is a database.
+        path = Path(run.info.artifact_uri.removeprefix("file://"))
+        if name and name not in dirs and path.is_dir():
+            dirs[name] = path
+    return dirs
+
+
+def index_run_directory(run_dir: Path, experiment_name: str) -> str | None:
+    """Record a finished run directory in MLflow, reading whatever it happens to contain.
+
+    The regular loggers are handed live objects by the pipeline; this one has only the files.
+    It exists because the store is a gitignored sqlite database with no backup: without a way
+    to rebuild the index from `reports/`, losing `mlflow.db` would lose every run's record,
+    and because runs written before the instrumentation existed are otherwise invisible.
+    """
+    if not run_dir.is_dir():
+        return None
+
+    _open_experiment(experiment_name)
+    with mlflow.start_run(run_name=run_dir.name) as active:
+        for name in ("backtest_metadata.json", "eda_metadata.json"):
+            candidate = run_dir / name
+            if candidate.exists():
+                loaded = json.loads(candidate.read_text(encoding="utf-8"))
+                mlflow.log_params(
+                    {
+                        key: "null" if value is None else value
+                        for key, value in loaded.items()
+                        if not isinstance(value, dict | list)
+                    }
+                )
+        for name in ("metrics_summary.csv", "cost_summary.csv", "dataset_summary.csv"):
+            candidate = run_dir / name
+            if candidate.exists():
+                mlflow.log_metrics(_numeric_metrics(pd.read_csv(candidate)))
+
+        mlflow.set_tags({"reports_run_dir": str(run_dir), "backfilled": "true"})
+        mlflow.log_artifacts(str(run_dir))
+        return str(active.info.run_id)
+
+
+def resolve_run_dir(value: str | Path) -> Path:
+    """A run directory, given either a path to one or the name of a recorded run.
+
+    Command lines used to name runs by path, which stops working once the artifacts live
+    behind a UUID. Accepting the name keeps `docs/runs.md` readable: a run is cited by the
+    name it was given, not by the directory it happens to sit in.
+    """
+    candidate = Path(value)
+    if candidate.is_dir():
+        return candidate
+    for experiment in (EXPERIMENT_RUNS, EXPERIMENT_EDA):
+        found = logged_run_dirs(experiment).get(str(value))
+        if found is not None:
+            return found
+    raise FileNotFoundError(f"'{value}' no es un directorio ni una corrida registrada.")

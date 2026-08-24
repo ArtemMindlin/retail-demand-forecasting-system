@@ -141,9 +141,9 @@ def test_artifacts_follow_the_tracking_store_rather_than_the_working_directory(
     assert not run.info.artifact_uri.startswith(str(Path.cwd()))
 
     client = mlflow.MlflowClient()
-    assert [a.path for a in client.list_artifacts(run.info.run_id, "figures")] == [
-        "figures/cost_by_model.png"
-    ]
+    # The run directory is mirrored into the root, alongside the JSON tables `log_table`
+    # writes there -- so a subset, not an equality.
+    assert "cost_by_model.png" in {a.path for a in client.list_artifacts(run.info.run_id)}
 
 
 def test_a_broken_tracking_store_does_not_take_the_run_down(
@@ -206,8 +206,9 @@ def _logged_eda_run(run_dir: Path) -> mlflow.entities.Run:
     return found[0]
 
 
-def test_an_eda_run_uploads_its_figures_and_its_summaries(tmp_path: Path) -> None:
-    """Both, so the run can be read in a browser without knowing the folder name."""
+def test_an_eda_run_is_mirrored_file_for_file(tmp_path: Path) -> None:
+    """The artifact root has the shape of the run directory, which is what lets every
+    reader that took a run path move to MLflow untouched."""
     run_dir = _eda_run_dir(tmp_path)
     tracking.log_eda_run_to_mlflow(
         metadata=_eda_metadata(),
@@ -216,12 +217,14 @@ def test_an_eda_run_uploads_its_figures_and_its_summaries(tmp_path: Path) -> Non
     )
 
     client = mlflow.tracking.MlflowClient()
-    run_id = _logged_eda_run(run_dir).info.run_id
-    figures = {item.path.split("/")[-1] for item in client.list_artifacts(run_id, "figures")}
-    summaries = {item.path.split("/")[-1] for item in client.list_artifacts(run_id, "summaries")}
+    run = _logged_eda_run(run_dir)
+    uploaded = {item.path for item in client.list_artifacts(run.info.run_id)}
 
-    assert figures == {"observed_demand_distribution.png", "coverage_heatmap.png"}
-    assert summaries == {"series_summary.csv"}
+    assert uploaded == {path.name for path in run_dir.iterdir()}
+    # And reachable as plain files, not only listed.
+    mirrored = Path(run.info.artifact_uri.removeprefix("file://"))
+    assert (mirrored / "series_summary.csv").exists()
+    assert (mirrored / "coverage_heatmap.png").exists()
 
 
 def test_an_unset_dataset_limit_is_recorded_rather_than_dropped(tmp_path: Path) -> None:
