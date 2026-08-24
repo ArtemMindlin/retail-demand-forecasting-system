@@ -108,10 +108,15 @@ STORAGES = {
     },
 }
 
-# ── Pipeline artifacts ────────────────────────────────────────────────────────
+# ── Pipeline state ────────────────────────────────────────────────────────────
 # CWD-relative by default, matching how the pipeline and the Makefile targets
 # already resolve these paths.
-REPORTS_DIR = Path(os.environ.get("RETAIL_REPORTS_DIR", "reports"))
+#
+# Finished runs are not here: they live in the MLflow run store, discovered through
+# `tracking.logged_run_dirs`. What this holds is the log of a run still in flight,
+# which is the one thing an MLflow run cannot be -- a run is the closed record of
+# something that already finished.
+STATE_DIR = Path(os.environ.get("RETAIL_STATE_DIR", "var"))
 CONFIG_PATH = Path(os.environ.get("RETAIL_CONFIG_PATH", "configs/experiment/default.yaml"))
 
 # Rate limit for the pipeline-trigger endpoint.

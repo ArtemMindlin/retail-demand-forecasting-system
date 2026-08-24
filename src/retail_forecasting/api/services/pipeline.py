@@ -76,12 +76,12 @@ class PipelineRunner:
 
     def __init__(
         self,
-        reports_dir: Path,
+        state_dir: Path,
         config_path: Path,
         rate_limit_max: int = 3,
         rate_limit_window: int = 600,
     ) -> None:
-        self.reports_dir = Path(reports_dir)
+        self.state_dir = Path(state_dir)
         self.config_path = Path(config_path)
         self.state = RunState()
         self._lock = threading.Lock()
@@ -89,7 +89,7 @@ class PipelineRunner:
 
     @property
     def log_path(self) -> Path:
-        return self.reports_dir / LOG_RELATIVE_PATH
+        return self.state_dir / LOG_RELATIVE_PATH
 
     def check_rate_limit(self, client_key: str) -> None:
         """Raise :class:`RateLimitedError` when ``client_key`` has run too often."""
@@ -137,7 +137,7 @@ class PipelineRunner:
             return
         try:
             self.state = RunState(status="running", started_at=time.monotonic())
-            self.reports_dir.mkdir(parents=True, exist_ok=True)
+            self.state_dir.mkdir(parents=True, exist_ok=True)
 
             header = f"--- Pipeline Execution Started at {datetime.now(UTC).isoformat()} ---\n"
             self.log_path.write_text(header, encoding="utf-8")

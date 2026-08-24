@@ -74,7 +74,7 @@ _IDENTITY_COLUMNS = ("model_name", "backend_name", "data_strategy", "observation
 
 
 def _artifact_root(tracking_uri: str) -> str | None:
-    """Where artifacts belong for a given tracking store, as an absolute path.
+    """Where artifacts belong for a given tracking store.
 
     Pinned explicitly rather than left to MLflow's default, which resolves `mlruns/` against
     the WORKING DIRECTORY, independently of where the tracking store lives. That independence
@@ -85,7 +85,14 @@ def _artifact_root(tracking_uri: str) -> str | None:
     prefix = "sqlite:///"
     if not tracking_uri.startswith(prefix):
         return None
-    return str(Path(tracking_uri.removeprefix(prefix)).resolve().parent / "mlruns")
+    store = Path(tracking_uri.removeprefix(prefix))
+    # Expressed the way the store is expressed, absolute or not. MLflow bakes this location
+    # into the experiment row, so resolving a relative store to an absolute path would write
+    # the developer's own checkout into the database -- and the container that later mounts
+    # the same store at /app would look for artifacts under a path that does not exist there.
+    # A store named relatively keeps a relatively named root, which both resolve correctly
+    # against their own working directory.
+    return str(store.parent / "mlruns")
 
 
 # What makes a summary row distinct, in the order it reads best. `cadence` is here for the OPS

@@ -63,12 +63,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=Path("tmp/render"))
     parser.add_argument(
-        "--reports",
-        type=Path,
-        default=Path("reports"),
-        help="Reports directory the views read their artifacts from.",
-    )
-    parser.add_argument(
         "--no-static",
         action="store_true",
         help="Skip copying static/, when only the HTML diff matters.",
@@ -83,7 +77,8 @@ def main() -> None:
     os.environ["AUTH_USERNAME"] = USERNAME
     os.environ["AUTH_PASSWORD"] = SNAPSHOT_PASSWORD
     os.environ["DJANGO_DEBUG"] = "true"
-    os.environ["RETAIL_REPORTS_DIR"] = str(args.reports.resolve())
+    # No artifact directory to point at: the views discover runs through the MLflow store,
+    # so what they render is whatever `RETAIL_MLFLOW_*` resolves to for this process.
 
     import django
 

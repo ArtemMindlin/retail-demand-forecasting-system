@@ -11,7 +11,15 @@ services:
     volumes:
       - ./configs:/app/configs
       - ./data:/app/data
-      - ./reports:/app/reports
+      # The run store: the index and the artifacts it points at. Both are needed -- the
+      # database alone names runs whose files would be missing, and the artifact tree alone
+      # is a set of UUIDs the dashboard cannot enumerate.
+      - ./mlflow.db:/app/mlflow.db
+      - ./mlruns:/app/mlruns
+      # The champion registry, which is mutable state carried across runs.
+      - ./models:/app/models
+      # In-flight run log, written by the dashboard's own pipeline trigger.
+      - ./var:/app/var
     env_file:
       - .env
     environment:

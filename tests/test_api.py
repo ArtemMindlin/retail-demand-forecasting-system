@@ -36,18 +36,23 @@ def index_run(run: Path) -> None:
 
 
 @pytest.fixture
-def reports_dir(tmp_path: Path) -> Path:
-    """An empty reports directory wired into settings for one test."""
-    reports = tmp_path / "reports"
-    reports.mkdir()
-    with override_settings(REPORTS_DIR=reports):
+def state_dir(tmp_path: Path) -> Path:
+    """A scratch state directory, and a store reset, for one test.
+
+    There is no artifact directory to point at any more: the views find runs through the
+    MLflow store, which `tests/conftest.py` already redirects per test. What is left here is
+    the in-flight run log, and making sure the cached store does not leak between tests.
+    """
+    state = tmp_path / "var"
+    state.mkdir()
+    with override_settings(STATE_DIR=state):
         store_module.reset_store()
-        yield reports
+        yield state
     store_module.reset_store()
 
 
 @pytest.fixture
-def ops_backtest_artifact(reports_dir: Path, tmp_path: Path) -> Path:
+def ops_backtest_artifact(state_dir: Path, tmp_path: Path) -> Path:
     """A tiny OPS backtest artifact: two cadences, two weekly origins, one partial.
 
     Mirrors what ``run_operational_simulation`` writes, including the paired
@@ -103,9 +108,9 @@ def ops_backtest_artifact(reports_dir: Path, tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def run_with_predictions(reports_dir: Path) -> Path:
+def run_with_predictions(state_dir: Path) -> Path:
     """A run directory holding a small but realistic predictions.csv."""
-    run = reports_dir / "20260101_120000_test"
+    run = state_dir / "20260101_120000_test"
     run.mkdir()
     frame = pd.DataFrame(
         {
@@ -217,7 +222,7 @@ def test_dashboard_renders_kpis_and_chart(auth_client: Client, run_with_predicti
 
 
 def test_dashboard_shows_empty_state_without_predictions(
-    auth_client: Client, reports_dir: Path
+    auth_client: Client, state_dir: Path
 ) -> None:
     response = auth_client.get("/dashboard/")
     assert response.status_code == 200
@@ -291,11 +296,11 @@ def test_academic_modal_renders_live_parameters(
     assert "0.833" in body
 
 
-def test_unknown_academic_module_is_404(auth_client: Client, reports_dir: Path) -> None:
+def test_unknown_academic_module_is_404(auth_client: Client, state_dir: Path) -> None:
     assert auth_client.get("/dashboard/modulo/nope/").status_code == 404
 
 
-def test_ops_view_reports_a_missing_simulation(auth_client: Client, reports_dir: Path) -> None:
+def test_ops_view_reports_a_missing_simulation(auth_client: Client, state_dir: Path) -> None:
     response = auth_client.get("/ops/")
     assert response.status_code == 200
     assert "backtest de producción no se ha ejecutado" in response.content.decode()
@@ -433,7 +438,7 @@ def test_ops_cadence_block_reports_nothing_for_a_fully_partial_week() -> None:
     assert block["actuals_complete"] is False
 
 
-def test_eda_view_reports_a_missing_run(auth_client: Client, reports_dir: Path) -> None:
+def test_eda_view_reports_a_missing_run(auth_client: Client, state_dir: Path) -> None:
     response = auth_client.get("/eda/")
     assert response.status_code == 200
     assert "No hay ningún run de EDA" in response.content.decode()
@@ -459,7 +464,7 @@ def test_forecast_endpoint_returns_kpis_and_recommendation(
 
 
 def test_forecast_endpoint_reports_missing_predictions(
-    auth_client: Client, reports_dir: Path
+    auth_client: Client, state_dir: Path
 ) -> None:
     response = auth_client.post("/api/forecast", data="{}", content_type="application/json")
     assert response.status_code == 200
@@ -476,7 +481,7 @@ def test_skus_endpoint_returns_one_row_per_series(
     assert all(row["coverageTarget"] == 90 for row in rows)
 
 
-def test_skus_endpoint_is_empty_without_predictions(auth_client: Client, reports_dir: Path) -> None:
+def test_skus_endpoint_is_empty_without_predictions(auth_client: Client, state_dir: Path) -> None:
     assert auth_client.get("/api/skus").json() == []
 
 
@@ -503,11 +508,11 @@ def test_download_is_404_when_the_file_is_absent(
     assert auth_client.get("/api/download/costs").status_code == 404
 
 
-def test_download_is_404_without_any_run(auth_client: Client, reports_dir: Path) -> None:
+def test_download_is_404_without_any_run(auth_client: Client, state_dir: Path) -> None:
     assert auth_client.get("/api/download/predictions").status_code == 404
 
 
-def test_predict_orders_rejects_a_missing_config(auth_client: Client, reports_dir: Path) -> None:
+def test_predict_orders_rejects_a_missing_config(auth_client: Client, state_dir: Path) -> None:
     response = auth_client.post(
         "/predict_orders",
         data=json.dumps({"config_path": "non_existent.yaml"}),
@@ -517,7 +522,7 @@ def test_predict_orders_rejects_a_missing_config(auth_client: Client, reports_di
 
 
 def test_predict_orders_returns_recommendations(
-    auth_client: Client, reports_dir: Path, tmp_path: Path
+    auth_client: Client, state_dir: Path, tmp_path: Path
 ) -> None:
     config_file = tmp_path / "config.yaml"
     config_file.write_text(Path("configs/experiment/default.yaml").read_text(encoding="utf-8"))
@@ -608,14 +613,14 @@ def test_config_editor_saves_a_valid_file(auth_client: Client, tmp_path: Path) -
 # ── Pipeline console ──────────────────────────────────────────────────────────
 
 
-def test_pipeline_status_renders_the_console(auth_client: Client, reports_dir: Path) -> None:
+def test_pipeline_status_renders_the_console(auth_client: Client, state_dir: Path) -> None:
     response = auth_client.get("/pipeline/status/")
     assert response.status_code == 200
     assert "retail_forecasting.run" in response.content.decode()
 
 
 def test_pipeline_run_reports_a_missing_config(
-    auth_client: Client, reports_dir: Path, tmp_path: Path
+    auth_client: Client, state_dir: Path, tmp_path: Path
 ) -> None:
     with override_settings(CONFIG_PATH=tmp_path / "missing.yaml"):
         from retail_forecasting.api.views import pipeline as pipeline_views

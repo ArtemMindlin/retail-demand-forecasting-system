@@ -22,7 +22,7 @@ def get_runner() -> PipelineRunner:
     global _runner
     if _runner is None:
         _runner = PipelineRunner(
-            reports_dir=settings.REPORTS_DIR,
+            state_dir=settings.STATE_DIR,
             config_path=settings.CONFIG_PATH,
             rate_limit_max=settings.RUN_RATE_LIMIT_MAX,
             rate_limit_window=settings.RUN_RATE_LIMIT_WINDOW,
