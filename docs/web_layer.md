@@ -51,14 +51,26 @@ una corrida mas: sus costes no son costes de walk-forward y `docs/runs.md` dice
 explicitamente que no se citen al lado. Compartir experimento los pondria bajo un
 mismo `search_runs`.
 
-La ubicacion de artefactos que MLflow graba en la base de datos es RELATIVA
-(`mlruns`), no absoluta. Eso es deliberado y tiene un porque de despliegue: MLflow
-la hornea en la fila del experimento, asi que una ruta absoluta grabaria el
-checkout del que la creo, y el contenedor que monta el mismo almacen en `/app`
-buscaria los artefactos donde no estan. El precio es que el almacen queda atado al
-directorio de trabajo: lanzar el pipeline desde un subdirectorio no encuentra sus
-artefactos. Los comandos documentados y el contenedor arrancan los dos desde la
-raiz, asi que en la practica no se nota.
+### La ubicacion de artefactos, y por que esta relativa
+
+MLflow hornea en la fila del experimento donde viven sus artefactos, y las filas de
+este almacen la tienen RELATIVA (`mlruns`). Hace falta que lo este: una ruta absoluta
+graba el checkout que creo el experimento, y el contenedor que monta el mismo
+`mlflow.db` en `/app` buscaria los artefactos donde no estan.
+
+**No lo consigue el codigo.** MLflow absolutiza contra el directorio de trabajo
+cualquier ubicacion que se le pase, y no ofrece forma de guardar una relativa:
+`mlruns`, `./mlruns` y `file:mlruns` vuelven las tres absolutas (medido). Las filas
+estan relativas porque se reescribieron a mano, y eso aguanta: **una corrida hereda
+la ubicacion guardada de su experimento tal cual**, asi que las corridas nuevas de
+los tres experimentos ya salen relativas.
+
+Lo que no cubre: un experimento NUEVO nace absoluto otra vez. Si se añade uno, hay
+que reescribirlo igual, sobre `experiments.artifact_location` y `runs.artifact_uri`.
+
+El precio de todo esto es que el almacen queda atado al directorio de trabajo:
+lanzar el pipeline desde un subdirectorio no encuentra sus artefactos. Los comandos
+documentados y el contenedor arrancan los dos desde la raiz.
 
 Solo `active_run.log` sigue en `reports/`, porque se escribe mientras la corrida va:
 una corrida de MLflow es el registro cerrado de algo que ya acabo, no un sitio para

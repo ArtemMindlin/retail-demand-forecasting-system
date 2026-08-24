@@ -1,7 +1,7 @@
 """Rolling-origin production backtest (the OPS plane).
 
 Reads the artifact written by ``run_operational_simulation``
-(``reports/<run>/simulation/predictions_by_day.parquet``) and indexes it by
+(``simulation/predictions_by_day.parquet`` inside an OPS run) and indexes it by
 weekly origin, so the dashboard can play the backtest back week by week and
 compare retrain cadences. Pure artifact reads — no live compute.
 

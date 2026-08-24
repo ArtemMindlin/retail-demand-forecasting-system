@@ -1,7 +1,7 @@
 """Background execution of the forecasting pipeline.
 
 The pipeline runs as a subprocess (``python -m retail_forecasting.run``) writing
-its output to ``reports/active_run.log``, which the dashboard tails. A lock
+its output to ``var/active_run.log``, which the dashboard tails. A lock
 allows only one run at a time; a small per-IP rate limit keeps the trigger from
 being hammered.
 

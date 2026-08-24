@@ -85,7 +85,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             label="SIN ARTEFACTOS",
             title="Todavía no hay predicciones que mostrar",
             detail=(
-                "No se ha encontrado ningún run con predictions.csv bajo reports/. "
+                "No se ha encontrado ninguna corrida con predictions.csv en el almacén. "
                 "Lanza el pipeline para generar el primer conjunto de recomendaciones."
             ),
             show_run_button=True,
@@ -292,7 +292,7 @@ def skus(request: HttpRequest) -> HttpResponse:
             label="SIN ARTEFACTOS",
             title="Todavía no hay predicciones que mostrar",
             detail=(
-                "No se ha encontrado ningún run con predictions.csv bajo reports/. "
+                "No se ha encontrado ninguna corrida con predictions.csv en el almacén. "
                 "Lanza el pipeline para generar el primer conjunto de recomendaciones."
             ),
             show_run_button=True,

@@ -1,8 +1,8 @@
 """Django settings for the retail forecasting dashboard.
 
-Deliberately database-free: the system's state lives in on-disk artifacts under
-``reports/`` (Parquet/CSV written by the pipeline), not in a relational store.
-Sessions therefore use the signed-cookie backend, and no app in
+Deliberately free of an application database: the system's state is the runs in the
+MLflow store, read as the Parquet/CSV the pipeline wrote into them, not rows in a
+relational schema. Sessions therefore use the signed-cookie backend, and no app in
 ``INSTALLED_APPS`` defines models. There is nothing to migrate.
 """
 

@@ -67,7 +67,7 @@ _MLFLOW_EXPERIMENT = "imputation_lgbm_tuning"
 # distribution for.
 _INT_BOUNDS: dict[str, tuple[int, int]] = {
     "n_estimators": (50, 3000),
-    # Lower bound pulled up to where the six searches of reports/sampler_ab agreed, every
+    # Lower bound pulled up to where the six searches of `docs/sampler_ab.md` agreed, every
     # winner sitting at 10-11. It stops at the untuned defaults rather than at the winners'
     # range because the defaults have to stay expressible: they are enqueued as a reference
     # trial and pinned by `test_the_untuned_defaults_sit_inside_the_search_space`. The 300-trial
@@ -88,12 +88,12 @@ _INT_BOUNDS: dict[str, tuple[int, int]] = {
 _FLOAT_BOUNDS: dict[str, tuple[float, float]] = {
     # The 300-trial winner sat at 1.0, which is a fraction of rows and so the definitional
     # maximum rather than a wall this range put there. Nothing outside to reach, and the floor
-    # is not binding, so it stays where reports/sampler_ab's winners put it.
+    # is not binding, so it stays where the `docs/sampler_ab.md` winners put it.
     "subsample": (0.85, 1.0),
     "learning_rate": (0.005, 0.3),
     # Widened BELOW the 0.3 it started at, because the 300-trial winner landed exactly on the
     # 0.5 floor a narrowing had raised it to. That narrowing was justified by the winners of
-    # reports/sampler_ab, which ran under the starved-teacher regime b7900cb replaced, so its
+    # `docs/sampler_ab.md`, which ran under the starved-teacher regime b7900cb replaced, so its
     # evidence no longer applies to this objective.
     "colsample_bytree": (0.1, 1.0),
     "reg_alpha": (1e-8, 100.0),
@@ -560,7 +560,7 @@ def tune_imputation_lgbm(
     # Its INFO handler emits one paragraph per trial. Ours reports every
     # `_PROGRESS_EVERY_TRIALS` instead, so warnings from Optuna still get through.
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    # Known and accepted: the sampler choice is measured in reports/sampler_ab. Left to fire
+    # Known and accepted: the sampler choice is measured in `docs/sampler_ab.md`. Left to fire
     # once per import would still put it in the middle of the setup block on every run.
     warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
 

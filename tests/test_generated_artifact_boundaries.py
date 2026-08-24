@@ -8,13 +8,13 @@ ALLOWED_GENERATED_PLACEHOLDERS = {
     "data/raw/.gitkeep",
     "data/interim/.gitkeep",
     "data/processed/.gitkeep",
-    "reports/.gitkeep",
 }
 GENERATED_PREFIXES = (
     "data/raw/",
     "data/interim/",
     "data/processed/",
-    "reports/",
+    "mlruns/",
+    "var/",
     "tmp/",
 )
 
@@ -40,7 +40,8 @@ def test_project_gitignore_covers_local_generated_artifacts() -> None:
         "data/raw/*",
         "data/interim/*",
         "data/processed/*",
-        "reports/*",
+        "mlruns/",
+        "var/",
         "tmp/*",
         "output/*",
     ]

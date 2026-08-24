@@ -1,19 +1,20 @@
-"""MLflow tracking for every run mode, alongside the artifacts written under ``reports/``.
+"""The run store: where every mode records what it did, and writes what it produced.
 
 Its own layer and not part of `evaluation`, where it started: recording a run is something
 every mode does, and `eda` is forbidden from importing `evaluation` -- correctly, since the
 EDA has nothing to do with summarising predictions and costs. A cross-cutting concern parked
 inside one consumer is one the others cannot reach.
 
-What goes here and what stays a file is a size question, not a taste one. Metrics, parameters
-and decisions are aggregates -- a few numbers each -- and they are what `mlflow.search_runs`
-makes queryable across runs, which is the thing 92 timestamped folders cannot do. The row-level
-outputs stay in `reports/`: `predictions.csv` alone is 1.9 GB across runs, MLflow's artifact
-store is a plain directory, so moving them would put the same bytes behind a UUID, and
-`log_table` only writes JSON (2 MB of it already slows the UI down).
+`open_run_directory` is the entry point that matters. It opens an MLflow run and hands back
+the directory its artifacts live in, and for a local artifact store writing into that
+directory IS logging -- MLflow lists and serves whatever it holds, nested paths included. So
+the pipeline writes once, straight into the run, instead of writing a directory of its own and
+uploading a copy afterwards. Its cost is that the store stops being optional: a store that
+cannot be reached is no longer a lost record, it is a lost run.
 
-Failure here never fails a run. Everything a run produces is on disk by the time this is
-called, and half an hour of forecasting is not worth losing to a locked tracking store.
+The `log_*_metadata` functions add what a directory cannot answer -- which config produced
+this, how it scored, what it decided -- because that is what `mlflow.search_runs` makes
+queryable across runs, and a folder listing never could.
 """
 
 from __future__ import annotations
@@ -86,12 +87,14 @@ def _artifact_root(tracking_uri: str) -> str | None:
     if not tracking_uri.startswith(prefix):
         return None
     store = Path(tracking_uri.removeprefix(prefix))
-    # Expressed the way the store is expressed, absolute or not. MLflow bakes this location
-    # into the experiment row, so resolving a relative store to an absolute path would write
-    # the developer's own checkout into the database -- and the container that later mounts
-    # the same store at /app would look for artifacts under a path that does not exist there.
-    # A store named relatively keeps a relatively named root, which both resolve correctly
-    # against their own working directory.
+    # Expressed the way the store is expressed, absolute or not -- but MLflow ABSOLUTISES
+    # whatever it is given, against the working directory, and offers no way to store a
+    # relative location (`mlruns`, `./mlruns`, `file:mlruns` all come back absolute; measured).
+    # So this asks; it does not decide. The rows already in the store were rewritten to
+    # relative by hand, which is what makes the same `mlflow.db` work in the repo and mounted
+    # at /app -- and runs DO inherit their experiment's stored location verbatim, so that
+    # rewrite holds for every run to come. A brand-new experiment starts absolute again and
+    # has to be rewritten the same way; `docs/web_layer.md` carries the statement.
     return str(store.parent / "mlruns")
 
 
@@ -227,7 +230,9 @@ def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
     return dirs
 
 
-def index_run_directory(run_dir: Path, experiment_name: str) -> str | None:
+def index_run_directory(
+    run_dir: Path, experiment_name: str, run_name: str | None = None
+) -> str | None:
     """Record a finished run directory in MLflow, reading whatever it happens to contain.
 
     The regular loggers are handed live objects by the pipeline; this one has only the files.
@@ -238,8 +243,11 @@ def index_run_directory(run_dir: Path, experiment_name: str) -> str | None:
     if not run_dir.is_dir():
         return None
 
+    # Not derived from the directory unless asked for: rebuilding from the store hands this
+    # `mlruns/<id>/artifacts`, whose name is "artifacts" for every run. Named that way, and
+    # keyed by name, the whole index collapsed to one entry.
     _open_experiment(experiment_name)
-    with mlflow.start_run(run_name=run_dir.name) as active:
+    with mlflow.start_run(run_name=run_name or run_dir.name) as active:
         for name in ("backtest_metadata.json", "eda_metadata.json"):
             candidate = run_dir / name
             if candidate.exists():
@@ -256,8 +264,18 @@ def index_run_directory(run_dir: Path, experiment_name: str) -> str | None:
             if candidate.exists():
                 mlflow.log_metrics(_numeric_metrics(pd.read_csv(candidate)))
 
-        mlflow.set_tags({"reports_run_dir": str(run_dir), "backfilled": "true"})
+        mlflow.set_tags({"source_dir": str(run_dir), "backfilled": "true"})
         mlflow.log_artifacts(str(run_dir))
+        # The same identity a natively-written run carries, so a run that entered the index
+        # this way is recoverable the next time the index is lost. Written after the upload:
+        # `log_artifacts` copies the directory as it stands, and the artifact root is where the
+        # file has to end up.
+        _write_run_identity(
+            Path(active.info.artifact_uri.removeprefix("file://")),
+            run_name=run_name or run_dir.name,
+            run_id=active.info.run_id,
+            experiment_name=experiment_name,
+        )
         return str(active.info.run_id)
 
 
@@ -304,18 +322,23 @@ def open_run_directory(run_name: str, experiment_name: str) -> Iterator[Path]:
     with mlflow.start_run(run_name=full_name) as active:
         run_dir = Path(active.info.artifact_uri.removeprefix("file://"))
         run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / RUN_IDENTITY_FILE).write_text(
-            json.dumps(
-                {
-                    "run_name": full_name,
-                    "run_id": active.info.run_id,
-                    "experiment": experiment_name,
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
+        _write_run_identity(
+            run_dir,
+            run_name=full_name,
+            run_id=active.info.run_id,
+            experiment_name=experiment_name,
         )
         yield run_dir
+
+
+def _write_run_identity(run_dir: Path, *, run_name: str, run_id: str, experiment_name: str) -> None:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / RUN_IDENTITY_FILE).write_text(
+        json.dumps(
+            {"run_name": run_name, "run_id": run_id, "experiment": experiment_name}, indent=2
+        ),
+        encoding="utf-8",
+    )
 
 
 def log_ops_metadata(

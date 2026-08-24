@@ -97,7 +97,7 @@ def ops(request: HttpRequest) -> HttpResponse:
             title="El backtest de producción no se ha ejecutado",
             detail=(
                 f"{exc} El plano OPS lee "
-                "reports/<run>/simulation/predictions_by_day.parquet, que produce el modo "
+                "simulation/predictions_by_day.parquet de una corrida OPS, que produce el modo "
                 "simulate_ops del pipeline."
             ),
             hint="Genéralo con: make simulate",

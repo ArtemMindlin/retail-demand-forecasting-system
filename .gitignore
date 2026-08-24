@@ -50,14 +50,12 @@ db.sqlite3
 # OS
 .DS_Store
 
-# Project data and generated reports
+# Project data caches
 data/raw/*
 !data/raw/.gitkeep
 data/interim/*
 data/processed/*
 !data/processed/.gitkeep
-reports/*
-!reports/.gitkeep
 
 # LaTeX
 memoria/*.pdf

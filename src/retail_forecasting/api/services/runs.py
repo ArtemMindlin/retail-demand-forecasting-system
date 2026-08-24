@@ -1,9 +1,8 @@
 """Discovery and caching of pipeline artifacts on disk.
 
 Runs are discovered through MLflow, which is the index of what exists, and read as
-plain files from the artifact directory MLflow hands back. `log_artifacts` mirrors a
-run directory into the store, so that directory is shaped exactly like the ``reports/``
-folder that produced it and every reader below stayed as it was.
+plain files from the artifact directory MLflow hands back. The pipeline writes into that
+directory in the first place, so there is nothing to mirror and one copy to read.
 
 Discovery through the index also removes a class of bug rather than guarding against
 it: a run name now has to be a key MLflow already knows, so there is no path to
@@ -46,7 +45,7 @@ class RunNotFoundError(ArtifactError):
 
 
 class ArtifactStore:
-    """Cached, read-only access to the run artifacts under ``reports/``.
+    """Cached, read-only access to the artifacts of a recorded run.
 
     The cache is keyed on nothing: it holds one latest-run snapshot, and
     :meth:`invalidate` clears it. That is the same lifetime the FastAPI version
