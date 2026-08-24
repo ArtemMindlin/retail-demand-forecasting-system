@@ -70,6 +70,8 @@ from retail_forecasting.utils.io import (
 from retail_forecasting.utils.logging import Table, fields, get_logger, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
+logger = get_logger(__name__)
+
 
 def _split_train_calibration(
     frame: pd.DataFrame,
@@ -141,9 +143,6 @@ def _train_conformal_model(
             group_ids=group_ids,
         )
     return model
-
-
-logger = get_logger(__name__)
 
 
 def _evaluate_imputation_quality(
