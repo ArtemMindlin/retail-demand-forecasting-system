@@ -44,6 +44,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional override for the experiment run name.",
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Optional override for project.random_seed. A YAML that declares it beats the "
+        "environment, so this is the only way to vary it per invocation.",
+    )
+    parser.add_argument(
         "--run-mode",
         default=None,
         choices=list(get_args(RunMode)),
@@ -84,6 +91,8 @@ def main() -> None:
         reporting_updates["run_name"] = args.run_name
     if args.run_mode is not None:
         project_updates["run_mode"] = args.run_mode
+    if args.seed is not None:
+        project_updates["random_seed"] = args.seed
 
     if reporting_updates:
         new_reporting = settings.reporting.model_copy(update=reporting_updates)

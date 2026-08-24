@@ -171,12 +171,16 @@ def log_eda_metadata(metadata: BaseModel, dataset_summary: pd.DataFrame) -> None
 def log_imputation_comparison_metadata(
     settings: Settings, quality: pd.DataFrame, n_series: int, rows: int
 ) -> None:
-    """Attach the reconstruction scores to the run already open, one set per strategy.
+    """Config and tags on the open run; each strategy's scores on a nested run of its own.
 
-    Renamed on the way in: this MAE is reconstruction error against synthetically censored
-    days, and the forecast MAE of an experiment run lives under the same key in the same
-    experiment. `docs/runs.md` forbids quoting one beside the other, and a metric store that
-    called both `mae` would make that the easy mistake.
+    Nested because MLflow compares RUNS, not metric names: three keys named
+    `reconstruction_mae.<strategy>` are three separate one-bar charts, while three runs sharing
+    the key `reconstruction_mae` overlay in one. The suffix was doing by hand what the run axis
+    does natively, and doing it worse.
+
+    Renamed from plain `mae`: this is reconstruction error against synthetically censored days,
+    and the forecast MAE of an experiment run lives in the same experiment. `docs/runs.md`
+    forbids quoting one beside the other.
     """
     mlflow.log_params(_flat_params(settings))
     mlflow.set_tags(
@@ -188,16 +192,28 @@ def log_imputation_comparison_metadata(
             "panel_rows": rows,
         }
     )
-    renamed = quality.rename(
-        columns={
-            "mae": "reconstruction_mae",
-            "rmse": "reconstruction_rmse",
-            "bias": "reconstruction_bias",
-            "mape": "reconstruction_mape",
-        }
-    )
-    mlflow.log_metrics(_numeric_metrics(renamed))
     mlflow.log_table(quality, artifact_file="imputation_quality.json")
+
+    renamed = {
+        "mae": "reconstruction_mae",
+        "rmse": "reconstruction_rmse",
+        "bias": "reconstruction_bias",
+        "mape": "reconstruction_mape",
+    }
+    for _, row in quality.iterrows():
+        with mlflow.start_run(run_name=str(row["strategy"]), nested=True):
+            # The name stays the strategy, which is what makes the within-run comparison
+            # readable; the seed is a tag so the same strategy stays queryable across draws.
+            mlflow.set_tags(
+                {"strategy": str(row["strategy"]), "seed": settings.project.random_seed}
+            )
+            mlflow.log_metrics(
+                {
+                    renamed.get(str(column), str(column)): float(value)
+                    for column, value in row.items()
+                    if isinstance(value, int | float) and not pd.isna(value)
+                }
+            )
 
 
 def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
