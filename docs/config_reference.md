@@ -779,19 +779,6 @@ Interpretacion:
 
 Controla los artefactos generados.
 
-### `output_dir`
-
-Directorio base de salida.
-
-Ejemplo:
-
-```yaml
-output_dir: reports
-```
-
-`validate_settings()` evita escribir dentro de `data/`, porque `data/` se
-reserva para datasets y caches.
-
 ### `run_name`
 
 Prefijo del directorio de ejecucion.
@@ -802,11 +789,15 @@ Ejemplo:
 run_name: fresh_retailnet_v2
 ```
 
-Produce carpetas como:
+Es el nombre con el que la corrida queda registrada en MLflow, con una marca de
+tiempo detras:
 
 ```text
-reports/fresh_retailnet_v2_YYYYMMDD_HHMMSS/
+fresh_retailnet_v2_YYYYMMDD_HHMMSS
 ```
+
+Sus artefactos viven bajo `mlruns/<id>/artifacts/`, y ese nombre es la clave por la
+que el dashboard, `scripts/plot_*.py` y `evaluation/latex_exporter.py` la resuelven.
 
 ### `make_plots`
 
@@ -825,6 +816,5 @@ experimento, por ejemplo:
 - dataset no soportado;
 - horizonte, folds, lags, ventanas, costes o trials no positivos;
 - cuantiles vacios, duplicados, desordenados o fuera de `(0, 1)`;
-- `reporting.output_dir` dentro de `data/`.
 
 La idea es fallar antes de ejecutar un experimento largo con semantica invalida.

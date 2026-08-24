@@ -2,8 +2,8 @@
 
 Which run backs which result in the thesis, and with what code.
 
-`reports/` is gitignored and accumulates every execution, so without this file there is
-no way to tell a citable run from a scratch one. That gap caused a real defect: the
+The run store accumulates every execution and is gitignored, so without this file there
+is no way to tell a citable run from a scratch one. That gap caused a real defect: the
 conformal-calibration table in chapter 6 was published from a run predating the
 target-leakage fix of 16 May 2026, and nothing in the repository recorded it.
 
@@ -108,11 +108,16 @@ carries an `mlflow_run.json` naming the run, because the tracking store is a git
 sqlite database with no backup and, with a database store, `mlruns/` holds artifacts and
 nothing that says which run they belong to.
 
-Runs written before this — the ones this table cites — still live under `reports/`. They
-are in the index because they were put there with
+The runs this table cites were written before that and moved into the store, so they read
+the same way as any other: by the name in the table, not by a path.
+
+The store's two halves fail independently. `mlruns/` is a directory tree a backup catches;
+`mlflow.db` is a gitignored sqlite index nothing backs up. Losing it leaves the artifacts
+under UUID directories, which is why each carries its own `mlflow_run.json`. Rebuild with
 
 ```bash
-uv run python scripts/index_reports_into_mlflow.py
+uv run python scripts/rebuild_mlflow_index.py
 ```
 
-which is also how a legacy `reports/` directory is brought into the index.
+What returns is identity and files, not the params and metrics — those lived only in the
+index. Enough to cite a run and read it; not enough to compare runs by MAE.

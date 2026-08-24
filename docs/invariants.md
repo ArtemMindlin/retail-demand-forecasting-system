@@ -209,9 +209,12 @@ See `docs/web_layer.md` for the full description.
 
 31. The dashboard has no database.
 
-    System state lives in `reports/`; the only web-owned state is the operator
-    session, carried in a signed cookie. Adding a relational store is a design
-    change, not an implementation detail.
+    System state is the runs in the MLflow store, read as the files the pipeline
+    wrote into them; the only web-owned state is the operator session, carried in
+    a signed cookie. `mlflow.db` is an index over those files, not an application
+    database: nothing in `INSTALLED_APPS` defines a model and there is nothing to
+    migrate. Adding a relational store is a design change, not an implementation
+    detail.
 
 32. Missing artifacts render an explicit empty state that names the command
     which produces them.

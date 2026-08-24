@@ -499,7 +499,7 @@ y las vistas solo leen parametros, llaman a un servicio y renderizan.
 
 ### `ArtifactStore`
 - Archivo: `src/retail_forecasting/api/services/runs.py`
-- Que hace: acceso cacheado y de solo lectura a los artefactos de `reports/`. Localiza el run mas reciente, carga y filtra las predicciones por el champion, y valida nombres de run contra path traversal.
+- Que hace: acceso cacheado y de solo lectura a los artefactos de una corrida. Descubre las corridas por MLflow, localiza la mas reciente y carga y filtra las predicciones por el champion. Ya no sanea nombres contra path traversal: un nombre tiene que ser una clave que el indice conozca.
 - Metodos principales: `latest_run_path()`, `latest_predictions()`, `grouped_predictions()`, `resolve_run()`, `runs_with()`, `list_eda_runs()`, `invalidate()`.
 - Se usa en: todas las vistas, via `api/store.get_store()`.
 
@@ -584,7 +584,7 @@ y las vistas solo leen parametros, llaman a un servicio y renderizan.
 
 ### `PipelineRunner`
 - Archivo: `src/retail_forecasting/api/services/pipeline.py`
-- Que hace: lanza `python -m retail_forecasting.run` como subproceso en background, con lock de ejecucion unica, rate limit por IP y volcado a `reports/active_run.log`.
+- Que hace: lanza `python -m retail_forecasting.run` como subproceso en background, con lock de ejecucion unica, rate limit por IP y volcado a `var/active_run.log`.
 - Metodos principales: `start()`, `read_log()`, `reset()`, `check_rate_limit()`.
 - Se usa en: consola de pipeline del dashboard.
 

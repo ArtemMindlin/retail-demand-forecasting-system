@@ -34,17 +34,18 @@ mlruns/<id>/artifacts/  <- artefactos en disco (CSV, Parquet, JSON, PNG)
 ```
 
 `ArtifactStore` descubre las corridas por MLflow y las lee como ficheros del
-directorio de artefactos que este le devuelve. `log_artifacts` espeja el
-directorio de corrida dentro del almacen, asi que ese directorio tiene la misma
-forma que la carpeta de `reports/` que lo produjo: los `services/` de abajo no
-distinguen uno de otro. Descubrir por el indice tambien elimina una clase de
-fallo en lugar de defenderse de ella, porque un nombre de corrida tiene que ser
-una clave que MLflow ya conoce y no hay ruta que recorrer ni nombre que sanear.
+directorio de artefactos que este le devuelve. Son ficheros normales porque el
+pipeline los escribio ahi: `open_run_directory` abre la corrida y le entrega ese
+directorio, y para un almacen local escribir dentro *es* registrar. Una sola copia
+y ningun paso de subida.
 
-El pipeline ya no escribe en `reports/` y espeja despues: abre la corrida de MLflow
-y escribe dentro de su propio directorio de artefactos. Hay una sola copia, y el
-modo de fallo cambio con ella -- un almacen inalcanzable ya no cuesta el registro,
-cuesta la corrida, asi que el `try/except` que lo envolvia se ha ido.
+El modo de fallo cambio con ello: un almacen inalcanzable ya no cuesta el registro,
+cuesta la corrida, asi que el `try/except` que lo envolvia se ha ido. Tragarselo
+reportaria exito sobre una corrida sin ficheros.
+
+Descubrir por el indice elimina ademas una clase de fallo en lugar de defenderse de
+ella: un nombre de corrida tiene que ser una clave que MLflow ya conoce, asi que no
+hay ruta que recorrer ni nombre que sanear.
 
 El plano OPS escribe en su propio experimento, `retail_forecasting_ops`, y no como
 una corrida mas: sus costes no son costes de walk-forward y `docs/runs.md` dice
@@ -72,7 +73,7 @@ El precio de todo esto es que el almacen queda atado al directorio de trabajo:
 lanzar el pipeline desde un subdirectorio no encuentra sus artefactos. Los comandos
 documentados y el contenedor arrancan los dos desde la raiz.
 
-Solo `active_run.log` sigue en `reports/`, porque se escribe mientras la corrida va:
+`active_run.log` vive en `var/`, fuera del almacen, porque se escribe mientras la corrida va:
 una corrida de MLflow es el registro cerrado de algo que ya acabo, no un sitio para
 estado que cambia. Por eso `champion_registry.json` se mudo a `models_dir`, que es
 estado mutable que sobrevive a las corridas que lo actualizan.
@@ -247,7 +248,7 @@ fragmento.
 ## Ejecucion del pipeline desde el dashboard
 
 `services/pipeline.py` lanza `python -m retail_forecasting.run` como subproceso y
-vuelca la salida a `reports/active_run.log`. Un lock permite una sola ejecucion
+vuelca la salida a `var/active_run.log`. Un lock permite una sola ejecucion
 simultanea; un rate limit por IP (3 cada 10 minutos) evita el machaque.
 
 La consola hace polling con `hx-trigger="every 1s"` mientras el estado es
@@ -294,7 +295,7 @@ que exige ejecutar `collectstatic` (el `Dockerfile` lo hace en tiempo de build).
 ## Despliegue
 
 ```text
-Caddy (TLS)  ->  uvicorn retail_forecasting.api.asgi:application  ->  reports/
+Caddy (TLS)  ->  uvicorn retail_forecasting.api.asgi:application  ->  mlflow.db + mlruns/
 ```
 
 Variables obligatorias en produccion: `DJANGO_SECRET_KEY`,

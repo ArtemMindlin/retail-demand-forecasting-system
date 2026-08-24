@@ -54,7 +54,7 @@ El modulo `eda` opera exclusivamente sobre el panel preparado y no sobre nombres
 - resumenes de estacionalidad semanal;
 - diagnosticos de frecuencia e intensidad de stockout;
 - correlaciones descriptivas con `observed_demand`;
-- reporte Markdown y plots bajo `reports/eda_*`.
+- figuras y tablas en la corrida de EDA del almacen (`retail_forecasting_eda`).
 
 ## 4. Feature engineering temporal
 
@@ -223,7 +223,7 @@ Cada corrida genera:
   calidad de datos;
 - `backtest_metadata.json` con dataset, features, folds, modelos, hash de configuracion y commit Git;
 - graficos simples de coste y trade-off error-coste;
-- un reporte Markdown final en `reports/`.
+- un reporte Markdown final dentro de la corrida.
 
 ### Cuadro de mandos
 
@@ -234,7 +234,7 @@ dos planos que reflejan la separacion del propio sistema:
   monitor de drift;
 - **investigacion**: EDA, demanda latente y tuning multiobjetivo.
 
-El dashboard no calcula nada del dominio: lee los artefactos de `reports/` y
+El dashboard no calcula nada del dominio: descubre las corridas por MLflow, lee sus artefactos y
 llama a `forecasting/`, `inventory/`, `simulation/` y `eda/`. Los graficos se
 generan como SVG en Python, sin libreria de graficos en el cliente.
 

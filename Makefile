@@ -13,7 +13,6 @@ EDA_CONFIG = configs/eda/default.yaml
 TUNE_CONFIG = configs/tune_imputation/default.yaml
 OPS_SPLIT = data/processed/ops_sim/.built
 SNAPSHOT = current
-REPORTS = reports
 .PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf
 
 help: ## Show this help message
@@ -70,7 +69,7 @@ test-harness: ## Run only contract and architecture tests (fast)
 	$(PYTEST) tests/test_architecture_imports.py tests/test_temporal_leakage_contract.py tests/test_quantile_contract.py tests/test_dataframe_contracts.py tests/test_raw_column_boundaries.py tests/test_config_contract.py tests/test_generated_artifact_boundaries.py
 
 render-snapshots: ## Dump every dashboard view to tmp/render/<name> (safety net for CSS/template refactors)
-	$(PYTHON) scripts/render_snapshots.py --out tmp/render/$(SNAPSHOT) --reports $(REPORTS)
+	$(PYTHON) scripts/render_snapshots.py --out tmp/render/$(SNAPSHOT)
 
 lint: ## Run the linter (ruff)
 	uv run ruff check .
