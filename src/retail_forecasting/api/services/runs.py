@@ -86,17 +86,22 @@ class ArtifactStore:
         if not runs:
             raise NoPredictionsError("No recorded run holds predictions.csv.")
 
+        latest = next(iter(runs.values()))
         with self._lock:
-            self._cache["run_path"] = runs[0]
-        return runs[0]
+            self._cache["run_path"] = latest
+        return latest
 
-    def runs_with(self, *required_files: str) -> list[Path]:
-        """Recorded runs holding all of ``required_files``, newest first."""
-        return [
-            path
-            for path in logged_run_dirs(EXPERIMENT_RUNS).values()
+    def runs_with(self, *required_files: str) -> dict[str, Path]:
+        """Recorded runs holding all of ``required_files``, newest first, keyed by name.
+
+        Keyed rather than a bare list because an artifact directory is called `artifacts`
+        under a UUID: callers that showed a run's name were showing `artifacts`.
+        """
+        return {
+            name: path
+            for name, path in logged_run_dirs(EXPERIMENT_RUNS).items()
             if all((path / f).exists() for f in required_files)
-        ]
+        }
 
     def resolve_run(self, run_name: str, *, requires: str = "predictions.csv") -> Path:
         """Return the named run's artifact directory.
@@ -111,12 +116,7 @@ class ArtifactStore:
 
     def list_runs(self) -> list[str]:
         """Experiment runs that carry the full metrics/cost artifact set."""
-        required = ("predictions.csv", "metrics_summary.csv", "cost_summary.csv")
-        return [
-            name
-            for name, path in logged_run_dirs(EXPERIMENT_RUNS).items()
-            if all((path / f).exists() for f in required)
-        ]
+        return list(self.runs_with("predictions.csv", "metrics_summary.csv", "cost_summary.csv"))
 
     # ── EDA runs ──────────────────────────────────────────────────────────────
 

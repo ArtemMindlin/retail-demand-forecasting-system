@@ -136,10 +136,10 @@ def fair_cost(runs_with: Any) -> dict[str, Any]:
     candidates = runs_with("fair_cost_backtest.csv")
     if not candidates:
         return {"rows": [], "run": None}
-    latest = candidates[0]
+    name, latest = next(iter(candidates.items()))
     return {
         "rows": records(pd.read_csv(latest / "fair_cost_backtest.csv")),
-        "run": latest.name,
+        "run": name,
     }
 
 

@@ -24,7 +24,7 @@ def _pick_run(available: list[str], requested: str | None) -> str | None:
 def latent(request: HttpRequest) -> HttpResponse:
     """Compare latent-demand reconstruction strategies for one series."""
     store = get_store()
-    runs = [d.name for d in store.runs_with("latent_strategies.csv")]
+    runs = list(store.runs_with("latent_strategies.csv"))
     run_name = _pick_run(runs, request.GET.get("run"))
 
     if run_name is None:

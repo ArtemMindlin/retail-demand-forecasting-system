@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import statistics
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -54,12 +55,17 @@ from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.optimization import HyperparameterTuner
-from retail_forecasting.tracking import EXPERIMENT_RUNS, open_run_directory
+from retail_forecasting.tracking import (
+    EXPERIMENT_RUNS,
+    log_imputation_comparison_metadata,
+    open_run_directory,
+)
 from retail_forecasting.utils.io import (
     HOLDOUT_FOLD_ID,
     quantile_column_name,
     quantile_level_from_column,
 )
+from retail_forecasting.utils.logging import Table, fields, get_logger, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 
@@ -136,6 +142,8 @@ def _train_conformal_model(
 
 
 # Every strategy except "none", which is the uncorrected baseline rather than a candidate.
+logger = get_logger(__name__)
+
 IMPUTATION_COMPARISON_STRATEGIES: tuple[ImputationStrategy, ...] = (
     "supervised",
     "historical_mean",
@@ -194,23 +202,30 @@ def run_imputation_comparison(settings: Settings) -> Path:
     Returns:
         The created run directory path.
     """
-    print("\n" + "=" * 50)
-    print("🧪 LATENT-DEMAND IMPUTATION COMPARISON (no forecasting)")
-    print("=" * 50 + "\n")
-    print("📂 Loading train panel...")
+    rule(logger, "comparación de imputación")
     panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
         split="train",
     )
     n_series = panel["series_id"].nunique() if "series_id" in panel.columns else 0
-    print(f"✅ Train panel loaded: {len(panel):,} rows, {n_series} series")
+    fields(
+        logger,
+        {
+            "panel": f"{thousands(n_series)} series, {thousands(len(panel))} filas",
+            "ventana": f"{panel['date'].min().date()} → {panel['date'].max().date()}",
+            "estrategias": " · ".join(IMPUTATION_COMPARISON_STRATEGIES),
+        },
+    )
 
     imputer_params_path = settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
 
+    stages = Table(logger, {"estrategia": 18, "filas": 10, "imputadas": 10, "tiempo": 6})
+    stages.header()
+
     frames: list[pd.DataFrame] = []
     for strategy in IMPUTATION_COMPARISON_STRATEGIES:
-        print(f"  🧮 Imputing latent demand with strategy: {strategy}...")
+        started = time.monotonic()
         imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
             panel
         )
@@ -226,10 +241,17 @@ def run_imputation_comparison(settings: Settings) -> Path:
             }
         )
         frames.append(frame)
+        stages.row(
+            {
+                "estrategia": strategy,
+                "filas": thousands(len(frame)),
+                "imputadas": thousands(int(frame["is_imputed"].sum())),
+                "tiempo": f"{time.monotonic() - started:.0f}s",
+            }
+        )
 
     long_df = pd.concat(frames, ignore_index=True).sort_values(["series_id", "date", "strategy"])
 
-    print("  📐 Evaluating reconstruction quality via synthetic censoring of clean days...")
     quality_df = _evaluate_imputation_quality(
         panel,
         seed=settings.project.random_seed,
@@ -254,7 +276,24 @@ def run_imputation_comparison(settings: Settings) -> Path:
             json.dumps(metadata, indent=2), encoding="utf-8"
         )
 
-        print(f"\n✅ Imputation comparison written to: {run_dir}\n")
+        log_imputation_comparison_metadata(
+            settings=settings, quality=quality_df, n_series=int(n_series), rows=len(panel)
+        )
+
+        rule(logger, "calidad de reconstrucción")
+        scores = Table(logger, {"estrategia": 18, "MAE": 8, "RMSE": 8, "sesgo": 8, "n": 8})
+        scores.header()
+        for _, row in quality_df.sort_values("mae").iterrows():
+            scores.row(
+                {
+                    "estrategia": row["strategy"],
+                    "MAE": f"{row['mae']:.4f}",
+                    "RMSE": f"{row['rmse']:.4f}",
+                    "sesgo": f"{row['bias']:+.4f}",
+                    "n": thousands(int(row["n_eval"])),
+                }
+            )
+        fields(logger, {"escrito": run_dir})
         return run_dir
 
 

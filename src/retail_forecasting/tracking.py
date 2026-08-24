@@ -79,7 +79,7 @@ def _artifact_root(tracking_uri: str) -> str | None:
     return str(store.parent / "mlruns")
 
 
-_ROW_IDENTITY = ("model_name", "data_strategy", "cadence")
+_ROW_IDENTITY = ("model_name", "data_strategy", "cadence", "strategy")
 
 
 def _metric_name(prefix: str, row: pd.Series) -> str:
@@ -166,6 +166,38 @@ def log_eda_metadata(metadata: BaseModel, dataset_summary: pd.DataFrame) -> None
     mlflow.log_params({key: "null" if value is None else value for key, value in fields.items()})
     mlflow.set_tags({"run_mode": "eda"})
     mlflow.log_metrics(_numeric_metrics(dataset_summary))
+
+
+def log_imputation_comparison_metadata(
+    settings: Settings, quality: pd.DataFrame, n_series: int, rows: int
+) -> None:
+    """Attach the reconstruction scores to the run already open, one set per strategy.
+
+    Renamed on the way in: this MAE is reconstruction error against synthetically censored
+    days, and the forecast MAE of an experiment run lives under the same key in the same
+    experiment. `docs/runs.md` forbids quoting one beside the other, and a metric store that
+    called both `mae` would make that the easy mistake.
+    """
+    mlflow.log_params(_flat_params(settings))
+    mlflow.set_tags(
+        {
+            "git_commit": get_git_commit(),
+            "run_mode": settings.project.run_mode,
+            "config_hash": build_config_hash(settings),
+            "series": n_series,
+            "panel_rows": rows,
+        }
+    )
+    renamed = quality.rename(
+        columns={
+            "mae": "reconstruction_mae",
+            "rmse": "reconstruction_rmse",
+            "bias": "reconstruction_bias",
+            "mape": "reconstruction_mape",
+        }
+    )
+    mlflow.log_metrics(_numeric_metrics(renamed))
+    mlflow.log_table(quality, artifact_file="imputation_quality.json")
 
 
 def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
