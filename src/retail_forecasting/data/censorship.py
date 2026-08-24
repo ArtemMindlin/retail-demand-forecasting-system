@@ -212,10 +212,9 @@ class LatentDemandImputer:
             ).model_dump()
 
         lgbm_kwargs: dict[str, Any] = dict(params)
-        # n_jobs=1 is faster here, not a safety setting: 11 features leave LightGBM little to
-        # split across threads, so what remains is a fixed coordination cost per fit. On 10 cores
-        # one thread beat all of them by 17.6x at 2.2k training rows and by 2.8x at 16.7k rows
-        # with 3254 trees, monotonically worse from 2 threads up, predictions identical.
+        # `n_jobs=1` measured 16x FASTER than -1 here (1.6s vs 25.5s): ~17k clean rows over 11
+        # features is too little work per tree to pay for thread coordination, times 1827 trees.
+        # It is also what the tuning needs, calling this inside a 10-thread `Parallel`.
         lgbm_kwargs.update({"random_state": 42, "verbosity": -1, "n_jobs": 1})
         self.model = lgb.LGBMRegressor(**lgbm_kwargs)
         self.model.fit(X_train, y_train)
@@ -225,12 +224,6 @@ class LatentDemandImputer:
 
         predicted_latent = np.asarray(self.model.predict(X_censored), dtype=float)
 
-        # Keep the sales that did happen, and estimate only the unstocked slice of the day.
-        # With `r` the fraction of the operative window without stock, the day was sellable for
-        # `1 - r` of it: the observed sale already covers that part, and only `r` of a full day
-        # of demand is missing. Replaces a `max(observed, predicted)` that treated the two as
-        # rival estimates of one quantity and discarded the smaller, throwing away real sales on
-        # lightly-censored days where the observed value is the better evidence.
         ratio = np.clip(
             df.loc[is_censored, "stockout_hours"].to_numpy() / OPERATIVE_WINDOW_HOURS, 0.0, 1.0
         )
