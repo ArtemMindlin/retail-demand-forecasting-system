@@ -434,14 +434,21 @@ def build_promotion_decision(
     champion_reference = resolve_champion_reference(settings, champion_registry)
     champion_rows = summary.loc[_champion_mask(summary, champion_reference)].copy()
     if champion_rows.empty:
+        logger.warning(
+            "sin decisión de promoción: el campeón de referencia (%s/%s) no está en el "
+            "cost_summary de esta corrida",
+            champion_reference.model_name,
+            champion_reference.backend_name,
+        )
         return None
 
     champion = champion_rows.sort_values("total_cost").iloc[0]
+    # Models only. `data_strategy` used to widen this, which made the other arm of a
+    # two-arm run a challenger -- comparing costs measured against different targets.
+    # One arm per run now, and `run_fair_cost_backtest` is what ranks strategies.
     candidate_mask = (summary["model_name"] != champion["model_name"]) | (
         summary["backend_name"] != champion["backend_name"]
     )
-    if "data_strategy" in summary.columns:
-        candidate_mask |= summary["data_strategy"] != champion.get("data_strategy")
     challengers = summary.loc[candidate_mask].copy()
     if challengers.empty:
         return None
@@ -621,10 +628,20 @@ def resolve_champion_reference(
 
 
 def _champion_mask(summary: pd.DataFrame, reference: _ChampionReference) -> pd.Series:
+    """Rows in `summary` that are the reference champion.
+
+    The `data_strategy` filter only applies when the summary holds more than one arm.
+    A run scores a single strategy, so a registry champion promoted on another arm
+    would otherwise match nothing and silently cancel the whole decision.
+    """
     mask = (summary["model_name"] == reference.model_name) & (
         summary["backend_name"] == reference.backend_name
     )
-    if "data_strategy" in summary.columns and reference.data_strategy is not None:
+    if (
+        "data_strategy" in summary.columns
+        and reference.data_strategy is not None
+        and summary["data_strategy"].nunique() > 1
+    ):
         mask &= summary["data_strategy"] == reference.data_strategy
     return mask
 
