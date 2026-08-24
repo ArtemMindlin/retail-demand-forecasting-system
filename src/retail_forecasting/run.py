@@ -12,7 +12,6 @@ from retail_forecasting.eda.pipeline import run_eda
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
     run_fair_cost_backtest,
-    run_imputation_comparison,
     run_retrain,
     run_scoring,
 )
@@ -102,10 +101,6 @@ def main() -> None:
         settings = settings.model_copy(update={"project": new_project})
 
     mode = settings.project.run_mode
-    if mode == "compare_imputation":
-        run_dir = run_imputation_comparison(settings)
-        fields(logger, {"escrito": run_dir / "latent_strategies.csv"})
-        return
     if mode == "retrain":
         run_retrain(settings)
         return

@@ -423,7 +423,7 @@
 /* Card chrome, shared by every card in every view. These used to be two divergent sets:
    `.chart-head/.chart-title/.chart-subtitle` on the dashboard, and
    `.ops-chart-head/.ops-chart-title/.ops-chart-subtitle/.ops-chart-empty`, which despite
-   the prefix were used by /ops/, /pareto/ (three times) and /latent/. */
+   the prefix were used by /ops/ and /pareto/ (three times). */
 .card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 10px 18px; }
 .card-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
 .card-title-hero { font-size: 18px; }
@@ -461,37 +461,6 @@
 
 /* ── Research plane ────────────────────────────────────────────────────────── */
 .run-badge { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); border: 1px solid var(--border); padding: 6px 10px; border-radius: 8px; }
-.verdict { padding: 16px 20px; margin-bottom: 16px; }
-.verdict-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
-.verdict-scope { font-size: 10px; color: var(--c-conf); letter-spacing: 0.06em; font-weight: 600; }
-.verdict-headline { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
-.verdict-winner { font-size: 17px; font-weight: 700; }
-.verdict-mae { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text-1); }
-.verdict-unit { font-size: 10px; color: var(--text-3); }
-.verdict-note { font-size: 11.5px; color: var(--text-3); margin-top: 6px; max-width: 620px; line-height: 1.5; }
-.verdict-kpis { display: flex; gap: 22px; text-align: right; }
-.verdict-kpi-value { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--text-1); line-height: 1; }
-.verdict-kpi-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-3); letter-spacing: 0.04em; text-transform: uppercase; margin-top: 3px; }
-.verdict-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 16px; }
-.verdict-card { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(var(--rgb-white), 0.02); }
-.verdict-card.best { border-color: rgba(var(--rgb-conf), 0.35); background: rgba(var(--rgb-conf), 0.06); }
-.verdict-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.verdict-card-name { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2); }
-.verdict-card.best .verdict-card-name { color: var(--text-1); font-weight: 600; }
-.verdict-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.verdict-badge { background: rgba(var(--rgb-conf), 0.16); color: var(--c-conf); padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: bold; border: 1px solid rgba(var(--rgb-conf), 0.35); white-space: nowrap; }
-.verdict-direction { font-family: var(--font-mono); font-size: 9px; color: var(--text-3); }
-.verdict-card-mae { display: flex; align-items: baseline; gap: 5px; margin-top: 10px; }
-.verdict-card-mae .tnum { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text-1); line-height: 1; }
-.verdict-card.best .verdict-card-mae .tnum { color: var(--c-conf); }
-.verdict-card-mae .unit { font-size: 9.5px; color: var(--text-3); }
-.verdict-bar { height: 4px; border-radius: 999px; background: rgba(var(--rgb-slate), 0.1); margin: 10px 0 8px; overflow: hidden; }
-.verdict-bar-fill { height: 100%; border-radius: 999px; opacity: 0.7; }
-.verdict-card-stats { display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
-.latent-controls { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
-.latent-chips { display: flex; gap: 22px; }
-.latent-chip-value { font-family: var(--font-mono); font-size: 17px; font-weight: 700; color: var(--text-1); line-height: 1; }
-.latent-chip-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-3); letter-spacing: 0.04em; text-transform: uppercase; margin-top: 3px; }
 /* Same 1200px cap as .chart-card, applied to the grid so the scatter inside keeps its
    2fr share of it: the front chart is squarer than the hero ratio (a scatter needs to
    be), and at ~2/3 of the cap it still renders the same height as the hero charts. */

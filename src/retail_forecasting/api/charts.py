@@ -192,7 +192,7 @@ def sparkline(
 #
 # One ratio for every full-width chart card. Because these SVGs are width-driven, the
 # ratio IS the rendered height: at the 1200px `.chart-card` cap this one lands at ~307px,
-# so /dashboard/, /ops/ and /latent/ all show a chart of the same height instead of each
+# so /dashboard/ and /ops/ both show a chart of the same height instead of each
 # picking its own and reading as a different component. See HERO_HEIGHT in eda_charts.py
 # for the charts drawn on the 760-wide grid.
 HERO_WIDTH = 900

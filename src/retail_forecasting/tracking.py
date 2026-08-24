@@ -172,26 +172,6 @@ def log_eda_metadata(metadata: BaseModel, dataset_summary: pd.DataFrame) -> None
     mlflow.log_metrics(_numeric_metrics(dataset_summary))
 
 
-def log_imputation_comparison_metadata(settings: Settings, n_series: int, rows: int) -> None:
-    """Config and tags for a comparison run. No metrics: the mode scores nothing.
-
-    It used to log a reconstruction MAE/RMSE per strategy, on a nested run each so MLflow
-    would overlay them. Invariant 42 rules that ranking out -- the synthetic-censoring
-    holdout cannot compare reconciliation rules -- so the charts ranked strategies on a
-    number that was an artefact of the generator. `run_fair_cost_backtest` settles it.
-    """
-    mlflow.log_params(_flat_params(settings))
-    mlflow.set_tags(
-        {
-            "git_commit": get_git_commit(),
-            "run_mode": settings.project.run_mode,
-            "config_hash": build_config_hash(settings),
-            "series": n_series,
-            "panel_rows": rows,
-        }
-    )
-
-
 def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
     """Every run under `experiment_name`, newest first, mapped to its artifact directory.
 

@@ -37,7 +37,6 @@ MODES: list[dict[str, Any]] = [
         "icon": "sigma",
         "tabs": [
             {"id": "eda", "label": "EDA", "icon": "layers", "url_name": "eda"},
-            {"id": "latent", "label": "Demanda Latente", "icon": "eye", "url_name": "latent"},
             {"id": "pareto", "label": "Pareto Tuning", "icon": "target", "url_name": "pareto"},
         ],
     },

@@ -870,9 +870,10 @@ def test_censoring_refuses_a_panel_it_cannot_build_a_holdout_from(
     Both ingredients are required and for different reasons: a clean day is the only place the
     true demand is known, and a real stockout is the only realistic severity to fake it at.
 
-    It used to return empty and let each caller decide, which is how the imputation study came
-    to write an `imputation_quality.csv` of headers and no rows -- an empty artifact reading as
-    "no result" rather than "this failed". Same failure mode as invariants 14 and 32.
+    It used to return empty and let each caller decide, which is how the since-removed
+    imputation comparison came to write a quality CSV of headers and no rows -- an empty
+    artifact reading as "no result" rather than "this failed". Same failure mode as
+    invariants 14 and 32.
     """
     panel = pd.DataFrame(
         {
@@ -913,10 +914,10 @@ def test_imputer_returns_the_same_columns_whether_or_not_it_corrects_anything() 
     """One public method must not have two output shapes.
 
     `impute()` took a passthrough branch for strategy ``none`` and for panels with no censored
-    rows, and that branch omitted `original_observed_demand`. Two consumers assume otherwise:
-    `run_imputation_comparison` reads it unguarded, and `_build_prediction_frame` tests for
-    `latent_demand_est` before reaching for all three. Both were correct only because the v1
-    panel is 71.6% stockout days -- one config change from a KeyError, not unreachable.
+    rows, and that branch omitted `original_observed_demand`. Consumers assume otherwise:
+    `_build_prediction_frame` tests for `latent_demand_est` before reaching for all three.
+    That was correct only because the v1 panel is 71.6% stockout days -- one config change
+    from a KeyError, not unreachable.
     """
     with_stockouts = make_synthetic_panel(num_series=2, num_days=20)
     clean_only = with_stockouts.copy()

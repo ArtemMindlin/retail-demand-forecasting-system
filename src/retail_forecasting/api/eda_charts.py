@@ -27,8 +27,8 @@ PAD = {"left": 54, "right": 18, "top": 18, "bottom": 42}
 INNER_W = WIDTH - PAD["left"] - PAD["right"]
 INNER_H = HEIGHT - PAD["top"] - PAD["bottom"]
 
-# Height for the charts that live alone in a full-width `.chart-card` (latent
-# reconstruction, cost sensitivity). WIDTH / HERO_HEIGHT matches charts.HERO_RATIO, so at
+# Height for the charts that live alone in a full-width `.chart-card` (cost
+# sensitivity). WIDTH / HERO_HEIGHT matches charts.HERO_RATIO, so at
 # the 1200px card cap they render the same ~307px tall as the forecast and OPS charts
 # instead of each card setting its own height. HEIGHT stays the taller default for the
 # multi-column EDA grid tiles, which are never full-width.
@@ -447,81 +447,6 @@ def render(data: dict[str, Any]) -> SafeString:
 
 
 # ── Research-plane charts ─────────────────────────────────────────────────────
-
-
-def latent_compare(data: dict[str, Any], strategy_colors: dict[str, str]) -> SafeString:
-    """Observed (censored) sale against each strategy's reconstruction.
-
-    Days with stockout hours are shaded, because those are exactly the days
-    where observed sale is a censored view of demand and the strategies diverge.
-    """
-    dates = data.get("dates", [])
-    observed = data.get("observed", [])
-    strategies = data.get("strategies", {})
-    if not dates:
-        return _svg("", "Sin datos")
-
-    height = HERO_HEIGHT
-    inner_h = HERO_INNER_H
-    values = [v for v in observed if v is not None]
-    for series in strategies.values():
-        values.extend(v for v in series if v is not None)
-    if not values:
-        return _svg("", "Sin datos")
-
-    grid, scale_y = _y_axis(min(values), max(values), height)
-    divisor = max(1, len(dates) - 1)
-    xs = [PAD["left"] + (i / divisor) * INNER_W for i in range(len(dates))]
-
-    parts: list[str] = []
-
-    # Stockout shading sits under the grid so the lines stay legible.
-    stockout = data.get("stockout_hours", [])
-    band_width = INNER_W / max(1, len(dates))
-    for index, hours in enumerate(stockout):
-        if hours:
-            parts.append(
-                f'<rect x="{_num(xs[index] - band_width / 2)}" y="{PAD["top"]}" '
-                f'width="{_num(band_width)}" height="{_num(inner_h)}" '
-                f'fill="rgba(var(--rgb-drift), 0.1)"/>'
-            )
-
-    parts.append(grid)
-
-    def polyline(series: Sequence[float | None], color: str, dashed: bool = False) -> str:
-        points = " ".join(
-            f"{_num(xs[i])},{_num(scale_y(v))}" for i, v in enumerate(series) if v is not None
-        )
-        if not points:
-            return ""
-        dash = ' stroke-dasharray="5 4"' if dashed else ""
-        return (
-            f'<polyline points="{points}" fill="none" stroke="{escape(color)}" '
-            f'stroke-width="2" stroke-linejoin="round"{dash}/>'
-        )
-
-    for name, series in strategies.items():
-        parts.append(polyline(series, strategy_colors.get(name, "var(--c-slate)")))
-    parts.append(polyline(observed, "var(--text-2)", dashed=True))
-
-    step = max(1, len(dates) // 8)
-    for index in range(0, len(dates), step):
-        parts.append(_x_label(xs[index], str(dates[index])[5:], height))
-
-    legend = [
-        (strategy_meta_label(n), strategy_colors.get(n, "var(--c-slate)")) for n in strategies
-    ]
-    legend.append(("observado", "var(--text-2)"))
-    parts.append(_legend(legend))
-
-    return _svg("".join(parts), "Reconstrucción de demanda latente por estrategia", height)
-
-
-def strategy_meta_label(name: str) -> str:
-    """Short label for a strategy legend entry."""
-    from retail_forecasting.api.services.experiments import strategy_meta
-
-    return strategy_meta(name)["short"]
 
 
 def pareto_chart(rows: Sequence[dict[str, Any]]) -> SafeString:

@@ -38,7 +38,6 @@ PAGES: tuple[tuple[str, str], ...] = (
     ("/skus/", "skus.html"),
     ("/drift/", "drift.html"),
     ("/eda/", "eda.html"),
-    ("/latent/", "latent.html"),
     ("/pareto/", "pareto.html"),
     ("/api/", "api_docs.html"),
     ("/alertas/", "_alerts_panel.html"),

@@ -1,8 +1,6 @@
-"""Research plane: latent-demand imputation and Pareto tuning."""
+"""Research plane: Pareto tuning, cost sensitivity and the fair-cost backtest."""
 
 from __future__ import annotations
-
-from typing import Any
 
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
@@ -12,7 +10,6 @@ from retail_forecasting.api.services import experiments as service
 from retail_forecasting.api.services.runs import RunNotFoundError
 from retail_forecasting.api.store import get_store
 from retail_forecasting.api.views.empty import empty_state
-from retail_forecasting.tracking import EXPERIMENT_IMPUTATION
 
 
 def _pick_run(available: list[str], requested: str | None) -> str | None:
@@ -20,72 +17,6 @@ def _pick_run(available: list[str], requested: str | None) -> str | None:
     if requested and requested in available:
         return requested
     return available[0] if available else None
-
-
-def latent(request: HttpRequest) -> HttpResponse:
-    """Compare latent-demand reconstruction strategies for one series."""
-    store = get_store()
-    runs = list(store.runs_with("latent_strategies.csv", experiment=EXPERIMENT_IMPUTATION))
-    run_name = _pick_run(runs, request.GET.get("run"))
-
-    if run_name is None:
-        return empty_state(
-            request,
-            icon="sigma",
-            label="PLANO DE ANÁLISIS",
-            title="Sin comparación de imputación",
-            detail=(
-                "Ningún run contiene latent_strategies.csv. Ese artefacto lo produce el "
-                "modo de comparación de estrategias de imputación."
-            ),
-            hint=(
-                "Genérala con: uv run python -m retail_forecasting.run "
-                "--config configs/compare_imputation/default.yaml"
-            ),
-        )
-
-    try:
-        run_path = store.resolve_run(
-            run_name, requires="latent_strategies.csv", experiment=EXPERIMENT_IMPUTATION
-        )
-    except RunNotFoundError as exc:
-        return empty_state(
-            request,
-            icon="sigma",
-            label="PLANO DE ANÁLISIS",
-            title="Run no encontrado",
-            detail=str(exc),
-        )
-
-    data = service.imputation_strategies(run_path, request.GET.get("series"))
-    quality = service.rank_quality(data.get("quality", []))
-
-    strategy_colors = {name: service.strategy_meta(name)["color"] for name in data["strategies"]}
-    censored_days = sum(1 for h in data.get("stockout_hours", []) if h)
-
-    context: dict[str, Any] = {
-        "runs": runs,
-        "run": run_name,
-        "series_list": data["series"],
-        "series_id": data.get("series_id"),
-        "day_count": len(data["dates"]),
-        "censored_days": censored_days,
-        "has_data": bool(data["dates"]),
-        "chart": eda_charts.latent_compare(data, strategy_colors),
-        "quality": quality,
-        "best": quality[0] if quality else None,
-        "n_eval": quality[0].get("n_eval") if quality else None,
-        "series_count": len(data["series"]),
-        "strategy_rows": [
-            {
-                **service.strategy_meta(name),
-                "name": name,
-                "values": values,
-            }
-            for name, values in data["strategies"].items()
-        ],
-    }
-    return render(request, "views/latent.html", context)
 
 
 def pareto(request: HttpRequest) -> HttpResponse:

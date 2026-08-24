@@ -10,8 +10,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
   its own mode reads. `configs/experiment/default.yaml` is the canonical v1 config;
   `large.yaml`/`daily.yaml` cover the scale/daily variants, both still `run_mode = experiment`.
   The other folders (`retrain/`, `score_daily/`, `simulate_ops/`, `fair_cost_backtest/`,
-  `compare_imputation/`, `tune_imputation/`)
-  hold a `default.yaml` each, `eda/` included: exploratory analysis is a run mode like the
+  `tune_imputation/`) hold a `default.yaml` each, `eda/` included: exploratory analysis is a run mode like the
   rest, not a second CLI. `project.run_mode` always matches the folder name, so `--run-mode`
   is only for ad-hoc overrides. The map of which sections each mode reads is
   `MODE_SECTIONS` in `contracts/contracts_config.py`, enforced by `tests/test_config_layout.py`:
@@ -37,14 +36,14 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 - `src/retail_forecasting/eda/`: exploratory analysis and figure generation, surfaced in the dashboard's `/eda/` tab. Entered through `run_mode = eda` (`--split` picks the split); the dataset config is honoured as written, so `top_n_series: null` in `configs/eda/default.yaml` is what makes the analysis describe the whole panel rather than the subset a model trains on. Set it to explore an experiment's exact panel instead.
 - `src/retail_forecasting/tracking.py`: MLflow tracking for every run mode — its own layer, not part of `evaluation`, because recording a run is something every mode does and `eda` may not import `evaluation`. Owns the tracking-store URI and derives the artifact root from it.
 - `src/retail_forecasting/contracts/`: pydantic-style contracts for backtesting, business rules, config, drift, feature engineering, quality, and tuning — enforced by the `tests/test_*_contract.py` / `tests/test_*_boundaries.py` suite.
-- `src/retail_forecasting/api/`: Django dashboard and JSON API (`views/`, `templates/`, `static/`, `services/`) — visualizes experiments, EDA, drift, latent-demand imputation, the OPS plane, and exposes a documented JSON surface (`/api/forecast`, `/api/skus`, `/predict_orders`, etc.). Served via `asgi.py`/`wsgi.py`.
+- `src/retail_forecasting/api/`: Django dashboard and JSON API (`views/`, `templates/`, `static/`, `services/`) — visualizes experiments, EDA, drift, the OPS plane, and exposes a documented JSON surface (`/api/forecast`, `/api/skus`, `/predict_orders`, etc.). Served via `asgi.py`/`wsgi.py`.
 - `tests/`: contract tests, smoke tests, synthetic-panel tests, and API tests.
 
 ## Current Scope
 
 The v1 pipeline supports only `FreshRetailNet-50K` through `dataset.source = fresh_retailnet`.
 
-Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/censorship.py`), compared against the raw observed-demand baseline. Model selection and champion evaluation run on a base subset of the 50 highest-rotation series; a separate 500-series run validates conformal-calibration stability at scale, and a 30-series fair-cost backtest isolates the imputation signal from the rest of the pipeline under a common ground truth. Each subset answers a different question, so do not average metrics across them as if they were the same experiment.
+Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/censorship.py`), compared against the raw observed-demand baseline by `run_fair_cost_backtest` -- the only comparison that ranks strategies, since invariant 42 rules out the reconstruction-MAE route. Model selection and champion evaluation run on a base subset of the 50 highest-rotation series; a separate 500-series run validates conformal-calibration stability at scale, and a 30-series fair-cost backtest isolates the imputation signal from the rest of the pipeline under a common ground truth. Each subset answers a different question, so do not average metrics across them as if they were the same experiment.
 
 CatBoost is the current champion model, selected by simulated logistic cost, not by MAE or Winkler Score alone — point-error and logistic-cost rankings can (and do) invert.
 
@@ -69,7 +68,7 @@ run.py
  -> write_run_artifacts()
 ```
 
-Related entry points in `forecasting/pipeline.py`: `run_imputation_comparison()`, `run_fair_cost_backtest()`, `train_and_save_champion()` / `run_retrain()`, `run_scoring()`. `tune_imputation_lgbm()` (in `forecasting/imputation_tuning.py`, `run_mode = tune_imputation`) is a separate, upstream entry point: it tunes the supervised imputer's LGBM hyperparameters, not the forecasting model.
+Related entry points in `forecasting/pipeline.py`: `run_fair_cost_backtest()`, `train_and_save_champion()` / `run_retrain()`, `run_scoring()`. `tune_imputation_lgbm()` (in `forecasting/imputation_tuning.py`, `run_mode = tune_imputation`) is a separate, upstream entry point: it tunes the supervised imputer's LGBM hyperparameters, not the forecasting model.
 
 The dashboard's what-if simulator does not go through the pipeline: it recomputes a
 single-period Newsvendor quantity in `api/services/forecast.py` from the run's
@@ -157,9 +156,7 @@ Run the default experiment:
 uv run python -m retail_forecasting.run --config configs/experiment/default.yaml
 ```
 
-Every other mode has a `make` target named after it (`make help` lists them);
-`compare-imputation` replaced the `preprocessing.compare_imputation` flag, which dispatched a
-second mode from inside `run_mode = experiment`.
+Every other mode has a `make` target named after it (`make help` lists them).
 
 Run the dashboard:
 

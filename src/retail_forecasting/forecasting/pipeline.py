@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import statistics
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -55,9 +53,7 @@ from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.optimization import HyperparameterTuner
 from retail_forecasting.tracking import (
-    EXPERIMENT_IMPUTATION,
     EXPERIMENT_RUNS,
-    log_imputation_comparison_metadata,
     open_run_directory,
 )
 from retail_forecasting.utils.io import (
@@ -66,7 +62,7 @@ from retail_forecasting.utils.io import (
     quantile_column_name,
     quantile_level_from_column,
 )
-from retail_forecasting.utils.logging import Table, fields, get_logger, rule, thousands
+from retail_forecasting.utils.logging import get_logger
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 
 logger = get_logger(__name__)
@@ -142,99 +138,6 @@ def _train_conformal_model(
             group_ids=group_ids,
         )
     return model
-
-
-def run_imputation_comparison(settings: Settings) -> Path:
-    """Run only the latent-demand imputation strategies side by side (no forecasting).
-
-    This is a lightweight pre-model pass: it loads the daily panel and applies each imputation strategy to reconstruct latent demand, then writes a long-format ``latent_strategies.csv`` plus an ``imputation_metadata.json`` marker. The dashboard uses this to compare strategies in the Demanda Latente tab. No models are trained and no walk-forward folds are run.
-
-    Descriptive only: it shows WHAT each strategy reconstructs, and deliberately scores
-    nothing. Invariant 42 forbids ranking reconciliation rules on the synthetic-censoring
-    holdout, so the strategy that wins is settled by `run_fair_cost_backtest`.
-
-    Returns:
-        The created run directory path.
-    """
-    strategies = settings.preprocessing.comparison_strategies
-    rule(logger, "comparación de imputación")
-    panel = load_prepared_panel(
-        dataset_config=settings.dataset,
-        preprocessing_config=settings.preprocessing,
-        split="train",
-    )
-    n_series = panel["series_id"].nunique()
-    n_censored = int((panel["stockout_hours"] > 0).sum())
-    fields(
-        logger,
-        {
-            "panel": f"{thousands(n_series)} series, {thousands(len(panel))} filas",
-            "ventana": f"{panel['date'].min().date()} → {panel['date'].max().date()}",
-            "por reconstruir": f"{thousands(n_censored)} días con rotura "
-            f"({n_censored / len(panel):.1%})",
-            "estrategias": " · ".join(strategies),
-        },
-    )
-
-    imputer_params_path = settings.models.models_dir / settings.models.imputation_params_filename
-
-    stages = Table(logger, {"estrategia": 18, "reconstruido": 12, "+demanda": 10, "tiempo": 6})
-
-    frames: list[pd.DataFrame] = []
-    for strategy in strategies:
-        started = time.monotonic()
-        imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
-            panel
-        )
-        frame = pd.DataFrame(
-            {
-                "series_id": imputed["series_id"].astype(str),
-                "date": pd.to_datetime(imputed["date"]).dt.strftime("%Y-%m-%d"),
-                "strategy": strategy,
-                "observed": imputed["original_observed_demand"].astype(float),
-                "latent_demand_est": imputed["latent_demand_est"].astype(float),
-                "stockout_hours": imputed["stockout_hours"].astype(float),
-                "is_imputed": imputed["is_imputed"].astype(bool),
-            }
-        )
-        frames.append(frame)
-        added = (
-            frame.loc[frame["is_imputed"], "latent_demand_est"]
-            - frame.loc[frame["is_imputed"], "observed"]
-        )
-        stages.row(
-            {
-                "estrategia": strategy,
-                "reconstruido": thousands(int(frame["is_imputed"].sum())),
-                "+demanda": f"{added.mean():.3f}" if len(added) else "—",
-                "tiempo": f"{time.monotonic() - started:.0f}s",
-            }
-        )
-
-    long_df = pd.concat(frames, ignore_index=True).sort_values(["series_id", "date", "strategy"])
-
-    with open_run_directory(settings.reporting.run_name, EXPERIMENT_IMPUTATION) as run_dir:
-        long_df.to_csv(run_dir / "latent_strategies.csv", index=False)
-
-        metadata = {
-            "run_name": settings.reporting.run_name,
-            "created_at": utc_timestamp(),
-            "git_commit": get_git_commit(),
-            "config_hash": build_config_hash(settings),
-            "strategies": list(strategies),
-            "series": int(n_series),
-            "rows": int(len(panel)),
-        }
-        (run_dir / "imputation_metadata.json").write_text(
-            json.dumps(metadata, indent=2), encoding="utf-8"
-        )
-
-        log_imputation_comparison_metadata(
-            settings=settings, n_series=int(n_series), rows=len(panel)
-        )
-
-        fields(logger, {"escrito": run_dir})
-        return run_dir
 
 
 def evaluate_fair_inventory_cost(

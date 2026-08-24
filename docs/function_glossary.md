@@ -574,14 +574,6 @@ y las vistas solo leen parametros, llaman a un servicio y renderizan.
 - Devuelve: `dict` con la clave `type` que elige el renderizador.
 - Se usa en: vista `eda`.
 
-### `imputation_strategies` / `rank_quality`
-- Archivo: `src/retail_forecasting/api/services/experiments.py`
-- Que hace: reconstruccion latente por estrategia para una serie, y ranking de las estrategias por MAE de reconstruccion con su sesgo y direccion (infra/sobre-imputa).
-- Recibe:
-  - `run_path` y `series_id`; `quality` en el segundo caso.
-- Devuelve: `dict` / `list[dict]`.
-- Se usa en: vista `latent`.
-
 ### `PipelineRunner`
 - Archivo: `src/retail_forecasting/api/services/pipeline.py`
 - Que hace: lanza `python -m retail_forecasting.run` como subproceso en background, con lock de ejecucion unica, rate limit por IP y volcado a `var/active_run.log`.
@@ -633,7 +625,7 @@ y las vistas solo leen parametros, llaman a un servicio y renderizan.
   - `experiment_name`.
 - Devuelve: `Iterator[Path]` (gestor de contexto).
 - Se usa en: los cuatro escritores de corrida (`write_run_artifacts()`, `run_eda()`,
-  `run_imputation_comparison()`, `run_fair_cost_backtest()`, `run_operational_simulation()`).
+  `run_fair_cost_backtest()`, `run_operational_simulation()`).
 
 ### `quantile_column_name`
 - Archivo: `src/retail_forecasting/utils/io.py`

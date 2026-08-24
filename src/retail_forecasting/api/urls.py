@@ -37,7 +37,6 @@ urlpatterns = [
     path("drift/", pages.drift, name="drift"),
     path("eda/", eda.eda, name="eda"),
     path("eda/figura/<slug:name>.png", eda.eda_figure, name="eda-figure"),
-    path("latent/", experiments.latent, name="latent"),
     path("pareto/", experiments.pareto, name="pareto"),
     # ── Overlay panels ────────────────────────────────────────────────────────
     path("alertas/", panels.alerts, name="alerts-panel"),

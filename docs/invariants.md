@@ -325,8 +325,8 @@ See `docs/web_layer.md` for the full description.
 
     The last two agree across different scoring periods, so this is scale, not calendar. An
     earlier design partitioned the panel by series, which shrank the teacher to a third of
-    deployment size and produced the -5.33% headline; at the 500-series scale where
-    `configs/compare_imputation/default.yaml` actually runs, those same params are 12% WORSE than not
+    deployment size and produced the -5.33% headline; at the 500-series scale of
+    `configs/experiment/large.yaml`, those same params are 12% WORSE than not
     tuning. Hence `teacher_fit_rows` in the metadata: a tuned params file is only valid near the
     teacher size it was tuned at, and the file cannot express that on its own. Tune at the scale
     you deploy.
@@ -416,9 +416,10 @@ See `docs/web_layer.md` for the full description.
     rule, so the assumption cancels. Reconciliation changes must be argued on modelling
     grounds and must never quote a reconstruction-MAE gain from this holdout.
 
-    `compare_imputation` used to write exactly that ranking to `imputation_quality.csv`, and
-    the dashboard crowned its lowest-MAE strategy "★ MEJOR" -- a verdict on agreement with the
-    generator, presented as imputation quality in the field. Both are gone: the mode is now
-    descriptive (`latent_strategies.csv` only, which shows WHAT each strategy reconstructs
-    without scoring it) and `run_fair_cost_backtest` is what ranks strategies, by cost against
-    a common ground truth.
+    A `compare_imputation` run mode used to write exactly that ranking to
+    `imputation_quality.csv`, and the dashboard's `/latent/` view crowned its lowest-MAE
+    strategy "★ MEJOR" -- a verdict on agreement with the generator, presented as imputation
+    quality in the field. Mode and view are both gone rather than merely corrected: with the
+    ranking removed, what was left described strategies nothing consumed, and no thesis figure
+    ever came from it. `run_fair_cost_backtest` is what ranks strategies, by cost against a
+    common ground truth.

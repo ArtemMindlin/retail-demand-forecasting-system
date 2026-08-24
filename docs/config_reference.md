@@ -77,16 +77,6 @@ Semantica:
   ciclo de reentrenamiento gobernado operacionalmente;
 - `score_daily`: escribe solo artefactos operativos de negocio y metadata
   ligera, sin `report.md`, sin `predictions.csv` y sin `backtest_metadata.json`.
-- `compare_imputation`: no entrena ningun modelo ni construye folds. Reconstruye la
-  demanda latente con cada estrategia de `LatentDemandImputer` y las pone una al lado
-  de otra, escribiendo `latent_strategies.csv`. Era un
-  booleano de `preprocessing` sobre `run_mode = experiment`, que es un segundo eje de
-  despacho duplicando lo que `run_mode` ya hace: la carpeta decia `experiment` y el
-  modo no entrenaba nada.
-  Es descriptivo y no puntua nada: escribia tambien un `imputation_quality.csv` con
-  MAE/RMSE de reconstruccion por estrategia, y el invariante 42 prohibe rankear reglas
-  de reconciliacion con ese holdout. Quien decide la estrategia ganadora es
-  `fair_cost_backtest`.
 - `tune_imputation`: no entrena el modelo de forecasting. Busca (via Optuna,
   `forecasting/imputation_tuning.py`) los mejores hiperparametros de LGBM para
   el imputador supervisado. Usa solo `split="train"`. El objetivo promedia el MAE
@@ -792,8 +782,7 @@ Controla los artefactos generados.
 ### `imputation_params_filename`
 
 Nombre del fichero donde `tune_imputation` persiste su ganador y de donde lo leen los
-tres modos que usan el imputador supervisado (`experiment`, `compare_imputation`,
-`fair_cost_backtest`). Se resuelve dentro de `models.models_dir`.
+dos modos que usan el imputador supervisado (`experiment` y `fair_cost_backtest`). Se resuelve dentro de `models.models_dir`.
 
 Ejemplo:
 
@@ -807,22 +796,6 @@ no pueda escapar de `models_dir`. Y esta pinchado en `SHARED_FIELDS` de
 leen cargan configs distintas, y un valor que solo declarase uno de ellos mandaria a los
 demas a un fichero que no existe --- lo que no da error, degrada a los defaults sin
 afinar.
-
-### `comparison_strategies`
-
-Que estrategias compara `run_mode = compare_imputation`. Solo ese modo la lee.
-
-Ejemplo:
-
-```yaml
-comparison_strategies: [supervised, historical_mean, clipped_scaling]
-```
-
-Acepta cualquier valor de `ImputationStrategy`, `none` incluido: `none` no es una
-candidata sino la linea base sin corregir, y declararla puntua el caso de no imputar
---- sobre el panel de 500 series da MAE 3,81 frente a 0,4367 de `supervised`, que es
-la magnitud del hueco de censura. Era una constante en `forecasting/pipeline.py`, que
-no dejaba medir eso.
 
 ### `run_name`
 

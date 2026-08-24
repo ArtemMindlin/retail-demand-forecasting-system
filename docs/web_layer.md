@@ -103,7 +103,7 @@ la sesion del operador, que viaja en una cookie firmada.
 | `services/forecast.py` | Conformal empirico, Newsvendor, PSI por SKU, tabla de SKUs, drift, alertas |
 | `services/ops.py` | Lectura e indexado semanal del backtest de origen rodante (rejilla no solapada; excluye semanas parciales) |
 | `services/eda.py` | Catalogo de figuras y datos listos para graficar desde los CSV del EDA |
-| `services/experiments.py` | Imputacion latente, ranking de calidad, frente de Pareto, coste justo |
+| `services/experiments.py` | Frente de Pareto, sensibilidad al ratio de costes, coste justo |
 | `services/pipeline.py` | Ejecucion en background del pipeline, con lock y rate limit |
 
 ## Vistas
@@ -117,7 +117,6 @@ Dos planos, como en el resto del sistema: operacion e investigacion.
 | `/skus/` | Analisis SKU | Tabla por SKU con busqueda, filtro por estado, orden y ajustes manuales de pedido |
 | `/drift/` | Monitor de drift | PSI por feature con histogramas referencia vs actual |
 | `/eda/` | EDA | Las figuras del modulo de analisis exploratorio, redibujadas como SVG |
-| `/latent/` | Demanda latente | Veredicto de calidad de reconstruccion y comparacion por estrategia |
 | `/pareto/` | Pareto tuning | Frente multiobjetivo, sensibilidad al ratio de costes, backtest de coste justo |
 
 Cada pestana es una URL real: la navegacion es historial del navegador, no

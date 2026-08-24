@@ -17,7 +17,6 @@ from django.test import Client, override_settings
 
 from retail_forecasting.api import store as store_module
 from retail_forecasting.tracking import (
-    EXPERIMENT_IMPUTATION,
     EXPERIMENT_OPS,
     EXPERIMENT_RUNS,
     index_run_directory,
@@ -130,29 +129,6 @@ def run_with_predictions(state_dir: Path) -> Path:
     frame.to_csv(run / "predictions.csv", index=False)
     index_run(run)
     return run
-
-
-@pytest.fixture
-def imputation_comparison(state_dir: Path, tmp_path: Path) -> Path:
-    """A comparison run, in the experiment the latent view actually reads."""
-    run_dir = tmp_path / "imputation_compare_20260101_120000"
-    run_dir.mkdir()
-    pd.DataFrame(
-        {
-            "series_id": ["SKU-100"] * 4,
-            "date": ["2026-05-01", "2026-05-01", "2026-05-02", "2026-05-02"],
-            "strategy": ["supervised", "historical_mean"] * 2,
-            "observed": [10.0, 10.0, 12.0, 12.0],
-            "latent_demand_est": [14.0, 16.0, 12.0, 12.0],
-            "stockout_hours": [4.0, 4.0, 0.0, 0.0],
-            "is_imputed": [True, True, False, False],
-        }
-    ).to_csv(run_dir / "latent_strategies.csv", index=False)
-    pd.DataFrame(
-        {"strategy": ["supervised", "historical_mean"], "mae": [0.44, 1.62], "n_eval": [5009, 5009]}
-    ).to_csv(run_dir / "imputation_quality.csv", index=False)
-    index_run_directory(run_dir, EXPERIMENT_IMPUTATION)
-    return run_dir
 
 
 @pytest.fixture
@@ -659,28 +635,3 @@ def test_pipeline_run_reports_a_missing_config(
 
     assert response.status_code == 200
     assert "Configuration file not found" in response.content.decode()
-
-
-def test_latent_view_names_the_run_it_is_showing(
-    auth_client: Client, imputation_comparison: Path
-) -> None:
-    """The run selector shows the run's NAME.
-
-    An artifact directory is called `artifacts` under a UUID, so a selector built from the
-    directory name showed "artifacts" for every run. Nothing covered this view, which is how
-    that shipped.
-    """
-    response = auth_client.get("/latent/")
-
-    assert response.status_code == 200
-    body = response.content.decode()
-    assert "imputation_compare_20260101_120000" in body
-    assert "artifacts" not in body
-
-
-def test_latent_view_reports_a_missing_comparison(auth_client: Client, state_dir: Path) -> None:
-    """With no comparison recorded, the empty state names the command that produces one."""
-    response = auth_client.get("/latent/")
-
-    assert response.status_code == 200
-    assert "compare_imputation" in response.content.decode()
