@@ -37,15 +37,6 @@ DEFAULT_SUPERVISED_LGBM_PARAMS: dict[str, int | float] = {
 IMPUTATION_LGBM_PARAMS_FILENAME = "imputation_lgbm_params.json"
 
 
-def imputation_params_path(models_dir: Path | str) -> Path:
-    """Where the tuned imputer's params live inside a models directory.
-
-    One place, because this is a handshake: `tune_imputation` writes the file and three other
-    modes read it. Joined at each call site instead, a rename would have to land in five.
-    """
-    return Path(models_dir) / IMPUTATION_LGBM_PARAMS_FILENAME
-
-
 SYNTHETIC_CENSORING_EVAL_FRACTION = 0.30
 
 # Feature space of the supervised teacher, in the order LightGBM receives it. Columns absent

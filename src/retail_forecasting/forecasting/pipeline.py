@@ -17,9 +17,9 @@ from retail_forecasting.contracts.contracts_config import ImputationStrategy
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_tuning import BoostingParams
 from retail_forecasting.data.censorship import (
+    IMPUTATION_LGBM_PARAMS_FILENAME,
     SYNTHETIC_CENSORING_EVAL_FRACTION,
     LatentDemandImputer,
-    imputation_params_path,
     synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel
@@ -216,7 +216,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
         },
     )
 
-    imputer_params_path = imputation_params_path(settings.models.models_dir)
+    imputer_params_path = settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
 
     stages = Table(logger, {"estrategia": 18, "filas": 10, "imputadas": 10, "tiempo": 6})
     stages.header()
@@ -254,7 +254,7 @@ def run_imputation_comparison(settings: Settings) -> Path:
         panel,
         seed=settings.project.random_seed,
         strategies=strategies,
-        imputer_params_path=imputation_params_path(settings.models.models_dir),
+        imputer_params_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
     )
 
     with open_run_directory(settings.reporting.run_name, EXPERIMENT_RUNS) as run_dir:
@@ -418,7 +418,7 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
         panel,
         settings.inventory,
         seed=settings.project.random_seed,
-        imputer_params_path=imputation_params_path(settings.models.models_dir),
+        imputer_params_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
     )
     # Provenance: the ranking flips with the source panel, so the artifact must say
     # which one it came from rather than leaving it to the reader's memory.
@@ -480,7 +480,7 @@ def run_experiment(settings: Settings) -> RunArtifacts:
     print("-" * 40)
     imputer = LatentDemandImputer(
         strategy=strategy_name,
-        model_path=imputation_params_path(settings.models.models_dir),
+        model_path=settings.models.models_dir / IMPUTATION_LGBM_PARAMS_FILENAME,
     )
     imputed_panel = imputer.impute(raw_panel)
 

@@ -23,8 +23,8 @@ from retail_forecasting.contracts.contracts_tuning import (
 )
 from retail_forecasting.data.censorship import (
     DEFAULT_SUPERVISED_LGBM_PARAMS,
+    IMPUTATION_LGBM_PARAMS_FILENAME,
     LatentDemandImputer,
-    imputation_params_path,
     synthetic_censor_holdout,
 )
 from retail_forecasting.data.dataset import load_prepared_panel, panel_cache_filename
@@ -519,7 +519,7 @@ def tune_imputation_lgbm(
     # Read the incumbent before the search, not after: the persist decision below either
     # overwrites or deletes this exact file, so by then there is nothing left to compare against.
     # None means no incumbent, which is the first ever run rather than an error.
-    params_path = imputation_params_path(models_dir)
+    params_path = models_dir / IMPUTATION_LGBM_PARAMS_FILENAME
     incumbent_params: dict[str, int | float] | None = (
         json.loads(params_path.read_text(encoding="utf-8")) if params_path.exists() else None
     )
