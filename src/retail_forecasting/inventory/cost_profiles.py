@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 
@@ -19,9 +21,31 @@ SERVICE_CRITICALITY_BASE = 0.9
 SERVICE_CRITICALITY_MULTIPLIER = 0.5
 
 
+@dataclass(frozen=True)
+class CostHeuristicCoefficients:
+    """The nine constants above, bundled so a study can vary them.
+
+    Deliberately NOT a `Settings` section: the defaults are the module constants and a
+    YAML cannot override them, so two runs of one panel still produce one profile. What
+    this buys is `scripts/cost_weight_sensitivity.py`, which has to perturb them and
+    would otherwise monkeypatch the module.
+    """
+
+    perishability_weights: tuple[float, float, float] = PERISHABILITY_WEIGHTS
+    slow_moving_weights: tuple[float, float] = SLOW_MOVING_WEIGHTS
+    criticality_weights: tuple[float, float] = CRITICALITY_WEIGHTS
+    perishability_base: float = PERISHABILITY_BASE
+    perishability_multiplier: float = PERISHABILITY_MULTIPLIER
+    slow_moving_base: float = SLOW_MOVING_BASE
+    slow_moving_multiplier: float = SLOW_MOVING_MULTIPLIER
+    service_criticality_base: float = SERVICE_CRITICALITY_BASE
+    service_criticality_multiplier: float = SERVICE_CRITICALITY_MULTIPLIER
+
+
 def build_series_cost_profile(
     panel: pd.DataFrame,
     inventory_config: InventoryConfig,
+    coefficients: CostHeuristicCoefficients | None = None,
 ) -> pd.DataFrame:
     """Build synthetic per-series cost coefficients for the newsvendor layer.
 
@@ -29,6 +53,7 @@ def build_series_cost_profile(
     intermittency, stockout tension, and category-level instability as
     proxies for service criticality and perishability.
     """
+    coefficients = coefficients or CostHeuristicCoefficients()
     required_columns = {
         "series_id",
         "observed_demand",
@@ -98,8 +123,8 @@ def build_series_cost_profile(
     profile["intermittency_rank"] = _percentile_rank(profile["zero_demand_rate"])
     profile["stockout_rank"] = _percentile_rank(profile["stockout_day_rate"])
 
-    profile = _score_dimensions(profile)
-    profile = _apply_cost_factors(profile, inventory_config)
+    profile = _score_dimensions(profile, coefficients)
+    profile = _apply_cost_factors(profile, inventory_config, coefficients)
 
     return profile[
         [
@@ -113,38 +138,46 @@ def build_series_cost_profile(
     ].copy()
 
 
-def _score_dimensions(profile: pd.DataFrame) -> pd.DataFrame:
+def _score_dimensions(
+    profile: pd.DataFrame, coefficients: CostHeuristicCoefficients
+) -> pd.DataFrame:
     """Combine the percentile ranks into perishability/slow-moving/criticality scores."""
-    pw = PERISHABILITY_WEIGHTS
+    pw = coefficients.perishability_weights
     profile["synthetic_perishability_score"] = (
         pw[0] * profile["category_zero_rank"]
         + pw[1] * profile["category_cv_rank"]
         + pw[2] * profile["intermittency_rank"]
     )
 
-    sw = SLOW_MOVING_WEIGHTS
+    sw = coefficients.slow_moving_weights
     profile["slow_moving_score"] = sw[0] * profile["intermittency_rank"] + sw[1] * (
         1.0 - profile["demand_rank"]
     )
 
-    cw = CRITICALITY_WEIGHTS
+    cw = coefficients.criticality_weights
     profile["service_criticality_score"] = (
         cw[0] * profile["demand_rank"] + cw[1] * profile["stockout_rank"]
     )
     return profile
 
 
-def _apply_cost_factors(profile: pd.DataFrame, inventory_config: InventoryConfig) -> pd.DataFrame:
+def _apply_cost_factors(
+    profile: pd.DataFrame,
+    inventory_config: InventoryConfig,
+    coefficients: CostHeuristicCoefficients,
+) -> pd.DataFrame:
     """Turn dimensional scores into per-series c_over / c_under / critical_fractile."""
     profile["perishability_factor"] = (
-        PERISHABILITY_BASE + PERISHABILITY_MULTIPLIER * profile["synthetic_perishability_score"]
+        coefficients.perishability_base
+        + coefficients.perishability_multiplier * profile["synthetic_perishability_score"]
     )
     profile["slow_moving_factor"] = (
-        SLOW_MOVING_BASE + SLOW_MOVING_MULTIPLIER * profile["slow_moving_score"]
+        coefficients.slow_moving_base
+        + coefficients.slow_moving_multiplier * profile["slow_moving_score"]
     )
     profile["service_criticality_factor"] = (
-        SERVICE_CRITICALITY_BASE
-        + SERVICE_CRITICALITY_MULTIPLIER * profile["service_criticality_score"]
+        coefficients.service_criticality_base
+        + coefficients.service_criticality_multiplier * profile["service_criticality_score"]
     )
 
     profile["c_over"] = (
