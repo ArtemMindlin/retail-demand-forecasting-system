@@ -21,7 +21,6 @@ def choose_order_quantity(
     inventory_config: InventoryConfig,
     quantile_columns: list[str],
     quantile_levels: list[float],
-    series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.Series:
     """Determine the single-period Newsvendor order quantity.
 
@@ -29,11 +28,7 @@ def choose_order_quantity(
     distribution. There is no inventory position to net out: each forecast origin
     is decided independently.
     """
-    enriched = attach_series_costs(
-        predictions=predictions,
-        inventory_config=inventory_config,
-        series_cost_profile=series_cost_profile,
-    )
+    enriched = attach_series_costs(predictions, inventory_config)
     alpha = enriched["critical_fractile"].to_numpy(dtype=float)
 
     if quantile_columns:
@@ -64,13 +59,8 @@ def choose_order_quantity(
 def attach_inventory_costs(
     predictions: pd.DataFrame,
     inventory_config: InventoryConfig,
-    series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    evaluated = attach_series_costs(
-        predictions=predictions,
-        inventory_config=inventory_config,
-        series_cost_profile=series_cost_profile,
-    )
+    evaluated = attach_series_costs(predictions, inventory_config)
 
     # Calculate overstock units.
     evaluated["overstock_units"] = np.maximum(
@@ -107,20 +97,8 @@ def _config_for_ratio(base_config: InventoryConfig, ratio: float) -> InventoryCo
     return InventoryConfig(
         overstock_cost=base_config.overstock_cost,
         stockout_cost=base_config.overstock_cost * ratio,
-        use_series_costs=base_config.use_series_costs,
         clip_negative_orders=base_config.clip_negative_orders,
     )
-
-
-def _rescale_under_cost(
-    df: pd.DataFrame, base_config: InventoryConfig, ratio: float
-) -> pd.DataFrame:
-    """Scale c_under (and recompute critical_fractile) so the effective Cs/Co matches `ratio`."""
-    scale = (base_config.overstock_cost * ratio) / base_config.stockout_cost
-    rescaled = df.copy()
-    rescaled["c_under"] = rescaled["c_under"] * scale
-    rescaled["critical_fractile"] = rescaled["c_under"] / (rescaled["c_under"] + rescaled["c_over"])
-    return rescaled
 
 
 def _summarize_group(
@@ -131,17 +109,8 @@ def _summarize_group(
     temp_config: InventoryConfig,
     quantile_columns: list[str],
     quantile_levels: list[float],
-    series_cost_profile: pd.DataFrame | None,
-    base_config: InventoryConfig,
 ) -> dict[str, Any]:
     """Re-cost one model group under `temp_config` and return its summary row."""
-    if (
-        series_cost_profile is None
-        and temp_config.use_series_costs
-        and {"c_over", "c_under", "critical_fractile"}.issubset(model_preds.columns)
-    ):
-        model_preds = _rescale_under_cost(model_preds, base_config, ratio)
-
     # Use quantiles only when the model actually produced (non-null) ones.
     has_quantiles = any(
         c.startswith("q_") and model_preds[c].notna().any() for c in model_preds.columns
@@ -151,14 +120,11 @@ def _summarize_group(
         inventory_config=temp_config,
         quantile_columns=quantile_columns if has_quantiles else [],
         quantile_levels=quantile_levels if has_quantiles else [],
-        series_cost_profile=series_cost_profile,
     )
     if not has_quantiles:
         model_preds["order_quantity"] = model_preds["y_pred"]
 
-    cost_preds = attach_inventory_costs(
-        model_preds, temp_config, series_cost_profile=series_cost_profile
-    )
+    cost_preds = attach_inventory_costs(model_preds, temp_config)
 
     res_dict = {
         "ratio": ratio,
@@ -177,7 +143,6 @@ def run_sensitivity_analysis(
     predictions: pd.DataFrame,
     base_inventory_config: InventoryConfig,
     ratios: list[float] | None = None,
-    series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Run sensitivity analysis across multiple cost ratios.
 
@@ -202,11 +167,6 @@ def run_sensitivity_analysis(
     results = []
     for ratio in ratios:
         temp_config = _config_for_ratio(base_inventory_config, ratio)
-        adjusted_profile = series_cost_profile
-        if series_cost_profile is not None and temp_config.use_series_costs:
-            adjusted_profile = _rescale_under_cost(
-                series_cost_profile, base_inventory_config, ratio
-            )
 
         for keys, group_df in predictions.groupby(group_cols):
             if len(group_cols) == 2:
@@ -222,8 +182,6 @@ def run_sensitivity_analysis(
                     temp_config,
                     quantile_columns,
                     quantile_levels,
-                    adjusted_profile,
-                    base_inventory_config,
                 )
             )
 

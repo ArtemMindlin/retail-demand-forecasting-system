@@ -46,7 +46,6 @@ from retail_forecasting.forecasting.pipeline import (
     _build_scoring_predictions,
     train_and_save_champion,
 )
-from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
 from retail_forecasting.inventory.newsvendor import attach_inventory_costs
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.tracking import EXPERIMENT_OPS, log_ops_metadata, open_run_directory
@@ -131,7 +130,6 @@ def _score_one_step(
     feature_columns: list[str],
     model_path: Path,
     settings: Settings,
-    series_cost_profile: pd.DataFrame | None,
 ) -> pd.DataFrame:
     """Reproduce the run_scoring inference path for one model at one origin."""
     model = ConformalForecaster.load(model_path)
@@ -140,7 +138,6 @@ def _score_one_step(
         feature_columns=feature_columns,
         model=model,
         settings=settings,
-        series_cost_profile=series_cost_profile,
     )
 
 
@@ -181,7 +178,6 @@ def _run_streaming_loop(
     cadence_int: dict[str, int | None],
     horizon: int,
     settings: Settings,
-    series_cost_profile: pd.DataFrame | None,
 ) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     """Stream eval days: for each day×cadence score, retrain on schedule, cost the window.
 
@@ -237,7 +233,6 @@ def _run_streaming_loop(
                 feature_columns=feature_columns,
                 model_path=model_path,
                 settings=settings,
-                series_cost_profile=series_cost_profile,
             )
             preds = preds.merge(
                 actuals[["series_id", "y_true"]],
@@ -249,9 +244,7 @@ def _run_streaming_loop(
                 preds["y_true"] = preds["y_true_actual"]
                 preds = preds.drop(columns=["y_true_actual"])
 
-            preds = attach_inventory_costs(
-                preds, settings.inventory, series_cost_profile=series_cost_profile
-            )
+            preds = attach_inventory_costs(preds, settings.inventory)
             preds["decision_date"] = current_date
             preds["day_index"] = day_index
             preds["cadence"] = label
@@ -343,12 +336,6 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
         combined_panel = pd.concat([train_panel, eval_panel], ignore_index=True)
         combined_panel = combined_panel.sort_values(["series_id", "date"]).reset_index(drop=True)
 
-        series_cost_profile = None
-        if settings.inventory.use_series_costs:
-            series_cost_profile = build_series_cost_profile(
-                label_all_regimes(train_panel), settings.inventory
-            )
-
         predictions_by_day, retrain_events = _run_streaming_loop(
             eval_dates=eval_dates,
             combined_panel=combined_panel,
@@ -357,7 +344,6 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
             cadence_int=cadence_int,
             horizon=horizon,
             settings=settings,
-            series_cost_profile=series_cost_profile,
         )
         cadence_summary = _summarize_cadences(predictions_by_day, retrain_events, horizon)
         cadence_comparison = _compare_cadences(

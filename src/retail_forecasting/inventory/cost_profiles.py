@@ -1,249 +1,29 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-import numpy as np
 import pandas as pd
 
 from retail_forecasting.config import InventoryConfig
-
-# Heuristic weights and scaling for the synthetic per-series cost model. These
-# are fixed constants (not exposed as config) because they are not varied across
-# experiments; the dimensional scores they weight are described in build_series_cost_profile.
-PERISHABILITY_WEIGHTS = (0.5, 0.3, 0.2)
-SLOW_MOVING_WEIGHTS = (0.6, 0.4)
-CRITICALITY_WEIGHTS = (0.7, 0.3)
-PERISHABILITY_BASE = 0.8
-PERISHABILITY_MULTIPLIER = 0.8
-SLOW_MOVING_BASE = 0.9
-SLOW_MOVING_MULTIPLIER = 0.5
-SERVICE_CRITICALITY_BASE = 0.9
-SERVICE_CRITICALITY_MULTIPLIER = 0.5
-
-
-@dataclass(frozen=True)
-class CostHeuristicCoefficients:
-    """The nine constants above, bundled so a study can vary them.
-
-    Deliberately NOT a `Settings` section: the defaults are the module constants and a
-    YAML cannot override them, so two runs of one panel still produce one profile. What
-    this buys is `scripts/cost_weight_sensitivity.py`, which has to perturb them and
-    would otherwise monkeypatch the module.
-    """
-
-    perishability_weights: tuple[float, float, float] = PERISHABILITY_WEIGHTS
-    slow_moving_weights: tuple[float, float] = SLOW_MOVING_WEIGHTS
-    criticality_weights: tuple[float, float] = CRITICALITY_WEIGHTS
-    perishability_base: float = PERISHABILITY_BASE
-    perishability_multiplier: float = PERISHABILITY_MULTIPLIER
-    slow_moving_base: float = SLOW_MOVING_BASE
-    slow_moving_multiplier: float = SLOW_MOVING_MULTIPLIER
-    service_criticality_base: float = SERVICE_CRITICALITY_BASE
-    service_criticality_multiplier: float = SERVICE_CRITICALITY_MULTIPLIER
-
-
-def build_series_cost_profile(
-    panel: pd.DataFrame,
-    inventory_config: InventoryConfig,
-    coefficients: CostHeuristicCoefficients | None = None,
-) -> pd.DataFrame:
-    """Build synthetic per-series cost coefficients for the newsvendor layer.
-
-    The profile remains intentionally heuristic: it uses demand intensity,
-    intermittency, stockout tension, and category-level instability as
-    proxies for service criticality and perishability.
-    """
-    coefficients = coefficients or CostHeuristicCoefficients()
-    required_columns = {
-        "series_id",
-        "observed_demand",
-        "stockout_hours",
-        "third_category_id",
-    }
-    missing_columns = required_columns - set(panel.columns)
-    if missing_columns:
-        raise ValueError(
-            "Cannot build series cost profile without required columns: "
-            f"{', '.join(sorted(missing_columns))}"
-        )
-
-    series_summary = (
-        panel.groupby("series_id")
-        .agg(
-            mean_observed_demand=("observed_demand", "mean"),
-            demand_std=("observed_demand", "std"),
-            zero_demand_rate=(
-                "observed_demand",
-                lambda values: float((values == 0).mean()),
-            ),
-            stockout_day_rate=(
-                "stockout_hours",
-                lambda values: float((values > 0).mean()),
-            ),
-            third_category_id=("third_category_id", "first"),
-        )
-        .reset_index()
-    )
-    # `replace(0.0, nan)` and not a plain division: with `drop_negative_sales: false` a
-    # series whose negatives cancel its positives has mean 0 and std > 0, and x/0 is `inf`,
-    # which `fillna` does not catch. That `inf` reaches the category mean and hands the whole
-    # category the top cv rank. The `fillna(0.0)` alone covers every NaN case, including the
-    # single-row group whose std is NaN.
-    denominator = series_summary["mean_observed_demand"].replace(0.0, np.nan)
-    series_summary["coefficient_variation"] = (series_summary["demand_std"] / denominator).fillna(
-        0.0
-    )
-
-    category_summary = (
-        series_summary.groupby("third_category_id")
-        .agg(
-            category_zero_demand_rate=("zero_demand_rate", "mean"),
-            category_cv=("coefficient_variation", "mean"),
-        )
-        .reset_index()
-    )
-    category_summary["category_zero_rank"] = _percentile_rank(
-        category_summary["category_zero_demand_rate"]
-    )
-    category_summary["category_cv_rank"] = _percentile_rank(category_summary["category_cv"])
-
-    profile = series_summary.merge(
-        category_summary[
-            [
-                "third_category_id",
-                "category_zero_rank",
-                "category_cv_rank",
-            ]
-        ],
-        on="third_category_id",
-        how="left",
-    )
-
-    profile["demand_rank"] = _percentile_rank(profile["mean_observed_demand"])
-    profile["intermittency_rank"] = _percentile_rank(profile["zero_demand_rate"])
-    profile["stockout_rank"] = _percentile_rank(profile["stockout_day_rate"])
-
-    profile = _score_dimensions(profile, coefficients)
-    profile = _apply_cost_factors(profile, inventory_config, coefficients)
-
-    return profile[
-        [
-            "series_id",
-            "c_over",
-            "c_under",
-            "critical_fractile",
-            "synthetic_perishability_score",
-            "service_criticality_score",
-        ]
-    ].copy()
-
-
-def _score_dimensions(
-    profile: pd.DataFrame, coefficients: CostHeuristicCoefficients
-) -> pd.DataFrame:
-    """Combine the percentile ranks into perishability/slow-moving/criticality scores."""
-    pw = coefficients.perishability_weights
-    profile["synthetic_perishability_score"] = (
-        pw[0] * profile["category_zero_rank"]
-        + pw[1] * profile["category_cv_rank"]
-        + pw[2] * profile["intermittency_rank"]
-    )
-
-    sw = coefficients.slow_moving_weights
-    profile["slow_moving_score"] = sw[0] * profile["intermittency_rank"] + sw[1] * (
-        1.0 - profile["demand_rank"]
-    )
-
-    cw = coefficients.criticality_weights
-    profile["service_criticality_score"] = (
-        cw[0] * profile["demand_rank"] + cw[1] * profile["stockout_rank"]
-    )
-    return profile
-
-
-def _apply_cost_factors(
-    profile: pd.DataFrame,
-    inventory_config: InventoryConfig,
-    coefficients: CostHeuristicCoefficients,
-) -> pd.DataFrame:
-    """Turn dimensional scores into per-series c_over / c_under / critical_fractile."""
-    profile["perishability_factor"] = (
-        coefficients.perishability_base
-        + coefficients.perishability_multiplier * profile["synthetic_perishability_score"]
-    )
-    profile["slow_moving_factor"] = (
-        coefficients.slow_moving_base
-        + coefficients.slow_moving_multiplier * profile["slow_moving_score"]
-    )
-    profile["service_criticality_factor"] = (
-        coefficients.service_criticality_base
-        + coefficients.service_criticality_multiplier * profile["service_criticality_score"]
-    )
-
-    profile["c_over"] = (
-        inventory_config.overstock_cost
-        * profile["perishability_factor"]
-        * profile["slow_moving_factor"]
-    )
-    profile["c_under"] = inventory_config.stockout_cost * profile["service_criticality_factor"]
-    profile["critical_fractile"] = profile["c_under"] / (profile["c_under"] + profile["c_over"])
-    return profile
 
 
 def attach_series_costs(
     predictions: pd.DataFrame,
     inventory_config: InventoryConfig,
-    series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Attach per-row inventory cost coefficients to a prediction frame."""
+    """Attach the inventory cost coefficients and the critical fractile to a prediction frame.
+
+    One `c_over`/`c_under` pair for the whole catalogue, straight from the config.
+
+    A synthetic PER-SERIES profile used to live here, deriving both coefficients from proxies
+    of each series' sales shape. It is gone: it produced a `total_cost` in an invented
+    currency, and that total was the champion-selection criterion. Measured before removing
+    it, the differentiation cut cost 2.05% on reconstructed demand and RAISED it 3.66% on
+    censored demand -- under either accounting -- so it was not reliably worth its nine
+    uncalibrated constants. See invariant 43.
+    """
     enriched = predictions.copy()
-    required_cost_columns = [
-        "c_over",
-        "c_under",
-        "critical_fractile",
-    ]
-    optional_cost_columns = [
-        "synthetic_perishability_score",
-        "service_criticality_score",
-    ]
-
-    if inventory_config.use_series_costs:
-        if all(column in enriched.columns for column in required_cost_columns):
-            return enriched
-        if series_cost_profile is None:
-            raise ValueError(
-                "Series cost profiles are enabled but no `series_cost_profile` was provided."
-            )
-        if "series_id" not in enriched.columns:
-            raise ValueError("Series cost profiles require a `series_id` column in predictions.")
-
-        enriched = enriched.merge(
-            series_cost_profile,
-            on="series_id",
-            how="left",
-            validate="many_to_one",
-        )
-        if enriched[["c_over", "c_under", "critical_fractile"]].isna().any().any():
-            raise ValueError("Missing cost profile values after merging `series_id` costs.")
-        return enriched
-
-    cost_columns = required_cost_columns + optional_cost_columns
-    existing_cost_columns = [column for column in cost_columns if column in enriched.columns]
-    if existing_cost_columns:
-        enriched = enriched.drop(columns=existing_cost_columns)
-
     enriched["c_over"] = inventory_config.overstock_cost
     enriched["c_under"] = inventory_config.stockout_cost
     enriched["critical_fractile"] = inventory_config.stockout_cost / (
         inventory_config.stockout_cost + inventory_config.overstock_cost
     )
     return enriched
-
-
-def _percentile_rank(values: pd.Series) -> pd.Series:
-    if values.nunique(dropna=True) <= 1:
-        return pd.Series(np.full(len(values), 0.5), index=values.index, dtype=float)
-    # >1 distinct non-NA values guarantees count >= 2, so the rescale is safe.
-    # Rescale ranks to [0, 1] (min at 0, not 1/n) so the least-ranked SKU maps to 0.0.
-    ranked = values.rank(method="average")
-    return ((ranked - 1.0) / (values.count() - 1.0)).astype(float)

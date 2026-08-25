@@ -42,7 +42,6 @@ from retail_forecasting.features.engineering import (
     build_supervised_frame,
 )
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
-from retail_forecasting.inventory.cost_profiles import build_series_cost_profile
 from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
@@ -147,9 +146,10 @@ def evaluate_fair_inventory_cost(
     censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed, eval_fraction)
     n_eval = len(eval_idx)
 
-    # Flat cost coefficients so every strategy is charged identically (isolates the signal).
-    flat_config = inventory_config.model_copy(update={"use_series_costs": False})
-    cr = flat_config.stockout_cost / (flat_config.stockout_cost + flat_config.overstock_cost)
+    # One cost pair for the whole catalogue, so every strategy is charged identically.
+    cr = inventory_config.stockout_cost / (
+        inventory_config.stockout_cost + inventory_config.overstock_cost
+    )
     z = statistics.NormalDist().inv_cdf(cr)
     sigma = float(np.std(true_demand))  # shared safety-stock scale (same scalar for all)
 
@@ -178,7 +178,7 @@ def evaluate_fair_inventory_cost(
             pd.DataFrame(
                 {"series_id": series_ids, "y_true": true_demand, "order_quantity": q_star}
             ),
-            flat_config,
+            inventory_config,
         )
         stockout_units = float(costed["stockout_units"].sum())
         records.append(
@@ -397,7 +397,6 @@ def _run_fold_loop(
     best_boosting_params: BoostingParams,
     settings: Settings,
     data_strategy: str,
-    series_cost_profile: pd.DataFrame | None,
 ) -> _FoldLoopResult:
     """Run the walk-forward loop: baseline + LightGBM + CatBoost per fold, with
     cross-fold model reuse and Page-Hinkley drift detection."""
@@ -455,7 +454,6 @@ def _run_fold_loop(
                 fold_id=fold.fold_id,
                 settings=settings,
                 data_strategy=data_strategy,
-                series_cost_profile=series_cost_profile,
             )
         )
 
@@ -482,7 +480,6 @@ def _run_fold_loop(
             fold_id=fold.fold_id,
             settings=settings,
             data_strategy=data_strategy,
-            series_cost_profile=series_cost_profile,
         )
         result.fold_predictions.append(boosting_preds)
 
@@ -510,7 +507,6 @@ def _run_fold_loop(
                 fold_id=fold.fold_id,
                 settings=settings,
                 data_strategy=data_strategy,
-                series_cost_profile=series_cost_profile,
             )
         )
 
@@ -563,7 +559,6 @@ def _evaluate_on_holdout(
     best_boosting_params: BoostingParams,
     settings: Settings,
     data_strategy: str,
-    series_cost_profile: pd.DataFrame | None,
 ) -> tuple[list[pd.DataFrame], ConformalForecaster | None, ConformalForecaster | None]:
     """Retrain both models on all training data and evaluate on the holdout split.
 
@@ -612,7 +607,6 @@ def _evaluate_on_holdout(
             fold_id=HOLDOUT_FOLD_ID,
             settings=settings,
             data_strategy=data_strategy,
-            series_cost_profile=series_cost_profile,
         ),
         _build_model_predictions(
             validation_frame=holdout_supervised_frame,
@@ -621,7 +615,6 @@ def _evaluate_on_holdout(
             fold_id=HOLDOUT_FOLD_ID,
             settings=settings,
             data_strategy=data_strategy,
-            series_cost_profile=series_cost_profile,
         ),
         _build_model_predictions(
             validation_frame=holdout_supervised_frame,
@@ -630,7 +623,6 @@ def _evaluate_on_holdout(
             fold_id=HOLDOUT_FOLD_ID,
             settings=settings,
             data_strategy=data_strategy,
-            series_cost_profile=series_cost_profile,
         ),
     ]
     return predictions, holdout_boosting_model, holdout_cat_model
@@ -709,9 +701,6 @@ def run_experiment_from_frame(
     raise_on_blocking_data_quality(quality_report)
 
     prepared_panel = label_all_regimes(panel)
-    series_cost_profile = None
-    if settings.inventory.use_series_costs:
-        series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)
 
     supervised_frame, feature_metadata, holdout_supervised_frame = _build_supervised_frames(
         panel, prepared_panel, holdout_panel, settings
@@ -753,7 +742,6 @@ def run_experiment_from_frame(
         best_boosting_params,
         settings,
         data_strategy,
-        series_cost_profile,
     )
 
     holdout_preds, holdout_boosting_model, holdout_cat_model = _evaluate_on_holdout(
@@ -764,7 +752,6 @@ def run_experiment_from_frame(
         best_boosting_params,
         settings,
         data_strategy,
-        series_cost_profile,
     )
     fold_predictions = loop.fold_predictions + holdout_preds
 
@@ -795,7 +782,6 @@ def run_experiment_from_frame(
     sensitivity_summary = run_sensitivity_analysis(
         predictions=predictions,
         base_inventory_config=settings.inventory,
-        series_cost_profile=series_cost_profile,
     )
 
     report_extra = ""
@@ -880,7 +866,6 @@ def _build_baseline_predictions(
     fold_id: int,
     settings: Settings,
     data_strategy: str = "Observed",
-    series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build baseline forecasts for one fold."""
     prediction_frame = _init_prediction_frame(validation_frame)
@@ -894,12 +879,10 @@ def _build_baseline_predictions(
         inventory_config=settings.inventory,
         quantile_columns=[],
         quantile_levels=[],
-        series_cost_profile=series_cost_profile,
     )
     return attach_inventory_costs(
         prediction_frame,
         settings.inventory,
-        series_cost_profile=series_cost_profile,
     )
 
 
@@ -910,7 +893,6 @@ def _build_model_predictions(
     fold_id: int,
     settings: Settings,
     data_strategy: str = "Observed",
-    series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build model forecasts and attach costs."""
     prediction_frame = _init_prediction_frame(validation_frame)
@@ -943,12 +925,10 @@ def _build_model_predictions(
         inventory_config=settings.inventory,
         quantile_columns=quantile_columns,
         quantile_levels=[quantile_level_from_column(c) for c in quantile_columns],
-        series_cost_profile=series_cost_profile,
     )
     return attach_inventory_costs(
         prediction_frame,
         settings.inventory,
-        series_cost_profile=series_cost_profile,
     )
 
 
@@ -1085,9 +1065,6 @@ def run_scoring(
     print(f"✅ Loaded champion model: {model.backend_name} from {model_path}")
 
     prepared_panel = label_all_regimes(panel)
-    series_cost_profile = None
-    if settings.inventory.use_series_costs:
-        series_cost_profile = build_series_cost_profile(prepared_panel, settings.inventory)
 
     inference_frame, inference_metadata = build_inference_frame_with_fallback(
         prepared_panel,
@@ -1100,7 +1077,6 @@ def run_scoring(
         feature_columns=inference_metadata.feature_columns,
         model=model,
         settings=settings,
-        series_cost_profile=series_cost_profile,
     )
 
     artifacts = RunArtifacts(
@@ -1120,7 +1096,6 @@ def _build_scoring_predictions(
     feature_columns: list[str],
     model: ConformalForecaster,
     settings: Settings,
-    series_cost_profile: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Generate operational predictions from an inference frame without y_true."""
     frame = inference_frame.copy()
@@ -1163,8 +1138,5 @@ def _build_scoring_predictions(
         inventory_config=settings.inventory,
         quantile_columns=quantile_columns,
         quantile_levels=[quantile_level_from_column(c) for c in quantile_columns],
-        series_cost_profile=series_cost_profile,
     )
-    return attach_inventory_costs(
-        frame, settings.inventory, series_cost_profile=series_cost_profile
-    )
+    return attach_inventory_costs(frame, settings.inventory)
