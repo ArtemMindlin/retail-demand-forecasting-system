@@ -150,67 +150,72 @@ def _evaluate(
     }
 
 
-def _one_at_a_time(rng: np.random.Generator) -> list[tuple[str, CostHeuristicCoefficients]]:
+SCALE_FIELDS = (
+    "perishability_base",
+    "perishability_multiplier",
+    "slow_moving_base",
+    "slow_moving_multiplier",
+    "service_criticality_base",
+    "service_criticality_multiplier",
+)
+WEIGHT_FIELDS = ("perishability_weights", "slow_moving_weights", "criticality_weights")
+
+
+def _one_at_a_time(factors: tuple[float, ...]) -> list[tuple[str, CostHeuristicCoefficients]]:
     """Perturb one constant at a time, renormalising the weight group it belongs to."""
-    del rng
     base = CostHeuristicCoefficients()
     cases: list[tuple[str, CostHeuristicCoefficients]] = []
 
-    for factor in (0.5, 0.8, 1.2, 1.5):
-        # Weight groups: scale one entry, then renormalise so the group still sums to 1.
-        for field_name, index in (
-            ("perishability_weights", 0),
-            ("perishability_weights", 1),
-            ("perishability_weights", 2),
-            ("slow_moving_weights", 0),
-            ("slow_moving_weights", 1),
-            ("criticality_weights", 0),
-            ("criticality_weights", 1),
-        ):
-            weights = list(getattr(base, field_name))
-            weights[index] *= factor
-            total = sum(weights)
-            weights = [weight / total for weight in weights]
-            cases.append(
-                (
-                    f"{field_name}[{index}] x{factor}",
-                    replace(base, **{field_name: tuple(weights)}),
+    for factor in factors:
+        for field_name in WEIGHT_FIELDS:
+            for index in range(len(getattr(base, field_name))):
+                weights = list(getattr(base, field_name))
+                weights[index] *= factor
+                total = sum(weights)
+                # Renormalised, so this asks "does the SPLIT between dimensions matter",
+                # not "does the overall scale matter" -- that is what the scale fields test.
+                weights = [weight / total for weight in weights]
+                cases.append(
+                    (
+                        f"{field_name}[{index}] x{factor}",
+                        replace(base, **{field_name: tuple(weights)}),
+                    )
                 )
-            )
-        # Scale factors are unconstrained, so they move on their own.
-        for field_name in (
-            "perishability_base",
-            "perishability_multiplier",
-            "slow_moving_base",
-            "slow_moving_multiplier",
-            "service_criticality_base",
-            "service_criticality_multiplier",
-        ):
+        for field_name in SCALE_FIELDS:
             value = getattr(base, field_name) * factor
             cases.append((f"{field_name} x{factor}", replace(base, **{field_name: value})))
     return cases
 
 
-def _joint(rng: np.random.Generator, draws: int) -> list[tuple[str, CostHeuristicCoefficients]]:
-    """Sample every constant at once: Dirichlet for the weight groups, uniform for scales."""
+def _joint(
+    rng: np.random.Generator,
+    draws: int,
+    scale_span: float,
+    weight_concentration: float,
+) -> list[tuple[str, CostHeuristicCoefficients]]:
+    """Sample every constant at once, centred on the defaults.
+
+    The Dirichlet is parameterised as `concentration * default_weights`, so its MEAN is the
+    default split and `concentration` sets how tightly draws cluster around it. A flat
+    Dirichlet(1,...,1) would instead be uniform over the simplex and would spend most of its
+    draws on degenerate splits like (0.99, 0.005, 0.005) -- that answers "what if I had no
+    idea", where the useful question is "how precisely do these need to be right".
+
+    Scales are uniform in `default * (1 +- scale_span)`.
+    """
+    base = CostHeuristicCoefficients()
     cases: list[tuple[str, CostHeuristicCoefficients]] = []
     for draw in range(draws):
-        cases.append(
-            (
-                f"joint#{draw}",
-                CostHeuristicCoefficients(
-                    perishability_weights=tuple(rng.dirichlet([1.0, 1.0, 1.0])),
-                    slow_moving_weights=tuple(rng.dirichlet([1.0, 1.0])),
-                    criticality_weights=tuple(rng.dirichlet([1.0, 1.0])),
-                    perishability_base=float(rng.uniform(0.4, 1.6)),
-                    perishability_multiplier=float(rng.uniform(0.4, 1.6)),
-                    slow_moving_base=float(rng.uniform(0.45, 1.8)),
-                    slow_moving_multiplier=float(rng.uniform(0.25, 1.0)),
-                    service_criticality_base=float(rng.uniform(0.45, 1.8)),
-                    service_criticality_multiplier=float(rng.uniform(0.25, 1.0)),
-                ),
+        values: dict[str, object] = {}
+        for field_name in WEIGHT_FIELDS:
+            defaults = np.asarray(getattr(base, field_name), dtype=float)
+            values[field_name] = tuple(rng.dirichlet(weight_concentration * defaults))
+        for field_name in SCALE_FIELDS:
+            default = getattr(base, field_name)
+            values[field_name] = float(
+                rng.uniform(default * (1.0 - scale_span), default * (1.0 + scale_span))
             )
-        )
+        cases.append((f"joint#{draw}", replace(base, **values)))
     return cases
 
 
@@ -228,7 +233,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="The config that produced the run: the profile is rebuilt from its panel, and "
         "a profile is relative to the panel it was built on.",
     )
-    parser.add_argument("--draws", type=int, default=200, help="Joint samples (default 200).")
+    parser.add_argument("--draws", type=int, default=300, help="Joint samples (default 300).")
+    parser.add_argument(
+        "--oat-factors",
+        type=float,
+        nargs="+",
+        default=[0.8, 1.2],
+        help="Multipliers for the one-at-a-time pass (default 0.8 1.2, i.e. +-20%%). Widen it "
+        "to ask how fragile the choice is, narrow it to ask how precise it must be.",
+    )
+    parser.add_argument(
+        "--scale-span",
+        type=float,
+        default=0.25,
+        help="Joint pass: scale factors are drawn uniformly in default*(1+-span). Default 0.25.",
+    )
+    parser.add_argument(
+        "--weight-concentration",
+        type=float,
+        default=50.0,
+        help="Joint pass: Dirichlet concentration. Its mean is the default split; higher "
+        "values cluster tighter around it. 1.0 would be uniform over the simplex, which "
+        "spends most draws on degenerate splits. Default 50.",
+    )
+    parser.add_argument("--arm", default=None, help="Only this data_strategy.")
+    parser.add_argument("--model", default=None, help="Only this model_name.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=Path, default=OUTPUT)
     return parser
@@ -251,8 +280,16 @@ def main() -> None:
         split="train",
     )
 
+    if args.arm:
+        predictions = predictions[predictions["data_strategy"] == args.arm]
+    if args.model:
+        predictions = predictions[predictions["model_name"] == args.model]
+    if predictions.empty:
+        raise SystemExit("No predictions left after --arm/--model filtering.")
+
     arms = sorted(predictions["data_strategy"].dropna().unique())
     models = sorted(predictions["model_name"].dropna().unique())
+    factors = tuple(args.oat_factors)
     fields(
         logger,
         {
@@ -261,15 +298,17 @@ def main() -> None:
             "predicciones": f"{len(predictions)} filas",
             "brazos": " · ".join(arms),
             "modelos": " · ".join(models),
-            "casos": f"{len(_one_at_a_time(np.random.default_rng(0)))} uno-a-uno "
-            f"+ {args.draws} conjuntos, por brazo y modelo",
+            "uno-a-uno": f"{len(_one_at_a_time(factors))} casos, factores "
+            f"{' · '.join(f'x{factor:g}' for factor in factors)}",
+            "conjunto": f"{args.draws} muestras, escalas ±{args.scale_span:.0%}, "
+            f"concentración {args.weight_concentration:g}",
         },
     )
 
     rng = np.random.default_rng(args.seed)
     cases = [("default", None), ("__flat__", None)]
-    cases += _one_at_a_time(rng)
-    cases += _joint(rng, args.draws)
+    cases += _one_at_a_time(factors)
+    cases += _joint(rng, args.draws, args.scale_span, args.weight_concentration)
 
     records: list[dict[str, object]] = []
     progress = Table(logger, {"brazo": 18, "modelo": 15, "casos": 7, "coste def.": 12})
@@ -322,32 +361,76 @@ def main() -> None:
     frame.to_csv(args.output, index=False)
 
     rule(logger, "resultado")
+    # Percent change against the default, not a ratio against the profile-vs-flat gap: that
+    # gap is ~2% of the cost, and dividing by it inflated a 47% move into "24x".
     summary = Table(
         logger,
-        {"brazo": 18, "modelo": 15, "def.": 10, "plano": 10, "p5–p95 pesos": 20, "rango/plano": 12},
+        {
+            "brazo": 18,
+            "modelo": 14,
+            "coste def.": 11,
+            "vs plano": 9,
+            "pesos p5–p95": 17,
+            "escalas p5–p95": 17,
+            "fill def.": 9,
+        },
     )
     for (arm, model), group in frame.groupby(["data_strategy", "model_name"]):
         if not float(group["uses_quantiles"].iloc[0]):
             # No quantile curve, so the critical fractile has nothing to move along:
             # `choose_order_quantity` takes the point forecast and ignores it entirely. The
             # sensitivity is zero by construction, which is a finding, not a measurement.
-            summary.row({"brazo": arm, "modelo": model, "def.": "sin cuantiles"})
+            summary.row({"brazo": arm, "modelo": model, "coste def.": "sin cuantiles"})
             continue
-        default_cost = float(group.loc[group["case"] == "default", "total_cost_flat"].iloc[0])
+
+        reference = group.loc[group["case"] == "default"]
+        default_cost = float(reference["total_cost_flat"].iloc[0])
         flat_cost = float(group.loc[group["case"] == "flat", "total_cost_flat"].iloc[0])
-        perturbed = group.loc[group["design"] != "reference", "total_cost_flat"].astype(float)
-        low, high = perturbed.quantile(0.05), perturbed.quantile(0.95)
-        gap = abs(default_cost - flat_cost)
+
+        def _span(subset: pd.DataFrame, base: float = default_cost) -> str:
+            if subset.empty:
+                return "—"
+            change = (subset["total_cost_flat"].astype(float) - base) / base * 100.0
+            return f"{change.quantile(0.05):+.1f}% {change.quantile(0.95):+.1f}%"
+
+        one_at_a_time = group.loc[group["design"] == "one_at_a_time"]
         summary.row(
             {
                 "brazo": arm,
                 "modelo": model,
-                "def.": f"{default_cost:.1f}",
-                "plano": f"{flat_cost:.1f}",
-                "p5–p95 pesos": f"{low:.1f} – {high:.1f}",
-                "rango/plano": f"{(high - low) / gap:.2f}x" if gap > 0 else "—",
+                "coste def.": f"{default_cost:.0f}",
+                "vs plano": f"{(default_cost - flat_cost) / flat_cost * 100.0:+.2f}%",
+                "pesos p5–p95": _span(one_at_a_time[one_at_a_time["case"].str.contains("weights")]),
+                "escalas p5–p95": _span(
+                    one_at_a_time[~one_at_a_time["case"].str.contains("weights")]
+                ),
+                "fill def.": f"{float(reference['fill_rate'].iloc[0]):.2f}%",
             }
         )
+
+    rule(logger, "muestreo conjunto")
+    joint = Table(
+        logger,
+        {"brazo": 18, "modelo": 14, "mediana": 10, "p5–p95": 17, "baten al def.": 14},
+    )
+    for (arm, model), group in frame.groupby(["data_strategy", "model_name"]):
+        if not float(group["uses_quantiles"].iloc[0]):
+            continue
+        default_cost = float(group.loc[group["case"] == "default", "total_cost_flat"].iloc[0])
+        sample = group.loc[group["design"] == "joint", "total_cost_flat"].astype(float)
+        if sample.empty:
+            continue
+        change = (sample - default_cost) / default_cost * 100.0
+        joint.row(
+            {
+                "brazo": arm,
+                "modelo": model,
+                "mediana": f"{change.median():+.2f}%",
+                "p5–p95": f"{change.quantile(0.05):+.1f}% {change.quantile(0.95):+.1f}%",
+                "baten al def.": f"{int((sample < default_cost).sum())}/{len(sample)}",
+            }
+        )
+
     fields(logger, {"escrito": args.output})
 
 
