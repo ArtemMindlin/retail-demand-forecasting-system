@@ -77,12 +77,6 @@ Semantica:
   ciclo de reentrenamiento gobernado operacionalmente;
 - `score_daily`: escribe solo artefactos operativos de negocio y metadata
   ligera, sin `predictions.csv` y sin `backtest_metadata.json`.
-- `cost_sensitivity`: no entrena ni predice nada. Barre los nueve coeficientes de la
-  heuristica de coste (`inventory/cost_profiles.py`) sobre una corrida YA terminada, que
-  nombra `--run`. Los coeficientes no llegan al forecast ---el fractil del modelo sale de
-  los costes globales---, asi que reevalua los cuantiles guardados en vez de reentrenar.
-  Escribe `cost_weight_sensitivity.csv` en una corrida propia, para que el barrido lleve su
-  commit y su amplitud de muestreo. Ver `sensitivity_*` en `InventoryConfig`.
 - `tune_imputation`: no entrena el modelo de forecasting. Busca (via Optuna,
   `forecasting/imputation_tuning.py`) los mejores hiperparametros de LGBM para
   el imputador supervisado. Usa solo `split="train"`. El objetivo promedia el MAE
@@ -588,65 +582,22 @@ Junto con `overstock_cost`, define la fractil critica:
 c_under / (c_under + c_over)
 ```
 
-### `use_series_costs`
+### Costes uniformes para todo el catalogo
 
-Si es `false`, todas las series usan los costes globales.
+`overstock_cost` y `stockout_cost` se aplican a TODAS las series. No hay forma de
+diferenciarlos por producto-tienda, y es deliberado.
 
-Si es `true`, se construyen costes por `series_id`:
+Hubo un perfil sintetico por serie detras de un flag `use_series_costs`, que derivaba
+`c_over` y `c_under` de proxies de la forma de la serie (intermitencia, variabilidad de
+categoria, tension de stockout) con nueve constantes heuristicas. Se retiro: el
+`total_cost` que producia estaba en una moneda inventada ---no hay dato de vida util ni
+de margen contra el que anclarlo--- y ese total era el criterio de seleccion del campeon.
+Medido antes de quitarlo, diferenciar reducia el coste un 2,05% sobre demanda
+reconstruida y lo AUMENTABA un 3,66% sobre demanda censurada, con cualquiera de las dos
+contabilidades. Ver el invariante 43.
 
-- `c_over`
-- `c_under`
-- `critical_fractile`
-
-Esto permite decisiones heterogeneas por producto-tienda.
-
-### Los coeficientes de la heuristica (no son config)
-
-Los pesos y factores de escala del perfil sintetico NO se declaran en el YAML: son
-constantes de modulo en `inventory/cost_profiles.py` (`PERISHABILITY_WEIGHTS`,
-`SLOW_MOVING_WEIGHTS`, `CRITICALITY_WEIGHTS` y los seis `*_BASE` / `*_MULTIPLIER`).
-Estan fijas a proposito, para que dos corridas del mismo panel produzcan el mismo perfil.
-
-Este documento describia aqui un bloque `synthetic_cost_config` con esos nueve parametros,
-y un `series_cost_strategy: synthetic_series` para elegir la heuristica. Ninguno de los dos
-existe ni existio en `src/`: escribirlos en un YAML lo rechaza la carga, porque las
-secciones de `Settings` llevan `extra="forbid"`. El unico interruptor real es
-`use_series_costs`, mas arriba.
-
-Que hace cada grupo de constantes, para leer el codigo:
-
-- `PERISHABILITY_WEIGHTS` combina inestabilidad de categoria, variabilidad de categoria e
-  intermitencia de la serie; ajusta `c_over`.
-- `SLOW_MOVING_WEIGHTS` combina intermitencia y baja intensidad de demanda; ajusta
-  `c_over`.
-- `CRITICALITY_WEIGHTS` combina intensidad de demanda y tension historica de stockout;
-  ajusta `c_under`.
-- Las bases y multiplicadores controlan cuanto se separan los costes por serie de los
-  globales `overstock_cost` y `stockout_cost`.
-
-### `sensitivity_*`
-
-Los cuatro parametros del barrido de `run_mode = cost_sensitivity`. Solo ese modo los lee.
-
-```yaml
-sensitivity_oat_factors: [0.8, 1.2]
-sensitivity_draws: 300
-sensitivity_scale_span: 0.25
-sensitivity_weight_concentration: 50.0
-```
-
-- `oat_factors`: multiplicadores del pase uno-a-uno. Ensancharlos pregunta "que fragil es
-  la eleccion"; estrecharlos, "cuanta precision necesita".
-- `draws` y `scale_span`: muestras del pase conjunto y amplitud con que se sortean los seis
-  factores de escala, en `defecto * (1 +- span)`.
-- `weight_concentration`: concentracion de la Dirichlet con que se sortean los pesos. Su
-  MEDIA es el reparto por defecto, y este numero fija cuanto se agrupan las muestras a su
-  alrededor. Con `1.0` seria uniforme sobre el simplex y gastaria casi todas las muestras
-  en repartos degenerados tipo (0,99 / 0,005 / 0,005).
-
-Estan en la config y no como flags porque la amplitud del muestreo ES la mitad de la
-conclusion: la misma corrida da un p5-p95 de +51% con muestreo uniforme y de +5,9% centrado
-en los defectos. Un resultado sin su amplitud declarada no se puede leer.
+Las decisiones siguen siendo por serie: cada una tiene su propia curva de cuantiles
+predicha, asi que el pedido difiere. Lo que es comun es el fractil critico.
 
 ### `clip_negative_orders`
 

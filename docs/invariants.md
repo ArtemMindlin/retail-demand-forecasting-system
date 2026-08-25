@@ -423,3 +423,29 @@ See `docs/web_layer.md` for the full description.
     ranking removed, what was left described strategies nothing consumed, and no thesis figure
     ever came from it. `run_fair_cost_backtest` is what ranks strategies, by cost against a
     common ground truth.
+
+43. Inventory costs are uniform across the catalogue, and `total_cost` is therefore a declared
+    assumption rather than an estimate of money.
+
+    A synthetic per-series profile used to derive `c_over` and `c_under` from proxies of each
+    series' sales shape -- category intermittency, category variability, stockout tension --
+    combined by nine hand-set constants. It is gone, and it must not come back in that form.
+
+    Three reasons, in order of weight. The `total_cost` it produced was in an invented
+    currency: no shelf life, margin or acquisition cost exists in `FreshRetailNet-50K` to
+    anchor "overstocking series X costs 1.669", and that same `total_cost` is the champion
+    selection criterion, so the model was chosen with a made-up unit. It could not be
+    compared with anything charged uniformly, including the fair-cost backtest that produces
+    the thesis headline. And measured, it did not reliably pay: differentiating cut cost
+    2.05% on reconstructed demand and RAISED it 3.66% on censored demand, the same winner
+    under either accounting, on the 500-series panel.
+
+    The score also did not measure what it was named. `synthetic_perishability_score` was
+    computed from sales irregularity, which cannot distinguish "spoils quickly" from "nobody
+    buys it". Naming an unvalidated proxy after the thing it proxies is how it came to be
+    read as a product fact.
+
+    What survives, and is worth keeping straight: decisions are still per series, because
+    each series has its own predicted quantile curve. What is shared is the critical
+    fractile. Any future reintroduction needs real business costs, not proxies -- and then
+    `attach_series_costs` is the one seam it enters through.

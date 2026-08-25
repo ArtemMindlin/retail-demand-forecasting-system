@@ -567,128 +567,60 @@ Es importante destacar un detalle del protocolo de evaluación predictiva cuando
 Dado que el proceso de imputación genera una señal suavizada y con menor varianza estocástica que las ventas observadas (las cuales sufren caídas drásticas por roturas de stock), predecir este target imputado resulta matemáticamente más sencillo. Esto genera un sesgo de evaluación que puede inflar la reducción de error (MAE y RMSE). Por ello, para realizar comparaciones rigurosas, este trabajo complementa la evaluación predictiva con una metodología de evaluación directa mediante censura sintética y análisis de costes bajo un \textit{ground-truth} común (Sección~\ref{sec:imputacion_censura_sintetica} y Sección~\ref{sec:resultados_gemelo}).
 
 
-\subsection{Perfiles de Coste Sintéticos por SKU}
+\subsection{Costes de Inventario Uniformes: un Supuesto Asumido}
 \label{sec:cost_profiles}
 
-Un supuesto limitante en muchas aplicaciones académicas de inventario es la utilización de costes de rotura ($c_u$) y exceso ($c_o$) uniformes para todo el catálogo. En un entorno real de \textit{retail} fresco, la penalización por una rotura de stock en un producto básico es muy superior a la de un producto de nicho, del mismo modo que el coste de exceso es crítico en productos de alta caducidad.
+Un supuesto limitante en muchas aplicaciones académicas de inventario es la utilización de
+costes de rotura ($c_u$) y exceso ($c_o$) uniformes para todo el catálogo. En un entorno real
+de \textit{retail} fresco la penalización por una rotura en un producto básico es muy superior
+a la de un producto de nicho, del mismo modo que el coste de exceso es crítico en productos de
+alta caducidad. Este trabajo \textbf{asume deliberadamente ese supuesto}, y esta sección
+justifica por qué.
 
-Ante la ausencia de datos financieros transaccionales explícitos en el dataset original, el sistema implementa un motor de \textbf{inferencia de perfiles de coste sintéticos} que analiza el comportamiento histórico de cada serie $s$ para derivar coeficientes personalizados. Todas las variables se normalizan como \textbf{rangos percentílicos} $\in [0, 1]$ antes de combinarse: $Rank(x_s)$ no refleja el valor absoluto de la variable, sino la posición relativa de la serie $s$ respecto al resto del catálogo. Por ejemplo, el SKU con mayor intermitencia recibe $Rank = 1{,}0$ y el de menor intermitencia $Rank = 0{,}0$, independientemente de sus valores absolutos. El proceso se articula en tres dimensiones:
+La razón es que \textit{FreshRetailNet-50K} no publica ninguna de las magnitudes que
+permitirían levantarlo: no contiene vida útil, ni margen, ni coste de adquisición. Diferenciar
+los costes por SKU exige por tanto \emph{inferirlos}, y una inferencia sin verdad terreno
+introduce un problema más grave que el que resuelve.
+
+Se implementó y se midió esa alternativa antes de descartarla. El sistema derivaba $c_o$ y
+$c_u$ por serie a partir de \textit{proxies} de la forma de la serie de ventas ---intermitencia
+de la categoría, variabilidad de la categoría y tensión histórica de rotura--- combinados
+mediante nueve constantes heurísticas. Tres hallazgos motivaron su retirada:
 
 \begin{enumerate}
-    \item \textbf{Factor de Perecederos ($F_{perish}$)}: Captura el riesgo de obsolescencia
-    combinando la intermitencia de la categoría, su coeficiente de variación medio y la
-    intermitencia propia de la serie:
-    \begin{equation}
-        Score_{perish} = 0{,}5 \cdot Rank(Z_{cat}) + 0{,}3 \cdot Rank(CV_{cat}) + 0{,}2 \cdot Rank(Z_s)
-    \end{equation}
-    donde $Z$ es la tasa de ceros y $CV$ el coeficiente de variación. El mayor peso a nivel
-    de categoría (0,5) refleja que la caducidad es principalmente una propiedad del tipo de
-    producto, no de la tienda concreta.
+    \item \textbf{El coste resultante no era dinero.} El \texttt{total\_cost} que producía era
+    el número de unidades multiplicado por coeficientes inventados, sin ningún anclaje en un
+    hecho de negocio. Como ese mismo \texttt{total\_cost} es el criterio de selección del
+    modelo campeón, la elección se realizaba en una unidad arbitraria; y las cifras no eran
+    comparables con las del \textit{backtest} de coste justo, que cobra de forma uniforme.
 
-    \item \textbf{Factor de Baja Rotación ($F_{slow}$)}: Identifica productos donde el
-    sobrestock es peligroso por su baja velocidad de salida:
-    \begin{equation}
-        Score_{slow} = 0{,}6 \cdot Rank(Z_s) + 0{,}4 \cdot (1 - Rank(\mu_s))
-    \end{equation}
+    \item \textbf{El \textit{proxy} no medía lo que su nombre indicaba.} La puntuación de
+    perecibilidad se calculaba a partir de la irregularidad de las ventas, que no permite
+    distinguir un producto que se deteriora rápido de uno que simplemente no se vende.
 
-    \item \textbf{Factor de Criticidad de Servicio ($F_{crit}$)}: Aumenta la presión para
-    evitar roturas en productos de alta demanda o con tensiones históricas de stock:
-    \begin{equation}
-        Score_{crit} = 0{,}7 \cdot Rank(\mu_s) + 0{,}3 \cdot Rank(StockoutRate_s)
-    \end{equation}
-    El mayor peso sobre la demanda media (0,7) refleja que los productos de alto volumen
-    causan el mayor impacto en ventas perdidas cuando hay rotura.
+    \item \textbf{La diferenciación no resultaba rentable de forma consistente.} Medida sobre
+    el panel de 500 series manteniendo fijas las predicciones y comparando ambas reglas de
+    decisión bajo una contabilidad común, la diferenciación reducía el coste un $2{,}05\%$
+    sobre demanda reconstruida pero lo \textbf{aumentaba} un $3{,}66\%$ sobre demanda
+    censurada. El ganador era el mismo con las dos contabilidades posibles, de modo que el
+    resultado no es un artefacto de la métrica elegida. La explicación es que el fractil
+    crítico es óptimo únicamente si la distribución predicha es la verdadera: sobre demanda
+    censurada los cuantiles están sesgados a la baja, y un ajuste que reduce el fractil empuja
+    a la baja un pedido que ya iba corto.
 \end{enumerate}
 
-Conviene ser explícito sobre el estatus de estos pesos: son \textbf{una elección de diseño,
-no un resultado calibrado}. No se han ajustado contra ningún criterio ni se ha medido su
-sensibilidad; el análisis de sensibilidad que sí ejecuta el sistema
-(\texttt{sensitivity\_summary.csv}) recorre el ratio $C_u/C_o$ global, no estos
-coeficientes. Las dos asignaciones argumentadas arriba
----el peso dominante de la categoría en la perecibilidad y el de la demanda media en la
-criticidad--- responden a razonamiento de dominio, no a evidencia empírica de este panel.
+En consecuencia, $c_o$ y $c_u$ son constantes de configuración declaradas, y la robustez del
+sistema frente a ellas se establece por la vía correcta: el análisis de sensibilidad recorre
+el ratio $C_u/C_o$ y reporta cómo se desplazan coste y nivel de servicio, en lugar de fijar
+una diferenciación por SKU que no puede validarse.
 
-Ello es consecuencia directa de los datos disponibles: \textit{FreshRetailNet-50K} no
-publica vida útil, margen ni coste de adquisición, de modo que no existe un objetivo contra
-el que calibrar. El papel del perfil no es ser el modelo de costes correcto, sino
-\textbf{introducir heterogeneidad realista} para que la decisión \textit{newsvendor} no
-aplique un fractil único a productos de naturaleza distinta, y así ejercitar y validar la
-arquitectura de decisión por serie. En un despliegue real estas constantes son el punto de
-sustitución por los costes de negocio efectivos, y la contribución del trabajo es la
-mecánica que los consume, no sus valores. Están fijas como constantes en el código
----y no expuestas en la configuración--- precisamente para que dos ejecuciones del mismo
-panel produzcan el mismo perfil. Los factores de escala son:
-$\beta_0^{perish}=0{,}8$, $\beta_1^{perish}=0{,}8$,
-$\beta_0^{slow}=0{,}9$, $\beta_1^{slow}=0{,}5$,
-$\beta_0^{crit}=0{,}9$, $\beta_1^{crit}=0{,}5$.
+Conviene precisar el alcance de este supuesto: \textbf{las decisiones siguen siendo
+específicas de cada serie}. Cada SKU tiene su propia distribución predictiva, de modo que el
+pedido difiere entre series aunque el fractil crítico sea común. Lo que se renuncia a modelar
+es la heterogeneidad \emph{económica} entre productos, no la heterogeneidad de su demanda. En
+un despliegue real con costes de negocio efectivos, ese es el punto exacto de entrada
+(\texttt{attach\_series\_costs}).
 
-
-Cada score se transforma en un factor mediante una reescala lineal parametrizada que garantiza que el factor sea siempre positivo y acotado:
-
-\begin{equation}
-    F = \beta_0 + \beta_1 \cdot Score
-\end{equation}
-
-donde $\beta_0 > 0$ es el valor base (factor mínimo cuando el score es 0) y $\beta_1 \geq 0$ controla la amplitud del ajuste. Los costes operativos del Newsvendor se recalculan dinámicamente para cada serie $s$:
-
-\begin{equation}
-    c_o^{(s)} = \bar{c}_o \cdot F_{perish}^{(s)} \cdot F_{slow}^{(s)}, \qquad
-    c_u^{(s)} = \bar{c}_u \cdot F_{crit}^{(s)}
-\end{equation}
-
-Esta arquitectura convierte el \textit{fractil crítico} $q^*$ en una \textbf{variable de estado por SKU}: el sistema asigna de forma autónoma mayores niveles de servicio a productos críticos y protege el capital circulante reduciendo el stock en productos perecederos de baja demanda. Estos costes per-SKU son los que alimentan directamente la simulación descrita a continuación. La Figura~\ref{fig:cost_profiles} resume el flujo completo.
-
-\begin{figure}[H]
-\centering
-\shorthandoff{>}%
-\resizebox{\linewidth}{!}{%
-\begin{tikzpicture}[
-  node distance=0.5cm and 0.7cm,
-  every node/.style={font=\sffamily\footnotesize, align=center},
-  input/.style={draw, rectangle, rounded corners=3pt, fill=blue!10,
-                minimum width=2.8cm, minimum height=0.7cm},
-  factor/.style={draw, rectangle, rounded corners=3pt,
-                minimum width=3.4cm, minimum height=0.7cm, text width=3.2cm},
-  output/.style={draw, rectangle, rounded corners=3pt,
-                minimum width=2.6cm, minimum height=0.7cm},
-  arr/.style={->, thick}
-]
-  % Input
-  \node[input] (sku) {Serie $s$\\(historial)};
-
-  % Three factor nodes to the right, stacked vertically
-  \node[factor, fill=orange!15, right=1.2cm of sku, yshift=1.4cm]  (fp) {$F_{perish}$\\{\tiny $0{,}5\cdot Rank(Z_{cat})+\ldots$}};
-  \node[factor, fill=yellow!20, right=1.2cm of sku]                 (fs) {$F_{slow}$\\{\tiny $0{,}6\cdot Rank(Z_s)+\ldots$}};
-  \node[factor, fill=red!12,   right=1.2cm of sku, yshift=-1.4cm]  (fc) {$F_{crit}$\\{\tiny $0{,}7\cdot Rank(\mu_s)+\ldots$}};
-
-  % Cost nodes
-  \node[output, fill=orange!25, right=1.1cm of fp, yshift=-0.7cm]  (co) {$c_o^{(s)} = \bar{c}_o \cdot F_{perish} \cdot F_{slow}$};
-  \node[output, fill=red!20,   right=1.1cm of fc, yshift=0.7cm]    (cu) {$c_u^{(s)} = \bar{c}_u \cdot F_{crit}$};
-
-  % q* final node
-  \node[draw, diamond, fill=green!15, aspect=2.2,
-        font=\sffamily\footnotesize, right=0.9cm of co, yshift=-0.7cm] (qs) {$q_s^* = \dfrac{c_u^{(s)}}{c_u^{(s)}+c_o^{(s)}}$};
-
-  % Arrows from SKU to factors
-  \draw[arr] (sku) -- (fp);
-  \draw[arr] (sku) -- (fs);
-  \draw[arr] (sku) -- (fc);
-  % Arrows factors to costs
-  \draw[arr] (fp) -- (co);
-  \draw[arr] (fs) -- (co);
-  \draw[arr] (fc) -- (cu);
-  % Arrows costs to q*
-  \draw[arr] (co) -- (qs);
-  \draw[arr] (cu) -- (qs);
-\end{tikzpicture}%
-}% end resizebox
-\shorthandon{>}%
-\caption{Flujo de inferencia de perfiles de coste sintéticos por SKU. A partir del historial de
-cada serie se calculan tres factores dimensionales que determinan los costes de exceso $c_o^{(s)}$
-y rotura $c_u^{(s)}$, lo que fija el fractil crítico $q^*_s$ específico para ese producto.}
-\label{fig:cost_profiles}
-\end{figure}
-% ==============================================================================
 \section{Bloque II: Operación}
 % ==============================================================================
 
