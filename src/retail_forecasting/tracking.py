@@ -63,6 +63,7 @@ EXPERIMENT_OPS = "retail_forecasting_ops"
 # censored days is not forecast error, and sharing an experiment put 21 comparison runs
 # in front of the 5 that back chapter 6.
 EXPERIMENT_IMPUTATION = "retail_forecasting_imputation"
+EXPERIMENT_SENSITIVITY = "retail_forecasting_sensitivity"
 
 _IDENTITY_COLUMNS = ("model_name", "backend_name", "data_strategy", "observations")
 

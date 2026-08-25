@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from retail_forecasting.config import load_config
 from retail_forecasting.contracts.contracts_config import ImputationStrategy, RunMode
 from retail_forecasting.eda.pipeline import run_eda
+from retail_forecasting.forecasting.cost_sensitivity import run_cost_sensitivity
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
     run_fair_cost_backtest,
@@ -16,6 +17,7 @@ from retail_forecasting.forecasting.pipeline import (
     run_scoring,
 )
 from retail_forecasting.simulation import run_operational_simulation
+from retail_forecasting.tracking import resolve_run_dir
 from retail_forecasting.utils.logging import configure as configure_logging
 from retail_forecasting.utils.logging import fields, get_logger
 from retail_forecasting.utils.provenance import freeze_git_commit
@@ -62,6 +64,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional override for preprocessing.imputation_strategy. It picks which arm "
         'an experiment runs: "none" scores Observed demand, anything else the '
         "reconstructed Latent demand.",
+    )
+    parser.add_argument(
+        "--run",
+        default=None,
+        help="Finished run to analyse, by the name docs/runs.md cites or by directory. "
+        "Only cost_sensitivity reads it, and it is required there: the mode analyses a "
+        "run rather than producing predictions of its own.",
     )
     parser.add_argument(
         "--split",
@@ -115,6 +124,11 @@ def main() -> None:
         settings = settings.model_copy(update={"preprocessing": new_preprocessing})
 
     mode = settings.project.run_mode
+    if mode == "cost_sensitivity":
+        if args.run is None:
+            raise SystemExit("cost_sensitivity necesita --run: la corrida que analiza.")
+        run_cost_sensitivity(settings, resolve_run_dir(args.run))
+        return
     if mode == "retrain":
         run_retrain(settings)
         return

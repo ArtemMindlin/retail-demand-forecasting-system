@@ -29,22 +29,24 @@ Scope, so the result is not over-read: this measures the SENSITIVITY of cost to 
 coefficients. It cannot say the heuristic is well specified. "The weights barely matter" is
 not "the cost model is right" -- it is "it barely matters how you parameterise it".
 
-Usage:
-    python scripts/cost_weight_sensitivity.py \
-        --run    fresh_retailnet_large_20260811_125735 \
-        --config configs/experiment/large.yaml
+The sampling breadth is config, not a flag: it turned out to BE half the conclusion, so
+it is declared and versioned alongside the result. See `inventory.sensitivity_*` in
+`docs/config_reference.md`.
+
+Entered through `run_mode = cost_sensitivity`; `--run` names the finished run to analyse.
 """
 
 from __future__ import annotations
 
-import argparse
+import json
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from retail_forecasting.config import InventoryConfig, load_config
+from retail_forecasting.config import InventoryConfig, Settings
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.inventory.cost_profiles import (
     CostHeuristicCoefficients,
@@ -54,14 +56,14 @@ from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
 )
-from retail_forecasting.tracking import resolve_run_dir
+from retail_forecasting.tracking import (
+    EXPERIMENT_SENSITIVITY,
+    open_run_directory,
+)
 from retail_forecasting.utils.io import quantile_level_from_column
-from retail_forecasting.utils.logging import Table, configure, fields, get_logger, rule
+from retail_forecasting.utils.logging import Table, fields, get_logger, rule
 
-# Named under the package root on purpose: `configure()` attaches the handler to
-# `retail_forecasting`, and a script's `__name__` is `__main__`, which sits outside that
-# tree and would emit nothing.
-logger = get_logger("retail_forecasting.scripts.cost_weight_sensitivity")
+logger = get_logger(__name__)
 
 # Written by `attach_series_costs` on the run that produced the predictions. They MUST go:
 # `attach_series_costs` returns early when it finds them, so leaving them in would silently
@@ -81,8 +83,6 @@ CHARGED_COLUMNS = [
     "total_cost",
 ]
 STORED_COST_COLUMNS = [*PROFILE_COLUMNS, "order_quantity", *CHARGED_COLUMNS]
-
-OUTPUT = Path("reports/cost_weight_sensitivity.csv")
 
 
 def _evaluate(
@@ -178,7 +178,7 @@ def _one_at_a_time(factors: tuple[float, ...]) -> list[tuple[str, CostHeuristicC
                 cases.append(
                     (
                         f"{field_name}[{index}] x{factor}",
-                        replace(base, **{field_name: tuple(weights)}),
+                        replace(base, **{field_name: tuple(weights)}),  # type: ignore[arg-type]
                     )
                 )
         for field_name in SCALE_FIELDS:
@@ -206,7 +206,7 @@ def _joint(
     base = CostHeuristicCoefficients()
     cases: list[tuple[str, CostHeuristicCoefficients]] = []
     for draw in range(draws):
-        values: dict[str, object] = {}
+        values: dict[str, Any] = {}
         for field_name in WEIGHT_FIELDS:
             defaults = np.asarray(getattr(base, field_name), dtype=float)
             values[field_name] = tuple(rng.dirichlet(weight_concentration * defaults))
@@ -219,99 +219,82 @@ def _joint(
     return cases
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--run",
-        type=resolve_run_dir,
-        required=True,
-        help="Run name or directory holding predictions.csv.",
-    )
-    parser.add_argument(
-        "--config",
-        required=True,
-        help="The config that produced the run: the profile is rebuilt from its panel, and "
-        "a profile is relative to the panel it was built on.",
-    )
-    parser.add_argument("--draws", type=int, default=300, help="Joint samples (default 300).")
-    parser.add_argument(
-        "--oat-factors",
-        type=float,
-        nargs="+",
-        default=[0.8, 1.2],
-        help="Multipliers for the one-at-a-time pass (default 0.8 1.2, i.e. +-20%%). Widen it "
-        "to ask how fragile the choice is, narrow it to ask how precise it must be.",
-    )
-    parser.add_argument(
-        "--scale-span",
-        type=float,
-        default=0.25,
-        help="Joint pass: scale factors are drawn uniformly in default*(1+-span). Default 0.25.",
-    )
-    parser.add_argument(
-        "--weight-concentration",
-        type=float,
-        default=50.0,
-        help="Joint pass: Dirichlet concentration. Its mean is the default split; higher "
-        "values cluster tighter around it. 1.0 would be uniform over the simplex, which "
-        "spends most draws on degenerate splits. Default 50.",
-    )
-    parser.add_argument("--arm", default=None, help="Only this data_strategy.")
-    parser.add_argument("--model", default=None, help="Only this model_name.")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output", type=Path, default=OUTPUT)
-    return parser
+def _analysed_run_name(run_dir: Path) -> str:
+    """The analysed run's NAME, not its artifact directory.
+
+    A run's artifacts live under a UUID, so the directory name is unreadable. Every run
+    directory carries `mlflow_run.json` for exactly this: the store is a gitignored sqlite
+    database, so nothing else in the directory says which run it is.
+    """
+    marker = run_dir / "mlflow_run.json"
+    if marker.exists():
+        try:
+            return str(json.loads(marker.read_text(encoding="utf-8"))["run_name"])
+        except (KeyError, ValueError):
+            pass
+    return run_dir.name
 
 
-def main() -> None:
-    args = build_parser().parse_args()
-    configure()
-    rule(logger, "sensibilidad del coste a los pesos de la heurística")
+def run_cost_sensitivity(settings: Settings, run_dir: Path) -> Path:
+    """Perturb the cost heuristic over a finished run and write the sweep to a new run.
 
-    settings = load_config(args.config)
-    predictions = pd.read_csv(args.run / "predictions.csv")
-    # `use_cache` off means "rebuild the panel" for a real run; here it would mean "re-download
-    # 45k rows to rebuild a panel we already have". The cache key is a hash of the dataset
-    # config, so the cached file IS what this config produces.
-    cached_dataset = settings.dataset.model_copy(update={"use_cache": True})
+    `run_dir` is another run's artifact directory: this mode analyses a finished experiment
+    rather than producing predictions of its own. It still opens a run of its own, so the
+    sweep carries the commit, the config hash and the sampling parameters that produced it --
+    two sweeps of the same panel with different breadths are otherwise indistinguishable
+    files, and the breadth changes the answer.
+
+    Returns:
+        The created run directory path.
+    """
+    rule(logger, "sensibilidad del coste a los coeficientes de la heurística")
+
+    predictions = pd.read_csv(run_dir / "predictions.csv")
+    # `use_cache` off means "rebuild the panel" for a real run; here it would mean
+    # re-downloading a panel we already have. The cache key is a hash of the dataset config,
+    # so the cached file IS what this config produces -- and it must be the same panel the
+    # analysed run used, because a profile is relative to the panel it was built on.
     panel = load_prepared_panel(
-        dataset_config=cached_dataset,
+        dataset_config=settings.dataset.model_copy(update={"use_cache": True}),
         preprocessing_config=settings.preprocessing,
         split="train",
     )
 
-    if args.arm:
-        predictions = predictions[predictions["data_strategy"] == args.arm]
-    if args.model:
-        predictions = predictions[predictions["model_name"] == args.model]
-    if predictions.empty:
-        raise SystemExit("No predictions left after --arm/--model filtering.")
-
+    inventory = settings.inventory
+    factors = tuple(inventory.sensitivity_oat_factors)
     arms = sorted(predictions["data_strategy"].dropna().unique())
     models = sorted(predictions["model_name"].dropna().unique())
-    factors = tuple(args.oat_factors)
+
     fields(
         logger,
         {
-            "corrida": args.run.name,
+            "analiza": _analysed_run_name(run_dir),
             "panel": f"{panel['series_id'].nunique()} series, {len(panel)} filas",
             "predicciones": f"{len(predictions)} filas",
             "brazos": " · ".join(arms),
             "modelos": " · ".join(models),
             "uno-a-uno": f"{len(_one_at_a_time(factors))} casos, factores "
             f"{' · '.join(f'x{factor:g}' for factor in factors)}",
-            "conjunto": f"{args.draws} muestras, escalas ±{args.scale_span:.0%}, "
-            f"concentración {args.weight_concentration:g}",
+            "conjunto": f"{inventory.sensitivity_draws} muestras, escalas "
+            f"±{inventory.sensitivity_scale_span:.0%}, concentración "
+            f"{inventory.sensitivity_weight_concentration:g}",
         },
     )
 
-    rng = np.random.default_rng(args.seed)
-    cases = [("default", None), ("__flat__", None)]
+    rng = np.random.default_rng(settings.project.random_seed)
+    cases: list[tuple[str, CostHeuristicCoefficients | None]] = [
+        ("default", None),
+        ("__flat__", None),
+    ]
     cases += _one_at_a_time(factors)
-    cases += _joint(rng, args.draws, args.scale_span, args.weight_concentration)
+    cases += _joint(
+        rng,
+        inventory.sensitivity_draws,
+        inventory.sensitivity_scale_span,
+        inventory.sensitivity_weight_concentration,
+    )
 
     records: list[dict[str, object]] = []
-    progress = Table(logger, {"brazo": 18, "modelo": 15, "casos": 7, "coste def.": 12})
     for arm in arms:
         for model in models:
             subset = predictions[
@@ -320,13 +303,6 @@ def main() -> None:
             if subset.empty:
                 continue
             for label, coefficients in cases:
-                result = _evaluate(
-                    subset,
-                    settings.inventory,
-                    panel,
-                    coefficients,
-                    flat=label == "__flat__",
-                )
                 records.append(
                     {
                         "data_strategy": arm,
@@ -337,32 +313,29 @@ def main() -> None:
                             if label in ("default", "__flat__")
                             else ("joint" if label.startswith("joint#") else "one_at_a_time")
                         ),
-                        **result,
+                        **_evaluate(
+                            subset, inventory, panel, coefficients, flat=label == "__flat__"
+                        ),
                     }
                 )
-            default_cost = next(
-                float(str(record["total_cost_flat"]))
-                for record in records
-                if record["data_strategy"] == arm
-                and record["model_name"] == model
-                and record["case"] == "default"
-            )
-            progress.row(
-                {
-                    "brazo": arm,
-                    "modelo": model,
-                    "casos": len(cases),
-                    "coste def.": f"{default_cost:.2f}",
-                }
-            )
 
     frame = pd.DataFrame(records)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(args.output, index=False)
+    with open_run_directory(
+        f"cost_sensitivity_{settings.reporting.run_name}", EXPERIMENT_SENSITIVITY
+    ) as out_dir:
+        frame.to_csv(out_dir / "cost_weight_sensitivity.csv", index=False)
+        _report(frame)
+        fields(logger, {"escrito": out_dir})
+        return out_dir
 
+
+def _report(frame: pd.DataFrame) -> None:
+    """Percent change against the default, split into the weights and the scale factors.
+
+    Not a ratio against the profile-vs-flat gap: that gap is ~2% of the cost, and dividing
+    by it inflated a 47% move into "24x", which impresses without informing.
+    """
     rule(logger, "resultado")
-    # Percent change against the default, not a ratio against the profile-vs-flat gap: that
-    # gap is ~2% of the cost, and dividing by it inflated a 47% move into "24x".
     summary = Table(
         logger,
         {
@@ -386,6 +359,7 @@ def main() -> None:
         reference = group.loc[group["case"] == "default"]
         default_cost = float(reference["total_cost_flat"].iloc[0])
         flat_cost = float(group.loc[group["case"] == "flat", "total_cost_flat"].iloc[0])
+        one_at_a_time = group.loc[group["design"] == "one_at_a_time"]
 
         def _span(subset: pd.DataFrame, base: float = default_cost) -> str:
             if subset.empty:
@@ -393,7 +367,6 @@ def main() -> None:
             change = (subset["total_cost_flat"].astype(float) - base) / base * 100.0
             return f"{change.quantile(0.05):+.1f}% {change.quantile(0.95):+.1f}%"
 
-        one_at_a_time = group.loc[group["design"] == "one_at_a_time"]
         summary.row(
             {
                 "brazo": arm,
@@ -410,8 +383,7 @@ def main() -> None:
 
     rule(logger, "muestreo conjunto")
     joint = Table(
-        logger,
-        {"brazo": 18, "modelo": 14, "mediana": 10, "p5–p95": 17, "baten al def.": 14},
+        logger, {"brazo": 18, "modelo": 14, "mediana": 10, "p5–p95": 17, "baten al def.": 14}
     )
     for (arm, model), group in frame.groupby(["data_strategy", "model_name"]):
         if not float(group["uses_quantiles"].iloc[0]):
@@ -430,9 +402,3 @@ def main() -> None:
                 "baten al def.": f"{int((sample < default_cost).sum())}/{len(sample)}",
             }
         )
-
-    fields(logger, {"escrito": args.output})
-
-
-if __name__ == "__main__":
-    main()

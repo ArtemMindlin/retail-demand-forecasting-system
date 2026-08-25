@@ -4,6 +4,7 @@ PYTEST = uv run pytest
 CONFIG = configs/experiment/default.yaml
 RETRAIN_CONFIG = configs/retrain/default.yaml
 SCORE_CONFIG = configs/score_daily/default.yaml
+SENSITIVITY_CONFIG = configs/cost_sensitivity/default.yaml
 FAIRCOST_CONFIG = configs/fair_cost_backtest/default.yaml
 SIM_CONFIG = configs/simulate_ops/default.yaml
 EDA_CONFIG = configs/eda/default.yaml
@@ -13,7 +14,7 @@ EDA_CONFIG = configs/eda/default.yaml
 TUNE_CONFIG = configs/tune_imputation/default.yaml
 OPS_SPLIT = data/processed/ops_sim/.built
 SNAPSHOT = current
-.PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf
+.PHONY: help install run retrain score simulate backtest-fair-cost cost-sensitivity tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -40,6 +41,9 @@ $(OPS_SPLIT):
 
 backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common ground truth (no training)
 	$(PYTHON) -m retail_forecasting.run --config $(FAIRCOST_CONFIG)
+
+cost-sensitivity: ## Sweep the cost heuristic's nine constants over a finished run (RUN=<name>)
+	$(PYTHON) -m retail_forecasting.run --config $(SENSITIVITY_CONFIG) --run $(RUN)
 
 tune-imputation: ## Tune LGBM hyperparameters for the supervised imputer, persist to disk
 	$(PYTHON) -m retail_forecasting.run --config $(TUNE_CONFIG)

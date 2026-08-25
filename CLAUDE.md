@@ -10,7 +10,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
   its own mode reads. `configs/experiment/default.yaml` is the canonical v1 config;
   `large.yaml`/`daily.yaml` cover the scale/daily variants, both still `run_mode = experiment`.
   The other folders (`retrain/`, `score_daily/`, `simulate_ops/`, `fair_cost_backtest/`,
-  `tune_imputation/`) hold a `default.yaml` each, `eda/` included: exploratory analysis is a run mode like the
+  `cost_sensitivity/`, `tune_imputation/`) hold a `default.yaml` each, `eda/` included: exploratory analysis is a run mode like the
   rest, not a second CLI. `project.run_mode` always matches the folder name, so `--run-mode`
   is only for ad-hoc overrides. The map of which sections each mode reads is
   `MODE_SECTIONS` in `contracts/contracts_config.py`, enforced by `tests/test_config_layout.py`:
@@ -68,6 +68,8 @@ run.py
  -> summarize_predictions() / summarize_costs()
  -> write_run_artifacts()
 ```
+
+`run_cost_sensitivity()` (in `forecasting/cost_sensitivity.py`, `run_mode = cost_sensitivity`) sweeps the nine constants of the synthetic cost profile over a FINISHED run named by `--run`: they never reach the forecast, so it re-decides stored quantiles instead of retraining.
 
 Related entry points in `forecasting/pipeline.py`: `run_fair_cost_backtest()`, `train_and_save_champion()` / `run_retrain()`, `run_scoring()`. `tune_imputation_lgbm()` (in `forecasting/imputation_tuning.py`, `run_mode = tune_imputation`) is a separate, upstream entry point: it tunes the supervised imputer's LGBM hyperparameters, not the forecasting model.
 

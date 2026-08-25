@@ -20,6 +20,7 @@ RunMode = Literal[
     "score_daily",
     "simulate_ops",
     "fair_cost_backtest",
+    "cost_sensitivity",
     "tune_imputation",
     "eda",
 ]
@@ -87,6 +88,9 @@ MODE_SECTIONS: dict[RunMode, frozenset[str]] = {
         }
     ),
     "fair_cost_backtest": frozenset(
+        {"project", "dataset", "preprocessing", "models", "inventory", "reporting"}
+    ),
+    "cost_sensitivity": frozenset(
         {"project", "dataset", "preprocessing", "models", "inventory", "reporting"}
     ),
     "tune_imputation": frozenset({"project", "dataset", "preprocessing", "models"}),
@@ -213,6 +217,16 @@ class InventoryConfig(BaseModel):
     stockout_cost: float = Field(default=4.0, gt=0)
     use_series_costs: bool = False
     clip_negative_orders: bool = True
+    # Read only by `run_mode = cost_sensitivity`, which perturbs the nine constants of
+    # `inventory/cost_profiles.py`. They are the study's design, so they belong in a
+    # config: the breadth of the sampling turned out to BE half the conclusion.
+    sensitivity_oat_factors: list[float] = Field(default_factory=lambda: [0.8, 1.2], min_length=1)
+    sensitivity_draws: int = Field(default=300, ge=1)
+    sensitivity_scale_span: float = Field(default=0.25, gt=0, lt=1)
+    # Dirichlet concentration. Its mean is the default split, so this sets how tightly
+    # draws cluster around it; 1.0 would be uniform over the simplex, which spends most
+    # draws on degenerate splits like (0.99, 0.005, 0.005).
+    sensitivity_weight_concentration: float = Field(default=50.0, gt=0)
 
 
 class BusinessConfig(BaseModel):

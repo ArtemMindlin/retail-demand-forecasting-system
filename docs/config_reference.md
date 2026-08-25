@@ -77,6 +77,12 @@ Semantica:
   ciclo de reentrenamiento gobernado operacionalmente;
 - `score_daily`: escribe solo artefactos operativos de negocio y metadata
   ligera, sin `predictions.csv` y sin `backtest_metadata.json`.
+- `cost_sensitivity`: no entrena ni predice nada. Barre los nueve coeficientes de la
+  heuristica de coste (`inventory/cost_profiles.py`) sobre una corrida YA terminada, que
+  nombra `--run`. Los coeficientes no llegan al forecast ---el fractil del modelo sale de
+  los costes globales---, asi que reevalua los cuantiles guardados en vez de reentrenar.
+  Escribe `cost_weight_sensitivity.csv` en una corrida propia, para que el barrido lleve su
+  commit y su amplitud de muestreo. Ver `sensitivity_*` en `InventoryConfig`.
 - `tune_imputation`: no entrena el modelo de forecasting. Busca (via Optuna,
   `forecasting/imputation_tuning.py`) los mejores hiperparametros de LGBM para
   el imputador supervisado. Usa solo `split="train"`. El objetivo promedia el MAE
@@ -617,6 +623,30 @@ Que hace cada grupo de constantes, para leer el codigo:
   ajusta `c_under`.
 - Las bases y multiplicadores controlan cuanto se separan los costes por serie de los
   globales `overstock_cost` y `stockout_cost`.
+
+### `sensitivity_*`
+
+Los cuatro parametros del barrido de `run_mode = cost_sensitivity`. Solo ese modo los lee.
+
+```yaml
+sensitivity_oat_factors: [0.8, 1.2]
+sensitivity_draws: 300
+sensitivity_scale_span: 0.25
+sensitivity_weight_concentration: 50.0
+```
+
+- `oat_factors`: multiplicadores del pase uno-a-uno. Ensancharlos pregunta "que fragil es
+  la eleccion"; estrecharlos, "cuanta precision necesita".
+- `draws` y `scale_span`: muestras del pase conjunto y amplitud con que se sortean los seis
+  factores de escala, en `defecto * (1 +- span)`.
+- `weight_concentration`: concentracion de la Dirichlet con que se sortean los pesos. Su
+  MEDIA es el reparto por defecto, y este numero fija cuanto se agrupan las muestras a su
+  alrededor. Con `1.0` seria uniforme sobre el simplex y gastaria casi todas las muestras
+  en repartos degenerados tipo (0,99 / 0,005 / 0,005).
+
+Estan en la config y no como flags porque la amplitud del muestreo ES la mitad de la
+conclusion: la misma corrida da un p5-p95 de +51% con muestreo uniforme y de +5,9% centrado
+en los defectos. Un resultado sin su amplitud declarada no se puede leer.
 
 ### `clip_negative_orders`
 
