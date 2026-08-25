@@ -79,7 +79,6 @@ models:
 inventory:
   overstock_cost: 1.0
   stockout_cost: 4.0
-  use_series_costs: true
   clip_negative_orders: true
 
 

@@ -61,7 +61,6 @@ def test_default_inventory_costs_are_positive() -> None:
 
     assert settings.inventory.overstock_cost > 0
     assert settings.inventory.stockout_cost > 0
-    assert isinstance(settings.inventory.use_series_costs, bool)
 
 
 def test_settings_instantiation_rejects_invalid_temporal_guardrails() -> None:
