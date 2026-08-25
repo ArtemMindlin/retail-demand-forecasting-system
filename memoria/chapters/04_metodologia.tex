@@ -600,9 +600,24 @@ Ante la ausencia de datos financieros transaccionales explícitos en el dataset 
     causan el mayor impacto en ventas perdidas cuando hay rotura.
 \end{enumerate}
 
-Los valores de los pesos son los valores por defecto del sistema, validados sobre el
-experimento base; todos están definidos como constantes heurísticas fijas en el código
-para garantizar la consistencia y reproducibilidad de los perfiles de coste entre experimentos. Los factores de escala son:
+Conviene ser explícito sobre el estatus de estos pesos: son \textbf{una elección de diseño,
+no un resultado calibrado}. No se han ajustado contra ningún criterio ni se ha medido su
+sensibilidad; el análisis de sensibilidad que sí ejecuta el sistema
+(\texttt{sensitivity\_summary.csv}) recorre el ratio $C_u/C_o$ global, no estos
+coeficientes. Las dos asignaciones argumentadas arriba
+---el peso dominante de la categoría en la perecibilidad y el de la demanda media en la
+criticidad--- responden a razonamiento de dominio, no a evidencia empírica de este panel.
+
+Ello es consecuencia directa de los datos disponibles: \textit{FreshRetailNet-50K} no
+publica vida útil, margen ni coste de adquisición, de modo que no existe un objetivo contra
+el que calibrar. El papel del perfil no es ser el modelo de costes correcto, sino
+\textbf{introducir heterogeneidad realista} para que la decisión \textit{newsvendor} no
+aplique un fractil único a productos de naturaleza distinta, y así ejercitar y validar la
+arquitectura de decisión por serie. En un despliegue real estas constantes son el punto de
+sustitución por los costes de negocio efectivos, y la contribución del trabajo es la
+mecánica que los consume, no sus valores. Están fijas como constantes en el código
+---y no expuestas en la configuración--- precisamente para que dos ejecuciones del mismo
+panel produzcan el mismo perfil. Los factores de escala son:
 $\beta_0^{perish}=0{,}8$, $\beta_1^{perish}=0{,}8$,
 $\beta_0^{slow}=0{,}9$, $\beta_1^{slow}=0{,}5$,
 $\beta_0^{crit}=0{,}9$, $\beta_1^{crit}=0{,}5$.
