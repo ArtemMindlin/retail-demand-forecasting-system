@@ -169,69 +169,54 @@ la normativa vigente. El análisis detallado de la vinculación con los Objetivo
 Sostenible se recoge en el Anexo~\ref{anx:ods}.
 
 \section{Aportaciones del Trabajo}
-Conviene declarar de entrada el tipo de aportación que este trabajo hace, porque el género
-invita a exagerarlo. No se propone aquí ninguna técnica nueva: la calibración conformal, su
-variante estratificada, el modelo del \textit{Newsvendor} y los métodos de \textit{boosting}
-sobre los que se construye el sistema están todos publicados y disponibles en librerías al uso.
-Lo que se aporta es la evaluación rigurosa y reproducible de ese conjunto sobre un
-\textit{benchmark} reciente ---\textit{FreshRetailNet-50K}, publicado en mayo de
-2025~\cite{freshretailnet2025}--- y, sobre todo, tres resultados \textbf{negativos} acerca de
-cómo debe evaluarse la recuperación de demanda censurada, que se obtuvieron al comprobar los
-propios resultados de este trabajo y que invalidaron mediciones ya escritas.
+Este trabajo no propone una técnica nueva, sino que establece cómo debe evaluarse la
+recuperación de demanda censurada, y lo hace sobre un \textit{benchmark} publicado en mayo de
+2025~\cite{freshretailnet2025}. Sus aportaciones son las siguientes.
 
 \begin{enumerate}
-    \item \textbf{El protocolo de censura sintética no puede ordenar las reglas de
-    reconciliación, y se cuantifica por qué.} La verdad-terreno de este protocolo se construye
-    como $\text{observado} = \text{real}\cdot(1-r)$, de modo que cualquier regla cuya forma
-    funcional invierta esa relación acierta por construcción y no por mérito. La demostración es
-    directa: una regla que solo usa el ratio de rotura $r$, sin modelo alguno, obtiene el menor
-    error de reconstrucción de todas las estrategias evaluadas. La consecuencia práctica es que
-    el error de reconstrucción queda excluido de la comparativa de estrategias de esta memoria
-    (Sección~\ref{sec:imputacion_censura_sintetica}), y que una comparación de hiperparámetros
-    sobre el mismo protocolo sigue siendo válida solo porque todos los candidatos comparten una
-    misma regla, de modo que el supuesto del generador se cancela.
+    \item \textbf{El protocolo de censura sintética no ordena reglas de reconciliación, y se
+    cuantifica por qué.} Su verdad-terreno se construye como
+    $\text{observado} = \text{real}\cdot(1-r)$, de modo que toda regla cuya forma funcional
+    invierta esa relación acierta por construcción: una que solo use el ratio de rotura $r$, sin
+    modelo alguno, obtiene el menor error de reconstrucción de todas las evaluadas. De ahí que
+    las estrategias se ordenen aquí por coste y no por error de reconstrucción, y que una
+    comparación de hiperparámetros sobre el mismo protocolo siga siendo válida, porque todos los
+    candidatos comparten una regla y el supuesto del generador se cancela
+    (Sección~\ref{sec:imputacion_censura_sintetica}).
 
     \item \textbf{Los hiperparámetros del imputador no transfieren entre tamaños de ajuste, y el
-    efecto cambia de signo.} Una búsqueda de 300 \textit{trials} sobre el imputador supervisado
-    mejora al ajuste por defecto cuando el maestro se entrena con pocos cientos de filas limpias,
-    y lo \textbf{empeora} cuando se entrena con decenas de miles, que es la escala a la que el
-    sistema opera. La tendencia es monótona en el tamaño de ajuste y se confirma en dos periodos
-    de puntuación distintos, de modo que es un efecto de escala y no de calendario
-    (Anexo~\ref{anx:tuning_imputador}). La lectura operativa es que un fichero de
+    efecto cambia de signo.} La búsqueda mejora al ajuste por defecto con pocos cientos de filas
+    limpias y lo empeora con decenas de miles, que es la escala a la que el sistema opera. La
+    tendencia es monótona en el tamaño de ajuste y se confirma sobre dos periodos de puntuación
+    distintos, de modo que es un efecto de escala y no de calendario. Un fichero de
     hiperparámetros solo es válido cerca del tamaño con el que se obtuvo, condición que el
-    fichero por sí mismo no puede expresar y que aquí queda registrada en su artefacto.
+    artefacto registra explícitamente (Anexo~\ref{anx:tuning_imputador}).
 
-    \item \textbf{La política de pedido de una evaluación por coste puede invertir el orden que
-    pretende medir.} Al comparar señales de demanda por el coste de inventario que inducen, el
-    término de seguridad de la política no es un detalle de implementación: con un único término
-    común al catálogo, \emph{conocer la demanda real} resulta más caro que la señal censurada sin
-    corregir, y con un término proporcional a cada serie la métrica satura hasta no distinguir un
-    imputador razonable de un oráculo. Solo sin término de seguridad ---pidiendo exactamente lo
-    que dice la señal--- el coste mide la señal y la demanda real cuesta cero
-    (Sección~\ref{sec:resultados_gemelo}). El resultado es directamente reutilizable por
-    cualquiera que construya una comparación de señales de demanda basada en coste.
+    \item \textbf{En una evaluación por coste, el término de seguridad de la política decide el
+    resultado.} Con un término común a todo el catálogo, conocer la demanda real sale más caro
+    que la señal censurada sin corregir; con un término proporcional a cada serie, la métrica
+    satura hasta no distinguir un imputador razonable de un oráculo. Solo sin término de
+    seguridad el coste mide la señal, y la demanda real cuesta cero. El resultado es directamente
+    reutilizable por cualquiera que compare señales de demanda por el coste que inducen
+    (Sección~\ref{sec:resultados_gemelo}).
 
-    \item \textbf{Caracterización empírica de la infracobertura conformal sobre demanda
-    reconstruida.} La calibración \textit{Mondrian} estratificada por categoría se aplica aquí
-    sobre un target reconstruido a partir de ventas censuradas, combinación que la literatura
-    revisada no cubre ---existen trabajos que llevan la predicción conformal al
-    \textit{Newsvendor} y trabajos que desarrollan la variante Mondrian, pero no sobre demanda
-    censurada. La aportación no es la combinación en sí, sino la \textbf{medición} de lo que le
-    ocurre: la cobertura empírica queda sistemáticamente por debajo del nivel nominal, la brecha
-    se estrecha al aumentar el panel en un orden de magnitud y no se cierra, y el análisis
-    atribuye el resto a la no-intercambiabilidad temporal entre los periodos de calibración y de
-    test (Sección~\ref{sec:resultados_conformal}).
+    \item \textbf{Medición de la calibración conformal estratificada sobre demanda
+    reconstruida.} La variante \textit{Mondrian} se aplica aquí sobre un target reconstruido a
+    partir de ventas censuradas, combinación que no cubren los trabajos que llevan la predicción
+    conformal al \textit{Newsvendor} ni los que desarrollan la estratificación. Se mide qué le
+    ocurre: la cobertura empírica queda por debajo del nivel nominal, la brecha se estrecha al
+    ampliar el panel un orden de magnitud sin cerrarse, y el análisis atribuye el resto a la
+    no-intercambiabilidad temporal entre calibración y test
+    (Sección~\ref{sec:resultados_conformal}).
 
     \item \textbf{Sistema completo, trazable y reproducible.} Se implementa el recorrido entero
-    desde el dato bruto hasta la decisión: preparación del panel, reconstrucción de la censura,
-    ingeniería de características sin fuga temporal, modelos probabilísticos, calibración,
-    política de pedido, API operacional, cuadro de mandos y despliegue contenerizado con
-    integración continua. Cada ejecución queda registrada en un almacén de corridas con su
-    configuración, sus métricas y el \textit{commit} exacto que la produjo, y toda cifra citada
-    en esta memoria nombra la corrida que la generó. Esto no es una aportación al estado del
-    arte, sino la condición que hace verificables las cuatro anteriores: los tres resultados
-    negativos se encontraron porque el sistema permitía volver sobre sus propias mediciones y
-    contradecirlas.
+    desde el dato bruto hasta la decisión de pedido: preparación del panel, reconstrucción de la
+    censura, ingeniería de características sin fuga temporal, modelos probabilísticos,
+    calibración, política de inventario, API operacional, cuadro de mandos y despliegue
+    contenerizado con integración continua. Cada ejecución queda registrada con su
+    configuración, sus métricas y el \textit{commit} que la produjo, y toda cifra citada en esta
+    memoria nombra la corrida que la generó. Esa trazabilidad es la que hace verificables las
+    cuatro aportaciones anteriores.
 \end{enumerate}
 
 \section{Metodología}
