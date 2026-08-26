@@ -9,8 +9,8 @@ from artifacts instead of being a hand-made PDF with no source.
 
 Usage:
     python scripts/plot_coverage_folds.py \
-        --base   fresh_retailnet_v2_20260811_123002 \
-        --scale  fresh_retailnet_large_20260811_125735
+        --base   <corrida del subset base> \
+        --scale  <corrida a escala>
 """
 
 from __future__ import annotations

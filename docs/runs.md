@@ -73,11 +73,18 @@ by hand. Regenerate both together:
 ```bash
 uv run python -m retail_forecasting.evaluation.latex_exporter \
     --metrics-run <corrida Observed> <corrida Latent> \
-    --fair-cost-run fresh_retailnet_large_20260811_184959
+    --fair-cost-run <corrida coste justo>
 ```
 
 Those are run names, resolved through MLflow — the same names this table cites. A directory
 still works.
+
+Every run in the commands on this page is a placeholder, and deliberately not a real name:
+take the name from the table above, which is the only place that says which run backs which
+figure. Concrete names in a usage example are the same trap one layer out --- three of them
+were still sitting in the `--help` text of the exporter and the two figure scripts, naming
+runs this page had already marked superseded, where nobody reading the command would see the
+banner.
 
 The runs are arguments, not defaults: the exporter used to pin them in `__main__`, which
 is how it kept republishing June runs. It also could not execute at all between `14ad8b4`
@@ -135,9 +142,8 @@ The figures read finished runs:
 
 ```bash
 uv run python scripts/plot_coverage_folds.py \
-    --base fresh_retailnet_v2_20260811_123002 \
-    --scale fresh_retailnet_large_20260811_125735
-uv run python scripts/plot_mae_vs_service.py --run fresh_retailnet_large_20260811_125735
+    --base <corrida del subset base> --scale <corrida a escala>
+uv run python scripts/plot_mae_vs_service.py --run <corrida a escala>
 ```
 
 Those are run names, resolved through MLflow, not paths. A directory still works.

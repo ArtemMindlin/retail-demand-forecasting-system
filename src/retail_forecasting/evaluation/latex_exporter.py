@@ -16,7 +16,7 @@ would have closed a cycle.
 Usage:
     python -m retail_forecasting.evaluation.latex_exporter \
         --metrics-run <corrida Observed> <corrida Latent> \
-        --fair-cost-run fresh_retailnet_large_20260811_184959
+        --fair-cost-run <corrida de coste justo>
 """
 
 from __future__ import annotations
@@ -25,13 +25,10 @@ import argparse
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
 
 import pandas as pd
 
 from retail_forecasting.tracking import resolve_run_dir
-
-CostMode = Literal["fair", "summary"]
 
 # Internal identifiers -> the names used in the prose of the report. Without this map the
 # generated tables read "Auto Boosting"/"Catboost"/"Seasonal Naive" while the chapters say
@@ -179,34 +176,14 @@ def _fair_cost_table(costs_df: pd.DataFrame) -> str:
     )
 
 
-def _cost_summary_table(costs_df: pd.DataFrame) -> str:
-    """Legacy per-model cost summary table (each strategy graded against its own target)."""
-    cost_cols = ["data_strategy", "model_name", "total_cost", "mean_cost"]
-    mask_costs = costs_df["model_name"].isin(_REPORTED_MODELS)
-    cost_table = costs_df.loc[mask_costs, cost_cols].sort_values(["total_cost"])
-    cost_table["model_name"] = _prettify(cost_table["model_name"])
-    cost_table["data_strategy"] = _prettify(cost_table["data_strategy"])
-    return _tabular(
-        cost_table,
-        header=["Estrategia", "Modelo", "Coste Total", "Coste Medio"],
-        column_format="@{}llcc@{}",
-        caption="Comparativa de costes operativos (Generada automáticamente).",
-        label="tab:metrics_cost_gen",
-    )
-
-
 def export_to_latex(
     metrics_path: str | Path | Sequence[str | Path],
     costs_path: str | Path,
     output_dir: str | Path,
-    cost_mode: CostMode = "fair",
     panel_series: int | None = None,
 ) -> None:
-    """Convert CSV results to LaTeX tables.
-
-    ``cost_mode`` selects which cost table to build (the caller knows which CSV it
-    passed): ``"fair"`` for a ``fair_cost_backtest.csv``, ``"summary"`` for a
-    legacy ``cost_summary.csv``.
+    """Convert CSV results to LaTeX tables from a run's `metrics_summary.csv` and its
+    `fair_cost_backtest.csv`.
 
     ``panel_series`` is stated in the predictive caption. The base subset and the scale
     run produce very different errors, so a table that does not name its panel invites
@@ -245,10 +222,7 @@ def export_to_latex(
         label="tab:metrics_predictive",
     )
 
-    # 2. Economic Metrics Table (Total Cost)
-    latex_cost = (
-        _fair_cost_table(costs_df) if cost_mode == "fair" else _cost_summary_table(costs_df)
-    )
+    latex_cost = _fair_cost_table(costs_df)
 
     (output_dir / "table_predictive.tex").write_text(latex_pred, encoding="utf-8")
     (output_dir / "table_costs.tex").write_text(latex_cost, encoding="utf-8")
@@ -293,7 +267,6 @@ def main() -> None:
         [run / "metrics_summary.csv" for run in args.metrics_run],
         args.fair_cost_run / "fair_cost_backtest.csv",
         args.output_dir,
-        cost_mode="fair",
         panel_series=_panel_series(args.metrics_run[0]),
     )
 

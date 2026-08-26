@@ -8,7 +8,7 @@ Reads `metrics_summary.csv` and `cost_summary.csv` from one run directory, so th
 figure is reproducible from artifacts instead of being a hand-made PDF.
 
 Usage:
-    python scripts/plot_mae_vs_service.py --run fresh_retailnet_large_20260811_125735
+    python scripts/plot_mae_vs_service.py --run <corrida de experimento>
 """
 
 from __future__ import annotations

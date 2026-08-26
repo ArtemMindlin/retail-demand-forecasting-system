@@ -50,7 +50,7 @@ def _export(tmp_path: Path, panel_series: int | None = 500) -> tuple[str, str]:
     METRICS.to_csv(metrics_path, index=False)
     FAIR_COST.to_csv(costs_path, index=False)
     out = tmp_path / "tables"
-    export_to_latex(metrics_path, costs_path, out, cost_mode="fair", panel_series=panel_series)
+    export_to_latex(metrics_path, costs_path, out, panel_series=panel_series)
     return (
         (out / "table_predictive.tex").read_text(encoding="utf-8"),
         (out / "table_costs.tex").read_text(encoding="utf-8"),
