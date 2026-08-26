@@ -42,6 +42,7 @@ ALLOWED_LAYER_IMPORTS = {
         "inventory",
         "models",
         "tracking",
+        "utils",
     },
     "utils": set(),
     "visualization": {"config", "evaluation", "inventory", "utils"},
