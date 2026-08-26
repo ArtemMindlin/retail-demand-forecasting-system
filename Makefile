@@ -11,6 +11,7 @@ EDA_CONFIG = configs/eda/default.yaml
 # imputation study runs at (500 series), not at experiment.yaml's 50. A winner tuned on 50
 # series measured 12.4% WORSE than the untuned defaults at 500. See docs/invariants.md 41.
 TUNE_CONFIG = configs/tune_imputation/default.yaml
+TUNE_FORECASTING_CONFIG = configs/tune_forecasting/default.yaml
 OPS_SPLIT = data/processed/ops_sim/.built
 SNAPSHOT = current
 .PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf
@@ -43,6 +44,9 @@ backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common gro
 
 tune-imputation: ## Tune LGBM hyperparameters for the supervised imputer, persist to disk
 	$(PYTHON) -m retail_forecasting.run --config $(TUNE_CONFIG)
+
+tune-forecasting: ## Tune the forecasting model's hyperparameters (one backend per run), persist to disk
+	$(PYTHON) -m retail_forecasting.run --config $(TUNE_FORECASTING_CONFIG)
 
 mlflow-ui: ## Browse past runs and imputation searches at http://localhost:5000
 	uv run mlflow ui --backend-store-uri sqlite:///mlflow.db

@@ -23,6 +23,7 @@ SHARED_FIELDS = (
     ("dataset", "local_cache_dir"),
     ("models", "models_dir"),
     ("models", "imputation_params_filename"),
+    ("models", "forecasting_params_filename"),
 )
 
 

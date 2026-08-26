@@ -146,3 +146,76 @@ class ImputationTuningMetadata(BaseModel):
     created_at: str
     git_commit: str | None
     best_params: ImputationBoostingParams
+
+
+class ForecastingTuningMetadata(BaseModel):
+    """Metadata for a single-objective Optuna search over ONE forecasting backend.
+
+    Mirrors `ImputationTuningMetadata`, including the reason the scores are split in two:
+    ``best_cost_selection`` is the objective the search minimized, so it is in-sample for the
+    search and cannot evidence a gain, while the validation costs come from draws the search
+    never saw. ``persisted`` is decided on ``improvement_ci95``, not on ``improvement_pct``,
+    whose sign alone does not distinguish a real gain from a coin flip.
+
+    The cost is simulated inventory cost per scored origin, not MAE or Winkler: it is the
+    criterion the champion is selected by, and point-error and cost rankings do invert.
+
+    Read ``improvement_pct`` and ``improvement_ci95`` as different quantities. The percentage
+    is a ratio of the two mean costs; the interval is over the PAIRED per-draw differences and
+    is therefore in cost units, not percentage points. Quoting the interval as a percentage is
+    the mistake this note exists to prevent.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    strategy: Literal["optuna_forecasting_cost"] = "optuna_forecasting_cost"
+    backend: str
+    n_trials_requested: int = Field(gt=0)
+    best_cost_selection: float = Field(ge=0)
+    best_cost_validation: float = Field(ge=0)
+    default_cost_validation: float = Field(ge=0)
+    improvement_pct: float
+    improvement_ci95: list[float] = Field(min_length=2, max_length=2)
+    # Second gate, guarding the OVERWRITE rather than the claim: the first answers "does tuning
+    # beat no tuning", which says nothing about whether THIS search beat the winner already on
+    # disk. All three None on the first run, when there is no incumbent to beat.
+    incumbent_cost_validation: float | None = Field(default=None, ge=0)
+    incumbent_ci95: list[float] | None = Field(default=None, min_length=2, max_length=2)
+    beats_incumbent: bool | None = None
+    # What the incumbent was tuned on, when the file records it. An incumbent from a different
+    # panel is still compared -- both are scored on THIS run's draws, so the comparison is fair
+    # -- but the mismatch has to be visible, since a params file is only valid near the training
+    # size it was tuned at (invariant 41).
+    incumbent_tuned_on: dict[str, Any] | None = None
+    persisted: bool
+    n_selection_draws: int = Field(gt=0)
+    n_validation_draws: int = Field(gt=0)
+    selection_seeds: list[int]
+    validation_seeds: list[int]
+    # The windows are described by their boundary dates and their row counts. The draws
+    # bootstrap the TRAINING rows of each window; every draw scores the window in full, so a
+    # single scored-row count stands for all of them.
+    selection_train_end: str
+    selection_eval_start: str
+    selection_eval_end: str
+    validation_train_end: str
+    validation_eval_start: str
+    validation_eval_end: str
+    n_selection_fit_rows: int = Field(gt=0)
+    n_validation_fit_rows: int = Field(gt=0)
+    n_selection_eval_rows: int = Field(gt=0)
+    n_validation_eval_rows: int = Field(gt=0)
+    # The panel and feature set the winner is valid for. Recorded because hyperparameters do
+    # not transfer across training sizes: invariant 41 measured a winner tuned at 50 series
+    # coming out 12% WORSE than not tuning at 500. Unlike the imputer's file, this one can say
+    # what it was tuned on, so a consumer at another scale can refuse it.
+    n_series: int = Field(gt=0)
+    horizon: int = Field(gt=0)
+    lags: list[int] = Field(min_length=1)
+    rolling_windows: list[int] = Field(min_length=1)
+    seed: int
+    created_at: str
+    git_commit: str | None
+    # Keyed by the DATACLASS's parameter names for the three core ones and by the backend's own
+    # names for the rest, which is the shape `LightGBMModel`/`CatBoostingModel` consume.
+    best_params: dict[str, Any]
