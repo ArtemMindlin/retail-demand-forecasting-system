@@ -33,12 +33,18 @@ the LightGBM hyperparameter search (`run_mode = tune_forecasting`, in flight) an
 CatBoost one after it. A champion trained on untuned defaults is not the champion the
 thesis will defend.
 
-Beyond the numbers, the THIRD conclusion under `tab:metrics_cost` in chapter 6 needs
-rewriting, not just re-citing. It tells a story about an "unexpected ordering" in which
+The three conclusions under `tab:metrics_cost` in chapter 6 have been rewritten for the
+protocol they now describe, with every figure wrapped in `\pendiente{}` — it prints in red
+and in brackets so a provisional number cannot ship silently. Seven of them are waiting on
+one run of `make backtest-fair-cost`, which is blocked only by the forecasting search holding
+the machine. The estimates inside the markers come from a 6-draw check of the committed code,
+not from a registered run, and must be replaced rather than merely confirmed.
+
+The rewrite also retired a paragraph rather than updating it. It tells a story about an "unexpected ordering" in which
 `historical_mean` is the most expensive of the four signals, dearer than the uncorrected
-baseline. Under a per-series safety stock it is the second cheapest, and the cost ranking
-follows signal quality monotonically. The old ordering looks like an artefact of the flat
-cushion; do not carry that paragraph over.
+baseline. Under the current policy it is the second cheapest and the ordering follows what
+each rule can recognise about stockout severity. The old ordering was an artefact of the flat
+cushion, and that paragraph is gone.
 
 `tab:imputation_reconstruction` is gone from chapter 6, not pending: the `compare_imputation`
 mode that wrote it is deleted and invariant 42 forbids the ranking it showed. Restoring the
