@@ -222,3 +222,51 @@ def test_stockout_regime_thresholds() -> None:
     assert res_all.loc[0, "stockout_regime"] == "high_stockout"
     assert res_all.loc[1, "stockout_regime"] == "low_stockout"
     assert res_all.loc[2, "stockout_regime"] == "low_stockout"
+
+
+def test_pinned_velocity_means_make_regime_labeling_concatenable() -> None:
+    """Labeling halves separately must agree with labeling their concatenation.
+
+    Only `velocity_regime` can disagree: it is the one label built from an aggregate over
+    the frame. `_build_supervised_frames` relies on this to give the holdout the regime the
+    train panel knew, instead of one computed with the holdout's own demand.
+    """
+    import pandas as pd
+
+    from retail_forecasting.drift import label_all_regimes
+
+    def panel(dates: list[str], demand: list[float]) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "series_id": ["A"] * len(dates),
+                "date": pd.to_datetime(dates),
+                "observed_demand": demand,
+                "stockout_hours": [0.0] * len(dates),
+                "discount": [0.0] * len(dates),
+                "holiday_flag": [0] * len(dates),
+            }
+        )
+
+    # A series that is slow-moving over train alone and fast-moving once the holdout lands.
+    train = panel(["2024-06-22", "2024-06-23", "2024-06-24", "2024-06-25"], [0.5, 0.6, 0.7, 0.8])
+    holdout = panel(["2024-06-26", "2024-06-27", "2024-06-28"], [5.0, 6.0, 7.0])
+    train_means = train.groupby("series_id", sort=False)["observed_demand"].mean()
+
+    unpinned = label_all_regimes(pd.concat([train, holdout], ignore_index=True))
+    assert set(unpinned["velocity_regime"]) == {"fast_moving"}
+
+    pinned = label_all_regimes(
+        pd.concat([train, holdout], ignore_index=True), velocity_series_means=train_means
+    )
+    assert set(pinned["velocity_regime"]) == {"slow_moving"}
+
+    labeled_apart = label_all_regimes(train, velocity_series_means=train_means)
+    assert (
+        pinned.loc[pinned["date"] <= "2024-06-25", "velocity_regime"].tolist()
+        == labeled_apart["velocity_regime"].tolist()
+    )
+
+    # A series missing from the reference falls back to its mean within the frame.
+    other = panel(["2024-06-26"], [40.0]).assign(series_id="B")
+    fallback = label_all_regimes(other, velocity_series_means=train_means)
+    assert fallback.loc[0, "velocity_regime"] == "fast_moving"
