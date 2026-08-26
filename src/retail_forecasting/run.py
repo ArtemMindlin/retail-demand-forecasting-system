@@ -20,9 +20,9 @@ from pydantic import ValidationError
 from retail_forecasting.config import load_config
 from retail_forecasting.contracts.contracts_config import ImputationStrategy, RunMode
 from retail_forecasting.eda.pipeline import run_eda
+from retail_forecasting.forecasting.fair_cost import run_fair_cost_backtest
 from retail_forecasting.forecasting.pipeline import (
     run_experiment,
-    run_fair_cost_backtest,
     run_retrain,
     run_scoring,
 )
@@ -134,8 +134,7 @@ def main() -> None:
         fields(logger, {"escrito": sim_artifacts.run_directory})
         return
     if mode == "fair_cost_backtest":
-        run_dir = run_fair_cost_backtest(settings)
-        fields(logger, {"escrito": run_dir / "fair_cost_backtest.csv"})
+        run_fair_cost_backtest(settings)
         return
     if mode == "tune_imputation":
         from retail_forecasting.forecasting.imputation_tuning import tune_imputation_lgbm

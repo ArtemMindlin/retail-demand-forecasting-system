@@ -1,24 +1,17 @@
 from __future__ import annotations
 
-import statistics
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
-from retail_forecasting.config import InventoryConfig, Settings, build_config_hash
+from retail_forecasting.config import Settings, build_config_hash
 from retail_forecasting.contracts.contracts_backtesting import FoldRunMetadata
-from retail_forecasting.contracts.contracts_config import ImputationStrategy
 from retail_forecasting.contracts.contracts_drift import DriftDetectorMetadata, DriftEvent
 from retail_forecasting.contracts.contracts_tuning import BoostingParams
-from retail_forecasting.data.censorship import (
-    SYNTHETIC_CENSORING_EVAL_FRACTION,
-    LatentDemandImputer,
-    synthetic_censor_holdout,
-)
+from retail_forecasting.data.censorship import LatentDemandImputer
 from retail_forecasting.data.dataset import load_prepared_panel
 from retail_forecasting.data.quality import (
     raise_on_blocking_data_quality,
@@ -53,10 +46,6 @@ from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.optimization import HyperparameterTuner
-from retail_forecasting.tracking import (
-    EXPERIMENT_RUNS,
-    open_run_directory,
-)
 from retail_forecasting.utils.io import (
     HOLDOUT_FOLD_ID,
     model_file_path,
@@ -138,121 +127,6 @@ def _train_conformal_model(
             group_ids=group_ids,
         )
     return model
-
-
-def evaluate_fair_inventory_cost(
-    panel: pd.DataFrame,
-    inventory_config: InventoryConfig,
-    seed: int,
-    eval_fraction: float = SYNTHETIC_CENSORING_EVAL_FRACTION,
-    imputer_params_path: Path | None = None,
-) -> pd.DataFrame:
-    """Compare strategies on inventory cost against a COMMON ground truth.
-
-    Returns one row per strategy: signal_mae, total_cost, fill_rate, mean_order, n_eval.
-    """
-    censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed, eval_fraction)
-    n_eval = len(eval_idx)
-
-    # One cost pair for the whole catalogue, so every strategy is charged identically.
-    cr = inventory_config.stockout_cost / (
-        inventory_config.stockout_cost + inventory_config.overstock_cost
-    )
-    z = statistics.NormalDist().inv_cdf(cr)
-    sigma = float(np.std(true_demand))  # shared safety-stock scale (same scalar for all)
-
-    if "series_id" in panel.columns:
-        series_ids = panel.loc[eval_idx, "series_id"].astype(str).to_numpy()
-    else:
-        series_ids = np.arange(n_eval)
-
-    total_demand = float(true_demand.sum())
-    records: list[dict[str, Any]] = []
-    # "none" leaves the censored sale untouched → it IS the Observed (deflated) signal.
-    strategies: tuple[tuple[ImputationStrategy, str], ...] = (
-        ("none", "Observed"),
-        ("supervised", "Latent_supervised"),
-        ("historical_mean", "Latent_historical_mean"),
-        ("clipped_scaling", "Latent_clipped_scaling"),
-    )
-    for strategy, label in strategies:
-        imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
-            censored
-        )
-        signal = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
-        q_star = np.maximum(signal + z * sigma, 0.0)
-
-        costed = attach_inventory_costs(
-            pd.DataFrame(
-                {"series_id": series_ids, "y_true": true_demand, "order_quantity": q_star}
-            ),
-            inventory_config,
-        )
-        stockout_units = float(costed["stockout_units"].sum())
-        records.append(
-            {
-                "strategy": label,
-                "signal_mae": float(np.mean(np.abs(signal - true_demand))),
-                "total_cost": float(costed["total_cost"].sum()),
-                "fill_rate": (
-                    (1.0 - stockout_units / total_demand) * 100.0
-                    if total_demand > 0
-                    else float("nan")
-                ),
-                "mean_order": float(np.mean(q_star)),
-                "n_eval": int(n_eval),
-            }
-        )
-    return pd.DataFrame(records)
-
-
-def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
-    """Lightweight backtest (no training) validating the fair inventory-cost comparison.
-
-    Returns:
-        The created run directory path.
-    """
-    rule(logger, "backtest de coste justo · verdad común, sin forecasting")
-    panel = load_prepared_panel(
-        dataset_config=settings.dataset,
-        preprocessing_config=settings.preprocessing,
-        split="train",
-    )
-    source_series = panel["series_id"].nunique() if "series_id" in panel.columns else 0
-    if "series_id" in panel.columns and n_series:
-        unique_ids = panel["series_id"].drop_duplicates().to_numpy()
-        if len(unique_ids) > n_series:
-            rng = np.random.default_rng(settings.project.random_seed)
-            keep = rng.choice(unique_ids, size=n_series, replace=False)
-            panel = panel[panel["series_id"].isin(keep)].reset_index(drop=True)
-    n_kept = panel["series_id"].nunique() if "series_id" in panel.columns else 0
-    fields(
-        logger,
-        {"panel": f"{thousands(len(panel))} filas · {n_kept} de {source_series} series (muestra)"},
-    )
-
-    result = evaluate_fair_inventory_cost(
-        panel,
-        settings.inventory,
-        seed=settings.project.random_seed,
-        imputer_params_path=(
-            settings.models.models_dir / settings.models.imputation_params_filename
-        ),
-    )
-    # Provenance: the ranking flips with the source panel, so the artifact must say
-    # which one it came from rather than leaving it to the reader's memory.
-    result.insert(1, "source_panel_series", source_series)
-    result.insert(2, "sampled_series", n_kept)
-
-    with open_run_directory(settings.reporting.run_name, EXPERIMENT_RUNS) as run_dir:
-        out_path = run_dir / "fair_cost_backtest.csv"
-        result.to_csv(out_path, index=False)
-
-        rule(logger, "coste de inventario contra una verdad COMÚN (menos es mejor)")
-        for line in result.to_string(index=False).splitlines():
-            logger.info("  %s", line)
-        fields(logger, {"escrito": str(out_path)})
-        return run_dir
 
 
 def run_experiment(settings: Settings) -> RunArtifacts:

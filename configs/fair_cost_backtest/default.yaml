@@ -20,18 +20,12 @@ dataset:
 preprocessing:
   drop_negative_sales: true
   fill_missing_values: true
-  imputation_strategy: supervised
 
 
+# Only the store: this mode trains no forecasting model. It reads the supervised imputer's
+# tuned params from here.
 models:
   models_dir: models
-  quantiles: [0.1, 0.5, 0.9]
-  seasonal_period: 7
-  n_estimators: 200
-  learning_rate: 0.05
-  max_depth: 6
-  use_tuning: false
-  tuning_trials: 40
 
 
 inventory:
@@ -42,4 +36,3 @@ inventory:
 
 reporting:
   run_name: fresh_retailnet_v2
-  make_plots: true
