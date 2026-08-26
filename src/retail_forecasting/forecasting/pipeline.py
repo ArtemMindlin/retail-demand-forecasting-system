@@ -212,10 +212,7 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
     Returns:
         The created run directory path.
     """
-    print("\n" + "=" * 50)
-    print("🧪 FAIR INVENTORY-COST BACKTEST (common ground truth · no forecasting)")
-    print("=" * 50 + "\n")
-    print("📂 Loading train panel...")
+    rule(logger, "backtest de coste justo · verdad común, sin forecasting")
     panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
@@ -229,7 +226,10 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
             keep = rng.choice(unique_ids, size=n_series, replace=False)
             panel = panel[panel["series_id"].isin(keep)].reset_index(drop=True)
     n_kept = panel["series_id"].nunique() if "series_id" in panel.columns else 0
-    print(f"✅ Panel: {len(panel):,} rows · {n_kept} of {source_series} series (sample)")
+    fields(
+        logger,
+        {"panel": f"{thousands(len(panel))} filas · {n_kept} de {source_series} series (muestra)"},
+    )
 
     result = evaluate_fair_inventory_cost(
         panel,
@@ -248,9 +248,10 @@ def run_fair_cost_backtest(settings: Settings, n_series: int = 30) -> Path:
         out_path = run_dir / "fair_cost_backtest.csv"
         result.to_csv(out_path, index=False)
 
-        print("\n── Inventory cost against a COMMON ground truth (lower = better) ──")
-        print(result.to_string(index=False))
-        print(f"\n✅ Fair-cost backtest written to: {out_path}\n")
+        rule(logger, "coste de inventario contra una verdad COMÚN (menos es mejor)")
+        for line in result.to_string(index=False).splitlines():
+            logger.info("  %s", line)
+        fields(logger, {"escrito": str(out_path)})
         return run_dir
 
 
@@ -1093,7 +1094,7 @@ def run_scoring(
     if not model_path.exists():
         raise FileNotFoundError(f"No saved model at {model_path}. Run a backtest or retrain first.")
     model = ConformalForecaster.load(model_path)
-    print(f"✅ Loaded champion model: {model.backend_name} from {model_path}")
+    fields(logger, {"campeón cargado": f"{model.backend_name} desde {model_path}"})
 
     prepared_panel = label_all_regimes(panel)
 

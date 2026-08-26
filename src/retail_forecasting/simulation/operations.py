@@ -49,6 +49,9 @@ from retail_forecasting.forecasting.pipeline import (
 from retail_forecasting.inventory.newsvendor import attach_inventory_costs
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.tracking import EXPERIMENT_OPS, log_ops_metadata, open_run_directory
+from retail_forecasting.utils.logging import fields, get_logger, rule, thousands
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -151,11 +154,11 @@ def _setup_cadence_models(
     Returns ``(cadence_paths, cadence_int)`` mapping each cadence label to its
     model file and to its retrain period (``None`` = never retrain).
     """
-    print(f"🔧 Training initial champion on train split ({len(train_panel)} rows)...")
+    fields(logger, {"campeón inicial": f"entrenando sobre {thousands(len(train_panel))} filas"})
     base_model_path = train_and_save_champion(
         settings, train_panel, models_dir=sim_models_root / "initial"
     )
-    print(f"   ↳ saved to {base_model_path}")
+    fields(logger, {"guardado": str(base_model_path)})
 
     cadence_paths: dict[str, Path] = {}
     cadence_int: dict[str, int | None] = {}
@@ -186,9 +189,12 @@ def _run_streaming_loop(
     retrain_events: list[dict[str, Any]] = []
     rows: list[pd.DataFrame] = []
 
-    print(
-        f"▶️  Streaming {len(eval_dates)} eval days across "
-        f"{len(cadence_paths)} cadences (horizon={horizon})..."
+    fields(
+        logger,
+        {
+            "transmitiendo": f"{len(eval_dates)} días de eval",
+            "cadencias": f"{len(cadence_paths)} · horizonte {horizon}d",
+        },
     )
 
     for day_index, current_date in enumerate(eval_dates):
@@ -253,9 +259,12 @@ def _run_streaming_loop(
             rows.append(preds)
 
         if (day_index + 1) % 5 == 0 or day_index == len(eval_dates) - 1:
-            print(
-                f"   day {day_index + 1}/{len(eval_dates)} ({current_date.date()}) "
-                f"— retrains so far: {len(retrain_events)}"
+            logger.info(
+                "  día %d/%d (%s) — reentrenos hasta ahora: %d",
+                day_index + 1,
+                len(eval_dates),
+                current_date.date(),
+                len(retrain_events),
             )
 
     return pd.concat(rows, ignore_index=True), retrain_events
@@ -298,7 +307,7 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
     triggered according to the cadence period. See the module docstring for what
     this backtest does and does not model.
     """
-    print("📥 Loading train and eval splits for the rolling-origin backtest...")
+    rule(logger, "backtest de origen rodante")
     train_panel = load_prepared_panel(
         dataset_config=settings.dataset,
         preprocessing_config=settings.preprocessing,
@@ -360,15 +369,18 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
             eval_dates,
         )
 
-        print(
-            f"✅ Rolling-origin backtest complete. Outputs in {sim_root} "
-            f"({len(retrain_events)} retrain events)"
+        fields(
+            logger,
+            {
+                "escrito": str(sim_root),
+                "reentrenos": str(len(retrain_events)),
+            },
         )
         if not cadence_comparison.empty and bool(cadence_comparison["underpowered"].any()):
-            print(
-                "⚠️  Only "
-                f"{int(cadence_comparison['n_origins'].max())} independent origins: the "
-                "cadence comparison is descriptive, not conclusive."
+            logger.warning(
+                "solo %d orígenes independientes: la comparación de cadencias es "
+                "descriptiva, no concluyente",
+                int(cadence_comparison["n_origins"].max()),
             )
 
         log_ops_metadata(

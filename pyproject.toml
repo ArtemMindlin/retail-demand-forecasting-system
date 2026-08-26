@@ -104,8 +104,18 @@ target-version = "py311"
 extend-exclude = ["notebooks/*.ipynb"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "N"]
+select = ["E", "F", "I", "B", "UP", "N", "T20"]
 ignore = ["E402", "N806", "E501", "N803"]
+
+# T20 (no prints) applies to the library only. A run narrates through
+# `utils/logging`, whose handler honours `set_verbosity` and can be pointed at a file;
+# a print goes to stdout regardless, so half the narrative escapes whatever the CLI
+# configured. The exceptions below print on purpose, being tools rather than runs.
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["T20"]
+"manage.py" = ["T20"]
+"tests/*" = ["T20"]
+"src/retail_forecasting/evaluation/latex_exporter.py" = ["T20"]
 
 [tool.ruff.format]
 quote-style = "double"
