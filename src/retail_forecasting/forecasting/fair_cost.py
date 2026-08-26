@@ -194,6 +194,7 @@ def _build_metadata(
     seeds: list[int],
     inventory_config: InventoryConfig,
     seed: int,
+    imputer_params_path: Path | None,
 ) -> FairCostMetadata:
     """The facts a reader needs to know whether this ranking applies to their question."""
     ranked = summary[summary["strategy"] != BASELINE_STRATEGY].sort_values("total_cost")
@@ -212,6 +213,7 @@ def _build_metadata(
         seeds=seeds,
         overstock_cost=inventory_config.overstock_cost,
         stockout_cost=inventory_config.stockout_cost,
+        imputer_params_tuned=imputer_params_path is not None and imputer_params_path.exists(),
         best_strategy=str(best["strategy"]),
         best_cost_delta_pct=float(best["cost_delta_pct"]),
         best_ci95=[float(best["cost_ci95_low"]), float(best["cost_ci95_high"])],
@@ -254,17 +256,24 @@ def run_fair_cost_backtest(settings: Settings) -> Path:
     )
 
     seeds = [seed + offset for offset in range(N_DRAWS)]
+    imputer_params_path = settings.models.models_dir / settings.models.imputation_params_filename
+    if not imputer_params_path.exists():
+        logger.warning(
+            "sin params afinados del imputador en %s: el brazo supervisado corre con los "
+            "defaults, y el artefacto lo deja dicho",
+            imputer_params_path,
+        )
     draws = draw_costs(
         panel,
         settings.inventory,
         seeds,
-        imputer_params_path=(
-            settings.models.models_dir / settings.models.imputation_params_filename
-        ),
+        imputer_params_path=imputer_params_path,
         censorable_mask=censorable_mask,
     )
     summary = summarize_draws(draws)
-    metadata = _build_metadata(summary, draws, panel, n_kept, seeds, settings.inventory, seed)
+    metadata = _build_metadata(
+        summary, draws, panel, n_kept, seeds, settings.inventory, seed, imputer_params_path
+    )
     # Provenance in the artifact itself: the ranking flips with the source panel, so the CSV
     # must say which one it came from rather than leaving it to the reader's memory.
     summary.insert(1, "source_panel_series", source_series)

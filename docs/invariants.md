@@ -537,4 +537,7 @@ See `docs/web_layer.md` for the full description.
     ranking it exists to produce, against the strategy the thesis defends. It now passes a
     `censorable_mask` and keeps the whole panel, which is the mechanism the imputation search
     already uses for the same reason. `teacher_fit_rows` is recorded so the mismatch between a
-    params file and the teacher it is applied to stays visible.
+    params file and the teacher it is applied to stays visible -- alongside
+    `imputer_params_tuned`, since `LatentDemandImputer` falls back to the untuned defaults in
+    silence when the file is absent, and a teacher size is unreadable without knowing whether
+    a params file was read at all.

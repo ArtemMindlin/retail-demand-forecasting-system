@@ -57,6 +57,11 @@ class FairCostMetadata(BaseModel):
     # order IS the signal, so these two numbers are the whole policy (invariant 44).
     overstock_cost: float = Field(gt=0.0)
     stockout_cost: float = Field(gt=0.0)
+    # Whether the supervised arm ran on the TUNED imputer params or on the untuned defaults.
+    # `LatentDemandImputer` falls back silently when the file is absent, so without this the
+    # artifact cannot say which of the two it measured -- and `teacher_fit_rows`, recorded to
+    # make the invariant-41 scale check possible, is unreadable if the file was never used.
+    imputer_params_tuned: bool
     best_strategy: str
     best_cost_delta_pct: float
     best_ci95: list[float] = Field(min_length=2, max_length=2)

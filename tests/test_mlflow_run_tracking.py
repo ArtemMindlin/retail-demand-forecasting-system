@@ -275,6 +275,7 @@ def _fair_cost_metadata() -> FairCostMetadata:
         seeds=[42, 43],
         overstock_cost=1.0,
         stockout_cost=4.0,
+        imputer_params_tuned=True,
         best_strategy="Latent_supervised",
         best_cost_delta_pct=-3.72,
         best_ci95=[-95.41, -41.76],

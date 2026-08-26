@@ -457,8 +457,10 @@ Invariants:
   rule using only the stockout ratio and no model at all scores the best MAE of any of them
 
 The per-draw detail behind all of it is written beside it as `fair_cost_draws.csv`, one row
-per (seed, strategy), carrying also `teacher_fit_rows`; the run's
-identity goes to `fair_cost_metadata.json`.
+per (seed, strategy), carrying also `teacher_fit_rows`; the run's identity goes to
+`fair_cost_metadata.json`, which also records `imputer_params_tuned` — the imputer falls back
+to the untuned defaults in silence when the params file is missing, and `teacher_fit_rows` is
+unreadable without knowing whether a file was read at all.
 
 `sampled_series` counts the series EVALUATED, not the series the panel holds: the sample is
 applied as a censoring mask, so the supervised imputer's teacher keeps the whole panel

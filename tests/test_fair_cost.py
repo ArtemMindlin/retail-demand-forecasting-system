@@ -9,21 +9,31 @@ the baseline is paired.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 from pydantic import ValidationError
 
+from retail_forecasting.config import ReportingConfig, Settings
 from retail_forecasting.contracts.contracts_backtesting import FairCostMetadata
-from retail_forecasting.contracts.contracts_config import InventoryConfig
+from retail_forecasting.contracts.contracts_config import (
+    InventoryConfig,
+    ModelConfig,
+    ProjectConfig,
+)
 from retail_forecasting.data.censorship import synthetic_censor_holdout
 from retail_forecasting.evaluation.latex_exporter import _cost_gap_column, _fair_cost_table
+from retail_forecasting.forecasting import fair_cost
 from retail_forecasting.forecasting.fair_cost import (
     BASELINE_STRATEGY,
     STRATEGIES,
     _build_metadata,
     draw_costs,
     evaluate_fair_inventory_cost,
+    run_fair_cost_backtest,
     summarize_draws,
 )
 from tests.conftest import make_synthetic_panel
@@ -175,7 +185,7 @@ def test_a_single_draw_cannot_produce_an_interval(panel: pd.DataFrame) -> None:
 def test_metadata_names_the_cheapest_reconstruction(panel: pd.DataFrame) -> None:
     draws = draw_costs(panel, INVENTORY, SEEDS)
     summary = summarize_draws(draws)
-    metadata = _build_metadata(summary, draws, panel, 30, SEEDS, INVENTORY, seed=42)
+    metadata = _build_metadata(summary, draws, panel, 30, SEEDS, INVENTORY, 42, None)
 
     candidates = summary[summary["strategy"] != BASELINE_STRATEGY]
     assert metadata.best_strategy == candidates.loc[candidates["total_cost"].idxmin(), "strategy"]
@@ -191,7 +201,7 @@ def test_beating_the_baseline_is_decided_on_the_interval_not_the_sign(
 ) -> None:
     """A negative mean with an interval straddling zero is a coin flip, not a win."""
     summary = summarize_draws(draws)
-    metadata = _build_metadata(summary, draws, panel, 30, SEEDS, INVENTORY, seed=42)
+    metadata = _build_metadata(summary, draws, panel, 30, SEEDS, INVENTORY, 42, None)
     best = summary.set_index("strategy").loc[metadata.best_strategy]
     assert metadata.best_beats_baseline == bool(best["cost_ci95_high"] < 0.0)
 
@@ -211,6 +221,7 @@ def test_metadata_refuses_a_run_that_cannot_carry_an_interval() -> None:
         "seeds": [1, 2],
         "overstock_cost": 1.0,
         "stockout_cost": 4.0,
+        "imputer_params_tuned": True,
         "best_strategy": "Latent_supervised",
         "best_cost_delta_pct": -3.1,
         "best_ci95": [-5.0, -1.0],
@@ -271,3 +282,86 @@ def test_the_latex_table_still_renders_a_pre_interval_artifact() -> None:
     latex = _fair_cost_table(legacy)
     assert "--" in latex
     assert "sorteos" not in latex
+
+
+def test_the_run_writes_everything_a_reader_needs(
+    panel: pd.DataFrame, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole entry point, which nothing exercised until this test existed.
+
+    The pieces were covered one by one; the run that stitches them together -- open the run,
+    write three artifacts, log the record -- was not, and it is the only path a user ever
+    takes.
+    """
+    monkeypatch.setattr(fair_cost, "load_prepared_panel", lambda **_: panel)
+    monkeypatch.setattr(fair_cost, "N_SERIES", 3)
+    monkeypatch.setattr(fair_cost, "N_DRAWS", 3)
+    settings = Settings().model_copy(
+        update={
+            "project": ProjectConfig(run_mode="fair_cost_backtest"),
+            "models": ModelConfig(models_dir=tmp_path / "models"),
+            "reporting": ReportingConfig(run_name="fair_cost_test"),
+        }
+    )
+
+    run_dir = run_fair_cost_backtest(settings)
+
+    summary = pd.read_csv(run_dir / "fair_cost_backtest.csv")
+    draws = pd.read_csv(run_dir / "fair_cost_draws.csv")
+    metadata = json.loads((run_dir / "fair_cost_metadata.json").read_text(encoding="utf-8"))
+
+    assert list(summary["strategy"]) == [label for _, label in STRATEGIES]
+    assert len(draws) == 3 * len(STRATEGIES)
+    assert metadata["sampled_series"] == 3
+    assert metadata["source_panel_series"] == panel["series_id"].nunique()
+    # The mask, not a subset: the teacher saw more rows than the evaluated series hold.
+    assert metadata["teacher_fit_rows"] > 0
+    assert metadata["n_draws"] == 3
+    # No params file in a fresh models_dir, so the supervised arm ran on the untuned
+    # defaults -- and the artifact has to say so rather than let a reader assume otherwise.
+    assert metadata["imputer_params_tuned"] is False
+
+
+def test_a_run_without_tuned_params_says_so(
+    panel: pd.DataFrame, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`LatentDemandImputer` falls back to the untuned defaults in silence when the file is
+    missing. Silence is the problem: `teacher_fit_rows` is recorded so a reader can apply the
+    invariant-41 scale check, and that check is meaningless if the file was never read."""
+    monkeypatch.setattr(fair_cost, "load_prepared_panel", lambda **_: panel)
+    monkeypatch.setattr(fair_cost, "N_SERIES", 3)
+    monkeypatch.setattr(fair_cost, "N_DRAWS", 2)
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    settings = Settings().model_copy(
+        update={
+            "project": ProjectConfig(run_mode="fair_cost_backtest"),
+            "models": ModelConfig(models_dir=models_dir),
+            "reporting": ReportingConfig(run_name="fair_cost_tuned"),
+        }
+    )
+    (models_dir / settings.models.imputation_params_filename).write_text(
+        json.dumps(
+            {
+                "n_estimators": 40,
+                "learning_rate": 0.1,
+                "max_depth": 4,
+                "num_leaves": 8,
+                "min_child_samples": 2,
+                "colsample_bytree": 0.8,
+                "subsample": 1.0,
+                "subsample_freq": 0,
+                "reg_alpha": 0.0,
+                "reg_lambda": 0.0,
+                "min_data_per_group": 1,
+                "cat_smooth": 10.0,
+                "max_bin": 63,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    run_dir = run_fair_cost_backtest(settings)
+
+    metadata = json.loads((run_dir / "fair_cost_metadata.json").read_text(encoding="utf-8"))
+    assert metadata["imputer_params_tuned"] is True
