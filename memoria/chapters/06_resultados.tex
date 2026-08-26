@@ -218,8 +218,9 @@ Para resolver este sesgo de evaluación, implementamos una metodología de \text
 
 \begin{itemize}
     \item \textbf{Política de pedido común y simplificada}: la cantidad a pedir no proviene de los cuantiles del modelo de \textit{forecasting} ni de la capa conformal, sino de una aproximación normal \textit{order-up-to} idéntica para todas las estrategias, $q^* = \max(\text{señal} + z_{q^*}\cdot\sigma,\, 0)$, donde $z_{q^*}$ es el cuantil normal estándar del fractil crítico. Esta comparativa mide por tanto el \textbf{imputador}, no el modelo campeón; el rendimiento del sistema completo se evalúa en la validación a escala de la Sección~\ref{sec:resultados_escala}.
-    \item \textbf{Costes aplanados}: los perfiles de coste sintéticos por SKU de la Sección~\ref{sec:cost_profiles} se desactivan (\texttt{use\_series\_costs = false}) y se aplica un único par $(c_o, c_u)$ a todas las series, de modo que ninguna estrategia se beneficia de una composición de catálogo favorable.
-    \item \textbf{Término de seguridad compartido}: la escala $\sigma$ del \textit{safety stock} se estima como la desviación típica de la demanda real del conjunto de evaluación y se comparte entre estrategias. Al ser un valor común, no altera el orden entre ellas, que es la magnitud de interés, pero conviene advertir que es una cantidad de tipo oráculo: en producción $\sigma$ tendría que estimarse sobre el histórico disponible, por lo que los niveles absolutos de coste y de \textit{fill rate} de la Tabla~\ref{tab:metrics_cost} deben leerse como una cota optimista.
+    \item \textbf{Costes aplanados}: se aplica un único par $(c_o, c_u)$ a todas las series, de modo que ninguna estrategia se beneficia de una composición de catálogo favorable. Los perfiles de coste sintéticos por SKU que en su día se contemplaron fueron retirados del sistema por las razones que recoge la Sección~\ref{sec:cost_profiles}.
+    \item \textbf{Término de seguridad compartido y estimable}: la escala $\sigma$ del \textit{safety stock} es la misma para las cuatro estrategias, de modo que la diferencia de coste no mezcla la señal con la política. Se estima sobre el panel \textbf{censurado}, que es lo que un decisor observa en el momento de pedir. Una versión anterior de este protocolo la estimaba sobre la demanda real de los días evaluados: al ser un valor común no alteraba el orden entre estrategias, pero introducía una cantidad de tipo oráculo dentro de la propia política de pedido, algo que ninguna operativa real podría reproducir.
+    \item \textbf{Repetición del sorteo de censura}: la comparativa no descansa sobre una única inserción de censuras. Se repite el sorteo y el hueco de coste frente a la señal \textit{Observed} se reporta como una diferencia \textbf{emparejada} --- ambas estrategias vieron el mismo sorteo, así que la dificultad concreta de ese sorteo se cancela --- acompañada de su intervalo de confianza al 95\% (Student-t) en unidades de coste. El signo de la diferencia media, por sí solo, no distingue una ventaja real de un empate afortunado.
 \end{itemize}
 
 Los resultados de esta comparativa equitativa, calculada sobre un subconjunto de 30 series muestreadas del panel de 500 y $n = 293$ días censurados sintéticamente, se presentan en la Tabla~\ref{tab:metrics_cost}.
@@ -237,9 +238,12 @@ es que el subset base contiene demasiadas pocas series con regímenes de rotura 
 para que la corrección emerja por encima del ruido de muestreo con $n=30$: precisamente
 el mecanismo por el que la ventaja se diluye a escala, aquí operando en sentido
 contrario. Las conclusiones de esta sección deben leerse por tanto acotadas al panel de
-500 series, y no como una propiedad independiente del subconjunto evaluado. Ampliar $n$
-hasta que el signo sea estable frente al remuestreo queda como verificación pendiente,
-y es la limitación más relevante de esta sección.
+500 series, y no como una propiedad independiente del subconjunto evaluado. La
+incertidumbre \emph{dentro} de un panel dado sí está ahora cuantificada, por la
+repetición del sorteo de censura y el intervalo emparejado de la última columna de la
+tabla. Lo que queda abierto es la otra fuente de variación: repetir el muestreo de las
+30 series hasta que el signo sea estable frente a qué series entran, que es la
+limitación más relevante que subsiste en esta sección.
 \end{quote}
 
 \input{tables/table_costs}

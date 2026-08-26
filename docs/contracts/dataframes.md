@@ -418,6 +418,45 @@ Expected ordering:
 
 - sorted ascending by `total_cost`
 
+## Fair Cost Summary
+
+Persisted as `fair_cost_backtest.csv`. Created by:
+
+- `summarize_draws()`, from the per-draw frame `draw_costs()` builds
+
+Expected columns:
+
+| Column | Meaning |
+| --- | --- |
+| `strategy` | demand-signal label (`Observed`, `Latent_<strategy>`) |
+| `source_panel_series` | series in the panel the sample was drawn from |
+| `sampled_series` | series actually scored |
+| `signal_mae` | reconstruction error of the signal on the censored days |
+| `total_cost` | mean inventory cost over the draws |
+| `fill_rate` | mean served share of true demand, in % |
+| `mean_order` | mean order quantity |
+| `cost_delta` | paired cost gap against `Observed`, in cost units |
+| `cost_delta_pct` | same gap as a ratio of the two mean costs, in % |
+| `cost_ci95_low` / `cost_ci95_high` | Student-t 95% interval of the paired gap, in COST UNITS |
+| `n_eval` | censored days scored per draw |
+| `n_draws` | censoring draws averaged |
+
+Expected ordering:
+
+- declaration order of `STRATEGIES`, baseline first — never sorted by cost, so the reader
+  compares against a row whose position does not move
+
+Invariants:
+
+- the four gap columns are EMPTY on the `Observed` row: its gap against itself is undefined,
+  and a zero-width interval on the reference row reads as a finding
+- `cost_delta` equals the difference of the two mean costs; the pairing buys the INTERVAL,
+  not the point estimate
+- `cost_delta_pct` is a percentage, the interval is not — see invariant 44
+
+The per-draw detail behind all of it is written beside it as `fair_cost_draws.csv`, one row
+per (seed, strategy), and the run's identity as `fair_cost_metadata.json`.
+
 ## Pareto Frontier
 
 Created by:

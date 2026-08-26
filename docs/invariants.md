@@ -465,3 +465,28 @@ See `docs/web_layer.md` for the full description.
     each series has its own predicted quantile curve. What is shared is the critical
     fractile. Any future reintroduction needs real business costs, not proxies -- and then
     `attach_series_costs` is the one seam it enters through.
+
+44. The fair-cost backtest reports a PAIRED cost gap over repeated draws, and its order policy
+    may not read the answer key.
+
+    Two defects lived in the version that produced the chapter 6 ranking, and both were quiet
+    because the comparison stayed internally fair either way.
+
+    The safety-stock scale was `std(true_demand)` -- the demand of the very days the strategies
+    are trying to reconstruct. Shared by all four, so it never biased the ranking, but an order
+    policy that reads the ground truth is not a policy anyone could run. It is now estimated on
+    the CENSORED panel, which is what a decision-maker sees. Absolute costs moved; every
+    strategy's moved together.
+
+    And the ranking came from ONE censoring draw, with no interval around it. That is the
+    thinnest possible evidence for the only comparison that ranks reconstruction strategies,
+    and the ranking is known to be fragile: at 500 series the observed signal beat the
+    reconstructed one on simulated cost, the reverse of the 50-series result. Runs now score
+    `N_DRAWS` draws and report the gap against the observed signal as a paired per-draw
+    difference with a Student-t 95% interval -- paired because both arms saw the same draw, so
+    the draw's own difficulty cancels. `best_beats_baseline` is decided on that interval, never
+    on the sign of the percentage.
+
+    Read the two quantities as different things: `best_cost_delta_pct` is a ratio of two mean
+    costs, while the interval is over the paired differences and is in COST UNITS. Quoting the
+    interval as percentage points is the mistake this note exists to prevent.

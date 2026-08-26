@@ -285,6 +285,51 @@ main()
 - Devuelve: `pd.DataFrame`.
 - Se usa en: `run_experiment_from_frame()`.
 
+### `evaluate_fair_inventory_cost`
+- Archivo: `src/retail_forecasting/forecasting/fair_cost.py`
+- Que hace: puntua las cuatro estrategias de senal de demanda en UN sorteo de censura
+  sintetica, contra la misma verdad.
+- Recibe:
+  - `panel`;
+  - `inventory_config`;
+  - `seed`;
+  - `imputer_params_path`.
+- Devuelve: `pd.DataFrame` con una fila por estrategia (`signal_mae`, `total_cost`,
+  `fill_rate`, `mean_order`, `n_eval`, `order_policy_scale`).
+- Invariantes:
+  - la politica de pedido es COMUN a las cuatro: un unico par de costes y una unica escala de
+    stock de seguridad, de modo que la diferencia de coste sea atribuible a la senal;
+  - esa escala se estima sobre el panel CENSURADO, nunca sobre la demanda real (invariante 44).
+- Se usa en: `draw_costs()`.
+
+### `summarize_draws`
+- Archivo: `src/retail_forecasting/forecasting/fair_cost.py`
+- Que hace: promedia cada estrategia sobre los sorteos y valora su hueco de coste frente al
+  observado.
+- Recibe:
+  - `draws`.
+- Devuelve: `pd.DataFrame` con las medias mas `cost_delta`, `cost_delta_pct` y el intervalo
+  `cost_ci95_low` / `cost_ci95_high`.
+- Invariantes:
+  - el hueco es EMPAREJADO: ambos brazos vieron el mismo sorteo, asi que la dificultad del
+    sorteo se cancela;
+  - el intervalo va en unidades de coste, no en puntos porcentuales;
+  - la fila del observado deja esas columnas vacias, no a cero.
+- Se usa en: `run_fair_cost_backtest()`.
+
+### `run_fair_cost_backtest`
+- Archivo: `src/retail_forecasting/forecasting/fair_cost.py`
+- Que hace: ordena las estrategias de reconstruccion por coste de inventario contra una verdad
+  comun. No entrena ningun modelo de forecasting.
+- Recibe:
+  - `settings`.
+- Devuelve: `Path` del directorio de corrida.
+- Invariantes:
+  - muestrea `N_SERIES` series del panel y registra en el artefacto de que panel salieron: el
+    orden se invierte con el panel de origen;
+  - `best_beats_baseline` se decide sobre el intervalo, nunca sobre el signo del porcentaje.
+- Se usa en: `main()`.
+
 ## Models
 
 ### `SeasonalNaiveModel.fit`
