@@ -21,6 +21,14 @@ class LightGBMModel(QuantileForecasterMixin):
     max_depth: int
     overstock_cost: float = 1.0
     stockout_cost: float = 4.0  # must be > 0; drives the critical fractile q* = cu/(cu+co)
+    # Cores per fit. -1 takes them all, right for one fit at a time and wrong when a caller
+    # fits many models in parallel: `tune_forecasting` pins this to 1 and parallelizes across
+    # draws instead, the same trade `censorship.py` already hardcodes for the imputer's LGBM.
+    n_jobs: int = -1
+    # Backend kwargs beyond the three the pipeline configures, keyed by the backend's own
+    # parameter names. `tune_forecasting` searches over these; anything here overrides the
+    # defaults below, so a tuned winner is reproducible by passing the same dict back.
+    extra_params: dict[str, Any] = field(default_factory=dict)
     model_name: str = "lightgbm"
     backend_name: str = field(init=False, default="lightgbm")
     point_model_: Any = field(init=False, default=None)
@@ -54,16 +62,18 @@ class LightGBMModel(QuantileForecasterMixin):
         return self._build_quantile_model(critical_fractile)
 
     def _build_quantile_model(self, quantile: float) -> Any:
-        return lgb.LGBMRegressor(
-            objective="quantile",
-            alpha=quantile,
-            random_state=self.random_seed,
-            n_estimators=self.n_estimators,
-            learning_rate=self.learning_rate,
-            num_leaves=31,
-            max_depth=self.max_depth,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            n_jobs=-1,
-            verbosity=-1,
-        )
+        kwargs: dict[str, Any] = {
+            "objective": "quantile",
+            "alpha": quantile,
+            "random_state": self.random_seed,
+            "n_estimators": self.n_estimators,
+            "learning_rate": self.learning_rate,
+            "num_leaves": 31,
+            "max_depth": self.max_depth,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "n_jobs": self.n_jobs,
+            "verbosity": -1,
+        }
+        kwargs.update(self.extra_params)
+        return lgb.LGBMRegressor(**kwargs)

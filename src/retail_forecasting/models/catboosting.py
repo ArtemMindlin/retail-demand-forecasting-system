@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 import pandas as pd
 from catboost import CatBoostRegressor
@@ -27,6 +28,10 @@ class CatBoostingModel(QuantileForecasterMixin):
     max_depth: int
     overstock_cost: float = 1.0
     stockout_cost: float = 4.0  # must be > 0; drives the critical fractile q* = cu/(cu+co)
+    # Cores per fit; see the note on `LightGBMModel.n_jobs`. CatBoost calls it `thread_count`.
+    n_jobs: int = -1
+    # See the note on `LightGBMModel.extra_params`.
+    extra_params: dict[str, Any] = field(default_factory=dict)
     model_name: str = "catboost"
     backend_name: str = field(init=False, default="catboost_official")
     point_model_: CatBoostRegressor | None = field(init=False, default=None)
@@ -37,19 +42,21 @@ class CatBoostingModel(QuantileForecasterMixin):
         cat_features = features.select_dtypes(include=["category", "object"]).columns.tolist()
 
         # 1. Fit Point Model at critical fractile q* (cost-aware, pinball loss)
-        self.point_model_ = CatBoostRegressor(
-            iterations=self.n_estimators,
-            learning_rate=self.learning_rate,
-            depth=min(self.max_depth, 16),
-            random_seed=self.random_seed,
-            loss_function=f"Quantile:alpha={critical_fractile}",
-            task_type="CPU",
-            l2_leaf_reg=3.0,
-            nan_mode="Min",
-            verbose=False,
-            allow_writing_files=False,
-            thread_count=-1,
-        )
+        kwargs: dict[str, Any] = {
+            "iterations": self.n_estimators,
+            "learning_rate": self.learning_rate,
+            "depth": min(self.max_depth, 16),
+            "random_seed": self.random_seed,
+            "loss_function": f"Quantile:alpha={critical_fractile}",
+            "task_type": "CPU",
+            "l2_leaf_reg": 3.0,
+            "nan_mode": "Min",
+            "verbose": False,
+            "allow_writing_files": False,
+            "thread_count": self.n_jobs,
+        }
+        kwargs.update(self.extra_params)
+        self.point_model_ = CatBoostRegressor(**kwargs)
         logger.info(
             "Cost-aware training: optimizing point model for critical fractile tau = %.4f",
             critical_fractile,
@@ -58,19 +65,21 @@ class CatBoostingModel(QuantileForecasterMixin):
 
         # 2. Fit Quantile Models (One per quantile for consistency)
         for q in sorted(set(self.quantiles)):
-            q_model = CatBoostRegressor(
-                iterations=self.n_estimators,
-                learning_rate=self.learning_rate,
-                depth=min(self.max_depth, 16),
-                random_seed=self.random_seed,
-                loss_function=f"Quantile:alpha={q}",
-                task_type="CPU",
-                l2_leaf_reg=3.0,
-                nan_mode="Min",
-                verbose=False,
-                allow_writing_files=False,
-                thread_count=-1,
-            )
+            q_kwargs: dict[str, Any] = {
+                "iterations": self.n_estimators,
+                "learning_rate": self.learning_rate,
+                "depth": min(self.max_depth, 16),
+                "random_seed": self.random_seed,
+                "loss_function": f"Quantile:alpha={q}",
+                "task_type": "CPU",
+                "l2_leaf_reg": 3.0,
+                "nan_mode": "Min",
+                "verbose": False,
+                "allow_writing_files": False,
+                "thread_count": self.n_jobs,
+            }
+            q_kwargs.update(self.extra_params)
+            q_model = CatBoostRegressor(**q_kwargs)
             q_model.fit(features, target, cat_features=cat_features)
             self.quantile_models_[q] = q_model
 
