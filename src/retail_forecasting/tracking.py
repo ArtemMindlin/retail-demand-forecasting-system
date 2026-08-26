@@ -173,6 +173,42 @@ def log_eda_metadata(metadata: BaseModel, dataset_summary: pd.DataFrame) -> None
     mlflow.log_metrics(_numeric_metrics(dataset_summary))
 
 
+# Per-strategy scores worth ranking runs by. The rest of the summary is provenance, identical
+# across its four rows, and already recorded as params.
+_FAIR_COST_METRICS = (
+    "signal_mae",
+    "total_cost",
+    "fill_rate",
+    "mean_order",
+    "cost_delta",
+    "cost_delta_pct",
+)
+
+
+def log_fair_cost_metadata(metadata: BaseModel, summary: pd.DataFrame, settings: Settings) -> None:
+    """Attach the fair-cost backtest's config, identity and per-strategy scores to the open run.
+
+    Both CSVs are already in the run's artifact directory. What this adds is what a directory
+    cannot answer: before this, a fair-cost run carried no params, no metrics and not even a
+    `run_mode` tag, so `search_runs` could neither rank these runs by the cost gap of each
+    strategy nor tell them apart from an experiment.
+    """
+    mlflow.log_params(_flat_params(settings))
+    mlflow.log_params(
+        {key: "null" if value is None else value for key, value in metadata.model_dump().items()}
+    )
+    mlflow.set_tags(
+        {
+            "git_commit": get_git_commit(),
+            "run_mode": settings.project.run_mode,
+            "config_hash": build_config_hash(settings),
+        }
+    )
+    scored = [column for column in _FAIR_COST_METRICS if column in summary.columns]
+    mlflow.log_metrics(_numeric_metrics(summary.loc[:, ["strategy", *scored]]))
+    mlflow.log_table(summary, artifact_file="fair_cost_backtest.json")
+
+
 def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
     """Every run under `experiment_name`, newest first, mapped to its artifact directory.
 

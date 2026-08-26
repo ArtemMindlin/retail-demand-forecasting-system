@@ -16,7 +16,8 @@ import pandas as pd
 import pytest
 
 from retail_forecasting import tracking
-from retail_forecasting.config import ReportingConfig, Settings
+from retail_forecasting.config import ProjectConfig, ReportingConfig, Settings
+from retail_forecasting.contracts.contracts_backtesting import FairCostMetadata
 from retail_forecasting.contracts.contracts_quality import EdaRunMetadata
 from retail_forecasting.evaluation import reporting
 from retail_forecasting.evaluation.reporting import RunArtifacts
@@ -238,6 +239,79 @@ def test_an_unreachable_store_takes_the_run_down(
 
     with pytest.raises(Exception):  # noqa: B017 - MLflow's own error type is not part of this
         reporting.write_run_artifacts(_artifacts(), _settings(tmp_path))
+
+
+def _fair_cost_summary() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "strategy": ["Observed", "Latent_supervised"],
+            "source_panel_series": [500, 500],
+            "sampled_series": [30, 30],
+            "signal_mae": [3.39, 1.29],
+            "total_cost": [1843.41, 1774.82],
+            "fill_rate": [90.43, 99.75],
+            "mean_order": [10.44, 13.92],
+            "cost_delta": [float("nan"), -68.59],
+            "cost_delta_pct": [float("nan"), -3.72],
+            "cost_ci95_low": [float("nan"), -95.41],
+            "cost_ci95_high": [float("nan"), -41.76],
+            "n_eval": [293, 293],
+            "n_draws": [20, 20],
+        }
+    )
+
+
+def _fair_cost_metadata() -> FairCostMetadata:
+    return FairCostMetadata(
+        baseline_strategy="Observed",
+        source_panel_series=500,
+        sampled_series=30,
+        panel_rows=2700,
+        panel_start="2024-03-01",
+        panel_end="2024-06-25",
+        n_draws=20,
+        n_eval_rows=293,
+        eval_fraction=0.3,
+        seeds=[42, 43],
+        critical_fractile=0.8,
+        order_policy_scale=4.2,
+        best_strategy="Latent_supervised",
+        best_cost_delta_pct=-3.72,
+        best_ci95=[-95.41, -41.76],
+        best_beats_baseline=True,
+        seed=42,
+        created_at="2026-08-26T00:00:00Z",
+        git_commit=None,
+    )
+
+
+def test_a_fair_cost_run_is_findable_and_rankable(tmp_path: Path) -> None:
+    """It used to record nothing at all.
+
+    The backtest opened a run, wrote its CSV and closed, so `search_runs` could neither
+    filter these runs by mode nor rank them by the cost gap they measured -- the one thing
+    the run exists to produce.
+    """
+    with tracking.open_run_directory("fair_cost", tracking.EXPERIMENT_RUNS) as run_dir:
+        tracking.log_fair_cost_metadata(
+            metadata=_fair_cost_metadata(),
+            summary=_fair_cost_summary(),
+            settings=_settings(tmp_path).model_copy(
+                update={"project": ProjectConfig(run_mode="fair_cost_backtest")}
+            ),
+        )
+        recorded = run_dir
+
+    run = _logged_run(recorded)
+    assert run.data.tags["run_mode"] == "fair_cost_backtest"
+    assert run.data.params["best_strategy"] == "Latent_supervised"
+    assert run.data.params["inventory.stockout_cost"] == "4.0"
+    assert run.data.metrics["total_cost.Observed"] == pytest.approx(1843.41)
+    assert run.data.metrics["cost_delta.Latent_supervised"] == pytest.approx(-68.59)
+    # The baseline has no gap against itself, and a NaN must not land as a metric.
+    assert "cost_delta.Observed" not in run.data.metrics
+    # Provenance is a param, not something to rank runs by.
+    assert "sampled_series.Observed" not in run.data.metrics
 
 
 def test_an_unset_dataset_limit_is_recorded_rather_than_dropped() -> None:

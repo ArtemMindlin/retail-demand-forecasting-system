@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -15,3 +17,44 @@ class FoldRunMetadata(BaseModel):
     validation_rows: int = Field(ge=0)
     train_series: int = Field(ge=0)
     validation_series: int = Field(ge=0)
+
+
+class FairCostMetadata(BaseModel):
+    """Identity of one fair-cost backtest: what was compared, on what, and how it decided.
+
+    The comparison trains no model. Every strategy reconstructs the same synthetically
+    censored days and pays for the same order policy, so the only thing separating their
+    costs is the demand signal.
+
+    Read ``best_cost_delta_pct`` and ``best_ci95`` as different quantities. The percentage is
+    a ratio of two mean costs; the interval is over the PAIRED per-draw differences and is
+    therefore in cost units. ``best_beats_baseline`` is decided on the interval, not on the
+    percentage, whose sign alone does not distinguish a real gap from a coin flip.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    strategy: Literal["fair_cost_synthetic_censoring"] = "fair_cost_synthetic_censoring"
+    baseline_strategy: str
+    # The ranking flips with the panel the sample was drawn from, so both counts are recorded:
+    # sampling the 50-series subset instead of the 500 inverts the order.
+    source_panel_series: int = Field(gt=0)
+    sampled_series: int = Field(gt=0)
+    panel_rows: int = Field(gt=0)
+    panel_start: str
+    panel_end: str
+    n_draws: int = Field(gt=1)
+    n_eval_rows: int = Field(gt=0)
+    eval_fraction: float = Field(gt=0.0, le=1.0)
+    seeds: list[int] = Field(min_length=2)
+    critical_fractile: float = Field(gt=0.0, lt=1.0)
+    # Safety-stock scale of the shared order policy, estimated from the CENSORED panel: it has
+    # to be knowable at decision time, and the true demand of a censored day is not.
+    order_policy_scale: float = Field(ge=0.0)
+    best_strategy: str
+    best_cost_delta_pct: float
+    best_ci95: list[float] = Field(min_length=2, max_length=2)
+    best_beats_baseline: bool
+    seed: int
+    created_at: str
+    git_commit: str | None
