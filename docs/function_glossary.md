@@ -295,12 +295,13 @@ main()
   - `seed`;
   - `imputer_params_path`;
   - `censorable_mask`.
-- Devuelve: `pd.DataFrame` con una fila por estrategia (`signal_mae`, `total_cost`,
-  `fill_rate`, `mean_order`, `n_eval`, `mean_order_policy_scale`, `teacher_fit_rows`).
+- Devuelve: `pd.DataFrame` con una fila por estrategia (`total_cost`, `fill_rate`,
+  `mean_order`, `n_eval`, `teacher_fit_rows`).
 - Invariantes:
-  - la politica de pedido es COMUN a las cuatro: un unico par de costes y una escala de stock
-    de seguridad POR SERIE, de modo que la diferencia de coste sea atribuible a la senal;
-  - esa escala se estima sobre el panel CENSURADO, nunca sobre la demanda real (invariante 44);
+  - la politica de pedido es COMUN a las cuatro y es la senal misma, sin termino de seguridad:
+    el coste ES el error asimetrico de la senal (invariante 44);
+  - no devuelve MAE de reconstruccion: el invariante 42 prohibe ordenar estas cuatro por esa
+    magnitud;
   - `censorable_mask` estrecha lo que se evalua sin recortar el panel: el maestro del imputador
     supervisado conserva su tamano de despliegue (invariantes 41 y 44).
 - Se usa en: `draw_costs()`.

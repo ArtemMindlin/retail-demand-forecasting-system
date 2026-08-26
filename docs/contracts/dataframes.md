@@ -431,8 +431,7 @@ Expected columns:
 | `strategy` | demand-signal label (`Observed`, `Latent_<strategy>`) |
 | `source_panel_series` | series in the panel the sample was drawn from |
 | `sampled_series` | series actually scored |
-| `signal_mae` | reconstruction error of the signal on the censored days |
-| `total_cost` | mean inventory cost over the draws |
+| `total_cost` | mean inventory cost over the draws — the signal's asymmetric error, since the order IS the signal |
 | `fill_rate` | mean served share of true demand, in % |
 | `mean_order` | mean order quantity |
 | `cost_delta` | paired cost gap against `Observed`, in cost units |
@@ -453,9 +452,12 @@ Invariants:
 - `cost_delta` equals the difference of the two mean costs; the pairing buys the INTERVAL,
   not the point estimate
 - `cost_delta_pct` is a percentage, the interval is not — see invariant 44
+- reconstruction MAE is deliberately ABSENT: invariant 42 forbids ranking these four by it,
+  since they differ in reconciliation rule and the generator favours one form. Measured, a
+  rule using only the stockout ratio and no model at all scores the best MAE of any of them
 
 The per-draw detail behind all of it is written beside it as `fair_cost_draws.csv`, one row
-per (seed, strategy), carrying also `mean_order_policy_scale` and `teacher_fit_rows`; the run's
+per (seed, strategy), carrying also `teacher_fit_rows`; the run's
 identity goes to `fair_cost_metadata.json`.
 
 `sampled_series` counts the series EVALUATED, not the series the panel holds: the sample is

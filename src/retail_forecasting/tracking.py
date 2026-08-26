@@ -176,7 +176,6 @@ def log_eda_metadata(metadata: BaseModel, dataset_summary: pd.DataFrame) -> None
 # Per-strategy scores worth ranking runs by. The rest of the summary is provenance, identical
 # across its four rows, and already recorded as params.
 _FAIR_COST_METRICS = (
-    "signal_mae",
     "total_cost",
     "fill_rate",
     "mean_order",

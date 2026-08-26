@@ -30,7 +30,6 @@ FAIR_COST = pd.DataFrame(
         "strategy": ["Observed", "Latent_supervised"],
         "source_panel_series": [500, 500],
         "sampled_series": [30, 30],
-        "signal_mae": [3.3912308020477817, 1.2909867391653858],
         "total_cost": [1843.4099137659625, 1774.8228848638441],
         "fill_rate": [90.42729586868771, 99.74686927967038],
         "mean_order": [10.442437074900662, 13.918321151333373],

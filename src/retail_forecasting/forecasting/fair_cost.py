@@ -13,7 +13,6 @@ target, so two runs are not comparable. Here every strategy pays for the same da
 
 from __future__ import annotations
 
-import statistics
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +68,10 @@ def evaluate_fair_inventory_cost(
 ) -> pd.DataFrame:
     """Score every strategy on ONE censoring draw, against a common ground truth.
 
+    The order policy is the signal itself, priced with the catalogue's single cost pair, so the
+    cost IS the asymmetric error of the signal and nothing else. That is what "attribute the
+    difference to the signal" has to mean here.
+
     ``censorable_mask`` restricts which rows may be censored and scored WITHOUT shrinking the
     panel, so the supervised imputer's teacher keeps its deployment-sized training set. Passing
     a smaller panel instead is the defect invariant 41 was written about: it shrank the teacher
@@ -77,38 +80,28 @@ def evaluate_fair_inventory_cost(
     MAE 0.5640 against 0.4106 for the 16405-row one -- a 27% handicap, and one that fell on the
     supervised arm alone, since both heuristics are per-series or per-row.
 
-    Returns one row per strategy: signal_mae, total_cost, fill_rate, mean_order, n_eval, the
-    mean per-series safety-stock scale and the teacher's training size.
+    Returns one row per strategy: total_cost, fill_rate, mean_order, n_eval and the teacher's
+    training size.
     """
     censored, eval_idx, true_demand = synthetic_censor_holdout(
         panel, seed, censorable_mask=censorable_mask
     )
-    scored_rows = slice(None) if censorable_mask is None else censorable_mask
-
-    # One cost pair for the whole catalogue, so every strategy is charged identically.
-    critical_fractile = inventory_config.stockout_cost / (
-        inventory_config.stockout_cost + inventory_config.overstock_cost
-    )
-    z = statistics.NormalDist().inv_cdf(critical_fractile)
-    # PER SERIES, and from the CENSORED panel. Identical for all four strategies -- it is
-    # computed before any imputation -- so the comparison stays isolated to the signal, while
-    # the cushion stays proportional to the series it orders for. One catalogue-wide scalar
-    # made z*sigma 120% of the smallest series' daily sales and 33% of the largest's, and at
-    # ~6 units it swamped the one-to-two-unit differences between the signals: every strategy
-    # ordered almost the same thing and the comparison measured the cushion. See invariant 44.
-    scale_by_series = censored.loc[scored_rows].groupby("series_id")["observed_demand"].std()
-    pooled = float(np.std(censored.loc[scored_rows, "observed_demand"].to_numpy(dtype=float)))
-    sigma = censored.loc[eval_idx, "series_id"].map(scale_by_series).fillna(pooled).to_numpy(float)
     teacher_fit_rows = int((censored["stockout_hours"] == 0).sum())
-
     total_demand = float(true_demand.sum())
+
     records: list[dict[str, Any]] = []
     for strategy, label in STRATEGIES:
         imputed = LatentDemandImputer(strategy=strategy, model_path=imputer_params_path).impute(
             censored
         )
         signal = imputed.loc[eval_idx, "latent_demand_est"].astype(float).to_numpy()
-        order_quantity = np.maximum(signal + z * sigma, 0.0)
+        # The policy IS the signal. Deliberately naive, and the only version of this that
+        # measures anything: an imputer returns a point estimate, not a predictive
+        # distribution, so there is no quantile for a newsvendor to take. Two safety-stock
+        # terms were tried and both broke the metric -- see invariant 44 for the measurements.
+        order_quantity = (
+            np.maximum(signal, 0.0) if inventory_config.clip_negative_orders else signal
+        )
 
         costed = attach_inventory_costs(
             pd.DataFrame({"y_true": true_demand, "order_quantity": order_quantity}),
@@ -118,7 +111,6 @@ def evaluate_fair_inventory_cost(
         records.append(
             {
                 "strategy": label,
-                "signal_mae": float(np.mean(np.abs(signal - true_demand))),
                 "total_cost": float(costed["total_cost"].sum()),
                 "fill_rate": (
                     (1.0 - stockout_units / total_demand) * 100.0
@@ -127,7 +119,6 @@ def evaluate_fair_inventory_cost(
                 ),
                 "mean_order": float(np.mean(order_quantity)),
                 "n_eval": int(len(eval_idx)),
-                "mean_order_policy_scale": float(np.mean(sigma)),
                 "teacher_fit_rows": teacher_fit_rows,
             }
         )
@@ -181,7 +172,6 @@ def summarize_draws(draws: pd.DataFrame) -> pd.DataFrame:
         records.append(
             {
                 "strategy": label,
-                "signal_mae": float(group["signal_mae"].mean()),
                 "total_cost": mean_cost,
                 "fill_rate": float(group["fill_rate"].mean()),
                 "mean_order": float(group["mean_order"].mean()),
@@ -220,9 +210,8 @@ def _build_metadata(
         n_eval_rows=int(summary["n_eval"].iloc[0]),
         eval_fraction=SYNTHETIC_CENSORING_EVAL_FRACTION,
         seeds=seeds,
-        critical_fractile=inventory_config.stockout_cost
-        / (inventory_config.stockout_cost + inventory_config.overstock_cost),
-        mean_order_policy_scale=float(draws["mean_order_policy_scale"].mean()),
+        overstock_cost=inventory_config.overstock_cost,
+        stockout_cost=inventory_config.stockout_cost,
         best_strategy=str(best["strategy"]),
         best_cost_delta_pct=float(best["cost_delta_pct"]),
         best_ci95=[float(best["cost_ci95_low"]), float(best["cost_ci95_high"])],

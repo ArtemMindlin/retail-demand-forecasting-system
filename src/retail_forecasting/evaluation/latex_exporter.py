@@ -134,7 +134,7 @@ def _cost_gap_column(costs_df: pd.DataFrame) -> pd.Series:
 
 def _fair_cost_table(costs_df: pd.DataFrame) -> str:
     """Fair-cost backtest table: every strategy charged against a common ground truth."""
-    cost_cols = ["strategy", "signal_mae", "total_cost", "fill_rate", "mean_order"]
+    cost_cols = ["strategy", "total_cost", "fill_rate", "mean_order"]
     cost_table = costs_df[cost_cols].copy()
     cost_table["strategy"] = _prettify(cost_table["strategy"])
     cost_table["cost_gap"] = _cost_gap_column(costs_df)
@@ -160,20 +160,20 @@ def _fair_cost_table(costs_df: pd.DataFrame) -> str:
         "Comparativa de costes operativos bajo evaluación justa: todas las estrategias se "
         "puntúan contra la misma demanda real mediante censura sintética sobre días limpios"
         f"{panel} ($n = {n_eval_es}$ días censurados). La política de pedido es común a todas "
-        "ellas (aproximación normal \\textit{order-up-to} con costes aplanados), de modo que "
-        f"la diferencia de coste es atribuible únicamente a la señal de demanda.{draws}"
+        "ellas y deliberadamente ingenua --- se pide exactamente lo que dice la señal, sin "
+        "término de seguridad, y se tarifa con el único par de costes del catálogo ---, de modo "
+        f"que el coste ES el error asimétrico de la señal y nada más.{draws}"
     )
     return _tabular(
         cost_table,
         header=[
             "Estrategia",
-            "MAE Señal",
             "Coste Total",
             "Fill Rate (\\%)",
             "Pedido Medio",
             "$\\Delta$ vs Observado (IC 95\\%)",
         ],
-        column_format="@{}lccccc@{}",
+        column_format="@{}lcccc@{}",
         caption=caption,
         label="tab:metrics_cost",
     )

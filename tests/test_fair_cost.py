@@ -9,8 +9,6 @@ the baseline is paired.
 
 from __future__ import annotations
 
-import statistics
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -73,36 +71,44 @@ def test_the_order_policy_is_shared_by_every_strategy(panel: pd.DataFrame) -> No
     """The whole design: if the safety stock differed per strategy, the cost gap would mix
     the signal with the policy and stop being attributable to the reconstruction."""
     result = evaluate_fair_inventory_cost(panel, INVENTORY, seed=42)
-    assert result["mean_order_policy_scale"].nunique() == 1
     assert result["n_eval"].nunique() == 1
     assert result["teacher_fit_rows"].nunique() == 1
 
 
-def test_the_cushion_is_per_series_and_never_reads_the_answer_key(panel: pd.DataFrame) -> None:
-    """Pins the order policy exactly, on the baseline arm where the signal is computable.
+def test_the_order_is_the_signal_itself(panel: pd.DataFrame) -> None:
+    """No safety-stock term, which is the only version of this that measures anything.
 
-    Two properties at once. The scale is estimated on the CENSORED panel, so it is knowable
-    at decision time -- the true demand of a censored day is not. And it is one scale PER
-    SERIES: a single catalogue-wide scalar was ~6 units against series selling 5 a day, which
-    swamped the one-to-two-unit differences between the signals and left the comparison
-    measuring the cushion instead of the reconstruction.
+    An imputer returns a point estimate, not a predictive distribution, so there is no
+    quantile for a newsvendor to take. Two cushions were tried. A catalogue-wide scalar made
+    knowing the TRUE demand 2.2% more expensive than the uncorrected signal -- a metric that
+    punishes truth. A per-series one fixed the sign but saturated: the truth cost 854 and the
+    supervised imputer 858, so the metric could not tell a good imputer from an oracle. With
+    no cushion the truth costs zero and the four strategies separate. See invariant 44.
     """
-    censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed=42)
-    scale_by_series = censored.groupby("series_id")["observed_demand"].std()
-    sigma = censored.loc[eval_idx, "series_id"].map(scale_by_series).to_numpy(float)
+    censored, eval_idx, _ = synthetic_censor_holdout(panel, seed=42)
     signal = censored.loc[eval_idx, "observed_demand"].to_numpy(float)
-    z = statistics.NormalDist().inv_cdf(0.8)
 
     result = evaluate_fair_inventory_cost(panel, INVENTORY, seed=42)
     baseline = result[result["strategy"] == BASELINE_STRATEGY].iloc[0]
 
-    assert baseline["mean_order"] == pytest.approx(
-        float(np.mean(np.maximum(signal + z * sigma, 0.0)))
-    )
-    # Not one scalar wearing a per-series disguise.
-    assert sigma.std() > 0
-    # And nothing here came from the answer key.
-    assert not np.allclose(sigma, np.std(true_demand))
+    assert baseline["mean_order"] == pytest.approx(float(np.mean(signal)))
+    assert "mean_order_policy_scale" not in result.columns
+
+
+def test_the_baseline_pays_exactly_for_the_demand_it_never_saw(panel: pd.DataFrame) -> None:
+    """A closed form over the whole pricing path, and the check that pins the policy.
+
+    Synthetic censoring only ever deflates, so the uncorrected signal is never above the truth:
+    its order can only understock, and its cost must be the stockout price times the demand it
+    missed, to the last decimal. Any safety-stock term, any pricing slip, breaks this.
+    """
+    censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed=42)
+    missed = float(np.sum(true_demand - censored.loc[eval_idx, "observed_demand"].to_numpy(float)))
+
+    result = evaluate_fair_inventory_cost(panel, INVENTORY, seed=42)
+    baseline = result[result["strategy"] == BASELINE_STRATEGY].iloc[0]
+
+    assert baseline["total_cost"] == pytest.approx(INVENTORY.stockout_cost * missed)
 
 
 def test_a_draw_is_reproducible_and_the_seed_actually_moves_it(panel: pd.DataFrame) -> None:
@@ -135,7 +141,7 @@ def test_the_reported_cost_is_the_mean_over_the_draws(draws: pd.DataFrame) -> No
     summary = summarize_draws(draws).set_index("strategy")
     for label, group in draws.groupby("strategy"):
         assert summary.loc[label, "total_cost"] == pytest.approx(group["total_cost"].mean())
-        assert summary.loc[label, "signal_mae"] == pytest.approx(group["signal_mae"].mean())
+        assert summary.loc[label, "fill_rate"] == pytest.approx(group["fill_rate"].mean())
     assert (summary["n_draws"] == len(SEEDS)).all()
 
 
@@ -173,7 +179,7 @@ def test_metadata_names_the_cheapest_reconstruction(panel: pd.DataFrame) -> None
 
     candidates = summary[summary["strategy"] != BASELINE_STRATEGY]
     assert metadata.best_strategy == candidates.loc[candidates["total_cost"].idxmin(), "strategy"]
-    assert metadata.critical_fractile == pytest.approx(0.8)
+    assert metadata.stockout_cost == pytest.approx(4.0)
     assert metadata.source_panel_series == panel["series_id"].nunique()
     assert metadata.sampled_series == 30
     assert metadata.teacher_fit_rows == draws["teacher_fit_rows"].iloc[0]
@@ -203,8 +209,8 @@ def test_metadata_refuses_a_run_that_cannot_carry_an_interval() -> None:
         "n_eval_rows": 400,
         "eval_fraction": 0.3,
         "seeds": [1, 2],
-        "critical_fractile": 0.8,
-        "mean_order_policy_scale": 4.2,
+        "overstock_cost": 1.0,
+        "stockout_cost": 4.0,
         "best_strategy": "Latent_supervised",
         "best_cost_delta_pct": -3.1,
         "best_ci95": [-5.0, -1.0],
@@ -226,7 +232,6 @@ def _summary_fixture() -> pd.DataFrame:
             "strategy": ["Observed", "Latent_supervised"],
             "source_panel_series": [500, 500],
             "sampled_series": [30, 30],
-            "signal_mae": [4.0, 2.5],
             "total_cost": [1234.5, 1200.25],
             "fill_rate": [90.0, 93.5],
             "mean_order": [12.0, 13.5],
@@ -248,7 +253,9 @@ def test_the_latex_gap_column_leaves_the_baseline_blank() -> None:
 
 def test_the_latex_table_carries_the_gap_and_says_it_is_not_a_percentage() -> None:
     latex = _fair_cost_table(_summary_fixture())
-    assert latex.count("&") // latex.count(r"\\") >= 5
+    assert "$\\Delta$ vs Observado (IC 95\\%)" in latex
+    # Invariante 42: esa columna invitaba a ordenar reglas de reconciliacion por MAE.
+    assert "MAE" not in latex
     assert "IC 95" in latex
     assert "20 sorteos" in latex
     assert "no en puntos porcentuales" in latex

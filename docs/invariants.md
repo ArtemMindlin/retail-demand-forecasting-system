@@ -491,21 +491,41 @@ See `docs/web_layer.md` for the full description.
     costs, while the interval is over the paired differences and is in COST UNITS. Quoting the
     interval as percentage points is the mistake this note exists to prevent.
 
-    The safety-stock scale is also PER SERIES, and that is not a refinement: it decides the
-    answer. One catalogue-wide scalar put `z*sigma` at ~5.9 units across series whose daily
-    sales range from 4.95 to 18.27 -- 120% of the smallest one's sales and 33% of the largest's
-    -- and at that size it swamped the one-to-two-unit differences between the signals. Every
-    strategy then ordered almost the same thing, and the comparison measured the cushion rather
-    than the reconstruction: measured, the supervised arm came out 2.23% WORSE than the
-    observed signal under the scalar and 48.57% BETTER per series, with the interval entirely
-    below zero. The scalar was collateral: it was written in the same breath as flattening the
-    per-series COST profiles, which was correct and necessary. But costs weight the outcome,
-    while the scale is part of the decision rule -- flattening the first removes an unfair
-    advantage, flattening the second removes the sensitivity being measured. When the cost
-    profiles were later removed, the line explaining the flattening went with them and the
-    surviving comment read as a fairness requirement in its own right. The per-series scale is
-    still computed on the censored panel BEFORE any imputation, so it is identical for all four
-    strategies and the isolation holds.
+    The order policy carries NO safety-stock term: the order is the signal itself, priced with
+    the catalogue's single cost pair. Two cushions of the form `q = signal + z*sigma` were tried
+    and both broke the metric, which is why this reads as a rule rather than a preference.
+
+    | signal | no cushion | per-series sigma | one catalogue scalar |
+    | --- | --- | --- | --- |
+    | observed (uncorrected) | 3782 | 1649 | 1704 |
+    | supervised | 275 (-92.7%) | 858 (-48.0%) | 1742 (+2.2%) |
+    | historical_mean | 1004 (-73.5%) | 1123 (-31.9%) | 1886 (+10.7%) |
+    | clipped_scaling | 2836 (-25.0%) | 1473 (-10.7%) | 1751 (+2.8%) |
+    | stockout ratio only, no model | 176 (-95.4%) | 950 (-42.4%) | 1778 (+4.3%) |
+    | **the TRUE demand** | **0 (-100%)** | **854 (-48.2%)** | **1742 (+2.2%)** |
+
+    Read the last row. Under one catalogue-wide scalar, knowing the true demand costs 2.2% MORE
+    than the uncorrected signal: a metric that punishes truth. Per series the sign is right but
+    the metric saturates -- the truth costs 854 and the supervised imputer 858, a 0.5% gap, so
+    it cannot tell a good imputer from an oracle. With no cushion the truth costs zero, the
+    strategies separate by an order of magnitude, and the ranking is monotone in accuracy.
+
+    The reason is not the size of the cushion but its existence. An imputer returns a POINT
+    estimate; there is no predictive distribution for a newsvendor to take a quantile of. A
+    `z*sigma` built from the dispersion of demand LEVELS is not safety stock -- it is a constant
+    handicap on top of every order, and it charges an accurate signal for accuracy. Dropping it
+    makes the cost exactly the 4:1 asymmetric error of the signal, which is what "attribute the
+    difference to the signal" has to mean. The catalogue-wide scalar was collateral in the first
+    place: it was written in the same breath as flattening the per-series COST profiles, which
+    was correct and necessary -- but costs weight the outcome while the scale is part of the
+    decision rule, and flattening the second removes the sensitivity being measured.
+
+    The artifact carries no reconstruction MAE either, and that is invariant 42 applied rather
+    than a second opinion: these four differ in RECONCILIATION rule, and the generator's
+    `observed = truth * (1 - r)` favours the one whose form inverts it. Measured, a rule using
+    only `r` and no model at all scores MAE 0.150 against the supervised imputer's 0.376 -- the
+    best of any of them, by construction and not by merit. A `signal_mae` column invited exactly
+    the comparison the invariant forbids, so it is gone.
 
     A third defect, found on re-reading and of the same family as invariant 41: the backtest
     handed the imputer a panel cut down to `N_SERIES`, which cut its teacher down with it. The
