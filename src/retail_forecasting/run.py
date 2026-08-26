@@ -1,5 +1,16 @@
 from __future__ import annotations
 
+# Before anything else, and for its ORDER rather than its API. Optuna's GPSampler loads torch
+# lazily on its first modelled trial; LightGBM and CatBoost are already loaded by then, since
+# the pipeline import below pulls them in -- and torch initialising second segfaults the process
+# on macOS (measured: SIGSEGV at trial `n_startup_trials + 1`, gone when torch goes first).
+# Guarded because torch lives in the optional `ml` extra: without it only the tuning modes are
+# unavailable, and they fail on their own with a clear ImportError.
+try:
+    import torch  # noqa: F401
+except ImportError:
+    pass
+
 import argparse
 from pathlib import Path
 from typing import get_args
@@ -54,14 +65,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         choices=list(get_args(RunMode)),
         help="Optional override for the execution mode.",
-    )
-    parser.add_argument(
-        "--imputation-strategy",
-        default=None,
-        choices=list(get_args(ImputationStrategy)),
-        help="Optional override for preprocessing.imputation_strategy. It picks which arm "
-        'an experiment runs: "none" scores Observed demand, anything else the '
-        "reconstructed Latent demand.",
     )
     parser.add_argument(
         "--imputation-strategy",
@@ -138,6 +141,12 @@ def main() -> None:
         from retail_forecasting.forecasting.imputation_tuning import tune_imputation_lgbm
 
         params_path = tune_imputation_lgbm(settings, config_path=Path(args.config))
+        fields(logger, {"escrito": params_path})
+        return
+    if mode == "tune_forecasting":
+        from retail_forecasting.forecasting.forecasting_tuning import tune_forecasting_models
+
+        params_path = tune_forecasting_models(settings, config_path=Path(args.config))
         fields(logger, {"escrito": params_path})
         return
     if mode == "eda":
