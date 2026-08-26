@@ -21,7 +21,6 @@ import pandas as pd
 import torch  # noqa: F401
 from joblib import Parallel, cpu_count, delayed
 from mlflow.data.pandas_dataset import from_pandas
-from scipy import stats
 
 from retail_forecasting.config import Settings, build_config_hash
 from retail_forecasting.contracts.contracts_tuning import (
@@ -37,6 +36,7 @@ from retail_forecasting.data.dataset import load_prepared_panel, panel_cache_fil
 from retail_forecasting.tracking import MLFLOW_TRACKING_URI
 from retail_forecasting.utils.logging import Table, fields, get_logger, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
+from retail_forecasting.utils.stats import mean_ci95
 
 logger = get_logger(__name__)
 
@@ -241,24 +241,6 @@ def _objective_mae(
     """
     del trial
     return float(np.mean(_holdout_maes(draws, params)))
-
-
-def mean_ci95(deltas: np.ndarray) -> tuple[float, float]:
-    """Two-sided 95% CI for the mean of the paired per-holdout MAE differences.
-
-    Student-t, not the normal's 1.96: at ``N_VALIDATION_HOLDOUTS`` draws the correct multiplier
-    is ``t(0.975, n-1) = 2.064``, and 1.96 would quote a ~93% interval as 95% -- permissive in
-    the one direction a gate must not be.
-
-    ``simulation/operations.py`` keeps its own bootstrap on purpose: that one resamples whole
-    ORIGINS as clusters, which no closed form covers.
-    """
-    n = len(deltas)
-    if n < 2:
-        raise ValueError(f"A 95% CI for the mean needs at least 2 draws, got {n}.")
-    mean = float(np.mean(deltas))
-    half_width = float(stats.t.ppf(0.975, n - 1) * np.std(deltas, ddof=1) / np.sqrt(n))
-    return mean - half_width, mean + half_width
 
 
 def _log_study_to_mlflow(

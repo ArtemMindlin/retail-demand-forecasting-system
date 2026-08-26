@@ -44,7 +44,7 @@ from retail_forecasting.contracts.contracts_tuning import ForecastingTuningMetad
 from retail_forecasting.data.dataset import load_prepared_panel, panel_cache_filename
 from retail_forecasting.drift import label_all_regimes
 from retail_forecasting.features.engineering import build_supervised_frame
-from retail_forecasting.forecasting.imputation_tuning import hhmm, mean_ci95, pace_seconds
+from retail_forecasting.forecasting.imputation_tuning import hhmm, pace_seconds
 from retail_forecasting.forecasting.tuned_params import (
     CORE_PARAMS,
     _drop_backend_block,
@@ -58,6 +58,7 @@ from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.tracking import MLFLOW_TRACKING_URI
 from retail_forecasting.utils.logging import Table, fields, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
+from retail_forecasting.utils.stats import mean_ci95
 
 logger = logging.getLogger(__name__)
 
