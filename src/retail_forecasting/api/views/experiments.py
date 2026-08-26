@@ -75,7 +75,11 @@ def pareto(request: HttpRequest) -> HttpResponse:
             "has_sensitivity": bool(sensitivity_rows),
             "fair_rows": fair["rows"],
             "fair_run": fair["run"],
-            "fair_columns": sorted(fair["rows"][0]) if fair["rows"] else [],
+            # Strategy first, the rest alphabetical: it is the row's label, and sorting
+            # it with the metrics buried it in the middle of thirteen columns.
+            "fair_columns": (
+                ["strategy", *sorted(set(fair["rows"][0]) - {"strategy"})] if fair["rows"] else []
+            ),
             "summary": service.run_summary(run_path),
         },
     )

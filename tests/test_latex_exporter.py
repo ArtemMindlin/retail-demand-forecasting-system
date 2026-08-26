@@ -34,7 +34,13 @@ FAIR_COST = pd.DataFrame(
         "total_cost": [1843.4099137659625, 1774.8228848638441],
         "fill_rate": [90.42729586868771, 99.74686927967038],
         "mean_order": [10.442437074900662, 13.918321151333373],
+        # Paired against the baseline, so the reference row's own gap is empty, not zero.
+        "cost_delta": [float("nan"), -68.58702890211835],
+        "cost_delta_pct": [float("nan"), -3.720686215],
+        "cost_ci95_low": [float("nan"), -95.4103],
+        "cost_ci95_high": [float("nan"), -41.7637],
         "n_eval": [293, 293],
+        "n_draws": [20, 20],
     }
 )
 

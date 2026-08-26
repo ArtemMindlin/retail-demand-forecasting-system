@@ -90,20 +90,46 @@ def _tabular(
         for record in frame.itertuples(index=False)
     ]
     body = "\n".join(" & ".join(row) + r" \\" for row in cells)
+    # Shrink to the text block if the table is wider, never stretch it if narrower. The
+    # exporter cannot know how wide its own numbers will be: adding the cost-gap column
+    # overflowed the page by 113pt, and the next re-run changes every figure in it.
+    fit = "\\resizebox{\\ifdim\\width>\\textwidth \\textwidth\\else\\width\\fi}{!}{%"
     return (
         "\\begin{table}[h]\n"
         "\\centering\n"
         f"\\caption{{{caption}}}\n"
         f"\\label{{{label}}}\n"
+        f"{fit}\n"
         f"\\begin{{tabular}}{{{column_format}}}\n"
         "\\toprule\n"
         f"{' & '.join(header)} \\\\\n"
         "\\midrule\n"
         f"{body}\n"
         "\\bottomrule\n"
-        "\\end{tabular}\n"
+        "\\end{tabular}}\n"
         "\\end{table}\n"
     )
+
+
+def _cost_gap_column(costs_df: pd.DataFrame) -> pd.Series:
+    """The paired cost gap against the baseline, rendered as ``mean [low; high]``.
+
+    Pre-formatted here rather than left to ``_tabular``, which prices one number per cell.
+    The baseline row is a dash: its gap against itself is not zero, it is undefined, and a
+    zero-width interval on the reference reads as a finding.
+    """
+    if "cost_ci95_low" not in costs_df.columns:
+        return pd.Series(["--"] * len(costs_df), index=costs_df.index)
+
+    def render(row: pd.Series) -> str:
+        if pd.isna(row["cost_delta"]):
+            return "--"
+        return (
+            f"{_es_number(row['cost_delta'])} "
+            f"[{_es_number(row['cost_ci95_low'])}; {_es_number(row['cost_ci95_high'])}]"
+        )
+
+    return costs_df.apply(render, axis=1)
 
 
 def _fair_cost_table(costs_df: pd.DataFrame) -> str:
@@ -111,6 +137,7 @@ def _fair_cost_table(costs_df: pd.DataFrame) -> str:
     cost_cols = ["strategy", "signal_mae", "total_cost", "fill_rate", "mean_order"]
     cost_table = costs_df[cost_cols].copy()
     cost_table["strategy"] = _prettify(cost_table["strategy"])
+    cost_table["cost_gap"] = _cost_gap_column(costs_df)
     n_eval = int(costs_df["n_eval"].iloc[0]) if "n_eval" in costs_df.columns else 0
     # Spanish thousands separator, applied to the number alone (never to the whole caption).
     n_eval_es = f"{n_eval:,}".replace(",", "\\,")
@@ -121,17 +148,32 @@ def _fair_cost_table(costs_df: pd.DataFrame) -> str:
         sampled = int(costs_df["sampled_series"].iloc[0])
         source = int(costs_df["source_panel_series"].iloc[0])
         panel = f", en {sampled} series muestreadas del panel de {source}"
+    draws = ""
+    if "n_draws" in costs_df.columns:
+        n_draws = int(costs_df["n_draws"].iloc[0])
+        draws = (
+            f" Cada cifra es la media de {n_draws} sorteos de censura, y el hueco de coste es "
+            "una diferencia EMPAREJADA frente al observado, con su intervalo de confianza al "
+            "95\\% en unidades de coste (no en puntos porcentuales)."
+        )
     caption = (
         "Comparativa de costes operativos bajo evaluación justa: todas las estrategias se "
         "puntúan contra la misma demanda real mediante censura sintética sobre días limpios"
         f"{panel} ($n = {n_eval_es}$ días censurados). La política de pedido es común a todas "
         "ellas (aproximación normal \\textit{order-up-to} con costes aplanados), de modo que "
-        "la diferencia de coste es atribuible únicamente a la señal de demanda."
+        f"la diferencia de coste es atribuible únicamente a la señal de demanda.{draws}"
     )
     return _tabular(
         cost_table,
-        header=["Estrategia", "MAE Señal", "Coste Total", "Fill Rate (\\%)", "Pedido Medio"],
-        column_format="@{}lcccc@{}",
+        header=[
+            "Estrategia",
+            "MAE Señal",
+            "Coste Total",
+            "Fill Rate (\\%)",
+            "Pedido Medio",
+            "$\\Delta$ vs Observado (IC 95\\%)",
+        ],
+        column_format="@{}lccccc@{}",
         caption=caption,
         label="tab:metrics_cost",
     )
