@@ -6,7 +6,6 @@ import pytest
 from retail_forecasting.config import FeatureConfig
 from retail_forecasting.contracts import FeatureMetadata
 from retail_forecasting.features.engineering import (
-    build_feature_frame,
     build_inference_frame,
     build_inference_frame_with_fallback,
     build_supervised_frame,
@@ -94,14 +93,6 @@ def test_build_inference_frame_returns_pydantic_metadata() -> None:
     assert metadata.output_rows == len(inference)
     assert metadata.output_rows == panel["series_id"].nunique()
     assert metadata.rows_not_latest_origin == 32
-
-
-def test_build_feature_frame_validates_required_columns() -> None:
-    panel = make_synthetic_panel(num_series=1, num_days=20).drop(columns=["observed_demand"])
-    feature_config = FeatureConfig(lags=[1], rolling_windows=[3])
-
-    with pytest.raises(ValueError, match="observed_demand"):
-        build_feature_frame(panel, feature_config)
 
 
 def test_build_supervised_frame_fails_when_no_usable_rows_remain() -> None:

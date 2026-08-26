@@ -139,7 +139,15 @@ Feature column families:
 | `stockout_roll_mean_<n>` | shifted rolling stockout mean |
 | `<weather_column>_lag_<n>` | lagged realized weather |
 | calendar columns | known ex-ante calendar features |
-| static id columns | store/product/category ids |
+| static id columns | store/product/category ids, as pandas `category` |
+
+The static ids are categorical in the FEATURE frame although the panel carries them as
+integers: store 351 is not greater than store 12, and CatBoost's ordered target statistics --
+the reason it is the champion backend -- only engage on category/object dtypes. Their category
+lists are sorted and taken from the panel, because pandas stores positional codes and LightGBM
+trains on those: two frames built from different panels would otherwise map the same store to
+different codes and predict wrongly without failing. That makes the codes stable exactly as
+long as the series universe is, which a non-train split inherits rather than recomputing.
 
 Target semantics:
 

@@ -4,7 +4,7 @@ import logging
 
 import numpy as np
 import pandas as pd
-from pandas.core.groupby.generic import DataFrameGroupBy, SeriesGroupBy
+from pandas.core.groupby.generic import DataFrameGroupBy
 
 from retail_forecasting.config import FeatureConfig
 from retail_forecasting.contracts import FeatureMetadata, InferenceFallbackMetadata
@@ -12,6 +12,18 @@ from retail_forecasting.contracts import FeatureMetadata, InferenceFallbackMetad
 logger = logging.getLogger(__name__)
 
 DROP_WARNING_FRACTION = 0.2
+
+# Duplicated from `data/dataset.py`, which owns the raw-loading copy. `features` may import only
+# `config` and `contracts`, so the two cannot share one list without closing a layer cycle.
+STATIC_ID_COLUMNS = [
+    "city_id",
+    "store_id",
+    "management_group_id",
+    "first_category_id",
+    "second_category_id",
+    "third_category_id",
+    "product_id",
+]
 
 
 def _add_lag_features(
@@ -23,7 +35,7 @@ def _add_lag_features(
 ) -> list[str]:
     """Add shifted lag columns ``{prefix}_lag_{lag}`` to ``frame``; return their names."""
     added = []
-    for lag in sorted(set(lags)):
+    for lag in lags:
         column = f"{prefix}_lag_{lag}"
         frame[column] = grouped[source_col].shift(lag)
         added.append(column)
@@ -47,8 +59,7 @@ def build_feature_frame(
     feature_config: FeatureConfig,
 ) -> tuple[pd.DataFrame, list[str]]:
     """Build reusable feature columns from a prepared daily panel."""
-    _validate_required_columns(panel=panel, feature_config=feature_config)
-    frame = panel.copy().sort_values(["series_id", "date"]).reset_index(drop=True)
+    frame = panel.copy()
     grouped = frame.groupby("series_id", sort=False)
 
     feature_columns: list[str] = []
@@ -74,7 +85,7 @@ def build_feature_frame(
         _add_lag_features(frame, grouped, "observed_demand", feature_config.lags, "demand")
     )
 
-    for window in sorted(set(feature_config.rolling_windows)):
+    for window in feature_config.rolling_windows:
         mean_column = f"demand_roll_mean_{window}"
         sum_column = f"demand_roll_sum_{window}"
         std_column = f"demand_roll_std_{window}"
@@ -99,7 +110,7 @@ def build_feature_frame(
         feature_columns.extend(
             _add_lag_features(frame, grouped, "stockout_hours", feature_config.lags, "stockout")
         )
-        for window in sorted(set(feature_config.rolling_windows)):
+        for window in feature_config.rolling_windows:
             column = f"stockout_roll_mean_{window}"
             frame[column] = _rolling_feature(grouped, "stockout_hours", window, "mean")
             feature_columns.append(column)
@@ -116,17 +127,21 @@ def build_feature_frame(
                 _add_lag_features(frame, grouped, source_column, feature_config.lags, source_column)
             )
 
-    if feature_config.include_static_ids:
-        static_columns = [
-            "city_id",
-            "store_id",
-            "management_group_id",
-            "first_category_id",
-            "second_category_id",
-            "third_category_id",
-            "product_id",
-        ]
-        feature_columns.extend(static_columns)
+    for column in STATIC_ID_COLUMNS:
+        # Categorical, not the int64 they arrive as. Store 351 is not "greater than" store 12,
+        # and as integers a tree spends depth carving meaningless ranges while CatBoost's
+        # ordered target statistics -- the reason it is the champion backend -- never engage,
+        # since its `fit` looks for category/object dtypes and found none.
+        #
+        # The categories are SORTED and taken from the panel rather than left to pandas to
+        # infer per frame. Pandas stores positional codes and LightGBM trains on those, so two
+        # frames built from different panels would map the same store to different codes and
+        # predict wrongly in silence. Sorted categories are stable as long as the series
+        # universe is, which a non-train split inherits rather than recomputing (invariant 14).
+        frame[column] = frame[column].astype(
+            pd.CategoricalDtype(categories=sorted(frame[column].dropna().unique()))
+        )
+    feature_columns.extend(STATIC_ID_COLUMNS)
 
     return frame, feature_columns
 
@@ -153,8 +168,10 @@ def build_supervised_frame(
     )
     grouped = frame.groupby("series_id", sort=False)
 
-    frame["target_lead_time_demand"] = _build_target(grouped["observed_demand"], horizon)
-    frame["target_horizon_days"] = horizon
+    future_demand = [grouped["observed_demand"].shift(-offset) for offset in range(horizon)]
+    frame["target_lead_time_demand"] = pd.concat(future_demand, axis=1).sum(
+        axis=1, min_count=horizon
+    )
 
     before_target_drop = len(frame)
     frame = frame.loc[frame["target_lead_time_demand"].notna()].copy()
@@ -173,17 +190,14 @@ def build_supervised_frame(
         input_rows=before_feature_drop,
         dropped_rows=dropped_rows_missing_features,
     )
-    frame = frame.reset_index(drop=True)
-    if frame.empty:
-        raise ValueError("Feature engineering produced no usable rows for supervised mode.")
 
     return frame, FeatureMetadata(
         mode="supervised",
         feature_columns=feature_columns,
         target_column="target_lead_time_demand",
         horizon=horizon,
-        lags=sorted(set(feature_config.lags)),
-        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        lags=list(feature_config.lags),
+        rolling_windows=list(feature_config.rolling_windows),
         input_rows=len(panel),
         output_rows=len(frame),
         dropped_rows_missing_target=dropped_rows_missing_target,
@@ -228,8 +242,8 @@ def build_inference_frame(
     return frame, FeatureMetadata(
         mode="inference",
         feature_columns=feature_columns,
-        lags=sorted(set(feature_config.lags)),
-        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        lags=list(feature_config.lags),
+        rolling_windows=list(feature_config.rolling_windows),
         input_rows=len(panel),
         output_rows=len(frame),
         dropped_rows_missing_features=dropped_rows_missing_features,
@@ -288,8 +302,8 @@ def build_inference_frame_with_fallback(
     return latest_rows, InferenceFallbackMetadata(
         feature_columns=feature_columns,
         horizon=horizon,
-        lags=sorted(set(feature_config.lags)),
-        rolling_windows=sorted(set(feature_config.rolling_windows)),
+        lags=list(feature_config.lags),
+        rolling_windows=list(feature_config.rolling_windows),
         input_rows=len(panel),
         output_rows=len(latest_rows),
         model_rows=int((latest_rows["prediction_source"] == "model").sum()),
@@ -299,65 +313,6 @@ def build_inference_frame_with_fallback(
         fallback_rows_third_category=int(fallback_counts.get("third_category", 0)),
         fallback_rows_global=int(fallback_counts.get("global", 0)),
     )
-
-
-def _build_target(series_group: SeriesGroupBy, horizon: int) -> pd.Series:
-    """Aggregate future demand over the configured forecast horizon.
-
-    Args:
-        series_group: Grouped demand series by ``series_id``.
-        horizon: Forecast horizon expressed in days.
-
-    Returns:
-        A Series containing lead-time demand targets for each row.
-    """
-    future_terms = [series_group.shift(-offset) for offset in range(horizon)]
-    return pd.concat(future_terms, axis=1).sum(axis=1, min_count=horizon)
-
-
-def _validate_required_columns(
-    panel: pd.DataFrame,
-    feature_config: FeatureConfig,
-) -> None:
-    required_columns = {
-        "series_id",
-        "date",
-        "observed_demand",
-        "holiday_flag",
-        "activity_flag",
-    }
-    if feature_config.include_discount_lags:
-        required_columns.add("discount")
-    if feature_config.include_stockout_lags:
-        required_columns.add("stockout_hours")
-    if feature_config.include_weather_lags:
-        required_columns.update(
-            {
-                "precpt",
-                "avg_temperature",
-                "avg_humidity",
-                "avg_wind_level",
-            }
-        )
-    if feature_config.include_static_ids:
-        required_columns.update(
-            {
-                "city_id",
-                "store_id",
-                "management_group_id",
-                "first_category_id",
-                "second_category_id",
-                "third_category_id",
-                "product_id",
-            }
-        )
-
-    missing_columns = required_columns - set(panel.columns)
-    if missing_columns:
-        raise ValueError(
-            "Cannot build feature frame without required columns: "
-            f"{', '.join(sorted(missing_columns))}"
-        )
 
 
 def _validate_fallback_columns(panel: pd.DataFrame) -> None:

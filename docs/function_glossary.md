@@ -214,15 +214,6 @@ main()
   - `fallback_rows_global`.
 - Se usa en: salida de `build_inference_frame_with_fallback()`.
 
-### `_build_target`
-- Archivo: `src/retail_forecasting/features/engineering.py`
-- Que hace: construye el target como suma de demanda observada en el horizonte futuro.
-- Recibe:
-  - `series_group`;
-  - `horizon`.
-- Devuelve: `pd.Series`.
-- Se usa en: `build_supervised_frame()`.
-
 ## Backtesting and Pipeline
 
 ### `build_walk_forward_folds`
