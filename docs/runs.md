@@ -11,7 +11,29 @@ target-leakage fix of 16 May 2026, and nothing in the repository recorded it.
 produced it.** A run whose commit is not an ancestor of the current `HEAD` is not
 citable — re-run it before citing.
 
-## Current results (audit of 13 Aug 2026, commit `df15b1d`)
+## SUPERSEDED — every run below predates the changes of 26 Aug 2026
+
+Nothing in the table that follows is citable. Four changes landed on 26 Aug 2026, each of
+which alters what the models see, so every number produced before them describes a
+configuration that no longer exists:
+
+| Change | Why it invalidates |
+| --- | --- |
+| `top_n_series` 50 → 500 in `experiment/default`, `retrain`, `score_daily`, `fair_cost_backtest` | ten times the panel; the champion is no longer selected on the 50 highest-rotation series |
+| `rolling_windows` [7, 28] → [7, 14] | different features: level and dispersion over two weeks instead of four |
+| `lags` [1, 7, 14, 28] → [1, 7, 14] | different features AND a shorter cold start: 70 origin dates per series instead of 56 |
+| static ids int64 → pandas `category` | CatBoost's ordered target statistics engage for the first time; LightGBM partitions 352 store levels instead of carving numeric ranges |
+
+Two more changes are pending and will invalidate again, so do not re-cite until both land:
+the LightGBM hyperparameter search (`run_mode = tune_forecasting`, in flight) and the
+CatBoost one after it. A champion trained on untuned defaults is not the champion the
+thesis will defend.
+
+`tab:imputation_reconstruction` is gone from chapter 6, not pending: the `compare_imputation`
+mode that wrote it is deleted and invariant 42 forbids the ranking it showed. Restoring the
+mode to republish a table the invariants reject would have been the wrong fix.
+
+## Previous results (audit of 13 Aug 2026, commit `df15b1d`)
 
 | Result in chapter 6 | Run | Panel | Notes |
 | --- | --- | --- | --- |
@@ -20,12 +42,11 @@ citable — re-run it before citing.
 | `tab:embargo_control` (embargo off) | `fresh_retailnet_v2_20260811_123106` | 50 series, 4 500 rows | Control: only the calibration embargo differs |
 | `tab:scale_coverage`, simulated costs, `fig:mae_vs_servicio` | `fresh_retailnet_large_20260811_125735` | 500 series, 45 000 rows | 10 500 evaluation origins |
 | `tab:metrics_cost` (fair cost) | `fresh_retailnet_large_20260811_184959` | 30 sampled from 500 | Generated. Ranking depends on the source panel — see below |
-| `tab:imputation_reconstruction` | `imputation_compare_20260811_174500` | 500 series | **NOT REPRODUCIBLE and not citable.** The `compare_imputation` mode that wrote it is deleted, and invariant 42 forbids the ranking it shows anyway. Either restore the mode or drop the table from chapter 6 |
 
-Every numbered table in chapter 6 is listed above. A table that is not in this list has
-no declared provenance, which is the state that produced the August 13 findings: both
-generated tables had drifted to June runs while this file declared newer ones, and
-neither was listed here at all.
+Every numbered table chapter 6 still has is listed above. A table that is not in this list
+has no declared provenance, which is the state that produced the August 13 findings: both
+generated tables had drifted to June runs while this file declared newer ones, and neither
+was listed here at all.
 
 ## Generated tables
 
@@ -89,7 +110,7 @@ make run                 # base subset, Latent arm → configs/experiment/defaul
 uv run python -m retail_forecasting.run --config configs/experiment/default.yaml \
     --imputation-strategy none   # the Observed arm of the same panel
 make simulate            # OPS plane        → configs/simulate_ops/default.yaml (builds the split if missing)
-uv run python -m retail_forecasting.run --config configs/experiment/large.yaml
+uv run python -m retail_forecasting.run --config configs/experiment/default.yaml
 uv run python -m retail_forecasting.run --config configs/experiment/default.yaml --run-mode fair_cost_backtest
 ```
 

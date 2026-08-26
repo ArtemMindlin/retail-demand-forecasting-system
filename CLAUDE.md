@@ -7,10 +7,12 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 ## Repo Map
 
 - `configs/`: one folder per run mode, so a config file declares only the `Settings` sections
-  its own mode reads. `configs/experiment/default.yaml` is the canonical v1 config;
-  `large.yaml`/`daily.yaml` cover the scale/daily variants, both still `run_mode = experiment`.
+  its own mode reads. `configs/experiment/default.yaml` is the canonical v1 config
+  and `daily.yaml` the daily variant, both `run_mode = experiment`. A `large.yaml` held the
+  500-series scale variant until every experiment config moved to 500 series, which left it
+  differing from `default.yaml` only in `run_name` and `make_plots`.
   The other folders (`retrain/`, `score_daily/`, `simulate_ops/`, `fair_cost_backtest/`,
-  `tune_imputation/`) hold a `default.yaml` each, `eda/` included: exploratory analysis is a run mode like the
+  `tune_imputation/`, `tune_forecasting/`) hold a `default.yaml` each, `eda/` included: exploratory analysis is a run mode like the
   rest, not a second CLI. `project.run_mode` always matches the folder name, so `--run-mode`
   is only for ad-hoc overrides. The map of which sections each mode reads is
   `MODE_SECTIONS` in `contracts/contracts_config.py`, enforced by `tests/test_config_layout.py`:
@@ -43,7 +45,7 @@ The priority of this repo is experimental validity: avoid temporal leakage, pres
 
 The v1 pipeline supports only `FreshRetailNet-50K` through `dataset.source = fresh_retailnet`.
 
-Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/censorship.py`), compared against the raw observed-demand baseline by `run_fair_cost_backtest` -- the only comparison that ranks strategies, since invariant 42 rules out the reconstruction-MAE route and an experiment scores one arm per run against its own target. Model selection and champion evaluation run on a base subset of the 50 highest-rotation series; a separate 500-series run validates conformal-calibration stability at scale, and a 30-series fair-cost backtest isolates the imputation signal from the rest of the pipeline under a common ground truth. Each subset answers a different question, so do not average metrics across them as if they were the same experiment.
+Stockout-censored demand can be reconstructed via `LatentDemandImputer` (`data/censorship.py`), compared against the raw observed-demand baseline by `run_fair_cost_backtest` -- the only comparison that ranks strategies, since invariant 42 rules out the reconstruction-MAE route and an experiment scores one arm per run against its own target. Every forecasting mode runs on the 500 highest-rotation series: model selection, champion evaluation, retraining and scoring. That is the scale the hyperparameters are tuned at, and invariant 41 measured what happens when the two diverge. The fair-cost backtest still samples 30 series, now drawn from those 500, to isolate the imputation signal from the rest of the pipeline under a common ground truth. The OPS plane is the exception at 100 series, because it streams its own re-carved split.
 
 CatBoost is the current champion model, selected by simulated logistic cost, not by MAE or Winkler Score alone — point-error and logistic-cost rankings can (and do) invert.
 
