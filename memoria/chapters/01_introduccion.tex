@@ -174,15 +174,29 @@ recuperación de demanda censurada, y lo hace sobre un \textit{benchmark} public
 2025~\cite{freshretailnet2025}. Sus aportaciones son las siguientes.
 
 \begin{enumerate}
-    \item \textbf{El protocolo de censura sintética no ordena reglas de reconciliación, y se
-    cuantifica por qué.} Su verdad-terreno se construye como
-    $\text{observado} = \text{real}\cdot(1-r)$, de modo que toda regla cuya forma funcional
-    invierta esa relación acierta por construcción: una que solo use el ratio de rotura $r$, sin
-    modelo alguno, obtiene el menor error de reconstrucción de todas las evaluadas. De ahí que
-    las estrategias se ordenen aquí por coste y no por error de reconstrucción, y que una
-    comparación de hiperparámetros sobre el mismo protocolo siga siendo válida, porque todos los
-    candidatos comparten una regla y el supuesto del generador se cancela
-    (Sección~\ref{sec:imputacion_censura_sintetica}).
+    \item \textbf{El protocolo estándar para medir la reconstrucción de demanda censurada es
+    circular, y se cuantifica cuánto.} Medir un imputador exige conocer la demanda real de un día
+    con rotura, que es justo lo que nunca se observa. El protocolo habitual lo resuelve
+    falsificándola: toma días \emph{sin} rotura, donde la demanda real sí se conoce, y finge que
+    la tuvieron multiplicándola por $(1-r)$, siendo $r$ la fracción de la jornada sin producto.
+    Un día de 10 unidades con media jornada vacía queda anotado como una venta de 5, y esas 10
+    unidades pasan a ser la respuesta contra la que se puntúa.
+
+    El problema es que esa relación se despeja: $\text{real} = \text{observado}/(1-r)$, y $r$
+    está anotado en los datos. Una regla que se limite a dividir por $(1-r)$ recupera la
+    respuesta \textbf{exactamente}, sin modelo y sin entrenar nada, mientras que un imputador que
+    estime la demanda de jornada completa se queda cerca pero no clavado. Medido sobre el panel
+    de este trabajo, esa regla trivial obtiene el menor error de reconstrucción de todas las
+    estrategias evaluadas. El error de reconstrucción no mide, por tanto, la calidad de la
+    reconstrucción: mide el parecido entre la fórmula del imputador y la fórmula con la que se
+    falsificaron los datos.
+
+    De ahí las dos consecuencias que recorren esta memoria. Las estrategias de imputación se
+    ordenan por el coste de inventario que inducen frente a una verdad común, nunca por su error
+    de reconstrucción (Sección~\ref{sec:imputacion_censura_sintetica}). Y la búsqueda de
+    hiperparámetros del imputador sí es válida sobre este mismo protocolo, porque todos sus
+    candidatos comparten una única fórmula: la circularidad les afecta por igual y se cancela al
+    compararlos entre sí.
 
     \item \textbf{Los hiperparámetros del imputador no transfieren entre tamaños de ajuste, y el
     efecto cambia de signo.} La búsqueda mejora al ajuste por defecto con pocos cientos de filas
