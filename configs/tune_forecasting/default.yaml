@@ -1,6 +1,16 @@
+# Hyperparameter search for the forecasting models (run_mode = tune_forecasting).
+#
+# Separate from the experiment for the same reason `tune_imputation` is: the search costs far
+# more than one run, so it is paid once and its winner persisted, rather than repeated inside
+# every experiment. `models.use_tuning` -- the in-run search this mode replaces -- stays false.
+#
+# `dataset`, `preprocessing` and `features` mirror configs/experiment/large.yaml on purpose.
+# The 500 series are not a detail of the measurement: invariant 41 measured a search that
+# inherited a 50-series panel by accident, and its winner was 12% WORSE than not tuning at
+# 500. Tune at the scale you deploy -- the same reason tune_imputation runs at 500.
 project:
   random_seed: 42
-  run_mode: score_daily
+  run_mode: tune_forecasting
 
 
 dataset:
@@ -31,11 +41,6 @@ features:
   include_stockout_lags: true
 
 
-data_quality:
-  max_missing_fraction_warning: 0.05
-  max_data_age_days: null
-
-
 models:
   models_dir: models
   quantiles: [0.1, 0.5, 0.9]
@@ -44,29 +49,11 @@ models:
   learning_rate: 0.05
   max_depth: 6
   use_tuning: false
-  tuning_trials: 40
+  tuning_trials: 300
+  tuning_backend: lightgbm
 
 
 inventory:
   overstock_cost: 1.0
   stockout_cost: 4.0
   clip_negative_orders: true
-
-
-business:
-  flag_cold_start: true
-  flag_drift_watch: true
-  flag_high_uncertainty: true
-  high_uncertainty_interval_quantile: 0.95
-  flag_extreme_order_quantity: true
-  extreme_order_quantity_quantile: 0.99
-  champion_data_strategy: Observed
-  champion_model_name: catboost
-  champion_backend_name: conformal_catboost_official
-  champion_min_cost_improvement_pct: 0.0
-  champion_max_service_level_degradation: 0.02
-
-
-reporting:
-  run_name: fresh_retailnet_v2
-  make_plots: true

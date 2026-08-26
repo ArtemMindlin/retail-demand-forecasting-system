@@ -11,9 +11,9 @@ dataset:
   local_cache_dir: data/raw/fresh_retailnet
   processed_panel_dir: data/processed
   use_cache: true
-  top_n_series: 50
+  top_n_series: 500
   min_history_days: 70
-  max_rows: 50000
+  max_rows: null
   horizon: 7
 
 
@@ -24,9 +24,8 @@ preprocessing:
 
 
 features:
-  lags: [1, 7, 14, 28]
-  rolling_windows: [7, 28]
-  include_static_ids: true
+  lags: [1, 7, 14]
+  rolling_windows: [7, 14]
   include_weather_lags: true
   include_discount_lags: true
   include_stockout_lags: true

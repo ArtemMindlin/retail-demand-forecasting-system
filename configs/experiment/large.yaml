@@ -24,9 +24,8 @@ preprocessing:
 
 
 features:
-  lags: [1, 7, 14, 28]
-  rolling_windows: [7, 28]
-  include_static_ids: true
+  lags: [1, 7, 14]
+  rolling_windows: [7, 14]
   include_weather_lags: true
   include_discount_lags: true
   include_stockout_lags: true

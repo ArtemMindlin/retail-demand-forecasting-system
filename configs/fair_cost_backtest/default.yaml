@@ -11,9 +11,9 @@ dataset:
   local_cache_dir: data/raw/fresh_retailnet
   processed_panel_dir: data/processed
   use_cache: true
-  top_n_series: 50
+  top_n_series: 500
   min_history_days: 70
-  max_rows: 50000
+  max_rows: null
   horizon: 7
 
 
