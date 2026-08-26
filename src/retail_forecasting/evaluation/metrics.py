@@ -15,6 +15,11 @@ from retail_forecasting.utils.io import (
 
 __all__ = ["summarize_predictions", "summarize_costs", "pinball_loss", "winkler_score"]
 
+# The benchmark `rel_mae_naive` divides by. Duplicated from `models/naive.py` rather than
+# imported: `evaluation` may not import `models`, and closing that boundary for one string
+# would be a worse trade than repeating it.
+NAIVE_MODEL_NAME = "seasonal_naive"
+
 
 def _exclude_holdout(df: pd.DataFrame) -> pd.DataFrame:
     """Drop the holdout fold so global summaries don't mix it with walk-forward folds."""
@@ -56,7 +61,47 @@ def summarize_predictions(
             record["data_strategy"] = key_map["data_strategy"]
         fold_records.append(record)
 
-    return pd.DataFrame(records), pd.DataFrame(fold_records)
+    summary = _attach_rel_mae_naive(pd.DataFrame(records), group_cols)
+    folds = _attach_rel_mae_naive(pd.DataFrame(fold_records), ["fold_id", *group_cols])
+    return summary, folds
+
+
+def _attach_rel_mae_naive(summary: pd.DataFrame, group_cols: list[str]) -> pd.DataFrame:
+    """Scale each model's MAE by the seasonal naive's, on the SAME rows. Below 1 beats it.
+
+    This is a RelMAE, and calling it MASE would be an abuse worth avoiding in writing. Textbook
+    MASE divides by the IN-SAMPLE one-step seasonal-naive error, and there is no such quantity
+    here: the target is demand summed over `horizon` days, for which a one-step naive error is
+    undefined. What this divides by is the seasonal naive's MAE over the same evaluation rows,
+    which is the benchmark the thesis actually argues against.
+
+    The naive is scored inside every run, so the denominator costs nothing. It is NaN when the
+    naive is absent -- a scoring run carries the champion alone -- rather than silently absent,
+    since a missing column reads as "not measured" and a missing value as "not comparable".
+    """
+    if summary.empty or "mae" not in summary.columns:
+        return summary
+    # Scaled WITHIN its own comparison group: an experiment scores one demand strategy, and each
+    # fold has its own difficulty, so a single global denominator would mix both.
+    scope = [column for column in group_cols if column not in ("model_name", "backend_name")]
+    baseline = summary.loc[summary["model_name"] == NAIVE_MODEL_NAME, [*scope, "mae"]]
+    if baseline.empty:
+        summary["rel_mae_naive"] = float("nan")
+        return summary
+
+    if scope:
+        baseline = baseline.drop_duplicates(subset=scope).rename(columns={"mae": "_naive_mae"})
+        # Left merge on de-duplicated keys, so length and row order survive and the positional
+        # assignment below lines up.
+        denominator = summary.merge(baseline, on=scope, how="left")["_naive_mae"]
+    else:
+        denominator = pd.Series([float(baseline["mae"].iloc[0])] * len(summary))
+
+    scaled = denominator.to_numpy(dtype=float)
+    summary["rel_mae_naive"] = np.where(
+        scaled > 0.0, summary["mae"].to_numpy(dtype=float) / scaled, np.nan
+    )
+    return summary
 
 
 def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
@@ -105,18 +150,39 @@ def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
     return summary
 
 
+def _ratio_of_sums(numerator: float, denominator: float) -> float:
+    """`numerator / denominator` as a percentage, NaN when there is no demand to divide by."""
+    if denominator <= 0.0:
+        return float("nan")
+    return numerator / denominator * 100.0
+
+
 def _build_metric_record(
     predictions: pd.DataFrame,
     model_name: str,
     backend_name: str,
 ) -> dict[str, float | str]:
     errors = predictions["y_pred"] - predictions["y_true"]
+    demand = float(predictions["y_true"].sum())
     record: dict[str, float | str] = {
         "model_name": model_name,
         "backend_name": backend_name,
         "observations": int(len(predictions)),
         "mae": float(np.abs(errors).mean()),
         "rmse": float(math.sqrt(np.square(errors).mean())),
+        # MAE as a fraction of the demand it was made against. Within ONE evaluation set this
+        # cannot reorder models -- every model scores the same rows, so `wape` is `mae` times the
+        # constant `n / sum(y)` -- and that is not what it is for. It is for reading an error
+        # ACROSS panels of different scale, which a raw MAE cannot: the base subset and the
+        # 500-series run are not comparable in units. A ratio of sums, so unlike MAPE it
+        # survives the 4.5% of days this panel has with zero demand.
+        "wape": _ratio_of_sums(float(np.abs(errors).sum()), demand),
+        # SIGNED, and reported beside the absolute errors on purpose: MAE and RMSE cannot tell
+        # over-prediction from under-prediction, and in inventory that is the difference between
+        # a stockout and tied-up capital. The system's central claim is about a downward BIAS
+        # from censoring, which the absolute metrics are blind to.
+        "mean_error": float(errors.mean()),
+        "bias_pct": _ratio_of_sums(float(errors.sum()), demand),
     }
 
     quantile_pairs = _find_quantile_columns(predictions)

@@ -142,9 +142,12 @@ personas con responsabilidades distintas, y el beneficio que cada una obtiene es
     la justifica, en lugar de una cifra aislada sin indicación de su fiabilidad. Dispone además de un
     simulador que permite contrastar el efecto de modificar los supuestos de coste antes de
     comprometer el pedido, de modo que la herramienta apoya la decisión sin sustituirla.
-    \item \textbf{Responsable de tienda u operaciones} (lectura agregada). Dispone de una medida
-    del nivel de servicio y del coste por producto y por categoría, lo que permite localizar dónde
-    se concentran las roturas y las mermas en lugar de diagnosticarlas producto a producto.
+    \item \textbf{Responsable de tienda u operaciones} (lectura agregada). Dispone del nivel de
+    servicio y del coste agregados de la tienda, y de un listado de excepciones que señala los
+    productos en riesgo, de modo que puede localizar dónde se concentran las roturas y las mermas
+    sin revisar el catálogo entero. La agregación por categoría de producto queda como extensión
+    natural: la categoría ya estructura la calibración conformal, pero el sistema no publica hoy
+    coste ni nivel de servicio agrupados por ella.
     \item \textbf{Equipo técnico responsable del sistema}. Cada ejecución queda registrada con su
     configuración, sus métricas y la versión exacta del código que la produjo, y el sistema
     contempla el reentrenamiento periódico y la vigilancia de la degradación del modelo. El efecto
@@ -165,19 +168,70 @@ origen es la vía más eficaz de contribuir al ODS~12 y de sustentar el Plan de 
 la normativa vigente. El análisis detallado de la vinculación con los Objetivos de Desarrollo
 Sostenible se recoge en el Anexo~\ref{anx:ods}.
 
-\section{Contribuciones Principales}
-Las aportaciones originales de este trabajo, diferenciadas del estado del arte revisado en el Capítulo~\ref{chap:estado_del_arte} y justificadas frente a los trabajos previos en la Sección~\ref{sec:posicionamiento}, son las siguientes:
+\section{Aportaciones del Trabajo}
+Conviene declarar de entrada el tipo de aportación que este trabajo hace, porque el género
+invita a exagerarlo. No se propone aquí ninguna técnica nueva: la calibración conformal, su
+variante estratificada, el modelo del \textit{Newsvendor} y los métodos de \textit{boosting}
+sobre los que se construye el sistema están todos publicados y disponibles en librerías al uso.
+Lo que se aporta es la evaluación rigurosa y reproducible de ese conjunto sobre un
+\textit{benchmark} reciente ---\textit{FreshRetailNet-50K}, publicado en mayo de
+2025~\cite{freshretailnet2025}--- y, sobre todo, tres resultados \textbf{negativos} acerca de
+cómo debe evaluarse la recuperación de demanda censurada, que se obtuvieron al comprobar los
+propios resultados de este trabajo y que invalidaron mediciones ya escritas.
 
 \begin{enumerate}
-    \item \textbf{Aplicación de Mondrian Conformal Prediction a demanda censurada en retail.} Si bien la Conformal Prediction con garantías de cobertura marginal es una técnica consolidada, su extensión estratificada (Mondrian) al contexto de demanda censurada por stockout en productos frescos constituye una combinación no explorada en la literatura de distribución masiva. La estratificación por categoría de producto permite obtener garantías de cobertura condicional respetando la heterogeneidad del catálogo demostrada en el análisis exploratorio.
+    \item \textbf{El protocolo de censura sintética no puede ordenar las reglas de
+    reconciliación, y se cuantifica por qué.} La verdad-terreno de este protocolo se construye
+    como $\text{observado} = \text{real}\cdot(1-r)$, de modo que cualquier regla cuya forma
+    funcional invierta esa relación acierta por construcción y no por mérito. La demostración es
+    directa: una regla que solo usa el ratio de rotura $r$, sin modelo alguno, obtiene el menor
+    error de reconstrucción de todas las estrategias evaluadas. La consecuencia práctica es que
+    el error de reconstrucción queda excluido de la comparativa de estrategias de esta memoria
+    (Sección~\ref{sec:imputacion_censura_sintetica}), y que una comparación de hiperparámetros
+    sobre el mismo protocolo sigue siendo válida solo porque todos los candidatos comparten una
+    misma regla, de modo que el supuesto del generador se cancela.
 
-    \item \textbf{Sistema de Apoyo a la Decisión con cierre logístico.} La mayoría de los trabajos académicos evalúan el rendimiento predictivo mediante métricas estadísticas (MAE, RMSE) desconectadas de la operativa real. Este trabajo cierra el ciclo integrando el modelo probabilístico con la política de pedido que se deriva de él, y midiendo el resultado en las dos magnitudes que la operación percibe: el coste logístico y el nivel de servicio. Esa doble lectura resulta ser imprescindible, porque ambas no ordenan igual a los modelos.
+    \item \textbf{Los hiperparámetros del imputador no transfieren entre tamaños de ajuste, y el
+    efecto cambia de signo.} Una búsqueda de 300 \textit{trials} sobre el imputador supervisado
+    mejora al ajuste por defecto cuando el maestro se entrena con pocos cientos de filas limpias,
+    y lo \textbf{empeora} cuando se entrena con decenas de miles, que es la escala a la que el
+    sistema opera. La tendencia es monótona en el tamaño de ajuste y se confirma en dos periodos
+    de puntuación distintos, de modo que es un efecto de escala y no de calendario
+    (Anexo~\ref{anx:tuning_imputador}). La lectura operativa es que un fichero de
+    hiperparámetros solo es válido cerca del tamaño con el que se obtuvo, condición que el
+    fichero por sí mismo no puede expresar y que aquí queda registrada en su artefacto.
 
-    \item \textbf{Selección de hiperparámetros gobernada por la decisión.} La búsqueda de hiperparámetros no se dirige a un error estadístico de propósito general, sino a las dos magnitudes de las que depende la decisión de reposición: la \textit{Pinball Loss} evaluada en el fractil crítico $q^*$ que fija la política de inventario, y el Winkler Score, que mide la calidad del intervalo sobre el que se cuantifica la incertidumbre. Ambas se mantienen separadas durante la búsqueda, de modo que su resultado no es una configuración aislada sino un frente de Pareto que hace explícito el compromiso entre ellas y permite reponderarlo ante un cambio en la estructura de costes sin repetir la exploración. La aportación no reside en el empleo de optimización multiobjetivo, técnica consolidada y disponible en las librerías al uso, sino en derivar sus objetivos del problema de decisión al que el modelo sirve.
+    \item \textbf{La política de pedido de una evaluación por coste puede invertir el orden que
+    pretende medir.} Al comparar señales de demanda por el coste de inventario que inducen, el
+    término de seguridad de la política no es un detalle de implementación: con un único término
+    común al catálogo, \emph{conocer la demanda real} resulta más caro que la señal censurada sin
+    corregir, y con un término proporcional a cada serie la métrica satura hasta no distinguir un
+    imputador razonable de un oráculo. Solo sin término de seguridad ---pidiendo exactamente lo
+    que dice la señal--- el coste mide la señal y la demanda real cuesta cero
+    (Sección~\ref{sec:resultados_gemelo}). El resultado es directamente reutilizable por
+    cualquiera que construya una comparación de señales de demanda basada en coste.
 
-    \item \textbf{Comparativa sistemática de estrategias de corrección de demanda censurada.} Se evalúan y comparan tres enfoques de imputación (escalado estático, media histórica local y modelo supervisor LightGBM) bajo el mismo protocolo de backtesting, cuantificando su efecto tanto en el error predictivo como en el coste logístico simulado.
+    \item \textbf{Caracterización empírica de la infracobertura conformal sobre demanda
+    reconstruida.} La calibración \textit{Mondrian} estratificada por categoría se aplica aquí
+    sobre un target reconstruido a partir de ventas censuradas, combinación que la literatura
+    revisada no cubre ---existen trabajos que llevan la predicción conformal al
+    \textit{Newsvendor} y trabajos que desarrollan la variante Mondrian, pero no sobre demanda
+    censurada. La aportación no es la combinación en sí, sino la \textbf{medición} de lo que le
+    ocurre: la cobertura empírica queda sistemáticamente por debajo del nivel nominal, la brecha
+    se estrecha al aumentar el panel en un orden de magnitud y no se cierra, y el análisis
+    atribuye el resto a la no-intercambiabilidad temporal entre los periodos de calibración y de
+    test (Sección~\ref{sec:resultados_conformal}).
 
-    \item \textbf{Arquitectura MLOps operativa sobre el problema.} Se diseña e implementa una arquitectura completa con trazabilidad de experimentos mediante artefactos versionados (\textit{hash} de configuración y \textit{commit} de Git por ejecución), API operacional de \textit{scoring}, explicabilidad automática (SHAP), cuadro de mandos \textit{What-If} renderizado en servidor e integración continua (CI/CD), operativizando el sistema más allá del prototipo experimental.
+    \item \textbf{Sistema completo, trazable y reproducible.} Se implementa el recorrido entero
+    desde el dato bruto hasta la decisión: preparación del panel, reconstrucción de la censura,
+    ingeniería de características sin fuga temporal, modelos probabilísticos, calibración,
+    política de pedido, API operacional, cuadro de mandos y despliegue contenerizado con
+    integración continua. Cada ejecución queda registrada en un almacén de corridas con su
+    configuración, sus métricas y el \textit{commit} exacto que la produjo, y toda cifra citada
+    en esta memoria nombra la corrida que la generó. Esto no es una aportación al estado del
+    arte, sino la condición que hace verificables las cuatro anteriores: los tres resultados
+    negativos se encontraron porque el sistema permitía volver sobre sus propias mediciones y
+    contradecirlas.
 \end{enumerate}
 
 \section{Metodología}

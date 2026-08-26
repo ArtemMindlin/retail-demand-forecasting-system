@@ -93,6 +93,22 @@ is how it kept republishing June runs. It also could not execute at all between 
 deliberately. If a table and this file disagree, run the command above before believing
 either.
 
+## Diagnostic figures that no run mode produces
+
+Three of the findings chapter 1 now lists as contributions are quantified by DIAGNOSTICS of the
+committed code, not by any run mode's artifact: the reconstruction MAE of a ratio-only rule with
+no model, the teacher-size comparison at 684 vs 16 405 clean rows, and the cost of a perfect
+signal under each safety-stock variant. They are real measurements of the code as committed, and
+they are reproducible, but nothing writes them to a run directory — so by this file's own rule
+they cannot be cited. Every one of them is wrapped in `\pendiente{}` in the memoria.
+
+Two ways to settle it, and the choice is not obvious. Either the fair-cost backtest grows a
+diagnostic block that scores the control signals (the truth, and the ratio-only rule) alongside
+the four strategies and writes them to `fair_cost_draws.csv` — which makes them citable and, as
+a regression test, would have caught all three defects invariant 44 records. Or the numbers come
+out of the memoria and the findings stay qualitative. Leaving them as unsourced figures is the
+one option this file exists to forbid.
+
 ## Traps this file exists to prevent
 
 **The processed-panel cache used to ignore `top_n_series`.** Before commit `94b1224`
