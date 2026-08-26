@@ -25,8 +25,8 @@ La Tabla~\ref{tab:gbdt_comparison} resume las dimensiones más relevantes para e
         \textbf{Criterio} & \textbf{XGBoost} & \textbf{LightGBM} & \textbf{CatBoost} \\
         \midrule
         Crecimiento de árbol & Por niveles & Por hojas & Oblivious (simétrico) \\
-        Variables categóricas & Manual (OHE) & Manual (OHE) & Nativa (Ordered TS) \\
-        Riesgo de \textit{target leakage} & Alto & Alto & Bajo (Ordered Boosting) \\
+        Variables categóricas & Manual (OHE) & Nativa (particiones) & Nativa (Ordered TS) \\
+        Riesgo de \textit{target leakage} & Alto & Medio & Bajo (Ordered Boosting) \\
         Velocidad en datasets grandes & Alta & Muy alta & Media \\
         Regularización implícita & Moderada & Moderada & Alta \\
         Predicción de cuantiles & Sí & Sí & Sí \\
@@ -37,13 +37,41 @@ La Tabla~\ref{tab:gbdt_comparison} resume las dimensiones más relevantes para e
     \label{tab:gbdt_comparison}
 \end{table}
 
-En este trabajo se implementan y comparan los tres \textit{backends} bajo el mismo protocolo de backtesting. El modelo seleccionado como campeón es \textbf{CatBoost} por tres razones que se alinean directamente con las características del dataset \textit{Fresh RetailNet}:
+La tabla recoge las tres implementaciones que la literatura considera de referencia, pero el
+sistema desarrollado implementa \textbf{dos}: LightGBM y CatBoost, ambas bajo el mismo protocolo
+de backtesting y el mismo envoltorio cuantílico. XGBoost se descarta antes de implementarse, y por
+la fila que más pesa en este dominio: es la única de las tres que exige codificar manualmente unos
+identificadores de tienda, producto y categoría de cardinalidad alta, y el \textit{one-hot} de ese
+catálogo produce una matriz dispersa que ni escala ni permite al árbol agrupar categorías con
+comportamiento parecido.
+
+Entre las dos que sí se implementan, la elección del campeón \textbf{no se decide con los
+argumentos de esta tabla}, sino empíricamente y por el criterio que la operación percibe: el coste
+logístico simulado sobre el protocolo de backtesting, mediante la lógica de promoción descrita en
+la Sección~\ref{sec:promocion}. Esa distinción importa, porque el orden por error puntual y el
+orden por coste no coinciden: reportarlos por separado es una de las conclusiones del trabajo. El
+campeón resultante es \textbf{CatBoost}, y las propiedades de la tabla explican \emph{por qué es
+razonable} que gane, no la razón por la que se selecciona:
 
 \begin{itemize}
-    \item \textbf{Gestión nativa de categoriales sin fuga de información:} El dataset contiene identificadores de tienda, producto y categoría de alta cardinalidad. XGBoost y LightGBM requieren codificación manual previa (\textit{one-hot} o \textit{target encoding}), que introduce riesgo de \textit{target leakage} al calcular estadísticos del target durante el entrenamiento. CatBoost resuelve esto mediante \textit{Ordered Target Statistics}, que garantiza que la codificación de cada observación solo utiliza información anterior en el orden de entrenamiento \cite{prokhorenkova2018catboost}.
-    \item \textbf{Regularización implícita mediante árboles oblivious:} Los árboles simétricos de CatBoost aplican la misma condición de división en todo un nivel, actuando como un regularizador estructural que favorece la generalización en series con alta variabilidad como los productos frescos.
-    \item \textbf{Estimación nativa de incertidumbre:} CatBoost permite obtener la varianza epistémica de la predicción directamente desde la función de pérdida, complementando la calibración posterior de los intervalos de confianza mediante Mondrian Conformal Prediction.
+    \item \textbf{Gestión nativa de categóricas con estadísticos ordenados:} las dos manejan las
+    categóricas sin codificación manual, pero lo hacen de forma distinta. LightGBM ordena las
+    categorías por el estadístico del gradiente y parte sobre ese orden, lo que en categorías con
+    pocas observaciones puede sobreajustar; CatBoost calcula estadísticos de destino sobre una
+    permutación previa (\textit{ordered target statistics}), construcción diseñada precisamente
+    para que el valor de la etiqueta de una observación no entre en el estadístico que la codifica.
+    Con identificadores de la cardinalidad de este catálogo, esa diferencia es la más relevante de
+    las tres.
+    \item \textbf{Regularización implícita mediante árboles \textit{oblivious}:} los árboles
+    simétricos de CatBoost aplican la misma condición de división en todo un nivel, lo que actúa
+    como regularizador estructural sobre un panel donde muchas series tienen historia corta.
 \end{itemize}
+
+La estimación nativa de incertidumbre que CatBoost ofrece (última fila de la tabla) \textbf{no se
+explota} en este sistema: la cuantificación de la incertidumbre se obtiene de la rejilla de
+cuantiles y de la calibración conformal, que son comunes a los dos \textit{backends} y por tanto
+mantienen la comparación entre ellos en igualdad de condiciones. Se recoge en la tabla como
+propiedad de la herramienta, no como capacidad utilizada.
 
 \section{Cuantificación de la Incertidumbre y Conformal Prediction}
 Una predicción puntual es insuficiente para la gestión de inventarios; es necesario cuantificar la probabilidad de diferentes escenarios de demanda para poder aplicar el criterio del Newsvendor. Los enfoques clásicos de cuantificación de incertidumbre se dividen en tres familias: métodos bayesianos, regresión cuantílica y métodos de calibración post-hoc. Los métodos bayesianos \cite{hyndman2021forecasting} ofrecen intervalos bien fundamentados teóricamente pero requieren especificar distribuciones a priori y son computacionalmente costosos a escala. La regresión cuantílica \cite{koenker2005quantile} estima directamente los cuantiles de la distribución condicionada, pero no garantiza cobertura calibrada: el cuantil $q_{0{,}9}$ estimado puede contener la demanda real solo el 70\% de las veces si la distribución de test difiere de la de entrenamiento.

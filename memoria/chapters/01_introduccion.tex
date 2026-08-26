@@ -42,8 +42,8 @@ predicción abstracta de demanda, sino la construcción de un \textbf{Sistema de
 próximos días?} Para contestarla, el sistema no solo estima la demanda esperada y cuantifica
 matemáticamente su incertidumbre, sino que la traduce en una cantidad de pedido que pondera de forma
 explícita el coste por rotura de stock (\textit{stockout}) frente al coste por sobrestock y
-desperdicio, con un umbral de decisión calculado producto a producto según su propio perfil de
-costes, contribuyendo así al Objetivo de Desarrollo Sostenible (ODS) 12: Producción y Consumo
+desperdicio, con un umbral de decisión (el fractil crítico) común al catálogo y una
+curva de cuantiles propia de cada producto, contribuyendo así al Objetivo de Desarrollo Sostenible (ODS) 12: Producción y Consumo
 Responsables \cite{ods12un}.
 
 \subsection{Motivación personal}
@@ -95,11 +95,11 @@ El objetivo general de este proyecto es diseñar, evaluar y desplegar un sistema
 
 Para alcanzar este objetivo general, se plantean los siguientes objetivos específicos:
 \begin{enumerate}[label=\textbf{O\arabic*.}, ref=O\arabic*]
-    \item \label{obj:pipeline} Desarrollar un \textit{pipeline} de datos reproducible que incluya compuertas de calidad (\textit{Data Quality Gates}) y la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}, verificando que ninguna observación censurada por stockout introduce fuga de información hacia la etiqueta objetivo.
+    \item \label{obj:pipeline} Desarrollar un \textit{pipeline} de datos reproducible que incluya la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}, verificando que ninguna observación censurada por stockout introduce fuga de información hacia la etiqueta objetivo.
     \item \label{obj:modelos} Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos, obteniendo un coste de inventario simulado en el conjunto de test inferior al de un \textit{baseline} estacional ingenuo (\textit{seasonal naïve}).
     \item \label{obj:conformal} \begin{sloppypar}Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con hiper-optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$) sobre el conjunto de test.\end{sloppypar}
     \item \label{obj:mlops} Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software,
-    incluyendo trazabilidad de experimentos mediante artefactos versionados, explicabilidad (SHAP),
+    incluyendo trazabilidad de experimentos en un almacén de corridas, explicabilidad (SHAP),
     una API operacional y un cuadro de mandos interactivo \textit{What-If} renderizado en servidor
     (Django), soportado por \textit{Docker} e Integración Continua (CI/CD).
 \end{enumerate}
@@ -195,7 +195,6 @@ Sobre esa base, el trabajo se organiza en seis etapas encadenadas:
 \begin{enumerate}
     \item \textbf{Análisis y preparación de los datos.} Caracterización del conjunto de partida,
     identificación de sus patrones y de sus patologías, y construcción de un panel diario homogéneo
-    con compuertas de calidad que rechazan la ejecución si el panel no cumple sus condiciones
     (Capítulo~\ref{chap:analisis_datos}).
     \item \textbf{Reconstrucción de la demanda censurada.} Estimación de la demanda que se habría
     producido en los días con rotura de stock, mediante tres estrategias alternativas que se
