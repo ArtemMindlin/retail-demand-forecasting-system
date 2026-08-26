@@ -11,6 +11,7 @@ from retail_forecasting.config import (
     BusinessConfig,
     DataQualityConfig,
     DatasetConfig,
+    FeatureConfig,
     InventoryConfig,
     ModelConfig,
     PreprocessingConfig,
@@ -79,6 +80,21 @@ def test_settings_instantiation_rejects_invalid_quantiles() -> None:
 def test_settings_instantiation_rejects_unsorted_quantiles() -> None:
     with pytest.raises(ValidationError, match="ascending order"):
         Settings(models=ModelConfig(quantiles=[0.5, 0.1, 0.9]))
+
+
+def test_settings_instantiation_rejects_duplicate_feature_lags() -> None:
+    with pytest.raises(ValidationError, match="features.lags must be unique"):
+        Settings(features=FeatureConfig(lags=[1, 7, 7]))
+
+
+def test_settings_instantiation_rejects_unsorted_rolling_windows() -> None:
+    with pytest.raises(ValidationError, match="features.rolling_windows"):
+        Settings(features=FeatureConfig(rolling_windows=[28, 7]))
+
+
+def test_settings_instantiation_rejects_zero_lag() -> None:
+    with pytest.raises(ValidationError, match="strictly positive"):
+        Settings(features=FeatureConfig(lags=[0, 7]))
 
 
 def test_settings_instantiation_rejects_invalid_inventory_costs() -> None:

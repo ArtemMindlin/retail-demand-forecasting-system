@@ -7,6 +7,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -21,6 +22,7 @@ RunMode = Literal[
     "simulate_ops",
     "fair_cost_backtest",
     "tune_imputation",
+    "tune_forecasting",
     "eda",
 ]
 
@@ -90,6 +92,9 @@ MODE_SECTIONS: dict[RunMode, frozenset[str]] = {
         {"project", "dataset", "preprocessing", "models", "inventory", "reporting"}
     ),
     "tune_imputation": frozenset({"project", "dataset", "preprocessing", "models"}),
+    "tune_forecasting": frozenset(
+        {"project", "dataset", "preprocessing", "features", "models", "inventory"}
+    ),
     "eda": frozenset({"project", "dataset", "preprocessing", "reporting"}),
 }
 
@@ -131,6 +136,10 @@ class DatasetConfig(BaseModel):
 # declared twice, once in each place, with nothing keeping the two in step.
 ImputationStrategy = Literal["supervised", "historical_mean", "clipped_scaling", "none"]
 
+# Single source of truth for the boosting backends a tuning run can target. It lives in
+# `contracts` so `forecasting_tuning` can type against it without importing `models`.
+BoostingBackend = Literal["lightgbm", "catboost"]
+
 
 class PreprocessingConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -143,10 +152,22 @@ class FeatureConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     lags: list[int] = Field(default_factory=lambda: [1, 7, 14, 28], min_length=1)
     rolling_windows: list[int] = Field(default_factory=lambda: [7, 28], min_length=1)
-    include_static_ids: bool = True
     include_weather_lags: bool = True
     include_discount_lags: bool = True
     include_stockout_lags: bool = True
+
+    @field_validator("lags", "rolling_windows")
+    @classmethod
+    def validate_positive_unique_sorted(cls, v: list[int], info: ValidationInfo) -> list[int]:
+        """Let feature engineering consume these as declared, without re-normalising."""
+        field = f"features.{info.field_name}"
+        if any(item <= 0 for item in v):
+            raise ValueError(f"{field} must be strictly positive: a zero lag or window leaks.")
+        if len(set(v)) != len(v):
+            raise ValueError(f"{field} must be unique.")
+        if v != sorted(v):
+            raise ValueError(f"{field} must be sorted in ascending order.")
+        return v
 
 
 class ValidationConfig(BaseModel):
@@ -157,6 +178,14 @@ class ValidationConfig(BaseModel):
     calibration_days: int = Field(default=21, gt=0)
     retrain_each_fold: bool = True
     drift_triggered_retrain: bool = False
+
+    def minimum_dates_required(self, horizon: int) -> int:
+        """Unique dates a panel needs for this fold layout to fit.
+
+        `horizon` is a parameter rather than a field because it lives in `DatasetConfig`,
+        and `build_walk_forward_folds` receives the two separately.
+        """
+        return self.initial_train_days + self.n_folds * self.fold_size_days + horizon - 1
 
 
 class DriftConfig(BaseModel):
@@ -180,6 +209,9 @@ class ModelConfig(BaseModel):
     # config, and a value that differed between them would send the readers to a file that is
     # not there, which degrades to the untuned defaults without an error.
     imputation_params_filename: str = "imputation_lgbm_params.json"
+    # Written by `tune_forecasting` and read by every mode that trains a boosting model, so it
+    # is the same kind of shared name as the line above, and drifts the same way.
+    forecasting_params_filename: str = "forecasting_params.json"
     quantiles: list[float] = Field(default_factory=lambda: [0.1, 0.5, 0.9], min_length=1)
     seasonal_period: int = Field(default=7, gt=0)
     n_estimators: int = Field(default=200, gt=0)
@@ -187,12 +219,15 @@ class ModelConfig(BaseModel):
     max_depth: int = Field(default=6, gt=0)
     use_tuning: bool = True
     tuning_trials: int = Field(default=20, gt=0)
+    # Which backend `run_mode = tune_forecasting` searches. ONE per run: two backends mean
+    # two independent searches, two gates and two verdicts, so they are two executions.
+    tuning_backend: BoostingBackend = "catboost"
 
-    @field_validator("imputation_params_filename")
+    @field_validator("imputation_params_filename", "forecasting_params_filename")
     @classmethod
-    def validate_imputation_params_filename(cls, v: str) -> str:
+    def validate_bare_params_filename(cls, v: str, info: ValidationInfo) -> str:
         if Path(v).name != v:
-            raise ValueError("models.imputation_params_filename must be a bare file name.")
+            raise ValueError(f"models.{info.field_name} must be a bare file name.")
         return v
 
     @field_validator("quantiles")

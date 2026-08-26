@@ -51,12 +51,7 @@ def build_walk_forward_folds(
     horizon: int,
 ) -> list[FoldSpec]:
     unique_dates = sorted(pd.to_datetime(panel["date"]).drop_duplicates())
-    minimum_dates_required = (
-        validation_config.initial_train_days
-        + validation_config.n_folds * validation_config.fold_size_days
-        + horizon
-        - 1
-    )
+    minimum_dates_required = validation_config.minimum_dates_required(horizon)
     if len(unique_dates) < minimum_dates_required:
         raise ValueError(
             "Not enough dates to create the requested walk-forward folds. "

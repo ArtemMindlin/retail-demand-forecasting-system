@@ -364,6 +364,13 @@ reentrena sobre los dias limpios del panel que reciba en cada llamada.
 
 Controla las features creadas por `build_supervised_frame()`.
 
+Los ids estaticos (`city_id`, `store_id`, `management_group_id`,
+`first_category_id`, `second_category_id`, `third_category_id`, `product_id`)
+entran siempre y no son configurables: el modelo global entrena muchas series a
+la vez y necesita distinguir tiendas, productos y categorias. El flag
+`include_static_ids` que los hacia opcionales se retiro sin haberse puesto nunca
+en `false`.
+
 ### `lags`
 
 Lags positivos usados para features historicas.
@@ -371,11 +378,13 @@ Lags positivos usados para features historicas.
 Ejemplo:
 
 ```yaml
-lags: [1, 7, 14, 28]
+lags: [1, 7, 14]
 ```
 
 Generan columnas como `demand_lag_1`, `discount_lag_7` o `stockout_lag_14`.
-Solo se permiten lags positivos para evitar leakage.
+La lista debe ser estrictamente positiva, sin repetidos y en orden ascendente:
+un lag 0 seria la demanda del propio origen, que el target ya incluye, y el
+orden declarado es el orden de las columnas que recibe el modelo.
 
 ### `rolling_windows`
 
@@ -384,26 +393,12 @@ Ventanas rolling historicas.
 Ejemplo:
 
 ```yaml
-rolling_windows: [7, 28]
+rolling_windows: [7, 14]
 ```
 
-Generan columnas como `demand_roll_mean_7`, `demand_roll_sum_28`,
-`demand_roll_std_28` o `stockout_roll_mean_7`.
-
-### `include_static_ids`
-
-Si es `true`, incluye identificadores estaticos como features:
-
-- `city_id`
-- `store_id`
-- `management_group_id`
-- `first_category_id`
-- `second_category_id`
-- `third_category_id`
-- `product_id`
-
-Son utiles porque el modelo global entrena muchas series a la vez y necesita
-distinguir tiendas, productos y categorias.
+Generan columnas como `demand_roll_mean_7`, `demand_roll_sum_14`,
+`demand_roll_std_14` o `stockout_roll_mean_7`. Mismas reglas que `lags`:
+positivas, sin repetidos y ascendentes.
 
 ### `include_weather_lags`
 
