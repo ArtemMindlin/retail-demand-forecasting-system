@@ -455,7 +455,13 @@ Invariants:
 - `cost_delta_pct` is a percentage, the interval is not — see invariant 44
 
 The per-draw detail behind all of it is written beside it as `fair_cost_draws.csv`, one row
-per (seed, strategy), and the run's identity as `fair_cost_metadata.json`.
+per (seed, strategy), carrying also `order_policy_scale` and `teacher_fit_rows`; the run's
+identity goes to `fair_cost_metadata.json`.
+
+`sampled_series` counts the series EVALUATED, not the series the panel holds: the sample is
+applied as a censoring mask, so the supervised imputer's teacher keeps the whole panel
+(`teacher_fit_rows`). Shrinking the panel instead shrank the teacher and biased the ranking
+— see invariant 44.
 
 ## Pareto Frontier
 

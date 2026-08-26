@@ -293,13 +293,16 @@ main()
   - `panel`;
   - `inventory_config`;
   - `seed`;
-  - `imputer_params_path`.
+  - `imputer_params_path`;
+  - `censorable_mask`.
 - Devuelve: `pd.DataFrame` con una fila por estrategia (`signal_mae`, `total_cost`,
-  `fill_rate`, `mean_order`, `n_eval`, `order_policy_scale`).
+  `fill_rate`, `mean_order`, `n_eval`, `order_policy_scale`, `teacher_fit_rows`).
 - Invariantes:
   - la politica de pedido es COMUN a las cuatro: un unico par de costes y una unica escala de
     stock de seguridad, de modo que la diferencia de coste sea atribuible a la senal;
-  - esa escala se estima sobre el panel CENSURADO, nunca sobre la demanda real (invariante 44).
+  - esa escala se estima sobre el panel CENSURADO, nunca sobre la demanda real (invariante 44);
+  - `censorable_mask` estrecha lo que se evalua sin recortar el panel: el maestro del imputador
+    supervisado conserva su tamano de despliegue (invariantes 41 y 44).
 - Se usa en: `draw_costs()`.
 
 ### `summarize_draws`

@@ -65,13 +65,25 @@ def evaluate_fair_inventory_cost(
     inventory_config: InventoryConfig,
     seed: int,
     imputer_params_path: Path | None = None,
+    censorable_mask: pd.Series | None = None,
 ) -> pd.DataFrame:
     """Score every strategy on ONE censoring draw, against a common ground truth.
 
-    Returns one row per strategy: signal_mae, total_cost, fill_rate, mean_order, n_eval and
-    the order policy's safety-stock scale.
+    ``censorable_mask`` restricts which rows may be censored and scored WITHOUT shrinking the
+    panel, so the supervised imputer's teacher keeps its deployment-sized training set. Passing
+    a smaller panel instead is the defect invariant 41 was written about: it shrank the teacher
+    to a fraction of deployment size and changed the answer. Measured here on the same 293
+    evaluation days, the same params file and the same ground truth, a 684-row teacher scored
+    MAE 0.5640 against 0.4106 for the 16405-row one -- a 27% handicap, and one that fell on the
+    supervised arm alone, since both heuristics are per-series or per-row.
+
+    Returns one row per strategy: signal_mae, total_cost, fill_rate, mean_order, n_eval, the
+    order policy's safety-stock scale and the teacher's training size.
     """
-    censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed)
+    censored, eval_idx, true_demand = synthetic_censor_holdout(
+        panel, seed, censorable_mask=censorable_mask
+    )
+    scored_rows = slice(None) if censorable_mask is None else censorable_mask
 
     # One cost pair for the whole catalogue, so every strategy is charged identically.
     critical_fractile = inventory_config.stockout_cost / (
@@ -80,7 +92,9 @@ def evaluate_fair_inventory_cost(
     z = statistics.NormalDist().inv_cdf(critical_fractile)
     # Estimated on the CENSORED panel, not on the answer key: a shared scalar taken from the
     # true demand is fair between strategies but is still an oracle inside the order policy.
-    sigma = float(np.std(censored["observed_demand"].to_numpy(dtype=float)))
+    # Scoped to the rows the policy actually orders for, not to the teacher's wider panel.
+    sigma = float(np.std(censored.loc[scored_rows, "observed_demand"].to_numpy(dtype=float)))
+    teacher_fit_rows = int((censored["stockout_hours"] == 0).sum())
 
     total_demand = float(true_demand.sum())
     records: list[dict[str, Any]] = []
@@ -109,6 +123,7 @@ def evaluate_fair_inventory_cost(
                 "mean_order": float(np.mean(order_quantity)),
                 "n_eval": int(len(eval_idx)),
                 "order_policy_scale": sigma,
+                "teacher_fit_rows": teacher_fit_rows,
             }
         )
     return pd.DataFrame(records)
@@ -119,16 +134,18 @@ def draw_costs(
     inventory_config: InventoryConfig,
     seeds: list[int],
     imputer_params_path: Path | None = None,
+    censorable_mask: pd.Series | None = None,
 ) -> pd.DataFrame:
     """Every strategy scored on each draw, one row per (seed, strategy).
 
-    Sequential on purpose: a draw fits one LGBM teacher on a 30-series panel, so the whole
-    sweep costs seconds and threads would only contend with whatever else is running.
+    Sequential on purpose: the LGBM teacher is pinned to one thread by the imputer itself, so
+    the sweep costs a few minutes and threading it would only contend with whatever else the
+    machine is running.
     """
     per_draw = [
-        evaluate_fair_inventory_cost(panel, inventory_config, seed, imputer_params_path).assign(
-            seed=seed
-        )
+        evaluate_fair_inventory_cost(
+            panel, inventory_config, seed, imputer_params_path, censorable_mask
+        ).assign(seed=seed)
         for seed in seeds
     ]
     return pd.concat(per_draw, ignore_index=True)
@@ -178,7 +195,7 @@ def _build_metadata(
     summary: pd.DataFrame,
     draws: pd.DataFrame,
     panel: pd.DataFrame,
-    source_series: int,
+    evaluated_series: int,
     seeds: list[int],
     inventory_config: InventoryConfig,
     seed: int,
@@ -188,9 +205,10 @@ def _build_metadata(
     best = ranked.iloc[0]
     return FairCostMetadata(
         baseline_strategy=BASELINE_STRATEGY,
-        source_panel_series=source_series,
-        sampled_series=int(panel["series_id"].nunique()),
+        source_panel_series=int(panel["series_id"].nunique()),
+        sampled_series=evaluated_series,
         panel_rows=len(panel),
+        teacher_fit_rows=int(draws["teacher_fit_rows"].iloc[0]),
         panel_start=str(pd.Timestamp(panel["date"].min()).date()),
         panel_end=str(pd.Timestamp(panel["date"].max()).date()),
         n_draws=len(seeds),
@@ -224,15 +242,19 @@ def run_fair_cost_backtest(settings: Settings) -> Path:
     )
     source_series = int(panel["series_id"].nunique())
     seed = settings.project.random_seed
+    # A MASK, not a subset: only the evaluated rows narrow, while the supervised imputer's
+    # teacher keeps the whole panel it is given in deployment. See invariant 41.
     unique_ids = panel["series_id"].drop_duplicates().to_numpy()
+    keep = unique_ids
     if len(unique_ids) > N_SERIES:
         keep = np.random.default_rng(seed).choice(unique_ids, size=N_SERIES, replace=False)
-        panel = panel[panel["series_id"].isin(keep)].reset_index(drop=True)
-    n_kept = int(panel["series_id"].nunique())
+    censorable_mask = panel["series_id"].isin(keep)
+    n_kept = int(panel.loc[censorable_mask, "series_id"].nunique())
     fields(
         logger,
         {
-            "panel": f"{thousands(len(panel))} filas · {n_kept} de {source_series} series",
+            "panel": f"{thousands(len(panel))} filas · {source_series} series (maestro)",
+            "evaluadas": f"{n_kept} series muestreadas",
             "sorteos": f"{N_DRAWS} censuras sintéticas · {len(STRATEGIES)} estrategias",
         },
     )
@@ -245,11 +267,10 @@ def run_fair_cost_backtest(settings: Settings) -> Path:
         imputer_params_path=(
             settings.models.models_dir / settings.models.imputation_params_filename
         ),
+        censorable_mask=censorable_mask,
     )
     summary = summarize_draws(draws)
-    metadata = _build_metadata(
-        summary, draws, panel, source_series, seeds, settings.inventory, seed
-    )
+    metadata = _build_metadata(summary, draws, panel, n_kept, seeds, settings.inventory, seed)
     # Provenance in the artifact itself: the ranking flips with the source panel, so the CSV
     # must say which one it came from rather than leaving it to the reader's memory.
     summary.insert(1, "source_panel_series", source_series)

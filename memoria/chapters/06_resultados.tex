@@ -220,6 +220,7 @@ Para resolver este sesgo de evaluación, implementamos una metodología de \text
     \item \textbf{Política de pedido común y simplificada}: la cantidad a pedir no proviene de los cuantiles del modelo de \textit{forecasting} ni de la capa conformal, sino de una aproximación normal \textit{order-up-to} idéntica para todas las estrategias, $q^* = \max(\text{señal} + z_{q^*}\cdot\sigma,\, 0)$, donde $z_{q^*}$ es el cuantil normal estándar del fractil crítico. Esta comparativa mide por tanto el \textbf{imputador}, no el modelo campeón; el rendimiento del sistema completo se evalúa en la validación a escala de la Sección~\ref{sec:resultados_escala}.
     \item \textbf{Costes aplanados}: se aplica un único par $(c_o, c_u)$ a todas las series, de modo que ninguna estrategia se beneficia de una composición de catálogo favorable. Los perfiles de coste sintéticos por SKU que en su día se contemplaron fueron retirados del sistema por las razones que recoge la Sección~\ref{sec:cost_profiles}.
     \item \textbf{Término de seguridad compartido y estimable}: la escala $\sigma$ del \textit{safety stock} es la misma para las cuatro estrategias, de modo que la diferencia de coste no mezcla la señal con la política. Se estima sobre el panel \textbf{censurado}, que es lo que un decisor observa en el momento de pedir. Una versión anterior de este protocolo la estimaba sobre la demanda real de los días evaluados: al ser un valor común no alteraba el orden entre estrategias, pero introducía una cantidad de tipo oráculo dentro de la propia política de pedido, algo que ninguna operativa real podría reproducir.
+    \item \textbf{La muestra acota lo evaluado, no lo entrenado}: el subconjunto de 30 series se aplica como una \emph{máscara} de censura, no como un recorte del panel. Se puntúan únicamente esos días, pero el maestro del imputador supervisado conserva el panel completo de 500 series, que es el que recibe en producción. La versión anterior recortaba el panel y con ello el maestro, de 16.405 filas limpias a 684: sobre los mismos 293 días evaluados, el mismo fichero de hiperparámetros y la misma verdad, eso empeoraba el MAE de reconstrucción de 0{,}411 a 0{,}564. El perjuicio recaía además solo sobre la estrategia supervisada, porque la media histórica opera por serie y el \textit{clipped scaling} por fila, de modo que sesgaba en contra precisamente la comparación que esta sección existe para hacer.
     \item \textbf{Repetición del sorteo de censura}: la comparativa no descansa sobre una única inserción de censuras. Se repite el sorteo y el hueco de coste frente a la señal \textit{Observed} se reporta como una diferencia \textbf{emparejada} --- ambas estrategias vieron el mismo sorteo, así que la dificultad concreta de ese sorteo se cancela --- acompañada de su intervalo de confianza al 95\% (Student-t) en unidades de coste. El signo de la diferencia media, por sí solo, no distingue una ventaja real de un empate afortunado.
 \end{itemize}
 
@@ -227,9 +228,9 @@ Los resultados de esta comparativa equitativa, calculada sobre un subconjunto de
 
 \begin{quote}
 \small
-\textbf{Precisión necesaria sobre el muestreo.} El protocolo extrae 30 series por
-motivos de coste computacional, y el resultado es \emph{sensible al panel del que se
-extraen}. La Tabla~\ref{tab:metrics_cost} las muestrea del panel de 500 series, que es
+\textbf{Precisión necesaria sobre el muestreo.} El protocolo evalúa 30 series por
+motivos de coste computacional --- entrenando sobre el panel completo, según lo dicho
+arriba --- y el resultado es \emph{sensible al panel del que se extraen}. La Tabla~\ref{tab:metrics_cost} las muestrea del panel de 500 series, que es
 lo que declara la columna \texttt{source\_panel\_series} del artefacto
 \texttt{fair\_cost\_backtest.csv}. Muestreadas en cambio del subset base de 50 series de
 alta rotación, el orden entre las dos estrategias principales \textbf{se invierte} y

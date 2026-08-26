@@ -47,12 +47,32 @@ def test_every_strategy_is_scored_once_per_draw(panel: pd.DataFrame) -> None:
     assert result["strategy"].iloc[0] == BASELINE_STRATEGY
 
 
+def test_narrowing_the_evaluation_does_not_shrink_the_teacher(panel: pd.DataFrame) -> None:
+    """The defect invariant 41 was written about, reproduced here and now fixed.
+
+    Handing the imputer a smaller panel shrinks its teacher, which changes the answer: on the
+    real 500-series panel the same 293 evaluation days scored MAE 0.5640 with a 684-row teacher
+    against 0.4106 with the 16405-row one. The handicap fell on the supervised arm alone, since
+    both heuristics are per-series or per-row -- so it biased the very ranking this backtest
+    exists to produce. The mask narrows what is scored; the panel stays whole.
+    """
+    half = panel["series_id"].isin(sorted(panel["series_id"].unique())[:3])
+
+    masked = evaluate_fair_inventory_cost(panel, INVENTORY, seed=42, censorable_mask=half)
+    subset = evaluate_fair_inventory_cost(panel[half].reset_index(drop=True), INVENTORY, seed=42)
+
+    assert masked["teacher_fit_rows"].iloc[0] > subset["teacher_fit_rows"].iloc[0]
+    # Same evaluation width either way: only the teacher differs.
+    assert masked["n_eval"].iloc[0] == subset["n_eval"].iloc[0]
+
+
 def test_the_order_policy_is_shared_by_every_strategy(panel: pd.DataFrame) -> None:
     """The whole design: if the safety stock differed per strategy, the cost gap would mix
     the signal with the policy and stop being attributable to the reconstruction."""
     result = evaluate_fair_inventory_cost(panel, INVENTORY, seed=42)
     assert result["order_policy_scale"].nunique() == 1
     assert result["n_eval"].nunique() == 1
+    assert result["teacher_fit_rows"].nunique() == 1
 
 
 def test_the_safety_stock_scale_is_not_taken_from_the_answer_key(panel: pd.DataFrame) -> None:
@@ -132,13 +152,14 @@ def test_a_single_draw_cannot_produce_an_interval(panel: pd.DataFrame) -> None:
 def test_metadata_names_the_cheapest_reconstruction(panel: pd.DataFrame) -> None:
     draws = draw_costs(panel, INVENTORY, SEEDS)
     summary = summarize_draws(draws)
-    metadata = _build_metadata(summary, draws, panel, 500, SEEDS, INVENTORY, seed=42)
+    metadata = _build_metadata(summary, draws, panel, 30, SEEDS, INVENTORY, seed=42)
 
     candidates = summary[summary["strategy"] != BASELINE_STRATEGY]
     assert metadata.best_strategy == candidates.loc[candidates["total_cost"].idxmin(), "strategy"]
     assert metadata.critical_fractile == pytest.approx(0.8)
-    assert metadata.source_panel_series == 500
-    assert metadata.sampled_series == panel["series_id"].nunique()
+    assert metadata.source_panel_series == panel["series_id"].nunique()
+    assert metadata.sampled_series == 30
+    assert metadata.teacher_fit_rows == draws["teacher_fit_rows"].iloc[0]
     assert metadata.n_draws == len(SEEDS)
 
 
@@ -147,7 +168,7 @@ def test_beating_the_baseline_is_decided_on_the_interval_not_the_sign(
 ) -> None:
     """A negative mean with an interval straddling zero is a coin flip, not a win."""
     summary = summarize_draws(draws)
-    metadata = _build_metadata(summary, draws, panel, 500, SEEDS, INVENTORY, seed=42)
+    metadata = _build_metadata(summary, draws, panel, 30, SEEDS, INVENTORY, seed=42)
     best = summary.set_index("strategy").loc[metadata.best_strategy]
     assert metadata.best_beats_baseline == bool(best["cost_ci95_high"] < 0.0)
 
@@ -157,7 +178,8 @@ def test_metadata_refuses_a_run_that_cannot_carry_an_interval() -> None:
         "baseline_strategy": "Observed",
         "source_panel_series": 500,
         "sampled_series": 30,
-        "panel_rows": 2700,
+        "panel_rows": 45000,
+        "teacher_fit_rows": 16405,
         "panel_start": "2024-03-01",
         "panel_end": "2024-06-25",
         "n_draws": 20,

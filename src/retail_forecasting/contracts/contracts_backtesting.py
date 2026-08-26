@@ -41,6 +41,12 @@ class FairCostMetadata(BaseModel):
     source_panel_series: int = Field(gt=0)
     sampled_series: int = Field(gt=0)
     panel_rows: int = Field(gt=0)
+    # Clean rows the supervised imputer's teacher actually fits on. Recorded for the same
+    # reason the imputation search records it: a tuned params file is only valid near the
+    # teacher size it was tuned at (invariant 41), and neither the file nor the panel says so.
+    # It must reflect the WHOLE panel, not the evaluated sample -- shrinking it cost the
+    # supervised arm 27% of its reconstruction accuracy while the heuristics were untouched.
+    teacher_fit_rows: int = Field(gt=0)
     panel_start: str
     panel_end: str
     n_draws: int = Field(gt=1)

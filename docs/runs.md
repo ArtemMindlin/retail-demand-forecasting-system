@@ -13,7 +13,7 @@ citable — re-run it before citing.
 
 ## SUPERSEDED — every run below predates the changes of 26 Aug 2026
 
-Nothing in the table that follows is citable. Six changes landed on 26 Aug 2026, each of
+Nothing in the table that follows is citable. Seven changes landed on 26 Aug 2026, each of
 which alters what the models see or how they are scored, so every number produced before them
 describes a configuration that no longer exists:
 
@@ -24,6 +24,7 @@ describes a configuration that no longer exists:
 | `lags` [1, 7, 14, 28] → [1, 7, 14] | different features AND a shorter cold start: 70 origin dates per series instead of 56 |
 | static ids int64 → pandas `category` | CatBoost's ordered target statistics engage for the first time; LightGBM partitions 352 store levels instead of carving numeric ranges |
 | fair-cost order policy: safety-stock scale from `std(true_demand)` → from the censored panel | `tab:metrics_cost` only. Every absolute cost in it moves; the scale is no longer an oracle (invariant 44) |
+| fair-cost sample: panel subset → censoring mask | `tab:metrics_cost` only. The supervised imputer's teacher goes from 684 rows to the full panel's 16 405; its reconstruction MAE improves 27%, and neither heuristic is affected (invariant 44) |
 | fair-cost ranking: 1 censoring draw → 20, with a paired 95% interval | `tab:metrics_cost` only. Its cost columns become means over draws and gain a gap column; the old single-draw ranking carried no uncertainty at all |
 
 Two more changes are pending and will invalidate again, so do not re-cite until both land:

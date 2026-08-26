@@ -490,3 +490,15 @@ See `docs/web_layer.md` for the full description.
     Read the two quantities as different things: `best_cost_delta_pct` is a ratio of two mean
     costs, while the interval is over the paired differences and is in COST UNITS. Quoting the
     interval as percentage points is the mistake this note exists to prevent.
+
+    A third defect, found on re-reading and of the same family as invariant 41: the backtest
+    handed the imputer a panel cut down to `N_SERIES`, which cut its teacher down with it. The
+    30 series are the EVALUATION sample, not the training set, and the distinction is not
+    cosmetic. Measured on the same 293 evaluation days, the same params file and the same
+    ground truth, the supervised arm scored MAE 0.5640 with a 684-row teacher against 0.4106
+    with the 16405-row one -- and the handicap fell on that arm alone, since `historical_mean`
+    is per series and `clipped_scaling` per row. The backtest was therefore biasing the exact
+    ranking it exists to produce, against the strategy the thesis defends. It now passes a
+    `censorable_mask` and keeps the whole panel, which is the mechanism the imputation search
+    already uses for the same reason. `teacher_fit_rows` is recorded so the mismatch between a
+    params file and the teacher it is applied to stays visible.
