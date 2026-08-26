@@ -491,6 +491,22 @@ See `docs/web_layer.md` for the full description.
     costs, while the interval is over the paired differences and is in COST UNITS. Quoting the
     interval as percentage points is the mistake this note exists to prevent.
 
+    The safety-stock scale is also PER SERIES, and that is not a refinement: it decides the
+    answer. One catalogue-wide scalar put `z*sigma` at ~5.9 units across series whose daily
+    sales range from 4.95 to 18.27 -- 120% of the smallest one's sales and 33% of the largest's
+    -- and at that size it swamped the one-to-two-unit differences between the signals. Every
+    strategy then ordered almost the same thing, and the comparison measured the cushion rather
+    than the reconstruction: measured, the supervised arm came out 2.23% WORSE than the
+    observed signal under the scalar and 48.57% BETTER per series, with the interval entirely
+    below zero. The scalar was collateral: it was written in the same breath as flattening the
+    per-series COST profiles, which was correct and necessary. But costs weight the outcome,
+    while the scale is part of the decision rule -- flattening the first removes an unfair
+    advantage, flattening the second removes the sensitivity being measured. When the cost
+    profiles were later removed, the line explaining the flattening went with them and the
+    surviving comment read as a fairness requirement in its own right. The per-series scale is
+    still computed on the censored panel BEFORE any imputation, so it is identical for all four
+    strategies and the isolation holds.
+
     A third defect, found on re-reading and of the same family as invariant 41: the backtest
     handed the imputer a panel cut down to `N_SERIES`, which cut its teacher down with it. The
     30 series are the EVALUATION sample, not the training set, and the distinction is not

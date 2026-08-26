@@ -275,7 +275,7 @@ def _fair_cost_metadata() -> FairCostMetadata:
         eval_fraction=0.3,
         seeds=[42, 43],
         critical_fractile=0.8,
-        order_policy_scale=4.2,
+        mean_order_policy_scale=4.2,
         best_strategy="Latent_supervised",
         best_cost_delta_pct=-3.72,
         best_ci95=[-95.41, -41.76],

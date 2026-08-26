@@ -9,6 +9,8 @@ the baseline is paired.
 
 from __future__ import annotations
 
+import statistics
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -16,6 +18,7 @@ from pydantic import ValidationError
 
 from retail_forecasting.contracts.contracts_backtesting import FairCostMetadata
 from retail_forecasting.contracts.contracts_config import InventoryConfig
+from retail_forecasting.data.censorship import synthetic_censor_holdout
 from retail_forecasting.evaluation.latex_exporter import _cost_gap_column, _fair_cost_table
 from retail_forecasting.forecasting.fair_cost import (
     BASELINE_STRATEGY,
@@ -70,22 +73,36 @@ def test_the_order_policy_is_shared_by_every_strategy(panel: pd.DataFrame) -> No
     """The whole design: if the safety stock differed per strategy, the cost gap would mix
     the signal with the policy and stop being attributable to the reconstruction."""
     result = evaluate_fair_inventory_cost(panel, INVENTORY, seed=42)
-    assert result["order_policy_scale"].nunique() == 1
+    assert result["mean_order_policy_scale"].nunique() == 1
     assert result["n_eval"].nunique() == 1
     assert result["teacher_fit_rows"].nunique() == 1
 
 
-def test_the_safety_stock_scale_is_not_taken_from_the_answer_key(panel: pd.DataFrame) -> None:
-    """It must be knowable at decision time. A scalar taken from the true demand of the
-    censored days is fair between strategies and still an oracle inside the policy."""
-    from retail_forecasting.data.censorship import synthetic_censor_holdout
+def test_the_cushion_is_per_series_and_never_reads_the_answer_key(panel: pd.DataFrame) -> None:
+    """Pins the order policy exactly, on the baseline arm where the signal is computable.
 
-    censored, _, true_demand = synthetic_censor_holdout(panel, seed=42)
+    Two properties at once. The scale is estimated on the CENSORED panel, so it is knowable
+    at decision time -- the true demand of a censored day is not. And it is one scale PER
+    SERIES: a single catalogue-wide scalar was ~6 units against series selling 5 a day, which
+    swamped the one-to-two-unit differences between the signals and left the comparison
+    measuring the cushion instead of the reconstruction.
+    """
+    censored, eval_idx, true_demand = synthetic_censor_holdout(panel, seed=42)
+    scale_by_series = censored.groupby("series_id")["observed_demand"].std()
+    sigma = censored.loc[eval_idx, "series_id"].map(scale_by_series).to_numpy(float)
+    signal = censored.loc[eval_idx, "observed_demand"].to_numpy(float)
+    z = statistics.NormalDist().inv_cdf(0.8)
+
     result = evaluate_fair_inventory_cost(panel, INVENTORY, seed=42)
-    scale = float(result["order_policy_scale"].iloc[0])
+    baseline = result[result["strategy"] == BASELINE_STRATEGY].iloc[0]
 
-    assert scale == pytest.approx(float(np.std(censored["observed_demand"].to_numpy(float))))
-    assert scale != pytest.approx(float(np.std(true_demand)))
+    assert baseline["mean_order"] == pytest.approx(
+        float(np.mean(np.maximum(signal + z * sigma, 0.0)))
+    )
+    # Not one scalar wearing a per-series disguise.
+    assert sigma.std() > 0
+    # And nothing here came from the answer key.
+    assert not np.allclose(sigma, np.std(true_demand))
 
 
 def test_a_draw_is_reproducible_and_the_seed_actually_moves_it(panel: pd.DataFrame) -> None:
@@ -187,7 +204,7 @@ def test_metadata_refuses_a_run_that_cannot_carry_an_interval() -> None:
         "eval_fraction": 0.3,
         "seeds": [1, 2],
         "critical_fractile": 0.8,
-        "order_policy_scale": 4.2,
+        "mean_order_policy_scale": 4.2,
         "best_strategy": "Latent_supervised",
         "best_cost_delta_pct": -3.1,
         "best_ci95": [-5.0, -1.0],

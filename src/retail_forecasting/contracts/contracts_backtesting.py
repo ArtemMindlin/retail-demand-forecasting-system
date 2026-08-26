@@ -54,9 +54,11 @@ class FairCostMetadata(BaseModel):
     eval_fraction: float = Field(gt=0.0, le=1.0)
     seeds: list[int] = Field(min_length=2)
     critical_fractile: float = Field(gt=0.0, lt=1.0)
-    # Safety-stock scale of the shared order policy, estimated from the CENSORED panel: it has
-    # to be knowable at decision time, and the true demand of a censored day is not.
-    order_policy_scale: float = Field(ge=0.0)
+    # Mean of the PER-SERIES safety-stock scales of the shared order policy, estimated from
+    # the CENSORED panel: it has to be knowable at decision time, and the true demand of a
+    # censored day is not. A mean, so it describes the policy without standing for any one
+    # series -- the policy itself carries one scale per series (invariant 44).
+    mean_order_policy_scale: float = Field(ge=0.0)
     best_strategy: str
     best_cost_delta_pct: float
     best_ci95: list[float] = Field(min_length=2, max_length=2)

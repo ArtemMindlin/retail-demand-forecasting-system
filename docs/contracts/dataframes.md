@@ -455,7 +455,7 @@ Invariants:
 - `cost_delta_pct` is a percentage, the interval is not — see invariant 44
 
 The per-draw detail behind all of it is written beside it as `fair_cost_draws.csv`, one row
-per (seed, strategy), carrying also `order_policy_scale` and `teacher_fit_rows`; the run's
+per (seed, strategy), carrying also `mean_order_policy_scale` and `teacher_fit_rows`; the run's
 identity goes to `fair_cost_metadata.json`.
 
 `sampled_series` counts the series EVALUATED, not the series the panel holds: the sample is

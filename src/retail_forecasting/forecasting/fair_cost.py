@@ -78,7 +78,7 @@ def evaluate_fair_inventory_cost(
     supervised arm alone, since both heuristics are per-series or per-row.
 
     Returns one row per strategy: signal_mae, total_cost, fill_rate, mean_order, n_eval, the
-    order policy's safety-stock scale and the teacher's training size.
+    mean per-series safety-stock scale and the teacher's training size.
     """
     censored, eval_idx, true_demand = synthetic_censor_holdout(
         panel, seed, censorable_mask=censorable_mask
@@ -90,10 +90,15 @@ def evaluate_fair_inventory_cost(
         inventory_config.stockout_cost + inventory_config.overstock_cost
     )
     z = statistics.NormalDist().inv_cdf(critical_fractile)
-    # Estimated on the CENSORED panel, not on the answer key: a shared scalar taken from the
-    # true demand is fair between strategies but is still an oracle inside the order policy.
-    # Scoped to the rows the policy actually orders for, not to the teacher's wider panel.
-    sigma = float(np.std(censored.loc[scored_rows, "observed_demand"].to_numpy(dtype=float)))
+    # PER SERIES, and from the CENSORED panel. Identical for all four strategies -- it is
+    # computed before any imputation -- so the comparison stays isolated to the signal, while
+    # the cushion stays proportional to the series it orders for. One catalogue-wide scalar
+    # made z*sigma 120% of the smallest series' daily sales and 33% of the largest's, and at
+    # ~6 units it swamped the one-to-two-unit differences between the signals: every strategy
+    # ordered almost the same thing and the comparison measured the cushion. See invariant 44.
+    scale_by_series = censored.loc[scored_rows].groupby("series_id")["observed_demand"].std()
+    pooled = float(np.std(censored.loc[scored_rows, "observed_demand"].to_numpy(dtype=float)))
+    sigma = censored.loc[eval_idx, "series_id"].map(scale_by_series).fillna(pooled).to_numpy(float)
     teacher_fit_rows = int((censored["stockout_hours"] == 0).sum())
 
     total_demand = float(true_demand.sum())
@@ -122,7 +127,7 @@ def evaluate_fair_inventory_cost(
                 ),
                 "mean_order": float(np.mean(order_quantity)),
                 "n_eval": int(len(eval_idx)),
-                "order_policy_scale": sigma,
+                "mean_order_policy_scale": float(np.mean(sigma)),
                 "teacher_fit_rows": teacher_fit_rows,
             }
         )
@@ -217,7 +222,7 @@ def _build_metadata(
         seeds=seeds,
         critical_fractile=inventory_config.stockout_cost
         / (inventory_config.stockout_cost + inventory_config.overstock_cost),
-        order_policy_scale=float(draws["order_policy_scale"].mean()),
+        mean_order_policy_scale=float(draws["mean_order_policy_scale"].mean()),
         best_strategy=str(best["strategy"]),
         best_cost_delta_pct=float(best["cost_delta_pct"]),
         best_ci95=[float(best["cost_ci95_low"]), float(best["cost_ci95_high"])],

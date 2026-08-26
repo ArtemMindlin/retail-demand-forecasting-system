@@ -13,7 +13,7 @@ citable — re-run it before citing.
 
 ## SUPERSEDED — every run below predates the changes of 26 Aug 2026
 
-Nothing in the table that follows is citable. Seven changes landed on 26 Aug 2026, each of
+Nothing in the table that follows is citable. Eight changes landed on 26 Aug 2026, each of
 which alters what the models see or how they are scored, so every number produced before them
 describes a configuration that no longer exists:
 
@@ -24,6 +24,7 @@ describes a configuration that no longer exists:
 | `lags` [1, 7, 14, 28] → [1, 7, 14] | different features AND a shorter cold start: 70 origin dates per series instead of 56 |
 | static ids int64 → pandas `category` | CatBoost's ordered target statistics engage for the first time; LightGBM partitions 352 store levels instead of carving numeric ranges |
 | fair-cost order policy: safety-stock scale from `std(true_demand)` → from the censored panel | `tab:metrics_cost` only. Every absolute cost in it moves; the scale is no longer an oracle (invariant 44) |
+| fair-cost order policy: one catalogue-wide safety-stock scale → one PER SERIES | `tab:metrics_cost` only, and it decides the answer: the supervised arm goes from 2.23% worse than the observed signal to 48.57% better, interval entirely below zero (invariant 44) |
 | fair-cost sample: panel subset → censoring mask | `tab:metrics_cost` only. The supervised imputer's teacher goes from 684 rows to the full panel's 16 405; its reconstruction MAE improves 27%, and neither heuristic is affected (invariant 44) |
 | fair-cost ranking: 1 censoring draw → 20, with a paired 95% interval | `tab:metrics_cost` only. Its cost columns become means over draws and gain a gap column; the old single-draw ranking carried no uncertainty at all |
 
@@ -31,6 +32,13 @@ Two more changes are pending and will invalidate again, so do not re-cite until 
 the LightGBM hyperparameter search (`run_mode = tune_forecasting`, in flight) and the
 CatBoost one after it. A champion trained on untuned defaults is not the champion the
 thesis will defend.
+
+Beyond the numbers, the THIRD conclusion under `tab:metrics_cost` in chapter 6 needs
+rewriting, not just re-citing. It tells a story about an "unexpected ordering" in which
+`historical_mean` is the most expensive of the four signals, dearer than the uncorrected
+baseline. Under a per-series safety stock it is the second cheapest, and the cost ranking
+follows signal quality monotonically. The old ordering looks like an artefact of the flat
+cushion; do not carry that paragraph over.
 
 `tab:imputation_reconstruction` is gone from chapter 6, not pending: the `compare_imputation`
 mode that wrote it is deleted and invariant 42 forbids the ranking it showed. Restoring the
