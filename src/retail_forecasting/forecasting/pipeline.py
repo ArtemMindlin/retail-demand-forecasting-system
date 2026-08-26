@@ -42,6 +42,7 @@ from retail_forecasting.features.engineering import (
     build_supervised_frame,
 )
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
+from retail_forecasting.forecasting.tuned_params import CORE_PARAMS, resolve_backend_params
 from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
@@ -94,17 +95,24 @@ def _split_train_calibration(
 def _instantiate_boosting_base(
     model_cls: type[LightGBMModel] | type[CatBoostingModel],
     settings: Settings,
-    params: BoostingParams,
+    params_by_backend: dict[str, dict[str, Any]],
 ) -> LightGBMModel | CatBoostingModel:
-    """Build a boosting base model from tuned params and inventory costs."""
+    """Build a boosting base model from its own resolved params and the inventory costs.
+
+    Keyed per backend because a tuning run searches ONE of them: LightGBM's space and
+    CatBoost's do not even share parameter names, and the previous single `BoostingParams`
+    silently applied a LightGBM-tuned set to CatBoost as well.
+    """
+    params = params_by_backend[model_cls.model_name]
     return model_cls(
         quantiles=settings.models.quantiles,
         random_seed=settings.project.random_seed,
-        n_estimators=params.n_estimators,
-        learning_rate=params.learning_rate,
-        max_depth=params.max_depth,
+        n_estimators=int(params["n_estimators"]),
+        learning_rate=float(params["learning_rate"]),
+        max_depth=int(params["max_depth"]),
         overstock_cost=settings.inventory.overstock_cost,
         stockout_cost=settings.inventory.stockout_cost,
+        extra_params={k: v for k, v in params.items() if k not in CORE_PARAMS},
     )
 
 
@@ -321,7 +329,6 @@ class _FoldLoopResult:
 
 
 def _build_supervised_frames(
-    panel: pd.DataFrame,
     prepared_panel: pd.DataFrame,
     holdout_panel: pd.DataFrame | None,
     settings: Settings,
@@ -340,7 +347,15 @@ def _build_supervised_frames(
 
     holdout_supervised_frame: pd.DataFrame | None = None
     if holdout_panel is not None:
-        combined_prepared = label_all_regimes(pd.concat([panel, holdout_panel], ignore_index=True))
+        train_series_means = prepared_panel.groupby("series_id", sort=False)[
+            "observed_demand"
+        ].mean()
+        prepared_holdout = label_all_regimes(
+            holdout_panel, velocity_series_means=train_series_means
+        )
+        combined_prepared = pd.concat(
+            [prepared_panel, prepared_holdout], ignore_index=True
+        ).sort_values(["series_id", "date"], ignore_index=True)
         full_supervised, _ = build_supervised_frame(
             panel=combined_prepared,
             feature_config=settings.features,
@@ -394,7 +409,7 @@ def _run_fold_loop(
     supervised_frame: pd.DataFrame,
     feature_columns: list[str],
     baseline_model: SeasonalNaiveModel,
-    best_boosting_params: BoostingParams,
+    best_boosting_params: dict[str, dict[str, Any]],
     settings: Settings,
     data_strategy: str,
 ) -> _FoldLoopResult:
@@ -556,7 +571,7 @@ def _evaluate_on_holdout(
     supervised_frame: pd.DataFrame,
     feature_columns: list[str],
     baseline_model: SeasonalNaiveModel,
-    best_boosting_params: BoostingParams,
+    best_boosting_params: dict[str, dict[str, Any]],
     settings: Settings,
     data_strategy: str,
 ) -> tuple[list[pd.DataFrame], ConformalForecaster | None, ConformalForecaster | None]:
@@ -703,7 +718,7 @@ def run_experiment_from_frame(
     prepared_panel = label_all_regimes(panel)
 
     supervised_frame, feature_metadata, holdout_supervised_frame = _build_supervised_frames(
-        panel, prepared_panel, holdout_panel, settings
+        prepared_panel, holdout_panel, settings
     )
     feature_columns = feature_metadata.feature_columns
 
@@ -725,9 +740,25 @@ def run_experiment_from_frame(
         },
     )
 
-    best_boosting_params, tuning_metadata, tuning_pareto = _run_tuning_phase(
+    in_run_params, tuning_metadata, tuning_pareto = _run_tuning_phase(
         supervised_frame, feature_columns, folds, settings, data_strategy
     )
+    # `use_tuning` is an explicit request to search inside this run, so it wins over a
+    # persisted winner. With it off -- which is every config in the repo -- each backend takes
+    # its own tuned block when one matches this panel, and the YAML defaults otherwise.
+    n_series = int(prepared_panel["series_id"].nunique())
+    if settings.models.use_tuning:
+        searched = in_run_params.model_dump()
+        best_boosting_params = {"lightgbm": searched, "catboost": searched}
+        fields(logger, {"hiperparámetros": "búsqueda dentro de la corrida (models.use_tuning)"})
+    else:
+        best_boosting_params = {}
+        provenance = {}
+        for backend in ("lightgbm", "catboost"):
+            resolved, source = resolve_backend_params(settings, backend, n_series)
+            best_boosting_params[backend] = resolved
+            provenance[backend] = source
+        fields(logger, provenance)
 
     baseline_model = SeasonalNaiveModel(
         seasonal_period=settings.models.seasonal_period,
