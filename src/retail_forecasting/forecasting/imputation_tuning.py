@@ -12,6 +12,13 @@ import mlflow
 import numpy as np
 import optuna
 import pandas as pd
+
+# Imported for its side effect and its ORDER, not for its API. Optuna's GPSampler loads torch
+# lazily on its first modelled trial, by which time LightGBM and CatBoost have initialised their
+# own runtimes -- and torch loading second segfaults the process on macOS (measured: SIGSEGV at
+# trial `n_startup_trials + 1`, and no crash when torch goes first). Ruff sorts third-party
+# above first-party, so this line stays ahead of the model imports that pull those two in.
+import torch  # noqa: F401
 from joblib import Parallel, cpu_count, delayed
 from mlflow.data.pandas_dataset import from_pandas
 from scipy import stats
@@ -182,7 +189,7 @@ def _holdout_maes(holdouts: list[Holdout], params: dict[str, int | float]) -> np
     return np.asarray(maes, dtype=float)
 
 
-def _hhmm(seconds: float) -> str:
+def hhmm(seconds: float) -> str:
     """Duration as ``1h52m``, ``12m`` or ``45s``, all the precision a progress line needs.
 
     Seconds below the minute and not just ``0m``: a trial here can cost one second, and a
@@ -195,7 +202,7 @@ def _hhmm(seconds: float) -> str:
     return f"{hours}h{minutes:02d}m" if hours else f"{minutes}m"
 
 
-def _pace_seconds(study: optuna.Study) -> float | None:
+def pace_seconds(study: optuna.Study, n_startup_trials: int = _N_STARTUP_TRIALS) -> float | None:
     """Seconds per trial, measured on the trials PAST the sampler's random startup.
 
     The startup trials are drawn uniformly and are not representative of the pace: measured
@@ -211,7 +218,7 @@ def _pace_seconds(study: optuna.Study) -> float | None:
             continue
         seconds = trial.duration.total_seconds()
         all_seconds.append(seconds)
-        if trial.number >= _N_STARTUP_TRIALS:
+        if trial.number >= n_startup_trials:
             past_startup.append(seconds)
 
     timed = past_startup or all_seconds
@@ -236,7 +243,7 @@ def _objective_mae(
     return float(np.mean(_holdout_maes(draws, params)))
 
 
-def _mean_ci95(deltas: np.ndarray) -> tuple[float, float]:
+def mean_ci95(deltas: np.ndarray) -> tuple[float, float]:
     """Two-sided 95% CI for the mean of the paired per-holdout MAE differences.
 
     Student-t, not the normal's 1.96: at ``N_VALIDATION_HOLDOUTS`` draws the correct multiplier
@@ -588,15 +595,15 @@ def tune_imputation_lgbm(
         done = trial.number + 1
         if done % _PROGRESS_EVERY_TRIALS and done != n_trials:
             return
-        pace = _pace_seconds(study)
+        pace = pace_seconds(study)
         table.row(
             {
                 "trial": f"{done}/{n_trials}",
                 "MAE": "-" if trial.value is None else f"{trial.value:.4f}",
                 "mejor": f"{study.best_value:.4f}",
                 "s/trial": "-" if pace is None else f"{pace:.0f}",
-                "pasado": _hhmm(time.monotonic() - started),
-                "queda": "-" if pace is None else _hhmm(pace * max(n_trials - done, 0)),
+                "pasado": hhmm(time.monotonic() - started),
+                "queda": "-" if pace is None else hhmm(pace * max(n_trials - done, 0)),
             }
         )
 
@@ -651,7 +658,7 @@ def tune_imputation_lgbm(
         (best_mae_validation - default_mae_validation) / default_mae_validation * 100
     )
 
-    ci_lo, ci_hi = _mean_ci95(tuned_maes - default_maes)
+    ci_lo, ci_hi = mean_ci95(tuned_maes - default_maes)
     beats_default = ci_hi < 0.0
 
     incumbent_mae_validation: float | None = None
@@ -661,7 +668,7 @@ def tune_imputation_lgbm(
         logger.info("Puntuando al campeón en disco sobre las mismas extracciones")
         incumbent_maes = _holdout_maes(validation.draws, incumbent_params)
         incumbent_mae_validation = float(np.mean(incumbent_maes))
-        inc_lo, inc_hi = _mean_ci95(tuned_maes - incumbent_maes)
+        inc_lo, inc_hi = mean_ci95(tuned_maes - incumbent_maes)
         incumbent_ci95 = [inc_lo, inc_hi]
 
         beats_incumbent = bool(np.mean(tuned_maes - incumbent_maes) < 0.0)
