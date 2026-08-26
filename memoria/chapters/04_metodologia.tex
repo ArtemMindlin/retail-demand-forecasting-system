@@ -167,11 +167,11 @@ Las características se organizan en cuatro grupos funcionales:
 \begin{enumerate}
     \item \textbf{Características Calendáricas}: Codifican la posición temporal del origen de predicción. Incluyen el día de la semana ($\in [0,6]$), el día del mes, el mes, la semana del año, un indicador binario de fin de semana, un indicador de festivo (\texttt{holiday\_flag}) y un indicador de actividad promocional especial (\texttt{activity\_flag}). Estas variables capturan la estacionalidad semanal y mensual identificada en el análisis exploratorio (véase Capítulo~\ref{chap:analisis_datos}).
 
-    \item \textbf{Lags de Demanda y Ventanas Deslizantes}: Para capturar la autocorrelación de la serie, se calculan lags de la demanda observada en los instantes $t-1$, $t-7$, $t-14$ y $t-28$. La elección no es arbitraria: el análisis de la función de autocorrelación (ACF) del Capítulo~\ref{chap:analisis_datos} reveló picos significativos en los retardos 7 y 14, correspondientes a la estacionalidad semanal dominante del dataset. El lag $t-1$ captura inercia de corto plazo (efecto del día anterior); $t-7$ y $t-14$ recogen la estacionalidad semanal dominante detectada en el ACF; y $t-28$ aproxima el ciclo mensual de reposición típico en retail fresco. Sobre ventanas de 7 y 28 días se calculan además la media, la suma y la desviación estándar rodantes. Todos los estadísticos se computan con desplazamiento de un día (\texttt{shift(1)}) para garantizar ausencia de \textit{data leakage}.
+    \item \textbf{Lags de Demanda y Ventanas Deslizantes}: Para capturar la autocorrelación de la serie, se calculan lags de la demanda observada en los instantes $t-1$, $t-7$ y $t-14$. La elección no es arbitraria: el análisis de la función de autocorrelación (ACF) del Capítulo~\ref{chap:analisis_datos} reveló picos significativos en los retardos 7 y 14, correspondientes a la estacionalidad semanal dominante del dataset. El lag $t-1$ captura inercia de corto plazo (efecto del día anterior); $t-7$ y $t-14$ recogen la estacionalidad semanal dominante detectada en el ACF; un cuarto retardo a $t-28$, que aproximaba el ciclo mensual de reposición, se retiró del conjunto final: con 96 días de historia disponible su coste no está en el número de columnas sino en el arranque en frío, porque el primer origen predecible de cada serie se retrasa hasta que el retardo más largo tiene dato --- 28 días en lugar de 14, lo que cuesta catorce orígenes por serie. Sobre ventanas de 7 y 14 días se calculan además la media, la suma y la desviación estándar rodantes. Todos los estadísticos se computan con desplazamiento de un día (\texttt{shift(1)}) para garantizar ausencia de \textit{data leakage}.
 
-    \item \textbf{Lags de Variables Exógenas Externas}: Se construyen lags en los instantes $t-1$, $t-7$, $t-14$ y $t-28$ para la variable de descuento (\texttt{discount}) y las cuatro variables meteorológicas (temperatura, precipitación, humedad y viento). Son covariables externas al sistema de inventario que modulan la demanda sin depender del estado del stock.
+    \item \textbf{Lags de Variables Exógenas Externas}: Se construyen lags en los instantes $t-1$, $t-7$ y $t-14$ para la variable de descuento (\texttt{discount}) y las cuatro variables meteorológicas (temperatura, precipitación, humedad y viento). Son covariables externas al sistema de inventario que modulan la demanda sin depender del estado del stock.
 
-    \item \textbf{Lags de Stockout}: Las horas diarias sin stock (\texttt{stockout\_hours}) se tratan como grupo propio por su doble rol en el sistema: actúan como señal proxy de la demanda latente en el módulo de imputación (Sección~\ref{sec:demanda_censurada}) y como covariable del modelo de forecasting que informa sobre la presión histórica de rotura. Se calculan lags en los mismos instantes ($t-1, t-7, t-14, t-28$) y medias rodantes a 7 y 28 días.
+    \item \textbf{Lags de Stockout}: Las horas diarias sin stock (\texttt{stockout\_hours}) se tratan como grupo propio por su doble rol en el sistema: actúan como señal proxy de la demanda latente en el módulo de imputación (Sección~\ref{sec:demanda_censurada}) y como covariable del modelo de forecasting que informa sobre la presión histórica de rotura. Se calculan lags en los mismos instantes ($t-1, t-7, t-14$) y medias rodantes a 7 y 14 días.
 
     \item \textbf{Identificadores Estáticos}: Los identificadores jerárquicos (\texttt{store\_id}, \texttt{product\_id}, \texttt{city\_id}, \texttt{management\_group\_id} y las tres categorías) se incluyen directamente como variables categóricas. CatBoost los codifica de forma nativa mediante \textit{Ordered Target Statistics}, evitando la necesidad de \textit{one-hot encoding} y el riesgo de \textit{target leakage} asociado al \textit{target encoding} estándar.
 \end{enumerate}
@@ -187,13 +187,13 @@ La Tabla~\ref{tab:features_summary} resume el número de características result
         \textbf{Grupo} & \textbf{N\textordmasculine{} características} & \textbf{Ejemplos} \\
         \midrule
         Calendáricas & 7 & \texttt{day\_of\_week}, \texttt{holiday\_flag}, \texttt{activity\_flag} \\
-        Lags de demanda & 4 & \texttt{demand\_lag\_7}, \texttt{demand\_lag\_28} \\
-        Ventanas deslizantes & 6 & \texttt{demand\_roll\_mean\_7}, \texttt{demand\_roll\_std\_28} \\
-        Lags de exógenas & 20 & \texttt{discount\_lag\_7}, \texttt{avg\_temperature\_lag\_1} \\
-        Lags de stockout & 6 & \texttt{stockout\_lag\_7}, \texttt{stockout\_roll\_mean\_28} \\
+        Lags de demanda & 3 & \texttt{demand\_lag\_1}, \texttt{demand\_lag\_14} \\
+        Ventanas deslizantes & 6 & \texttt{demand\_roll\_mean\_7}, \texttt{demand\_roll\_std\_14} \\
+        Lags de exógenas & 15 & \texttt{discount\_lag\_7}, \texttt{avg\_temperature\_lag\_1} \\
+        Lags de stockout & 5 & \texttt{stockout\_lag\_7}, \texttt{stockout\_roll\_mean\_14} \\
         Identificadores estáticos & 7 & \texttt{store\_id}, \texttt{third\_category\_id} \\
         \midrule
-        \textbf{Total} & \textbf{50} & \\
+        \textbf{Total} & \textbf{43} & \\
         \bottomrule
     \end{tabular}
     \caption{Resumen de características del frame supervisado.}

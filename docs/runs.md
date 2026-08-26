@@ -33,11 +33,12 @@ the LightGBM hyperparameter search (`run_mode = tune_forecasting`, in flight) an
 CatBoost one after it. A champion trained on untuned defaults is not the champion the
 thesis will defend.
 
-The three conclusions under `tab:metrics_cost` in chapter 6 have been rewritten for the
-protocol they now describe, with every figure wrapped in `\pendiente{}` — it prints in red
-and in brackets so a provisional number cannot ship silently. Seven of them are waiting on
-one run of `make backtest-fair-cost`, which is blocked only by the forecasting search holding
-the machine. The estimates inside the markers come from a 6-draw check of the committed code,
+The fair-cost figures have been rewritten for the protocol they now describe, with every one
+wrapped in `\pendiente{}` — it prints in red and in brackets so a provisional number cannot
+ship silently. There are 25 of them, and they were NOT confined to chapter 6: the same three
+numbers were asserted as fact in all three abstracts, in the conclusions, in the KPI table and
+in the SDG annex. All of them wait on one run of `make backtest-fair-cost`, which is blocked
+only by the forecasting search holding the machine. The estimates inside the markers come from a 6-draw check of the committed code,
 not from a registered run, and must be replaced rather than merely confirmed.
 
 The rewrite also retired a paragraph rather than updating it. It tells a story about an "unexpected ordering" in which
