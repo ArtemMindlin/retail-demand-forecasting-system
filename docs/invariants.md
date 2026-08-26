@@ -93,15 +93,31 @@ These rules protect the experimental validity and architecture of the project.
     Its temporal semantics are verified: the raw split covers 2024-06-26 to 2024-07-02, the
     7 days immediately following the train split's last date (2024-06-25), 7 days per series.
     A clean forward holdout, so `run_experiment` loads it unconditionally
-    (`forecasting/pipeline.py`) and the OPS plane streams it origin by origin.
+    (`forecasting/pipeline.py`). `_build_supervised_frames` is its ONLY consumer: the OPS
+    plane does not stream it, having rejected it as too small and carved its own split into
+    `data/processed/ops_sim/` (`scripts/build_ops_sim_split.py`).
+
+    What it buys is corroboration on the dataset's canonical split, not validation. Horizon 7
+    over 7 days leaves one origin per series, so the 50 rows all carry the same date and share
+    one week's weather, holidays and promotions: the effective sample size is nearer 1 than 50.
+    Read it as a smoke test -- the full pipeline runs on never-seen data and returns plausible
+    numbers -- and never as evidence that one model beats another.
 
     What this invariant protects is the frame construction, not the loading.
-    `_build_supervised_frames` concatenates `panel + holdout_panel` before calling
-    `build_supervised_frame` so the holdout rows get correct lag history, then keeps ONLY
-    holdout-date rows. Both halves are load-bearing: without the concatenation the holdout's
-    lags are null, and without the date filter the last `horizon - 1` train rows get targets
-    covering holdout days via `shift(-horizon)` -- the same embargo as invariants 11 and 12,
-    applied across the split boundary.
+    `_build_supervised_frames` concatenates the prepared panel with the prepared holdout
+    before calling `build_supervised_frame` so the holdout rows get correct lag history, then
+    keeps ONLY holdout-date rows. Both halves are load-bearing: without the concatenation the
+    holdout's lags are null, and without the date filter the last `horizon - 1` train rows get
+    targets covering holdout days via `shift(-horizon)` -- the same embargo as invariants 11
+    and 12, applied across the split boundary.
+
+    The holdout is labeled with `velocity_series_means` taken from the TRAIN panel. That
+    parameter exists because `label_demand_velocity_regime` averages `observed_demand` over
+    whatever frame it receives, so labeling the concatenation used to give train rows a
+    different `velocity_regime` than labeling the train panel alone, and gave the holdout a
+    regime computed with the holdout's own demand. Pinning the means makes every label a
+    row-wise function of the frame, hence concatenable. No leakage was involved -- regime
+    columns are evaluation strata, never features -- but the strata were inconsistent.
 
     A split other than `train` must INHERIT train's series universe, never recompute one.
     `prepare_daily_panel` takes `restrict_to_series` for this, and `load_prepared_panel` loads

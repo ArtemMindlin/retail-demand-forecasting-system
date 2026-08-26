@@ -55,10 +55,12 @@ The official `eval` split is wired as an external holdout and its temporal seman
 run.py
  -> load_config()
  -> run_experiment()
- -> load_prepared_panel()
- -> label_stockout_regime()
+ -> load_prepared_panel()            (train, then the eval holdout)
+ -> validate_prepared_panel()
  -> [optional] LatentDemandImputer reconstruction (one arm per run: `imputation_strategy`
-    picks it, `none` = Observed)
+    picks it, `none` = Observed). It REWRITES `observed_demand`, so every step below --
+    regime labels included -- sees the reconstruction, not the raw sale.
+ -> label_all_regimes()
  -> build_supervised_frame()
  -> build_walk_forward_folds()
  -> SeasonalNaiveModel / LightGBMModel / CatBoostingModel
