@@ -96,7 +96,7 @@
   {% endfor %}
 
   <div class="drift-panel-foot">
-    <span>reports/{{ run_name|default:"—" }}/drift_report.json</span>
+    <span>{{ run_name|default:"—" }}/drift_report.json</span>
     <span>thresholds · warn 0.10 · crit 0.20</span>
   </div>
 </div>
