@@ -187,7 +187,17 @@ recuperación de demanda censurada, y lo hace sobre un \textit{benchmark} public
     respuesta \textbf{exactamente}, sin modelo y sin entrenar nada, mientras que un imputador que
     estime la demanda de jornada completa se queda cerca pero no clavado. Medido sobre el panel
     de este trabajo, esa regla trivial obtiene el menor error de reconstrucción de todas las
-    estrategias evaluadas. El error de reconstrucción no mide, por tanto, la calidad de la
+    estrategias evaluadas.
+
+    Y no por ello es la mejor forma de reconstruir demanda, sino la peor de las cuatro por el
+    motivo que importa: la proporcionalidad $\text{observado} = \text{real}\cdot(1-r)$ es un
+    supuesto del simulador, no un hecho del mundo. En una rotura real no se pierde exactamente la
+    fracción de demanda correspondiente a la fracción de jornada sin producto ---parte de los
+    clientes vuelven más tarde, parte sustituye el producto, parte se va a otro
+    establecimiento, y la demanda no se reparte de forma uniforme a lo largo del día, de modo que
+    una rotura en hora punta y otra en hora muerta no cuestan lo mismo---. Esa regla acierta sobre
+    los días falsificados porque los falsificó ella misma, y no tiene ninguna garantía sobre los
+    días censurados de verdad. El error de reconstrucción no mide, por tanto, la calidad de la
     reconstrucción: mide el parecido entre la fórmula del imputador y la fórmula con la que se
     falsificaron los datos.
 
