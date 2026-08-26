@@ -94,9 +94,9 @@ La Tabla~\ref{tab:tech_stack} resume las herramientas principales del sistema. C
         \textbf{Componente} & \textbf{Herramienta} & \textbf{Alternativa descartada} \\
         \midrule
         Modelado probabilístico & CatBoost, LightGBM & XGBoost, scikit-learn \\
-        Optimización multi-objetivo & Optuna (TPE, Pinball vs.\ Winkler) & Hyperopt, GridSearch \\
-        Búsquedas dedicadas de un objetivo & Optuna (\textit{sampler} gaussiano) & TPE, medido en el Anexo~\ref{anx:tuning_imputador} \\
-        Trazabilidad de experimentos & MLflow (almacén de corridas) & Weights \& Biases, artefactos en disco \\
+        Búsqueda multi-objetivo & Optuna (TPE) & Hyperopt, GridSearch \\
+        Búsqueda de un objetivo & Optuna (\textit{sampler} gaussiano) & TPE \\
+        Trazabilidad de experimentos & MLflow & Weights \& Biases \\
         Capa web y API operacional & Django & FastAPI, Flask \\
         Contenerización & Docker + Compose & Entornos virtuales \\
         Validación de contratos & Pydantic v2 & dataclasses, marshmallow \\

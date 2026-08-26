@@ -25,7 +25,7 @@ La Tabla~\ref{tab:gbdt_comparison} resume las dimensiones más relevantes para e
         \textbf{Criterio} & \textbf{XGBoost} & \textbf{LightGBM} & \textbf{CatBoost} \\
         \midrule
         Crecimiento de árbol & Por niveles & Por hojas & Oblivious (simétrico) \\
-        Variables categóricas & Manual (OHE) & Nativa (particiones) & Nativa (Ordered TS) \\
+        Variables categóricas & Manual (OHE) & Nativa & Nativa (Ordered TS) \\
         Riesgo de \textit{target leakage} & Alto & Medio & Bajo (Ordered Boosting) \\
         Velocidad en datasets grandes & Alta & Muy alta & Media \\
         Regularización implícita & Moderada & Moderada & Alta \\
