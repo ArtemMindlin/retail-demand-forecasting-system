@@ -144,15 +144,29 @@ Para corregirlo, el sistema implementa un preprocesador dinámico que estima la 
     \end{equation}
 
     \item \textbf{Supervisada (LightGBM)}: Entrena un modelo LightGBM auxiliar
-    $\hat{g}$ sobre los registros históricos no afectados por stockouts. El vector de
-    covariables $x_{s,t}$ incluye: identificador de serie, mes, día de la semana, día del
-    mes, ratio de stockout $h_{s,t}/16$ (fracción de la ventana operativa sin stock),
-    media histórica de días limpios de la serie como prior, e indicadores contextuales
+    $\hat{g}$ sobre los registros históricos no afectados por stockouts, que aprende a
+    predecir la demanda de un \textbf{día completo sin rotura}. El vector de covariables
+    $x_{s,t}$ incluye: identificador de serie, mes, día de la semana, día del mes, media
+    histórica de días limpios de la serie como prior, e indicadores contextuales
     disponibles en el dataset (descuento, festivo, temperatura, precipitación, humedad y
-    viento). La demanda latente se estima como:
+    viento). El ratio de stockout $h_{s,t}/16$ se excluye deliberadamente de $x_{s,t}$:
+    entrenado únicamente con días limpios, donde ese ratio vale siempre 0, \textit{LightGBM}
+    no puede dividir sobre una constante y la variable no aportaba ninguna importancia al
+    modelo, pese a leerse en el código como si el regresor conociera la severidad del día
+    que reconstruye.
+
+    La severidad entra en cambio en la \textbf{reconciliación}, no en el regresor: puesto
+    que $\hat{g}$ predice un día completo, la fracción del día perdida por la rotura es
+    $r_{s,t} = \text{clip}(h_{s,t}/16,\ 0,\ 1)$, y la demanda latente se estima recomponiendo
+    lo observado con esa fracción de lo predicho:
     \begin{equation}
-        \tilde{y}_{s,t} = \max \left( y_{s,t}, \, \hat{g}(x_{s,t}) \right)
+        \tilde{y}_{s,t} = y_{s,t} + r_{s,t} \cdot \max\!\left( \hat{g}(x_{s,t}),\, 0 \right)
     \end{equation}
+    Esta regla sustituye a un $\max(y_{s,t}, \hat{g}(x_{s,t}))$ inicial, que descartaba la
+    venta observada en roturas leves --precisamente donde es la evidencia más fiable-- en
+    favor de la predicción íntegra del modelo. Las estrategias \textit{Clipped Scaling} y
+    \textit{Media Histórica Local} conservan esa regla de máximo, adecuada cuando no hay una
+    predicción de día completo con la que recomponer proporcionalmente.
 \end{itemize}
 
 En el benchmark oficial del propio dataset \cite{freshretailnet2025} se evalúan enfoques de aprendizaje profundo (TimesNet, CSDI, SAITS) que obtienen mejores métricas de recuperación, pero a un coste computacional incompatible con un despliegue operacional ligero; las tres estrategias aquí propuestas priorizan interpretabilidad y velocidad de inferencia. La estrategia \textbf{Supervisada (LightGBM)} es la seleccionada en el sistema final por obtener el menor coste de inventario bajo evaluación justa, que es el único criterio con el que este protocolo puede ordenarlas; la comparación empírica entre las tres estrategias se discute en la Sección~\ref{sec:resultados_imputacion}. Los hiperparámetros de ese regresor auxiliar son objeto de una búsqueda propia, independiente del ajuste del modelo de \textit{forecasting} y ejecutada como un modo de ejecución separado del sistema. El protocolo y las mediciones se recogen en el Anexo~\ref{anx:tuning_imputador}, pero el resultado de esa búsqueda no se queda en el anexo: el fichero de hiperparámetros que persiste es leído por el modo de experimento y por el \textit{backtest} de coste justo, de modo que forma parte de la configuración con la que se producen las cifras finales, no solo de un apéndice documental. Esa dependencia tiene un límite conocido: la ganancia que mide la búsqueda depende del tamaño del conjunto sobre el que se ajusta el imputador, y se invierte cuando se aplica a una escala distinta de aquella en la que el sistema opera. Por eso la validez del fichero queda acotada al tamaño de ajuste con el que se obtuvo: los metadatos de la búsqueda registran esa escala, pero es una condición documentada para quien lea el artefacto, no una comprobación que el sistema haga por sí mismo al cargarlo.
