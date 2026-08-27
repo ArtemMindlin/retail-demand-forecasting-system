@@ -12,8 +12,7 @@ El conjunto de datos \textit{FreshRetailNet-50K} \cite{freshretailnet2025} es un
 publicado en mayo de 2025 y diseñado específicamente para la estimación de demanda censurada en
 retail de producto fresco. Contiene series temporales diarias de ventas de productos frescos en diversas tiendas, acompañadas de metadatos jerárquicos y variables exógenas.
 
-Conviene fijar de entrada el alcance de este capítulo, porque no coincide con el de los
-resultados. El análisis exploratorio que sigue describe el \textbf{panel completo} del
+El análisis exploratorio que sigue describe el \textbf{panel completo} del
 \textit{split} de entrenamiento, sin aplicar ningún filtro de rotación: las 50.000 series. Los
 capítulos de metodología y resultados, en cambio, operan sobre el subconjunto de las 500 series de
 mayor rotación, por coste computacional. Ambos conjuntos responden a preguntas distintas y sus
@@ -82,7 +81,7 @@ La Tabla~\ref{tab:eda_estadisticos} recoge los estadísticos globales que resume
 el resto del capítulo desarrolla figura por figura. Tres de ellos delimitan el problema que este
 trabajo aborda: casi la mitad de los días del panel registran alguna hora sin producto en el
 lineal, la duración media de esas roturas ronda las tres horas sobre una jornada operativa de
-diecisiete, y solo una fracción pequeña de los días registra demanda estrictamente nula. Esa
+dieciséis, y solo una fracción pequeña de los días registra demanda estrictamente nula. Esa
 combinación es la que hace que la censura, y no la intermitencia, sea el fenómeno dominante en
 este catálogo.
 
@@ -201,9 +200,9 @@ Las magnitudes separan con claridad ambos orígenes en este panel. Los días con
 estrictamente nula son el \textbf{4,46\,\%} del total, mientras que los días con al menos una
 hora de rotura son el \textbf{44,27\,\%}: casi diez veces más. La censura no es por tanto un caso
 excepcional que afecte a la cola del catálogo, sino el régimen habitual de operación, y una
-duración media de \textbf{3,18} horas sobre una jornada de diecisiete significa que el día típico
-con rotura pierde en torno a un 19\,\% de su ventana de venta. Es esa combinación ---frecuencia
-alta y severidad moderada--- la que hace que corregir la censura tenga margen para cambiar la
+duración media de \textbf{3,18} horas sobre la jornada operativa de dieciséis (6:00--22:00)
+significa que el día típico con rotura pierde en torno a un 20\,\% de su ventana de venta. Es esa
+combinación de frecuencia alta y severidad moderada la que hace que corregir la censura tenga margen para cambiar la
 decisión de pedido, y también la que explica que una regla de corrección insensible a la
 severidad, como escalar por un factor fijo, se quede corta en los días que más importan.
 
