@@ -579,3 +579,14 @@ See `docs/web_layer.md` for the full description.
     search would see nothing left to do, return at once, and the gate would validate a winner
     selected under the old cost against defaults measured under the new one. Bump it whenever
     `_draw_cost` changes what it measures.
+
+    Reusing the pipeline's helper was not by itself enough: `_split_train_calibration` reads
+    `settings.validation.calibration_days`, and `tune_forecasting` declared no `validation`
+    section (`MODE_SECTIONS` did not list it either), so `Settings.validation` silently fell
+    back to the `ValidationConfig` class default of 21 days instead of the 14
+    `configs/experiment/default.yaml` deploys. `test_config_layout.py` only rejects a config
+    that declares a section its mode never reads; it has no test for the opposite direction, a
+    mode reading a section no config for it declares. Fixed by adding `"validation"` to
+    `MODE_SECTIONS["tune_forecasting"]` and `calibration_days: 14` to
+    `configs/tune_forecasting/default.yaml` -- bumping `_OBJECTIVE_VERSION` to 3, since this
+    changes what the objective measures the same way the conformal wrap did.

@@ -93,7 +93,7 @@ MODE_SECTIONS: dict[RunMode, frozenset[str]] = {
     ),
     "tune_imputation": frozenset({"project", "dataset", "preprocessing", "models"}),
     "tune_forecasting": frozenset(
-        {"project", "dataset", "preprocessing", "features", "models", "inventory"}
+        {"project", "dataset", "preprocessing", "features", "validation", "models", "inventory"}
     ),
     "eda": frozenset({"project", "dataset", "preprocessing", "reporting"}),
 }

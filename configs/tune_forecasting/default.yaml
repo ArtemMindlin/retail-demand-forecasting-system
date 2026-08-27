@@ -41,6 +41,14 @@ features:
   include_stockout_lags: true
 
 
+# _draw_cost scores candidates through the same conformal calibration split
+# configs/experiment/default.yaml uses, via the pipeline's own `_split_train_calibration`.
+# Only `calibration_days` reaches that helper; the fold-layout fields below are unused here
+# (this mode cuts its own selection/validation windows) and stay at their class default.
+validation:
+  calibration_days: 14
+
+
 models:
   models_dir: models
   quantiles: [0.1, 0.5, 0.9]

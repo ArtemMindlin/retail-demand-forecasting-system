@@ -94,9 +94,11 @@ _FINISHED_STATES = (optuna.trial.TrialState.COMPLETE,)
 # study whose trials were scored under a different objective would be reused in silence: the
 # search would see `trials_todo == 0`, return at once, and the gate would validate a winner
 # selected under the old cost against defaults measured under the new one -- a mixed verdict
-# that looks complete. v1 scored the raw model; v2 scores it through the conformal layer, which
-# is the policy the pipeline actually deploys.
-_OBJECTIVE_VERSION = 2
+# that looks complete. v1 scored the raw model; v2 scored it through the conformal layer but
+# calibrated on the class default of 21 days because `validation` was not wired into this
+# mode's settings; v3 calibrates on the 14 days configs/experiment/default.yaml actually
+# deploys.
+_OBJECTIVE_VERSION = 3
 
 _MLFLOW_EXPERIMENT = "forecasting_tuning"
 
