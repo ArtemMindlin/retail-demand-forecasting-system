@@ -57,7 +57,7 @@ models:
   learning_rate: 0.05
   max_depth: 6
   use_tuning: false
-  tuning_trials: 300
+  tuning_trials: 60
   tuning_backend: catboost
 
 
