@@ -5,7 +5,25 @@
 Este capítulo analiza la naturaleza y estructura del dataset \textit{Fresh RetailNet}, identificando los patrones, retos y oportunidades que condicionan el diseño del sistema de previsión.
 
 \section{Descripción del Dataset}
-El conjunto de datos \textit{Fresh RetailNet} es un benchmark masivo diseñado específicamente para el sector retail. Contiene series temporales diarias de ventas de productos frescos en diversas tiendas, acompañadas de metadatos jerárquicos y variables exógenas.
+
+\subsection{Origen y alcance del análisis}
+
+El conjunto de datos \textit{FreshRetailNet-50K} \cite{freshretailnet2025} es un benchmark
+publicado en mayo de 2025 y diseñado específicamente para la estimación de demanda censurada en
+retail de producto fresco. Contiene series temporales diarias de ventas de productos frescos en diversas tiendas, acompañadas de metadatos jerárquicos y variables exógenas.
+
+Conviene fijar de entrada el alcance de este capítulo, porque no coincide con el de los
+resultados. El análisis exploratorio que sigue describe el \textbf{panel completo} del
+\textit{split} de entrenamiento, sin aplicar ningún filtro de rotación: las 50.000 series. Los
+capítulos de metodología y resultados, en cambio, operan sobre el subconjunto de las 500 series de
+mayor rotación, por coste computacional. Ambos conjuntos responden a preguntas distintas y sus
+cifras no son intercambiables: las tasas de rotura e intermitencia de esta sección caracterizan el
+catálogo, no la muestra sobre la que se entrena y se evalúa.
+
+Todas las cifras y figuras de este capítulo proceden de una única ejecución del modo de análisis
+exploratorio del sistema, registrada en el almacén de corridas como
+\texttt{eda\_fresh\_retailnet\_v2\_\allowbreak{}20260823\_214350}, de modo que son reproducibles y
+trazables a la versión del código que las generó.
 
 Las características principales del dataset son:
 \begin{itemize}
@@ -50,11 +68,45 @@ Para mantener una interpretación consistente a lo largo del proyecto, el panel 
     \label{tab:dataset_variables}
 \end{table}
 
-El dataset comprende \textbf{4.500.000 observaciones} distribuidas en \textbf{50.000 series} únicas (combinaciones tienda-producto), abarcando \textbf{898 tiendas} y \textbf{865 productos} distintos. La jerarquía de categorías tiene 32 categorías de primer nivel, 84 de segundo y 233 de tercer nivel. El horizonte temporal cubre el período del 28 de marzo al 25 de junio de 2024, con todas las series de longitud exacta de 90 días, lo que garantiza un panel perfectamente balanceado.
+El dataset comprende \textbf{4.500.000 observaciones} distribuidas en \textbf{50.000 series} únicas (combinaciones tienda-producto), abarcando \textbf{898 tiendas} de \textbf{18 ciudades} y \textbf{865 identificadores de producto} distintos. Esta última cifra se mide sobre el propio panel y difiere en dos unidades de los 863 SKU perecederos que declara el artículo del \textit{benchmark} \cite{freshretailnet2025}; se reporta aquí la medida sobre el dato, que es la que gobierna el número de series y la cardinalidad de los identificadores que el modelo recibe. La jerarquía de categorías tiene 32 categorías de primer nivel, 84 de segundo y 233 de tercer nivel. El horizonte temporal cubre el período del 28 de marzo al 25 de junio de 2024, con todas las series de longitud exacta de 90 días, lo que garantiza un panel perfectamente balanceado.
+
+\subsection{Dimensiones y estructura}
 
 En términos operativos, las columnas \texttt{date} y \texttt{series\_id} definen la estructura temporal y panelizada del problema. El resto de variables se divide en tres grupos funcionales: la demanda observada que actúa como señal base, las variables contextuales exógenas que describen el entorno operativo y las variables estáticas que codifican la jerarquía geográfica y comercial de cada serie. Esta separación es importante porque más adelante determina qué campos pueden utilizarse como entrada, cuáles solo sirven como contexto y cuáles no deben confundirse con la etiqueta objetivo.
 
+\subsection{Calidad estructural y estadísticos globales}
+
 En cuanto a la calidad estructural, el panel preparado presenta una cobertura homogénea y balanceada tras el filtrado aplicado sobre las series válidas, sin discontinuidades ni huecos internos relevantes. La comprobación explícita de valores faltantes sobre las 4.500.000 filas del panel arroja \textbf{0 missings} en todas las columnas, tanto en la señal objetivo como en las variables exógenas y los identificadores jerárquicos. Esto permite interpretar el resto de resultados como propiedades del fenómeno de demanda y no como artefactos de una estructura irregular del dataset.
+
+La Tabla~\ref{tab:eda_estadisticos} recoge los estadísticos globales que resumen el panel y que
+el resto del capítulo desarrolla figura por figura. Tres de ellos delimitan el problema que este
+trabajo aborda: casi la mitad de los días del panel registran alguna hora sin producto en el
+lineal, la duración media de esas roturas ronda las tres horas sobre una jornada operativa de
+diecisiete, y solo una fracción pequeña de los días registra demanda estrictamente nula. Esa
+combinación es la que hace que la censura, y no la intermitencia, sea el fenómeno dominante en
+este catálogo.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{lr}
+        \toprule
+        \textbf{Estadístico} & \textbf{Valor} \\
+        \midrule
+        Observaciones                              & 4.500.000 \\
+        Series únicas (tienda--producto)           & 50.000 \\
+        Días de historia por serie                 & 90 \\
+        Demanda observada media (normalizada)      & 0,999 \\
+        Desviación típica de la demanda            & 1,407 \\
+        Tasa de días con demanda nula              & 4,46\,\% \\
+        Tasa de días con alguna hora de rotura     & 44,27\,\% \\
+        Horas de rotura medias por día con rotura  & 3,18 \\
+        Valores faltantes                          & 0 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Estadísticos globales del panel de entrenamiento completo (50.000 series), obtenidos de la corrida de análisis exploratorio declarada al inicio de la sección.}
+    \label{tab:eda_estadisticos}
+\end{table}
 
 \section{Distribución de la Demanda}
 
@@ -144,6 +196,16 @@ Los picos en los retardos múltiplos de 7 superan con claridad el intervalo de c
 \section{Intermitencia y Stockouts}
 
 En el contexto del \textit{retail} de producto fresco, los días con ventas registradas en cero pueden tener dos orígenes distintos. El primero es la \textbf{intermitencia}: una característica propia de ciertas series en las que la demanda real es esporádica, ya sea porque el producto se vende con poca frecuencia o porque la tienda no lo tiene en cartera todos los días, fenómeno ampliamente estudiado en la literatura de previsión de demanda esporádica \cite{syntetos2005accuracy}. El segundo es el \textbf{stockout}: una situación en la que sí existe demanda del producto pero no hay stock disponible en el lineal, de modo que las ventas se detienen artificialmente y el dato registrado subestima la demanda real, el problema clásico de demanda censurada en gestión de inventario \cite{nahmias1994demand,musalem2010structural}. Ambos fenómenos producen el mismo síntoma (un cero en el registro de ventas), pero tienen causas y consecuencias distintas para el modelado. Distinguirlos es fundamental: la intermitencia es una propiedad estructural de la serie que el modelo debe aprender, mientras que el stockout introduce un sesgo de censura que debe corregirse antes del entrenamiento.
+
+Las magnitudes separan con claridad ambos orígenes en este panel. Los días con demanda
+estrictamente nula son el \textbf{4,46\,\%} del total, mientras que los días con al menos una
+hora de rotura son el \textbf{44,27\,\%}: casi diez veces más. La censura no es por tanto un caso
+excepcional que afecte a la cola del catálogo, sino el régimen habitual de operación, y una
+duración media de \textbf{3,18} horas sobre una jornada de diecisiete significa que el día típico
+con rotura pierde en torno a un 19\,\% de su ventana de venta. Es esa combinación ---frecuencia
+alta y severidad moderada--- la que hace que corregir la censura tenga margen para cambiar la
+decisión de pedido, y también la que explica que una regla de corrección insensible a la
+severidad, como escalar por un factor fijo, se quede corta en los días que más importan.
 
 La Figura~\ref{fig:eda_zero_demand_rate_manual} muestra la distribución de la tasa de días con ventas cero en todas las series del panel.
 

@@ -165,6 +165,22 @@ uv run python scripts/plot_mae_vs_service.py --run <corrida a escala>
 
 Those are run names, resolved through MLflow, not paths. A directory still works.
 
+## The EDA figures of chapter 3
+
+All 15 figures and every statistic in chapter 3 come from one run,
+`eda_fresh_retailnet_v2_20260823_214350`, at commit `717f1b9`, which is an ancestor of HEAD.
+Verified: the PNGs under `memoria/figures/eda/` are byte-identical to that run's artifacts.
+
+The `eda/` module has changed since, and none of it moves a figure: `make_grid` relocated to
+`utils/plotting.py`, the pipeline moved from `make_run_directory` to `open_run_directory`, the
+prints became a logger, and one figure was deleted — `top_series_total_demand.png`, which the
+memoria never included. The EDA reads the prepared panel and applies no imputation, so the
+`censorship.py` changes do not reach it either.
+
+Chapter 3 describes the WHOLE 50 000-series panel (`configs/eda/default.yaml` sets
+`top_n_series: null`), while every forecasting result describes 500. The chapter now says so in
+its first subsection; do not carry a rate from one to the other.
+
 ## Where a finished run lives
 
 The pipeline opens an MLflow run and writes into `mlruns/<id>/artifacts/` directly, so
