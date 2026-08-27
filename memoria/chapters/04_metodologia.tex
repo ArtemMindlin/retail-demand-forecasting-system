@@ -2,7 +2,7 @@
 \chapter{Metodología}
 \label{chap:metodologia}
 
-Este capítulo describe \textbf{cómo} se resuelve el problema planteado en el Capítulo~\ref{chap:introduccion}: dado el histórico de ventas de un supermercado, \emph{\textquestiondown cuántas unidades debe pedir mañana cada producto?} La idea central es que predecir solo la media de la demanda no es suficiente: hay que predecir también la incertidumbre, para que la decisión de pedido tenga garantías estadísticas. A partir de ahí, el modelo se conecta directamente con la política de inventario óptima.
+Este capítulo describe \textbf{cómo} se resuelve el problema planteado en el Capítulo~\ref{chap:introduccion}: dado el histórico de ventas de una cadena de distribución, \emph{\textquestiondown cuántas unidades de cada producto debe pedir mañana cada tienda?} La idea central es que predecir solo la media de la demanda no es suficiente: hay que predecir también la incertidumbre, para que la decisión de pedido tenga garantías estadísticas. A partir de ahí, el modelo se conecta directamente con la política de inventario óptima.
 
 El capítulo se organiza en tres bloques, que se corresponden con las tres fases del ciclo de vida del sistema (véase Figura~\ref{fig:bloques_metodologia}):
 
@@ -27,7 +27,7 @@ El capítulo se organiza en tres bloques, que se corresponden con las tres fases
 \label{fig:bloques_metodologia}
 \end{figure}
 
-El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: reentrenamiento del modelo seleccionado y generación diaria de recomendaciones de pedido bajo restricciones logísticas reales. El \textbf{Bloque III} cubre la fase MLOps: simulación en streaming para determinar la cadencia óptima de reentrenamiento en producción.
+El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: reentrenamiento del modelo seleccionado y generación diaria de recomendaciones de pedido a partir del fractil crítico del \textit{Newsvendor}. El \textbf{Bloque III} cubre la fase MLOps: simulación en streaming para determinar la cadencia óptima de reentrenamiento en producción.
 
 % ==============================================================================
 \section{Bloque I: Investigación}
