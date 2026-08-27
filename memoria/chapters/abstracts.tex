@@ -2,7 +2,7 @@
 \chapter*{Resumen}
 \addcontentsline{toc}{chapter}{Resumen}
 
-El sector retail se enfrenta al reto constante de equilibrar la disponibilidad de producto con la minimización de mermas. Este Trabajo de Fin de Grado presenta el desarrollo de un Sistema de Apoyo a la Decisión (DSS) End-to-End cuyo objetivo operativo es estimar y automatizar cuántas unidades debe pedir diariamente cada SKU bajo restricciones logísticas reales.
+El sector retail se enfrenta al reto constante de equilibrar la disponibilidad de producto con la minimización de mermas. Este Trabajo de Fin de Grado presenta el desarrollo de un Sistema de Apoyo a la Decisión (DSS) End-to-End cuyo objetivo operativo es estimar y automatizar cuántas unidades debe pedir diariamente cada SKU bajo incertidumbre de demanda.
 
 La metodología propuesta evoluciona el \textit{forecasting} clásico integrando modelos de Gradient Boosting con \textit{Mondrian Conformal Prediction} para garantizar la equidad estadística de la incertidumbre por categoría de producto. El sistema no se limita a predecir, sino que transforma estos pronósticos probabilísticos en decisiones de inventario mediante la formulación del \textit{Newsvendor}, que traduce la distribución de demanda estimada en una cantidad de pedido según la asimetría entre el coste de rotura y el de sobrestock. Finalmente, el modelo estadístico se ha operativizado bajo estándares MLOps, incluyendo explicabilidad automática (SHAP), trazabilidad de experimentos por artefactos versionados y un cuadro de mandos interactivo renderizado en servidor.
 
@@ -16,7 +16,7 @@ Los resultados empíricos demuestran que la corrección de la demanda censurada,
 \chapter*{Resum}
 \addcontentsline{toc}{chapter}{Resum}
 
-El sector del retail s'enfronta al repte constant d'equilibrar la disponibilitat de producte amb la minimització de minves. Aquest Treball de Fi de Grau presenta el desenvolupament d'un Sistema de Suport a la Decisió (DSS) End-to-End amb l'objectiu operatiu d'estimar i automatitzar quantes unitats s'han de demanar diàriament per a cada SKU sota restriccions logístiques reals.
+El sector del retail s'enfronta al repte constant d'equilibrar la disponibilitat de producte amb la minimització de minves. Aquest Treball de Fi de Grau presenta el desenvolupament d'un Sistema de Suport a la Decisió (DSS) End-to-End amb l'objectiu operatiu d'estimar i automatitzar quantes unitats s'han de demanar diàriament per a cada SKU sota incertesa de demanda.
 
 La metodologia proposada evoluciona el \textit{forecasting} clàssic integrant models de Gradient Boosting amb \textit{Mondrian Conformal Prediction} per a garantir l'equitat estadística de la incertesa per categoria de producte. El sistema no es limita a predir, sinó que transforma aquests pronòstics probabilístics en decisions d'inventari mitjançant la formulació del \textit{Newsvendor}, que tradueix la distribució de demanda estimada en una quantitat de comanda segons l'asimetria entre el cost de ruptura i el de sobreestoc. Finalment, el model estadístic s'ha operativitzat sota estàndards MLOps, incloent-hi explicabilitat automàtica (SHAP), traçabilitat d'experiments per artefactes versionats i un quadre de comandament interactiu renderitzat al servidor.
 
@@ -31,7 +31,7 @@ Els resultats empírics demostren que la correcció de la demanda censurada, sot
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
 
-The retail sector faces the constant challenge of balancing product availability with waste minimization. This Bachelor's Thesis presents the development of an End-to-End Decision Support System (DSS) whose operational goal is to estimate and automate how many units of each SKU should be ordered daily under real logistical constraints.
+The retail sector faces the constant challenge of balancing product availability with waste minimization. This Bachelor's Thesis presents the development of an End-to-End Decision Support System (DSS) whose operational goal is to estimate and automate how many units of each SKU should be ordered daily under demand uncertainty.
 
 The proposed methodology evolves classical forecasting by integrating Gradient Boosting models with Mondrian Conformal Prediction to ensure statistical fairness of uncertainty across product categories. The system goes beyond prediction by transforming probabilistic forecasts into inventory decisions via the \textit{Newsvendor} formulation, which turns the estimated demand distribution into an order quantity according to the asymmetry between stockout and overstock costs. Finally, the statistical model has been operationalized under MLOps standards, including automated explainability (SHAP), experiment traceability through versioned run artifacts, and an interactive server-rendered dashboard.
 
