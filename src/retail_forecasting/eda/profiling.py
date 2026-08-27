@@ -158,14 +158,17 @@ def _plot_observed_demand_distribution(panel: pd.DataFrame, output_path: Path) -
     # own instead of being pooled with the small positive sales.
     edges = np.arange(-0.05, upper + 0.15, 0.1)
     axes[0].hist(demand[demand <= upper], bins=edges, color="#1f77b4")
-    axes[0].axvline(0.0, color="#d62728", linewidth=1.0, linestyle="--")
+    # Text in the empty upper right and an arrow to the bar, rather than a label beside the
+    # axis: the bulk is tall and narrow, so anything placed near the origin lands on the data.
+    zero_height = float((demand == 0.0).sum())
     axes[0].annotate(
-        f"exact zeros: {zero_share:.2f}%",
-        xy=(0.0, 0.0),
-        xytext=(0.11, 0.93),
+        f"exact zeros: {zero_share:.2f}% of the panel",
+        xy=(0.0, zero_height),
+        xytext=(0.42, 0.88),
         textcoords="axes fraction",
         color="#d62728",
         fontsize=9,
+        arrowprops={"arrowstyle": "->", "color": "#d62728", "linewidth": 1.0},
     )
     axes[0].set_xlabel(f"Observed demand (bulk, up to p99 = {upper:.1f})")
     axes[0].set_ylabel("Frequency")

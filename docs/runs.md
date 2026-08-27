@@ -168,8 +168,14 @@ Those are run names, resolved through MLflow, not paths. A directory still works
 ## The EDA figures of chapter 3
 
 All 15 figures and every statistic in chapter 3 come from one run,
-`eda_fresh_retailnet_v2_20260823_214350`, at commit `717f1b9`, which is an ancestor of HEAD.
-Verified: the PNGs under `memoria/figures/eda/` are byte-identical to that run's artifacts.
+`eda_fresh_retailnet_v2_20260827_163615`, at commit `66d6206`. Verified: the PNGs under
+`memoria/figures/eda/` are byte-identical to that run's artifacts, except
+`observed_demand_distribution.png`, which was re-rendered after the run to move an annotation
+off the bars — same data, same code path, a label position.
+
+It replaced `eda_fresh_retailnet_v2_20260823_214350` (commit `717f1b9`) when the demand
+distribution figure was rebuilt. Fourteen of the fifteen figures came out byte-identical between
+the two runs, which is what confirms the edit had no side effects.
 
 The `eda/` module has changed since, and none of it moves a figure: `make_grid` relocated to
 `utils/plotting.py`, the pipeline moved from `make_run_directory` to `open_run_directory`, the
