@@ -352,3 +352,73 @@ def test_update_champion_registry_bootstraps_from_first_run() -> None:
     assert registry is not None
     assert registry.current_champion.model_name == "catboost"
     assert registry.current_champion.backend_name == "conformal_catboost_official"
+
+
+def _promotion_summary(conclusive: list[bool] | None = None) -> pd.DataFrame:
+    """Two backends whose costs differ by 0.05%, which is the case that motivated the gate."""
+    columns: dict[str, object] = {
+        "data_strategy": ["Latent_supervised"] * 2,
+        "model_name": ["catboost", "lightgbm"],
+        "backend_name": ["conformal_catboost_official", "conformal_lightgbm"],
+        "total_cost": [120023.0, 119958.0],
+        "service_level": [0.944, 0.940],
+        "observations": [10500, 10500],
+    }
+    if conclusive is not None:
+        columns["conclusive"] = conclusive
+    return pd.DataFrame(columns)
+
+
+def _promotion_artifacts(cost_summary: pd.DataFrame) -> RunArtifacts:
+    panel = pd.DataFrame(
+        {
+            "series_id": ["1_101"],
+            "date": pd.to_datetime(["2024-06-01"]),
+            "observed_demand": [1.0],
+        }
+    )
+    return RunArtifacts(
+        prepared_panel=panel,
+        supervised_frame=panel,
+        predictions=pd.DataFrame(),
+        metrics_summary=pd.DataFrame(),
+        fold_metrics=pd.DataFrame(),
+        cost_summary=cost_summary,
+    )
+
+
+def test_a_cost_gap_within_the_noise_does_not_promote() -> None:
+    """The case this third guardrail exists for.
+
+    `champion_min_cost_improvement_pct` defaults to 0.0, so the cost gate alone admits any
+    improvement at all -- and the comparison between this project's two backends turned on
+    0.05%, which is inside the run's own variability.
+    """
+    decision = build_promotion_decision(
+        _promotion_artifacts(_promotion_summary(conclusive=[False, False])), Settings()
+    )
+
+    assert decision is not None
+    assert decision.cost_improvement_pct > 0.0
+    assert not decision.promote
+    assert "interval" in decision.decision_reason
+
+
+def test_a_cost_gap_whose_interval_clears_zero_does_promote() -> None:
+    decision = build_promotion_decision(
+        _promotion_artifacts(_promotion_summary(conclusive=[True, True])), Settings()
+    )
+
+    assert decision is not None
+    assert decision.promote
+
+
+def test_a_run_predating_the_interval_still_decides() -> None:
+    """Artifacts already in the store carry no `conclusive` column. Refusing to decide on them
+    would break every historical run rather than protect anything."""
+    decision = build_promotion_decision(
+        _promotion_artifacts(_promotion_summary(conclusive=None)), Settings()
+    )
+
+    assert decision is not None
+    assert decision.promote

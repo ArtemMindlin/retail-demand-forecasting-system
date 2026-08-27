@@ -45,9 +45,9 @@
 
 \begin{document}
 
-% --- Portada ---
-\maketitle
-
+% Sin portada propia: Ebron genera la del trabajo con sus datos y la adjunta como primera
+% pagina al depositar la memoria, de modo que \maketitle produciria una segunda portada
+% duplicada. La primera pagina del PDF es por tanto el resumen con sus palabras clave.
 \frontmatter
 \input{chapters/abstracts}
 \input{chapters/agradecimientos}

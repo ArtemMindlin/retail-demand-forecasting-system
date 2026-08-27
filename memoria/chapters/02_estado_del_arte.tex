@@ -25,8 +25,8 @@ La Tabla~\ref{tab:gbdt_comparison} resume las dimensiones más relevantes para e
         \textbf{Criterio} & \textbf{XGBoost} & \textbf{LightGBM} & \textbf{CatBoost} \\
         \midrule
         Crecimiento de árbol & Por niveles & Por hojas & Oblivious (simétrico) \\
-        Variables categóricas & Manual (OHE) & Nativa & Nativa (Ordered TS) \\
-        Riesgo de \textit{target leakage} & Alto & Medio & Bajo (Ordered Boosting) \\
+        Variables categóricas & Nativa (1.5+) & Nativa & Nativa \\
+        Codificación categórica & Por gradiente & Por gradiente & Ordenados (TS) \\
         Velocidad en datasets grandes & Alta & Muy alta & Media \\
         Regularización implícita & Moderada & Moderada & Alta \\
         Predicción de cuantiles & Sí & Sí & Sí \\
@@ -39,11 +39,16 @@ La Tabla~\ref{tab:gbdt_comparison} resume las dimensiones más relevantes para e
 
 La tabla recoge las tres implementaciones que la literatura considera de referencia, pero el
 sistema desarrollado implementa \textbf{dos}: LightGBM y CatBoost, ambas bajo el mismo protocolo
-de backtesting y el mismo envoltorio cuantílico. XGBoost se descarta antes de implementarse, y por
-la fila que más pesa en este dominio: es la única de las tres que exige codificar manualmente unos
-identificadores de tienda, producto y categoría de cardinalidad alta, y el \textit{one-hot} de ese
-catálogo produce una matriz dispersa que ni escala ni permite al árbol agrupar categorías con
-comportamiento parecido.
+de backtesting y el mismo envoltorio cuantílico. XGBoost se descarta antes de implementarse, y
+conviene ser preciso sobre el motivo, porque no es una limitación de la herramienta: desde su
+versión 1.5 soporta variables categóricas de forma nativa, con un algoritmo de particionamiento
+propio para las divisiones categóricas, de modo que el \textit{one-hot} manual dejó de ser
+necesario. La razón es de alcance y de redundancia. Sobre el eje que más pesa en este dominio, la
+forma de codificar identificadores de cardinalidad alta, XGBoost y LightGBM comparten mecanismo:
+ambos buscan la partición ordenando las categorías por el estadístico del gradiente. Un tercer
+\textit{backend} que replica el mecanismo de uno de los dos ya implementados multiplicaría cada
+corrida de backtesting sin añadir un contraste nuevo, mientras que CatBoost es el único de los
+tres que aporta un mecanismo distinto, los estadísticos de destino ordenados.
 
 Entre las dos que sí se implementan, la elección del campeón \textbf{no se decide con los
 argumentos de esta tabla}, sino empíricamente y por el criterio que la operación percibe: el coste
@@ -60,8 +65,9 @@ razonable} que gane, no la razón por la que se selecciona:
     pocas observaciones puede sobreajustar; CatBoost calcula estadísticos de destino sobre una
     permutación previa (\textit{ordered target statistics}), construcción diseñada precisamente
     para que el valor de la etiqueta de una observación no entre en el estadístico que la codifica.
-    Con identificadores de la cardinalidad de este catálogo, esa diferencia es la más relevante de
-    las tres.
+    Es la única de las dos que introduce la etiqueta en la codificación y, a la vez, la única que
+    incorpora un mecanismo explícito para que hacerlo no filtre información. Con identificadores de
+    la cardinalidad de este catálogo, esa diferencia es la más relevante de la tabla.
     \item \textbf{Regularización implícita mediante árboles \textit{oblivious}:} los árboles
     simétricos de CatBoost aplican la misma condición de división en todo un nivel, lo que actúa
     como regularizador estructural sobre un panel donde muchas series tienen historia corta.
@@ -99,7 +105,7 @@ Esta conexión entre predicción y decisión ha cristalizado en la última déca
 Sin embargo, tanto el Newsvendor como la política $(s, S)$ asumen implícitamente que la distribución $D$ es conocida y libre de sesgo. Esta hipótesis se viola cuando los datos de entrenamiento están censurados por roturas de stock, lo que desplaza el fractil crítico hacia abajo y genera pedidos insuficientes de forma estructural. La sección siguiente analiza este fenómeno y su impacto en la cadena de decisión.
 
 \section{Demanda Censurada y el Efecto de Stockout}
-Un desafío crítico y frecuentemente ignorado en \textit{retail} es que las ventas observadas solo coinciden con la demanda real cuando hay stock disponible. Cuando ocurre una rotura de stock (\textit{stockout}), los datos se ven \textbf{censurados por la derecha}: la venta registrada no es la demanda, sino una \emph{cota inferior} de ella, ya que observamos cero (o muy pocas) ventas mientras la demanda latente (lo que los clientes habrían comprado) es estrictamente mayor. Formalmente, al observar $\min(D, \text{stock})$ el valor verdadero queda siempre por encima del dato registrado, que es la definición de censura por la derecha en el sentido del análisis de supervivencia. El estudio teórico de los sistemas de inventario con demanda inobservable se remonta a trabajos fundamentales como el de Nahmias \cite{nahmias1994demand}, y posteriormente, Musalem et al.\ \cite{musalem2010structural} estimaron empíricamente que ignorar este fenómeno subestima la demanda real entre un 5\% y un 30\% dependiendo de la tasa de rotura histórica del producto.
+Un desafío crítico y frecuentemente ignorado en \textit{retail} es que las ventas observadas solo coinciden con la demanda real cuando hay stock disponible. Cuando ocurre una rotura de stock (\textit{stockout}), los datos se ven \textbf{censurados por la derecha}: la venta registrada no es la demanda, sino una \emph{cota inferior} de ella, ya que observamos cero (o muy pocas) ventas mientras la demanda latente (lo que los clientes habrían comprado) es estrictamente mayor. Formalmente, al observar $\min(D, \text{stock})$ el valor verdadero queda siempre por encima del dato registrado, que es la definición de censura por la derecha en el sentido del análisis de supervivencia. El estudio teórico de los sistemas de inventario con demanda inobservable se remonta a trabajos fundamentales como el de Nahmias \cite{nahmias1994demand}, y posteriormente, Musalem et al.\ \cite{musalem2010structural} cuantificaron empíricamente el efecto sobre datos de tienda: las ventas perdidas equivalen al 5,9\% de las ventas que se habrían producido con disponibilidad plena cuando las roturas son escasas, y se multiplican por más de tres, hasta el 20,2\%, cuando seis productos de la categoría están agotados a la vez. El hallazgo relevante no es la magnitud sino su \textbf{no linealidad}: el sesgo no escala con la tasa de rotura de un producto aislado, sino con el número de alternativas simultáneamente ausentes del lineal, porque es la disponibilidad del conjunto la que determina cuánta demanda puede desviarse a un sustituto y cuánta se pierde.
 
 Si un modelo se entrena con estos datos sesgados sin corrección, cae en una ``espiral de muerte'' (\textit{death spiral}): el modelo predice baja demanda, se pide poco producto, se agota antes, y el modelo vuelve a reducir su previsión. Este ciclo se retroalimenta hasta colapsar la reposición de ciertos SKUs. La literatura propone varias estrategias de corrección con distintos compromisos entre precisión y coste computacional:
 
@@ -115,6 +121,8 @@ La censura introduce además un segundo problema para la cuantificación de la i
 \section{Síntesis y Posicionamiento del Trabajo}
 \label{sec:posicionamiento}
 
-La revisión de la literatura revela que los avances en cada uno de los pilares descritos han evolucionado de forma mayoritariamente independiente. Los trabajos sobre modelos globales de \textit{boosting} \cite{makridakis2022m5, ke2017lightgbm, prokhorenkova2018catboost} optimizan la precisión predictiva sin conectarla con la decisión de inventario. Los trabajos sobre Conformal Prediction \cite{angelopoulos2021gentle, xu2021conformal} garantizan cobertura estadística pero asumen datos no censurados y no evalúan el impacto logístico de los intervalos. Los trabajos sobre optimización de inventarios bajo incertidumbre \cite{silver1998inventory, ban2019big} asumen distribuciones de demanda conocidas y libres de sesgo. La literatura de \textit{decision-focused learning} \cite{bertsimas2020prescriptive, elmachtoub2022spo} sí conecta explícitamente predicción y decisión, y es la más próxima al planteamiento de este trabajo, pero lo hace sobre datos limpios y sin cuantificar la incertidumbre con garantías formales ni evaluar la decisión en un régimen dinámico con estado de inventario. Finalmente, la literatura sobre demanda censurada \cite{musalem2010structural} propone correcciones estadísticas pero raramente las integra en un sistema de previsión probabilística con evaluación end-to-end.
+La revisión de la literatura revela que los avances en cada uno de los pilares descritos han evolucionado de forma mayoritariamente independiente. Los trabajos sobre modelos globales de \textit{boosting} \cite{makridakis2022m5, ke2017lightgbm, prokhorenkova2018catboost} optimizan la precisión predictiva sin conectarla con la decisión de inventario. Los trabajos sobre Conformal Prediction \cite{angelopoulos2021gentle, xu2021conformal} garantizan cobertura estadística pero asumen datos no censurados y no evalúan el impacto logístico de los intervalos. Los trabajos sobre optimización de inventarios bajo incertidumbre \cite{silver1998inventory, ban2019big} asumen distribuciones de demanda conocidas y libres de sesgo. La literatura de \textit{decision-focused learning} \cite{bertsimas2020prescriptive, elmachtoub2022spo} sí conecta explícitamente predicción y decisión, y es la más próxima al planteamiento de este trabajo, pero lo hace sobre datos limpios y sin cuantificar la incertidumbre con garantías formales. El régimen dinámico con estado de inventario queda fuera tanto de esa literatura como de este trabajo, y se señala aquí como carencia compartida y no como hueco que estas páginas cierren. Finalmente, la literatura sobre demanda censurada \cite{musalem2010structural} propone correcciones estadísticas pero raramente las integra en un sistema de previsión probabilística con evaluación end-to-end.
 
-Ningún trabajo previo identificado integra simultáneamente estos cuatro elementos: (1) corrección de demanda censurada, (2) forecasting probabilístico global con garantías de cobertura condicional, (3) transformación de la distribución predicha en una decisión de inventario vía el fractil crítico del Newsvendor, y (4) evaluación del impacto económico de esa decisión en las dos magnitudes que la operación percibe, coste logístico y nivel de servicio. Esta integración constituye la contribución central del presente trabajo y justifica el diseño del sistema descrito en los capítulos siguientes.
+De esa independencia se sigue el diseño del sistema que describen los capítulos siguientes, que reúne los cuatro elementos en un mismo recorrido: (1) corrección de demanda censurada, (2) forecasting probabilístico global con garantías de cobertura condicional, (3) transformación de la distribución predicha en una decisión de inventario vía el fractil crítico del Newsvendor, y (4) evaluación del impacto económico de esa decisión en las dos magnitudes que la operación percibe, coste logístico y nivel de servicio.
+
+Reunirlos no constituye por sí mismo una aportación al estado del arte, y conviene no presentarlo como tal: cada pieza está publicada y disponible. Lo que la integración aporta es la \textbf{posición de observación} desde la que se obtienen las aportaciones que enumera la Sección~\ref{sec:aportaciones}. Es al recorrer el trayecto completo, y solo entonces, cuando se hace visible que el protocolo con el que la literatura mide la reconstrucción de demanda censurada no puede ordenar sus reglas, que los hiperparámetros del imputador invierten su signo con el tamaño de ajuste, y que la política de pedido de una evaluación por coste puede invertir el orden que pretende medir. Ninguno de esos tres resultados es visible desde una de las piezas en aislamiento.

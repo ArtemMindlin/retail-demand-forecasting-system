@@ -463,12 +463,26 @@ def build_promotion_decision(
     challengers["service_level_delta"] = (
         challengers["service_level"].astype(float) - champion_service_level
     )
-    challengers["promote"] = (
+    # Three conditions, and the third is the one that stops a coin flip from replacing a
+    # champion. `champion_min_cost_improvement_pct` defaults to 0.0, so on its own the cost gate
+    # admits any improvement at all -- the previous champion comparison turned on 0.05%, which is
+    # within the run's own noise. `conclusive` comes from the paired bootstrap in
+    # `summarize_costs`: it is True only when the interval of the gap clears zero on enough
+    # clusters. A run whose cost_summary predates that column has no `conclusive` field, and the
+    # gate then falls back to the two configured thresholds rather than refusing to decide.
+    meets_cost = (
         challengers["cost_improvement_pct"] >= settings.business.champion_min_cost_improvement_pct
-    ) & (
+    )
+    keeps_service = (
         challengers["service_level_delta"]
         >= -settings.business.champion_max_service_level_degradation
     )
+    is_real = (
+        challengers["conclusive"].astype(bool)
+        if "conclusive" in challengers.columns
+        else pd.Series(True, index=challengers.index)
+    )
+    challengers["promote"] = meets_cost & keeps_service & is_real
 
     promotable = challengers.loc[challengers["promote"]].copy()
     if not promotable.empty:
@@ -486,7 +500,8 @@ def build_promotion_decision(
             ascending=[True, False],
         ).iloc[0]
         decision_reason = (
-            "No challenger satisfied both the minimum cost improvement and service-level guardrail."
+            "No challenger satisfied the minimum cost improvement, the service-level guardrail "
+            "and a cost gap whose interval clears zero."
         )
         promote = False
 

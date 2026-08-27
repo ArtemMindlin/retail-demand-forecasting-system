@@ -431,6 +431,9 @@ Invariants:
 - `conclusive` is False whenever the seasonal naive is absent, when the interval straddles zero,
   or when there are fewer than `MIN_SERIES_FOR_INFERENCE` clusters. A model that has not been
   shown to differ is never marked as differing
+- `build_promotion_decision` READS `conclusive` as its third guardrail, so this column decides
+  whether a challenger can replace the champion. A cost_summary predating the column falls back
+  to the two configured thresholds rather than refusing to decide
 
 ## Fair Cost Summary
 

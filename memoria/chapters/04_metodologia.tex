@@ -628,14 +628,17 @@ Una vez identificado el modelo óptimo en la fase de investigación, el sistema 
 \subsection{Criterio de Promoción del Modelo Campeón}
 \label{sec:promocion}
 
-El ciclo de operación no es estático: tras cada ejecución del modo \texttt{experiment}, el sistema evalúa si alguno de los modelos candidatos (\textit{challengers}) debe reemplazar al modelo actualmente en producción. La promoción no se decide por una única métrica, sino por dos guardarraíles independientes:
+El ciclo de operación no es estático: tras cada ejecución del modo \texttt{experiment}, el sistema evalúa si alguno de los modelos candidatos (\textit{challengers}) debe reemplazar al modelo actualmente en producción. La promoción no se decide por una única métrica, sino por tres guardarraíles independientes:
 
 \begin{enumerate}
     \item \textbf{Mejora de coste mínima} ($\Delta_{\text{cost}}$): el \textit{challenger} debe reducir el coste de inventario simulado respecto al campeón actual en al menos un umbral configurable $\theta_{\text{cost}}$.
     \item \textbf{Guardarraíl de nivel de servicio} ($\Delta_{\text{sl}}$): el \textit{challenger} no puede degradar el nivel de servicio por encima de un margen $\delta_{\text{sl}}$ configurable, aunque mejore el coste.
+    \item \textbf{Significación de la mejora}: el hueco de coste frente al campeón debe tener su intervalo de confianza al 95\% enteramente por debajo de cero. El intervalo procede de un \textit{bootstrap} emparejado que remuestrea series completas como conglomerados sobre las filas del protocolo de la Sección~\ref{sec:backtesting}.
 \end{enumerate}
 
-Este diseño prioriza la estabilidad operacional frente a la optimización agresiva: un modelo que recorte costes a costa de roturas frecuentes nunca alcanzará producción. La implementación detallada y el flujo de decisión se describen en la Sección~\ref{sec:champion_promotion}.
+El tercer guardarraíl existe porque los dos primeros no bastan. El umbral de mejora de coste es configurable y su valor por defecto es cero, de modo que por sí solo admite cualquier mejora por pequeña que sea: la comparación entre los dos \textit{backends} de este trabajo se decidía por una diferencia de coste del orden de la centésima de punto porcentual, magnitud que está dentro del propio ruido del experimento. Exigir que el intervalo despeje el cero traslada a esta decisión el mismo criterio que el resto del trabajo aplica a cualquier comparación entre alternativas.
+
+Este diseño prioriza la estabilidad operacional frente a la optimización agresiva: un modelo que recorte costes a costa de roturas frecuentes nunca alcanzará producción, y uno que las recorte por una diferencia indistinguible del azar tampoco. La implementación detallada y el flujo de decisión se describen en la Sección~\ref{sec:champion_promotion}.
 
 % ==============================================================================
 \section{Bloque III: MLOps}
