@@ -140,28 +140,42 @@ def render_profiling_figures(panel: pd.DataFrame, output_dir: Path) -> None:
 
 
 def _plot_observed_demand_distribution(panel: pd.DataFrame, output_path: Path) -> None:
+    """Two complementary views: the bulk on the data's own grid, and the tail on a log count.
+
+    Both panels used to be the same histogram with 50 bins over the full range, which made the
+    linear one unreadable and redundant: 89% of the panel sits below 2 while the tail reaches 45,
+    so the entire body collapsed into two bars and the exact zeros disappeared inside the first
+    one. That produced a spike at the origin that looks like a mass of zeros and is not --- the
+    first bar held 68% of the panel and only 6.6% of it was zero.
+    """
+    demand = panel["observed_demand"].to_numpy(dtype=float)
+    upper = float(np.quantile(demand, 0.99))
+    zero_share = float((demand == 0.0).mean()) * 100.0
+
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
-    axes[0].hist(
-        panel["observed_demand"],
-        bins=50,
-        color="#1f77b4",
-        edgecolor="white",
+    # Bins of 0.1 centred on the grid the data actually takes, so the zeros get a bar of their
+    # own instead of being pooled with the small positive sales.
+    edges = np.arange(-0.05, upper + 0.15, 0.1)
+    axes[0].hist(demand[demand <= upper], bins=edges, color="#1f77b4")
+    axes[0].axvline(0.0, color="#d62728", linewidth=1.0, linestyle="--")
+    axes[0].annotate(
+        f"exact zeros: {zero_share:.2f}%",
+        xy=(0.0, 0.0),
+        xytext=(0.11, 0.93),
+        textcoords="axes fraction",
+        color="#d62728",
+        fontsize=9,
     )
-    axes[0].set_xlabel("Observed demand")
+    axes[0].set_xlabel(f"Observed demand (bulk, up to p99 = {upper:.1f})")
     axes[0].set_ylabel("Frequency")
-    axes[0].set_title("Observed demand distribution (linear scale)")
+    axes[0].set_title("Bulk of the distribution, bins of 0.1")
 
-    axes[1].hist(
-        panel["observed_demand"],
-        bins=50,
-        color="#1f77b4",
-        edgecolor="white",
-    )
+    axes[1].hist(demand, bins=90, color="#1f77b4")
     axes[1].set_yscale("log")
-    axes[1].set_xlabel("Observed demand")
+    axes[1].set_xlabel("Observed demand (full range)")
     axes[1].set_ylabel("Frequency (log scale)")
-    axes[1].set_title("Observed demand distribution (log scale)")
+    axes[1].set_title("Full range with the right tail, log counts")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
