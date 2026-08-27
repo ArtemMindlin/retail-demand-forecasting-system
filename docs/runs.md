@@ -168,14 +168,16 @@ Those are run names, resolved through MLflow, not paths. A directory still works
 ## The EDA figures of chapter 3
 
 All 15 figures and every statistic in chapter 3 come from one run,
-`eda_fresh_retailnet_v2_20260827_163615`, at commit `66d6206`. Verified: the PNGs under
-`memoria/figures/eda/` are byte-identical to that run's artifacts, except
-`observed_demand_distribution.png`, which was re-rendered after the run to move an annotation
-off the bars — same data, same code path, a label position.
+`eda_fresh_retailnet_v2_20260827_171901`, at commit `a151564`. Verified: every PNG under
+`memoria/figures/eda/` is byte-identical to that run's artifacts — no post-hoc edits.
 
-It replaced `eda_fresh_retailnet_v2_20260823_214350` (commit `717f1b9`) when the demand
-distribution figure was rebuilt. Fourteen of the fifteen figures came out byte-identical between
-the two runs, which is what confirms the edit had no side effects.
+Three runs preceded it on the same day, and comparing them is what confirmed each change did
+only what it claimed. `66d6206` rebuilt the demand distribution figure and left the other
+fourteen byte-identical. `8b7c74c` translated the labels found inside labelling calls. `a151564`
+carries the rest: the titles passed as arguments, the weekday names that arrive in English from
+`dt.day_name()`, the tier names interpolated into a title, and two legend entries built with
+interpolated figures. Eight of the fifteen changed between the last two, and they are exactly
+the figures whose text was not a literal in a `set_*` call.
 
 The `eda/` module has changed since, and none of it moves a figure: `make_grid` relocated to
 `utils/plotting.py`, the pipeline moved from `make_run_directory` to `open_run_directory`, the
