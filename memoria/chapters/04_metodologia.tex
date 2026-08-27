@@ -33,6 +33,17 @@ El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamient
 \section{Bloque I: Investigación}
 % ==============================================================================
 
+Este bloque recorre, en este orden, la cadena completa de decisiones que separan el histórico
+de ventas de una recomendación de pedido: cómo se formula el problema y se corrige la censura
+por rotura de stock antes de que llegue al modelo, qué información temporal se codifica en cada
+fila del panel supervisado, cómo se entrena el modelo para producir cuantiles en lugar de un
+único valor esperado, por qué se implementan dos \textit{backends} de \textit{Gradient Boosting}
+en paralelo, cómo se corrige el cruce de cuantiles que introduce entrenarlos por separado, cómo
+se buscan sus hiperparámetros bajo dos objetivos en conflicto, cómo se calibra la incertidumbre
+resultante por categoría de producto, y bajo qué protocolo de \textit{backtesting} se mide todo
+lo anterior sin fuga de información. Cierra el bloque la discusión del supuesto de costes
+uniformes que sostiene la decisión final de inventario.
+
 \subsection{Formulación del Problema}
 
 En términos prácticos, el sistema trabaja con un panel de series temporales: cada par
