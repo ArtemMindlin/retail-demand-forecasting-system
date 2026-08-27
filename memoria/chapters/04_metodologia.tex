@@ -290,6 +290,37 @@ covariables disponible en $t$.
 
 Al entrenar con RMSE o MAE se minimiza el error estadístico pero no el coste logístico, lo que es inconsistente con el objetivo operativo del sistema. Por eso el entrenamiento orientado a costes es el único modo disponible.
 
+\subsection{Selección de las Implementaciones de Boosting}
+\label{sec:eleccion_backends}
+
+De las tres implementaciones de referencia que revisa el Capítulo~\ref{chap:estado_del_arte}, el
+sistema implementa \textbf{dos}: LightGBM y CatBoost, ambas bajo el mismo protocolo de
+\textit{backtesting} y el mismo envoltorio cuantílico. XGBoost se descarta antes de
+implementarse, y conviene ser preciso sobre el motivo, porque no es una limitación de la
+herramienta: desde su versión 1.5 soporta variables categóricas de forma nativa, con un
+algoritmo de particionamiento propio para las divisiones categóricas, de modo que el
+\textit{one-hot} manual dejó de ser necesario. La razón es de alcance y de redundancia. Sobre el
+eje que más pesa en este dominio, la forma de codificar identificadores de cardinalidad alta,
+XGBoost y LightGBM comparten mecanismo: ambos buscan la partición ordenando las categorías por
+el estadístico del gradiente. Un tercer \textit{backend} que replica el mecanismo de uno de los
+dos ya implementados multiplicaría cada corrida de \textit{backtesting} sin añadir un contraste
+nuevo, mientras que CatBoost es el único de los tres que aporta un mecanismo distinto.
+
+Entre las dos que sí se implementan, la elección del campeón \textbf{no se decide con argumentos
+de diseño} sino empíricamente, por el criterio de promoción de la
+Sección~\ref{sec:promocion}. Esa distinción importa, porque el orden por error puntual y el
+orden por coste no coinciden, y reportarlos por separado es una de las conclusiones del trabajo.
+Las propiedades de las dos implementaciones explican \emph{por qué es razonable} que gane la que
+gana, no la razón por la que se selecciona: los estadísticos de destino ordenados de CatBoost
+son la única defensa explícita frente a la fuga por la etiqueta cuando los identificadores
+tienen la cardinalidad de este catálogo, y sus árboles \textit{oblivious} actúan como
+regularizador estructural sobre un panel donde muchas series tienen historia corta.
+
+La estimación nativa de incertidumbre que CatBoost ofrece \textbf{no se explota} en este sistema:
+la cuantificación de la incertidumbre se obtiene de la rejilla de cuantiles y de la calibración
+conformal, comunes a los dos \textit{backends}, de modo que la comparación entre ellos se
+mantiene en igualdad de condiciones.
+
 \subsection{Arquitectura Multi-Modelo y Corrección del Quantile Crossing}
 \label{sec:crossing}
 Dado que los frameworks estándar de Gradient Boosting están diseñados para optimizar un único objetivo escalar por modelo, el sistema implementa un \textbf{Wrapper Cuantílico Multi-Modelo}. Este componente instancia y entrena de forma independiente $M$ estimadores, cada uno sintonizado para un cuantil específico del conjunto $\mathcal{Q} = \{q_1, q_2, \dots, q_M\}$, donde $q_1 < q_2 < \dots < q_M$.

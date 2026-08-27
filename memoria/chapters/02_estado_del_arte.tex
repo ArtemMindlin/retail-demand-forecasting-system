@@ -7,6 +7,20 @@ Este capítulo presenta una revisión de la literatura y las bases teóricas fun
 \section{Previsión de la Demanda en Retail}
 Tradicionalmente, la previsión de series temporales se ha abordado mediante modelos \textbf{locales}, donde se entrena un modelo individual para cada SKU o combinación tienda-producto. Los enfoques clásicos como ARIMA \cite{hyndman2021forecasting} o el suavizado exponencial (ETS) han sido el estándar durante décadas gracias a su interpretabilidad y su sólida base estadística. Sin embargo, en el contexto del \textit{retail} masivo presentan tres limitaciones estructurales: (1) su coste computacional crece linealmente con el número de series, haciendo inviable el ajuste individual sobre catálogos de decenas de miles de SKUs; (2) requieren un historial mínimo por serie para estimar sus parámetros, fallando sistemáticamente en productos nuevos o con alta intermitencia (\textit{cold-start problem}); y (3) no pueden aprovechar información compartida entre series como la estacionalidad semanal o la elasticidad de precio, que son patrones transversales a todo el catálogo.
 
+Un caso límite de esas limitaciones, y particularmente relevante en frescos, es la
+\textbf{demanda intermitente}: series en las que una fracción apreciable de los días registra
+demanda nula, no por falta de disponibilidad sino porque simplemente no hubo compra. Croston
+\cite{croston1972forecasting} propuso desacoplar el problema en dos, estimando por separado el
+tamaño de la demanda cuando ocurre y el intervalo entre ocurrencias, y Syntetos y Boylan
+\cite{syntetos2005accuracy} demostraron después que el estimador original está sesgado y
+propusieron la corrección que hoy se toma como referencia. La intermitencia importa aquí por dos
+motivos. Primero, porque distorsiona la evaluación: sobre una serie con muchos ceros, predecir
+sistemáticamente cero obtiene un error absoluto muy bajo sin aportar ninguna información útil,
+razón por la cual las métricas que revisa la Sección~\ref{sec:sota_evaluacion} deben leerse con
+cautela en este régimen. Y segundo, porque un cero observado en retail es ambiguo por naturaleza:
+puede ser ausencia de demanda o ausencia de producto, y distinguir ambos casos es exactamente el
+problema de censura que trata la Sección~\ref{sec:censura}.
+
 El paradigma actual ha girado hacia los \textbf{Modelos Globales de Pronóstico (GFMs)}, donde un único modelo se entrena sobre la totalidad de las series temporales de la base de datos. Montero-Manso y Hyndman \cite{montero2021principles} demostraron teóricamente que los modelos globales no son restrictivos: bajo condiciones razonables pueden aproximar cualquier función local, pero además se benefician del aprendizaje de representaciones compartidas. Este enfoque ha dominado competiciones de referencia como la M5 Walmart \cite{makridakis2022m5}, donde las soluciones ganadoras fueron casi exclusivamente modelos globales basados en \textit{Machine Learning}.
 
 Una alternativa relevante a los modelos de \textit{boosting} son las arquitecturas de \textit{deep learning} para series temporales, como DeepAR \cite{salinas2020deepar} o el Temporal Fusion Transformer (TFT) \cite{lim2021temporal}. Aunque estas arquitecturas pueden capturar dependencias temporales a largo plazo de forma automática, presentan desventajas en el contexto de este trabajo: requieren volúmenes de datos superiores para converger, son difíciles de interpretar para los responsables logísticos y su tiempo de entrenamiento es sensiblemente mayor sobre datasets de 4,5 millones de observaciones con covariables heterogéneas. En la competición M5 \cite{makridakis2022m5}, los modelos de \textit{boosting} superaron consistentemente a las redes neuronales en términos de precisión y eficiencia, lo que justifica su elección en este trabajo.
@@ -37,47 +51,68 @@ La Tabla~\ref{tab:gbdt_comparison} resume las dimensiones más relevantes para e
     \label{tab:gbdt_comparison}
 \end{table}
 
-La tabla recoge las tres implementaciones que la literatura considera de referencia, pero el
-sistema desarrollado implementa \textbf{dos}: LightGBM y CatBoost, ambas bajo el mismo protocolo
-de backtesting y el mismo envoltorio cuantílico. XGBoost se descarta antes de implementarse, y
-conviene ser preciso sobre el motivo, porque no es una limitación de la herramienta: desde su
-versión 1.5 soporta variables categóricas de forma nativa, con un algoritmo de particionamiento
-propio para las divisiones categóricas, de modo que el \textit{one-hot} manual dejó de ser
-necesario. La razón es de alcance y de redundancia. Sobre el eje que más pesa en este dominio, la
-forma de codificar identificadores de cardinalidad alta, XGBoost y LightGBM comparten mecanismo:
-ambos buscan la partición ordenando las categorías por el estadístico del gradiente. Un tercer
-\textit{backend} que replica el mecanismo de uno de los dos ya implementados multiplicaría cada
-corrida de backtesting sin añadir un contraste nuevo, mientras que CatBoost es el único de los
-tres que aporta un mecanismo distinto, los estadísticos de destino ordenados.
+Las tres comparten el núcleo algorítmico del \textit{boosting} por gradiente y difieren
+sobre todo en cómo crecen el árbol y en cómo tratan las variables categóricas. XGBoost crece
+por niveles; LightGBM por hojas, lo que le da ventaja en velocidad sobre paneles grandes;
+CatBoost construye árboles \textit{oblivious}, con la misma condición de división en todo un
+nivel, lo que actúa como regularizador estructural. En categóricas, las tres ofrecen soporte
+nativo ---XGBoost desde su versión 1.5---, pero por mecanismos distintos: XGBoost y LightGBM
+buscan la partición ordenando las categorías por el estadístico del gradiente, mientras que
+CatBoost calcula estadísticos de destino sobre una permutación previa
+(\textit{ordered target statistics}), construcción diseñada para que el valor de la etiqueta de
+una observación no entre en el estadístico que la codifica. Es el único de los tres que
+introduce la etiqueta en la codificación y, a la vez, el único que incorpora un mecanismo
+explícito para que hacerlo no filtre información, lo que resulta relevante cuando los
+identificadores tienen la cardinalidad de un catálogo retail. Qué implementaciones adopta este
+trabajo, y con qué criterio se elige entre ellas, se justifica en el
+Capítulo~\ref{chap:metodologia}.
 
-Entre las dos que sí se implementan, la elección del campeón \textbf{no se decide con los
-argumentos de esta tabla}, sino empíricamente y por el criterio que la operación percibe: el coste
-logístico simulado sobre el protocolo de backtesting, mediante la lógica de promoción descrita en
-la Sección~\ref{sec:promocion}. Esa distinción importa, porque el orden por error puntual y el
-orden por coste no coinciden: reportarlos por separado es una de las conclusiones del trabajo. El
-campeón resultante es \textbf{CatBoost}, y las propiedades de la tabla explican \emph{por qué es
-razonable} que gane, no la razón por la que se selecciona:
+\section{Evaluación de la Previsión de Demanda}
+\label{sec:sota_evaluacion}
+La elección de la métrica no es un detalle de reporte: determina qué modelo se considera mejor, y
+la literatura ha documentado repetidamente que métricas distintas ordenan los mismos modelos de
+forma distinta. Hyndman y Koehler \cite{hyndman2006another} revisan las familias disponibles y
+descartan explícitamente las porcentuales al uso: el MAPE es indefinido cuando la demanda vale
+cero, situación habitual en retail de frescos, y penaliza de forma asimétrica la sobreestimación
+frente a la subestimación, de modo que premia a los modelos sesgados a la baja. Su propuesta es
+escalar el error por el de un método de referencia, dando lugar al \textbf{MASE}, que divide el
+error absoluto medio por el del \textit{naive} estacional en la muestra de entrenamiento: valores
+por debajo de la unidad indican que el modelo bate a ese referente, y la escala desaparece, lo
+que permite agregar series de niveles muy distintos. La competición M5 \cite{makridakis2022m5}
+adoptó la variante cuadrática, RMSSE, precisamente por su comparabilidad entre los miles de SKUs
+de un catálogo retail. Una alternativa robusta a los ceros sin necesidad de referente es el
+\textbf{WAPE}, cociente entre la suma de errores absolutos y la suma de la demanda, que expresa
+el error como fracción del volumen y por tanto es comparable entre paneles de escala distinta.
 
-\begin{itemize}
-    \item \textbf{Gestión nativa de categóricas con estadísticos ordenados:} las dos manejan las
-    categóricas sin codificación manual, pero lo hacen de forma distinta. LightGBM ordena las
-    categorías por el estadístico del gradiente y parte sobre ese orden, lo que en categorías con
-    pocas observaciones puede sobreajustar; CatBoost calcula estadísticos de destino sobre una
-    permutación previa (\textit{ordered target statistics}), construcción diseñada precisamente
-    para que el valor de la etiqueta de una observación no entre en el estadístico que la codifica.
-    Es la única de las dos que introduce la etiqueta en la codificación y, a la vez, la única que
-    incorpora un mecanismo explícito para que hacerlo no filtre información. Con identificadores de
-    la cardinalidad de este catálogo, esa diferencia es la más relevante de la tabla.
-    \item \textbf{Regularización implícita mediante árboles \textit{oblivious}:} los árboles
-    simétricos de CatBoost aplican la misma condición de división en todo un nivel, lo que actúa
-    como regularizador estructural sobre un panel donde muchas series tienen historia corta.
-\end{itemize}
+Un segundo eje, con frecuencia ausente de los informes, es el \textbf{sesgo}. Ni el MAE ni el
+RMSE distinguen errar por exceso de errar por defecto, y en inventario esa distinción es la que
+separa una rotura de un capital inmovilizado. La distinción resulta central cuando el problema es
+la censura: el trabajo que acompaña al conjunto de datos empleado en esta memoria
+\cite{freshretailnet2025} reporta como resultado principal la reducción de la subestimación
+sistemática de la demanda, del 7,37\% a un sesgo próximo a cero, y no una mejora del error
+absoluto.
 
-La estimación nativa de incertidumbre que CatBoost ofrece (última fila de la tabla) \textbf{no se
-explota} en este sistema: la cuantificación de la incertidumbre se obtiene de la rejilla de
-cuantiles y de la calibración conformal, que son comunes a los dos \textit{backends} y por tanto
-mantienen la comparación entre ellos en igualdad de condiciones. Se recoge en la tabla como
-propiedad de la herramienta, no como capacidad utilizada.
+Cuando la predicción es una distribución y no un valor, la evaluación cambia de familia. La
+\textbf{pinball loss} \cite{koenker2005quantile} puntúa un cuantil concreto y es la pérdida que
+alinea entrenamiento y decisión en el planteamiento de este trabajo; el \textbf{CRPS}
+\cite{gneiting2007strictly} integra esa pérdida sobre todos los cuantiles y es una regla de
+puntuación estrictamente propia, es decir, se minimiza únicamente cuando la distribución
+predicha coincide con la real; y la \textbf{cobertura empírica} del intervalo verifica si la
+banda declarada al $1-\alpha$ contiene el valor real con esa frecuencia, que es la propiedad
+que la calibración conformal de la sección siguiente persigue.
+
+Ninguna de estas familias mide, sin embargo, la consecuencia económica de la decisión que el
+pronóstico induce, que es la magnitud que la operación percibe. Esa desconexión es el punto de
+partida de la línea de \textit{decision-focused learning} que se revisa en la
+Sección~\ref{sec:newsvendor}, y es también el motivo por el que este trabajo reporta el coste
+logístico y el nivel de servicio junto a las métricas de error, y no en su lugar. De las
+métricas revisadas aquí, el sistema desarrollado reporta el MAE y el RMSE, el WAPE, el sesgo en
+unidades y en porcentaje del volumen, un error relativo al \textit{naive} estacional evaluado
+sobre las mismas filas, la \textit{pinball loss} por cuantil, el Winkler Score del intervalo y
+su cobertura empírica. No reporta MASE ni RMSSE en su definición estricta: ambas escalan por el
+error del \textit{naive} sobre la muestra de entrenamiento con horizonte de un paso, y el
+objetivo de predicción de este sistema es la demanda acumulada a lo largo del horizonte de
+reposición, para la cual ese denominador no está definido.
 
 \section{Cuantificación de la Incertidumbre y Conformal Prediction}
 Una predicción puntual es insuficiente para la gestión de inventarios; es necesario cuantificar la probabilidad de diferentes escenarios de demanda para poder aplicar el criterio del Newsvendor. Los enfoques clásicos de cuantificación de incertidumbre se dividen en tres familias: métodos bayesianos, regresión cuantílica y métodos de calibración post-hoc. Los métodos bayesianos \cite{hyndman2021forecasting} ofrecen intervalos bien fundamentados teóricamente pero requieren especificar distribuciones a priori y son computacionalmente costosos a escala. La regresión cuantílica \cite{koenker2005quantile} estima directamente los cuantiles de la distribución condicionada, pero no garantiza cobertura calibrada: el cuantil $q_{0{,}9}$ estimado puede contener la demanda real solo el 70\% de las veces si la distribución de test difiere de la de entrenamiento.
@@ -105,6 +140,7 @@ Esta conexión entre predicción y decisión ha cristalizado en la última déca
 Sin embargo, tanto el Newsvendor como la política $(s, S)$ asumen implícitamente que la distribución $D$ es conocida y libre de sesgo. Esta hipótesis se viola cuando los datos de entrenamiento están censurados por roturas de stock, lo que desplaza el fractil crítico hacia abajo y genera pedidos insuficientes de forma estructural. La sección siguiente analiza este fenómeno y su impacto en la cadena de decisión.
 
 \section{Demanda Censurada y el Efecto de Stockout}
+\label{sec:censura}
 Un desafío crítico y frecuentemente ignorado en \textit{retail} es que las ventas observadas solo coinciden con la demanda real cuando hay stock disponible. Cuando ocurre una rotura de stock (\textit{stockout}), los datos se ven \textbf{censurados por la derecha}: la venta registrada no es la demanda, sino una \emph{cota inferior} de ella, ya que observamos cero (o muy pocas) ventas mientras la demanda latente (lo que los clientes habrían comprado) es estrictamente mayor. Formalmente, al observar $\min(D, \text{stock})$ el valor verdadero queda siempre por encima del dato registrado, que es la definición de censura por la derecha en el sentido del análisis de supervivencia. El estudio teórico de los sistemas de inventario con demanda inobservable se remonta a trabajos fundamentales como el de Nahmias \cite{nahmias1994demand}, y posteriormente, Musalem et al.\ \cite{musalem2010structural} cuantificaron empíricamente el efecto sobre datos de tienda: las ventas perdidas equivalen al 5,9\% de las ventas que se habrían producido con disponibilidad plena cuando las roturas son escasas, y se multiplican por más de tres, hasta el 20,2\%, cuando seis productos de la categoría están agotados a la vez. El hallazgo relevante no es la magnitud sino su \textbf{no linealidad}: el sesgo no escala con la tasa de rotura de un producto aislado, sino con el número de alternativas simultáneamente ausentes del lineal, porque es la disponibilidad del conjunto la que determina cuánta demanda puede desviarse a un sustituto y cuánta se pierde.
 
 Si un modelo se entrena con estos datos sesgados sin corrección, cae en una ``espiral de muerte'' (\textit{death spiral}): el modelo predice baja demanda, se pide poco producto, se agota antes, y el modelo vuelve a reducir su previsión. Este ciclo se retroalimenta hasta colapsar la reposición de ciertos SKUs. La literatura propone varias estrategias de corrección con distintos compromisos entre precisión y coste computacional:
