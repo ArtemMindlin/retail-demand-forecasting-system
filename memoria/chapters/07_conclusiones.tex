@@ -68,6 +68,22 @@ de ética algorítmica, responsabilidad social corporativa y cumplimiento legal:
     anonimizado, cumpliendo con los estándares europeos de protección de datos (GDPR). El sistema
     opera sobre patrones agregados de venta diaria por tienda-producto, sin procesar información
     personal de consumidores.
+    \item \textbf{Propiedad Intelectual}: \textit{FreshRetailNet-50K} \cite{freshretailnet2025}
+    se distribuye bajo licencia \textbf{CC BY 4.0}, que permite su uso y redistribución citando
+    a los autores originales, condición que esta memoria cumple mediante la referencia
+    bibliográfica. El código del sistema se publica bajo licencia \textbf{MIT} en el repositorio
+    citado en la Sección~\ref{sec:legado}, sin restricciones adicionales sobre su reutilización.
+    \item \textbf{Equidad Algorítmica}: el sistema no recibe ni condiciona sus predicciones con
+    atributos personales de clientes; los únicos identificadores que utiliza son de producto y
+    de tienda (Sección~\ref{sec:feature_engineering}). Existe, no obstante, un riesgo indirecto:
+    una tienda con historial corto o intermitente --por ejemplo, una apertura reciente en una
+    zona con menor densidad comercial-- recibe una calibración conformal menos precisa
+    (Sección~\ref{sec:conformal}) y, por tanto, un nivel de servicio sistemáticamente peor no por
+    decisión del sistema sino por escasez de datos. El identificador de tienda actúa aquí como
+    un \textit{proxy} indirecto de la zona que atiende. El trabajo no corrige este efecto --
+    mitigarlo exigiría datos socioeconómicos de la zona de cada tienda, que el dataset no
+    contiene-- pero conviene declararlo como una limitación a vigilar en cualquier despliegue
+    real, no solo como una propiedad estadística del modelo.
 \end{itemize}
 
 \section{Limitaciones Metodológicas y del Sistema}
