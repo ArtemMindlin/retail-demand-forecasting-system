@@ -162,7 +162,7 @@ En el benchmark oficial del propio dataset \cite{freshretailnet2025} se evalúan
 
 El sistema de previsión opera sobre un panel diario de series temporales. Dado que los modelos de \textit{Gradient Boosting} no tienen memoria temporal intrínseca, la información histórica debe codificarse explícitamente como columnas del vector de entrada. El proceso de ingeniería de características transforma el panel preparado en un \textit{frame} supervisado donde cada fila representa un origen de predicción con su vector de covariables correspondiente.
 
-Las características se organizan en cuatro grupos funcionales:
+Las características se organizan en cinco grupos funcionales:
 
 \begin{enumerate}
     \item \textbf{Características Calendáricas}: Codifican la posición temporal del origen de predicción. Incluyen el día de la semana ($\in [0,6]$), el día del mes, el mes, la semana del año, un indicador binario de fin de semana, un indicador de festivo (\texttt{holiday\_flag}) y un indicador de actividad promocional especial (\texttt{activity\_flag}). Estas variables capturan la estacionalidad semanal y mensual identificada en el análisis exploratorio (véase Capítulo~\ref{chap:analisis_datos}).
@@ -173,7 +173,7 @@ Las características se organizan en cuatro grupos funcionales:
 
     \item \textbf{Lags de Stockout}: Las horas diarias sin stock (\texttt{stockout\_hours}) se tratan como grupo propio por su doble rol en el sistema: actúan como señal proxy de la demanda latente en el módulo de imputación (Sección~\ref{sec:demanda_censurada}) y como covariable del modelo de forecasting que informa sobre la presión histórica de rotura. Se calculan lags en los mismos instantes ($t-1, t-7, t-14$) y medias rodantes a 7 y 14 días.
 
-    \item \textbf{Identificadores Estáticos}: Los identificadores jerárquicos (\texttt{store\_id}, \texttt{product\_id}, \texttt{city\_id}, \texttt{management\_group\_id} y las tres categorías) se incluyen directamente como variables categóricas. CatBoost los codifica de forma nativa mediante \textit{Ordered Target Statistics}, evitando la necesidad de \textit{one-hot encoding} y el riesgo de \textit{target leakage} asociado al \textit{target encoding} estándar.
+    \item \textbf{Identificadores Estáticos}: cada serie del panel es el par (\texttt{product\_id}, \texttt{store\_id}) definido al inicio de este bloque; junto a él se incluyen los identificadores que sitúan a ese par en la jerarquía del catálogo y de la red de tiendas -- \texttt{city\_id}, \texttt{management\_group\_id} y las tres categorías de producto --, todos como variables categóricas nativas, sin construir a mano ninguna jerarquía adicional. Cómo codifica cada \textit{backend} estas categóricas de alta cardinalidad, y por qué esa codificación pesa en la elección del campeón, se trata en la Sección~\ref{sec:eleccion_backends}.
 \end{enumerate}
 
 La Tabla~\ref{tab:features_summary} resume el número de características resultantes por grupo.
