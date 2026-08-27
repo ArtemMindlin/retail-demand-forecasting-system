@@ -114,16 +114,17 @@ def _plot_weekday_demand_profile(
     output_path: Path,
 ) -> None:
     fig, ax = plt.subplots(figsize=(9, 4))
+    dias = weekday_summary["weekday_name"].map(_DAY_ES).fillna(weekday_summary["weekday_name"])
     ax.plot(
-        weekday_summary["weekday_name"],
+        dias,
         weekday_summary["observed_demand_mean"],
         marker="o",
         linewidth=2,
         color="#2ca02c",
-        label="Mean",
+        label="Media",
     )
     ax.plot(
-        weekday_summary["weekday_name"],
+        dias,
         weekday_summary["observed_demand_median"],
         marker="s",
         linewidth=2,
@@ -232,6 +233,21 @@ _DAY_ORDER = [
 
 _TIER_COLOR = {"High": "#2166ac", "Medium": "#f4a582", "Low": "#d6604d"}
 
+# Traducciones SOLO para lo que se dibuja. Las claves inglesas se conservan porque vienen de
+# `dt.day_name()` y de la clasificacion por niveles, y son las que ordenan y agrupan: cambiarlas
+# obligaria a reescribir la logica para ganar unas etiquetas.
+_DAY_ES = {
+    "Monday": "Lunes",
+    "Tuesday": "Martes",
+    "Wednesday": "Miércoles",
+    "Thursday": "Jueves",
+    "Friday": "Viernes",
+    "Saturday": "Sábado",
+    "Sunday": "Domingo",
+}
+
+_TIER_ES = {"High": "alta", "Medium": "media", "Low": "baja"}
+
 _MIN_OBSERVATIONS = 500
 
 
@@ -300,7 +316,9 @@ def render_category_seasonality_heatmaps(
         if not categories:
             continue
         top = deviation.loc[categories].nlargest(n_per_tier).index
+        # Se ordena por la clave inglesa y se renombra solo para dibujar.
         data = pivot_std.loc[top].sort_values("Sunday", ascending=False)
+        data = data.rename(columns=_DAY_ES)
 
         fig, ax = plt.subplots(figsize=(10, 4))
         sns.heatmap(
@@ -314,8 +332,8 @@ def render_category_seasonality_heatmaps(
             ax=ax,
         )
         ax.set_title(
-            f"Weekly seasonality — {tier} demand categories\n"
-            f"(Z-score per category; {len(top)} most heterogeneous)",
+            f"Estacionalidad semanal · categorías de demanda {_TIER_ES[tier]}\n"
+            f"(Z-score por categoría; las {len(top)} más heterogéneas)",
             color=_TIER_COLOR[tier],
             fontsize=11,
         )

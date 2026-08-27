@@ -259,7 +259,7 @@ def _plot_covariate_vs_demand_grid(panel: pd.DataFrame, output_path: Path) -> No
             label="IC 95\u00a0%",
         )
         axis.plot(
-            binned["x_mid"], binned["mean"], color="#1f77b4", linewidth=2, label="Mean demand"
+            binned["x_mid"], binned["mean"], color="#1f77b4", linewidth=2, label="Demanda media"
         )
         axis.set_xlabel(column)
         axis.set_ylabel("Demanda observada media")

@@ -100,8 +100,8 @@ def _plot_observed_demand_boxplot_top_series(
         ax.tick_params(axis="x", rotation=45)
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    _draw(axes[0], top, "#2166ac", "High-volume series")
-    _draw(axes[1], mid + bottom, "#74add1", "Mid / low-volume series")
+    _draw(axes[0], top, "#2166ac", "Series de alto volumen")
+    _draw(axes[1], mid + bottom, "#74add1", "Series de volumen medio y bajo")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -126,14 +126,14 @@ def _plot_zero_demand_rate_by_series(
         color="#d62728",
         linewidth=1.8,
         linestyle="--",
-        label=f"Median: {median_rate:.2f}",
+        label="Mediana: " + f"{median_rate:.2f}".replace(".", ","),
     )
     ax.axvline(
         0.5,
         color="#ff7f0e",
         linewidth=1.4,
         linestyle=":",
-        label=f">50% zero: {pct_above_50:.0f}% of series",
+        label=f">50\u00a0% de días sin ventas: {pct_above_50:.0f}\u00a0% de las series",
     )
     ax.set_xlabel("Tasa de demanda nula")
     ax.set_ylabel("Número de series")
@@ -232,14 +232,14 @@ def _plot_representative_series_panels(
             series_frame["observed_demand"],
             color="#1f77b4",
             linewidth=1.8,
-            label="Demand",
+            label="Demanda",
         )
         axis.set_title(series_id)
         axis.tick_params(axis="x", rotation=45)
         axis.set_ylabel("Demanda")
 
     fig.suptitle(
-        "Representative series panels (line: demand, shaded: stockout hours)",
+        "Series representativas (línea: demanda; sombreado: horas de rotura)",
         y=1.02,
     )
     fig.tight_layout()
