@@ -162,7 +162,8 @@ def _plot_observed_demand_distribution(panel: pd.DataFrame, output_path: Path) -
     # axis: the bulk is tall and narrow, so anything placed near the origin lands on the data.
     zero_height = float((demand == 0.0).sum())
     axes[0].annotate(
-        f"exact zeros: {zero_share:.2f}% of the panel",
+        # Coma decimal: el documento esta en castellano y la figura va dentro de el.
+        f"ceros exactos: {zero_share:.2f}".replace(".", ",") + "\u00a0% del panel",
         xy=(0.0, zero_height),
         xytext=(0.42, 0.88),
         textcoords="axes fraction",
@@ -170,15 +171,15 @@ def _plot_observed_demand_distribution(panel: pd.DataFrame, output_path: Path) -
         fontsize=9,
         arrowprops={"arrowstyle": "->", "color": "#d62728", "linewidth": 1.0},
     )
-    axes[0].set_xlabel(f"Observed demand (bulk, up to p99 = {upper:.1f})")
-    axes[0].set_ylabel("Frequency")
-    axes[0].set_title("Bulk of the distribution, bins of 0.1")
+    axes[0].set_xlabel("Demanda observada")
+    axes[0].set_ylabel("Frecuencia")
+    axes[0].set_title("Cuerpo de la distribución, barras de 0,1")
 
     axes[1].hist(demand, bins=90, color="#1f77b4")
     axes[1].set_yscale("log")
-    axes[1].set_xlabel("Observed demand (full range)")
-    axes[1].set_ylabel("Frequency (log scale)")
-    axes[1].set_title("Full range with the right tail, log counts")
+    axes[1].set_xlabel("Demanda observada (rango completo)")
+    axes[1].set_ylabel("Frecuencia (escala logarítmica)")
+    axes[1].set_title("Rango completo y cola derecha, recuentos en log")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -208,8 +209,8 @@ def _plot_correlation_heatmap(panel: pd.DataFrame, output_path: Path) -> None:
     ax.set_xticklabels(correlation.columns, rotation=45, ha="right")
     ax.set_yticks(np.arange(len(correlation.index)))
     ax.set_yticklabels(correlation.index)
-    ax.set_title("Correlation heatmap")
-    fig.colorbar(image, ax=ax, fraction=0.02, pad=0.02, label="Correlation")
+    ax.set_title("Mapa de calor de correlaciones")
+    fig.colorbar(image, ax=ax, fraction=0.02, pad=0.02, label="Correlación")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -255,14 +256,14 @@ def _plot_covariate_vs_demand_grid(panel: pd.DataFrame, output_path: Path) -> No
             binned["mean"] + 1.96 * binned["sem"],
             alpha=0.25,
             color="#1f77b4",
-            label="95% CI",
+            label="IC 95\u00a0%",
         )
         axis.plot(
             binned["x_mid"], binned["mean"], color="#1f77b4", linewidth=2, label="Mean demand"
         )
         axis.set_xlabel(column)
-        axis.set_ylabel("Mean observed demand")
-        axis.set_title(f"{column} vs observed demand")
+        axis.set_ylabel("Demanda observada media")
+        axis.set_title(f"{column} frente a la demanda observada")
         axis.legend(fontsize=8)
 
     fig.tight_layout()

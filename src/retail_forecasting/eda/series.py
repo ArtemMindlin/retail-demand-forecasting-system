@@ -95,8 +95,8 @@ def _plot_observed_demand_boxplot_top_series(
             patch.set_facecolor(color)
             patch.set_alpha(0.7)
         ax.set_title(title)
-        ax.set_xlabel("Series")
-        ax.set_ylabel("Observed demand")
+        ax.set_xlabel("Serie")
+        ax.set_ylabel("Demanda observada")
         ax.tick_params(axis="x", rotation=45)
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
@@ -135,9 +135,9 @@ def _plot_zero_demand_rate_by_series(
         linestyle=":",
         label=f">50% zero: {pct_above_50:.0f}% of series",
     )
-    ax.set_xlabel("Zero-demand rate")
-    ax.set_ylabel("Number of series")
-    ax.set_title("Distribution of zero-demand rate across all series")
+    ax.set_xlabel("Tasa de demanda nula")
+    ax.set_ylabel("Número de series")
+    ax.set_title("Distribución de la tasa de demanda nula entre series")
     ax.legend()
 
     fig.tight_layout()
@@ -225,7 +225,7 @@ def _plot_representative_series_panels(
             stockout_scaled,
             color="#d62728",
             alpha=0.25,
-            label="Stockout (scaled)",
+            label="Rotura (escalada)",
         )
         axis.plot(
             series_frame["date"],
@@ -236,7 +236,7 @@ def _plot_representative_series_panels(
         )
         axis.set_title(series_id)
         axis.tick_params(axis="x", rotation=45)
-        axis.set_ylabel("Demand")
+        axis.set_ylabel("Demanda")
 
     fig.suptitle(
         "Representative series panels (line: demand, shaded: stockout hours)",

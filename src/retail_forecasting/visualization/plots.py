@@ -45,9 +45,9 @@ def _plot_total_cost(cost_summary: pd.DataFrame, output_path: Path) -> None:
 
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.bar(cost_summary["model_name"], cost_summary["total_cost"])
-    ax.set_ylabel("Total cost")
-    ax.set_xlabel("Model")
-    ax.set_title("Total operating cost by model")
+    ax.set_ylabel("Coste total")
+    ax.set_xlabel("Modelo")
+    ax.set_title("Coste operativo total por modelo")
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
@@ -75,8 +75,8 @@ def _plot_error_cost_tradeoff(
     for row in merged.itertuples(index=False):
         ax.annotate(row.model_name, (row.mae, row.total_cost))
     ax.set_xlabel("MAE")
-    ax.set_ylabel("Total cost")
-    ax.set_title("Error-cost tradeoff")
+    ax.set_ylabel("Coste total")
+    ax.set_title("Compromiso entre error y coste")
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
     plt.close(fig)

@@ -111,9 +111,9 @@ def _plot_stockout_hours_distribution(panel: pd.DataFrame, output_path: Path) ->
         edgecolor="white",
     )
     axes[0].set_yscale("log")
-    axes[0].set_xlabel("Stockout hours")
-    axes[0].set_ylabel("Frequency (log scale)")
-    axes[0].set_title("Stockout hours distribution (log scale)")
+    axes[0].set_xlabel("Horas de rotura")
+    axes[0].set_ylabel("Frecuencia (escala logarítmica)")
+    axes[0].set_title("Distribución de horas de rotura (escala logarítmica)")
     axes[0].set_xticks(range(0, max_hours, 2))
 
     positive_stockout = panel.loc[panel["stockout_hours"] > 0, "stockout_hours"]
@@ -124,9 +124,9 @@ def _plot_stockout_hours_distribution(panel: pd.DataFrame, output_path: Path) ->
         color="#ff9896",
         edgecolor="white",
     )
-    axes[1].set_xlabel("Positive stockout hours")
-    axes[1].set_ylabel("Frequency")
-    axes[1].set_title("Positive stockout-hour distribution")
+    axes[1].set_xlabel("Horas de rotura positivas")
+    axes[1].set_ylabel("Frecuencia")
+    axes[1].set_title("Distribución de horas de rotura positivas")
     axes[1].set_xticks(range(1, max_hours, 2))
 
     fig.tight_layout()
@@ -150,18 +150,18 @@ def _plot_stockout_band_demand(stockout_demand_bands: pd.DataFrame, output_path:
         stockout_band_frame["observed_demand_mean"],
         color="#ff7f0e",
     )
-    axes[0].set_xlabel("Stockout band")
-    axes[0].set_ylabel("Mean observed demand")
-    axes[0].set_title("Mean demand by stockout band")
+    axes[0].set_xlabel("Banda de rotura")
+    axes[0].set_ylabel("Demanda observada media")
+    axes[0].set_title("Demanda media por banda de rotura")
 
     axes[1].bar(
         stockout_band_frame["stockout_band"].astype(str),
         stockout_band_frame["observations"],
         color="#bcbd22",
     )
-    axes[1].set_xlabel("Stockout band")
-    axes[1].set_ylabel("Observations")
-    axes[1].set_title("Observation count by stockout band")
+    axes[1].set_xlabel("Banda de rotura")
+    axes[1].set_ylabel("Observaciones")
+    axes[1].set_title("Observaciones por banda de rotura")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -189,11 +189,11 @@ def _plot_stockout_vs_demand_scatter(panel: pd.DataFrame, output_path: Path) -> 
         grouped["observed_demand_mean"],
         color="#d62728",
         linewidth=2,
-        label="Mean by stockout hour",
+        label="Media por hora de rotura",
     )
-    ax.set_xlabel("Stockout hours")
-    ax.set_ylabel("Observed demand")
-    ax.set_title("Observed demand vs stockout hours")
+    ax.set_xlabel("Horas de rotura")
+    ax.set_ylabel("Demanda observada")
+    ax.set_title("Demanda observada frente a horas de rotura")
     ax.legend()
 
     fig.tight_layout()

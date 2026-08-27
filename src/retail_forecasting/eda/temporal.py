@@ -128,11 +128,11 @@ def _plot_weekday_demand_profile(
         marker="s",
         linewidth=2,
         color="#1f77b4",
-        label="Median",
+        label="Mediana",
     )
-    ax.set_xlabel("Weekday")
-    ax.set_ylabel("Observed demand")
-    ax.set_title("Weekly demand profile")
+    ax.set_xlabel("Día de la semana")
+    ax.set_ylabel("Demanda observada")
+    ax.set_title("Perfil semanal de demanda")
     ax.legend()
 
     fig.tight_layout()
@@ -164,10 +164,10 @@ def _plot_coverage_heatmap(
         vmin=0,
         vmax=1,
     )
-    ax.set_xlabel("Date index")
-    ax.set_ylabel("Series")
-    ax.set_title(f"Coverage heatmap (top {len(selected_series)} series by demand)")
-    fig.colorbar(image, ax=ax, fraction=0.02, pad=0.02, label="Present (1) / missing (0)")
+    ax.set_xlabel("Índice de fecha")
+    ax.set_ylabel("Serie")
+    ax.set_title(f"Mapa de cobertura (las {len(selected_series)} series de mayor demanda)")
+    fig.colorbar(image, ax=ax, fraction=0.02, pad=0.02, label="Presente (1) / ausente (0)")
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
@@ -196,7 +196,9 @@ def _plot_acf_demand(panel: pd.DataFrame, output_path: Path, max_lags: int = 28)
 
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.axhline(0, color="black", linewidth=0.8)
-    ax.axhspan(-confidence_bound, confidence_bound, color="#1f77b4", alpha=0.12, label="95% CI")
+    ax.axhspan(
+        -confidence_bound, confidence_bound, color="#1f77b4", alpha=0.12, label="IC 95\u00a0%"
+    )
 
     for lag, val in zip(lags, acf_values, strict=False):
         color = "#d62728" if lag in seasonal_lags else "#1f77b4"
@@ -207,9 +209,9 @@ def _plot_acf_demand(panel: pd.DataFrame, output_path: Path, max_lags: int = 28)
         if s_lag <= max_lags:
             ax.axvline(float(s_lag), color="#d62728", linewidth=0.7, linestyle="--", alpha=0.45)
 
-    ax.set_xlabel("Lag (days)")
-    ax.set_ylabel("Autocorrelation")
-    ax.set_title("ACF of daily aggregate demand (lags 0–28)")
+    ax.set_xlabel("Retardo (días)")
+    ax.set_ylabel("Autocorrelación")
+    ax.set_title("ACF de la demanda diaria agregada (retardos 0–28)")
     ax.set_xticks(lags)
     ax.legend(loc="upper right")
 
@@ -317,8 +319,8 @@ def render_category_seasonality_heatmaps(
             color=_TIER_COLOR[tier],
             fontsize=11,
         )
-        ax.set_xlabel("Day of the Week")
-        ax.set_ylabel("Category ID")
+        ax.set_xlabel("Día de la semana")
+        ax.set_ylabel("ID de categoría")
 
         fig.tight_layout()
         fig.savefig(
