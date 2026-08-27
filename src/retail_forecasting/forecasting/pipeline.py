@@ -684,7 +684,7 @@ def run_experiment_from_frame(
     predictions = validation_predictions
 
     metrics_summary, fold_metrics = summarize_predictions(validation_predictions)
-    cost_summary = summarize_costs(predictions)
+    cost_summary = summarize_costs(predictions, random_seed=settings.project.random_seed)
     sensitivity_summary = run_sensitivity_analysis(
         predictions=predictions,
         base_inventory_config=settings.inventory,

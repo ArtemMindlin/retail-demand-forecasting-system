@@ -178,3 +178,107 @@ def test_each_fold_scales_against_its_own_naive() -> None:
 
     assert scaled[(0, "catboost")] == pytest.approx(2.0)
     assert scaled[(1, "catboost")] == pytest.approx(0.5)
+
+
+def _cost_rows(model: str, series_costs: dict[str, float]) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "series_id": list(series_costs),
+            "model_name": [model] * len(series_costs),
+            "backend_name": [model] * len(series_costs),
+            "y_true": [10.0] * len(series_costs),
+            "order_quantity": [10.0] * len(series_costs),
+            "overstock_units": [0.0] * len(series_costs),
+            "stockout_units": [0.0] * len(series_costs),
+            "overstock_cost": [0.0] * len(series_costs),
+            "stockout_cost": [0.0] * len(series_costs),
+            "total_cost": list(series_costs.values()),
+        }
+    )
+
+
+def _two_model_costs(n_series: int, factor: float, seed: int = 0) -> pd.DataFrame:
+    """Two models over the same series, the champion cheaper by `factor` ON AVERAGE.
+
+    The per-series ratio is deliberately noisy. A first version of this helper multiplied every
+    series by exactly `factor`, which made the ratio identical in every cluster: the bootstrap
+    then correctly returned a zero-width interval and called a 0.05% gap certain. That is the
+    right answer to a degenerate question, and no model is uniformly better on every series.
+    """
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    base = {f"s{i}": float(rng.uniform(5.0, 50.0)) for i in range(n_series)}
+    champion = {k: v * factor * float(rng.uniform(0.7, 1.3)) for k, v in base.items()}
+    return pd.concat(
+        [_cost_rows("seasonal_naive", base), _cost_rows("catboost", champion)],
+        ignore_index=True,
+    )
+
+
+def test_a_real_cost_advantage_comes_out_conclusive() -> None:
+    from retail_forecasting.evaluation.metrics import summarize_costs
+
+    summary = summarize_costs(_two_model_costs(200, factor=0.70)).set_index("model_name")
+
+    assert summary.loc["catboost", "cost_change_pct"] < -20.0
+    assert summary.loc["catboost", "ci95_high_pct"] < 0.0
+    assert summary.loc["catboost", "conclusive"]
+
+
+def test_the_difference_the_champion_kpi_turned_on_is_not_conclusive() -> None:
+    """The reason this bootstrap exists.
+
+    The champion KPI hinged on a 0.05% cost difference between CatBoost and the seasonal naive.
+    That is plainly within noise, but "plainly" is not a measurement, and the methodology this
+    project declares requires a difference to exceed the experiment's own variability.
+    """
+    from retail_forecasting.evaluation.metrics import summarize_costs
+
+    summary = summarize_costs(_two_model_costs(200, factor=1.0005)).set_index("model_name")
+
+    assert abs(summary.loc["catboost", "cost_change_pct"]) < 2.0
+    assert not summary.loc["catboost", "conclusive"]
+    assert summary.loc["catboost", "ci95_low_pct"] < 0.0 < summary.loc["catboost", "ci95_high_pct"]
+
+
+def test_too_few_series_is_never_conclusive() -> None:
+    """Same 30% advantage, five clusters. The honest reading is that the run cannot tell."""
+    from retail_forecasting.evaluation.metrics import summarize_costs
+
+    summary = summarize_costs(_two_model_costs(5, factor=0.70)).set_index("model_name")
+
+    assert summary.loc["catboost", "cost_change_pct"] < 0.0
+    assert not summary.loc["catboost", "conclusive"]
+
+
+def test_the_naive_never_reports_a_gap_against_itself() -> None:
+    from retail_forecasting.evaluation.metrics import summarize_costs
+
+    summary = summarize_costs(_two_model_costs(200, factor=0.70)).set_index("model_name")
+
+    assert summary.loc["seasonal_naive", "cost_change_pct"] == pytest.approx(0.0)
+    assert not summary.loc["seasonal_naive", "conclusive"]
+
+
+def test_without_the_naive_there_is_nothing_to_compare_against() -> None:
+    """A scoring run carries the champion alone. Better an empty gap than a false one."""
+    from retail_forecasting.evaluation.metrics import summarize_costs
+
+    frame = _two_model_costs(200, factor=0.70)
+    summary = summarize_costs(frame[frame["model_name"] != "seasonal_naive"])
+
+    assert summary["cost_change_pct"].isna().all()
+    assert not summary["conclusive"].any()
+
+
+def test_the_bootstrap_is_reproducible_from_its_seed() -> None:
+    from retail_forecasting.evaluation.metrics import summarize_costs
+
+    frame = _two_model_costs(100, factor=0.9)
+    first = summarize_costs(frame, random_seed=7)["ci95_low_pct"].tolist()
+    again = summarize_costs(frame, random_seed=7)["ci95_low_pct"].tolist()
+    other = summarize_costs(frame, random_seed=8)["ci95_low_pct"].tolist()
+
+    assert first == again
+    assert first != other

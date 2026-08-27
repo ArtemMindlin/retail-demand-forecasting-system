@@ -222,9 +222,13 @@ recuperación de demanda censurada, y lo hace sobre un \textit{benchmark} public
 \end{enumerate}
 
 \section{Metodología}
-El desarrollo del sistema sigue el ciclo habitual de un proyecto de ciencia de datos (comprensión
-del problema y de los datos, preparación, modelado, evaluación y despliegue), con una particularidad
-que condiciona todas las etapas: al tratarse de datos temporales y de decisiones que se toman antes
+El desarrollo del sistema sigue el ciclo de \textbf{CRISP-DM}~\cite{chapman2000crispdm}
+(comprensión del problema, comprensión de los datos, preparación, modelado, evaluación y
+despliegue) en su extensión para aprendizaje automático \textbf{CRISP-ML(Q)}~\cite{studer2021crispmlq},
+cuya diferencia relevante aquí es que añade una fase final de monitorización y mantenimiento del
+modelo desplegado, ausente del estándar original y necesaria porque el riesgo de degradación en un
+entorno cambiante es precisamente uno de los fenómenos que este trabajo mide. A ello se suma una
+particularidad que condiciona todas las etapas: al tratarse de datos temporales y de decisiones que se toman antes
 de conocer la demanda, cada etapa debe respetar el orden del tiempo. Toda variable empleada en una
 predicción ha de estar disponible en el instante en que esa predicción se emite, y toda comparación
 entre alternativas debe realizarse sobre datos posteriores a los usados para ajustarlas. Este
@@ -253,18 +257,28 @@ Sobre esa base, el trabajo se organiza en seis etapas encadenadas:
     en una cantidad de pedido según la asimetría de costes del negocio, y evaluación del coste
     logístico y del nivel de servicio que esa política induce
     (Capítulos~\ref{chap:metodologia} y~\ref{chap:resultados}).
-    \item \textbf{Operativización.} Empaquetado del sistema como aplicación desplegable con interfaz
-    de consulta, cuadro de mandos y trazabilidad de cada ejecución, de modo que cualquier resultado
-    publicado pueda reproducirse (Capítulo~\ref{chap:implementacion}).
+    \item \textbf{Operativización, monitorización y mantenimiento.} Empaquetado del sistema como
+    aplicación desplegable con interfaz de consulta, cuadro de mandos y trazabilidad de cada
+    ejecución, de modo que cualquier resultado publicado pueda reproducirse
+    (Capítulo~\ref{chap:implementacion}). Esta etapa instancia la fase final de
+    CRISP-ML(Q)~\cite{studer2021crispmlq}: detección de deriva sobre las variables de entrada,
+    reentrenamiento periódico y una comparación de cadencias de reentreno que cuantifica si
+    mantener el modelo al día compensa su coste.
 \end{enumerate}
 
 Las etapas no se recorrieron una sola vez ni en línea recta: varias decisiones de diseño se
 revisaron al detectar que un resultado provenía de un defecto del protocolo de medida y no del
 fenómeno estudiado. El criterio para cerrar cada etapa fue siempre el mismo: una diferencia entre
 alternativas solo se considera real si se sostiene sobre datos no empleados para elegirlas y si su
-magnitud supera la variabilidad del propio experimento. Por ese motivo la selección del modelo final
-no se resuelve con una métrica de error estadístico, sino con el coste logístico que induce su
-política de reposición.
+magnitud supera la variabilidad del propio experimento, para lo cual toda comparación entre
+alternativas se acompaña de un intervalo de confianza obtenido por remuestreo.
+
+Ese criterio explica también cómo se resolvió la elección del modelo final, que no fue por error
+estadístico ni tampoco, en última instancia, por coste. El coste logístico de las alternativas
+resulta indistinguible entre sí una vez se le pone intervalo, de modo que no ordena a los
+candidatos; lo que los separa es el nivel de servicio que su política de pedido alcanza a ese
+mismo coste. El modelo probabilístico se prefiere por esa segunda magnitud, y el
+Capítulo~\ref{chap:resultados} documenta ambas lecturas junto con el hecho de que no coinciden.
 
 \section{Estructura del Documento}
 La presente memoria se organiza en siete capítulos adicionales:

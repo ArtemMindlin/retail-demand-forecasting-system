@@ -20,6 +20,13 @@ __all__ = ["summarize_predictions", "summarize_costs", "pinball_loss", "winkler_
 # would be a worse trade than repeating it.
 NAIVE_MODEL_NAME = "seasonal_naive"
 
+N_BOOTSTRAP_RESAMPLES = 2000
+
+# Below this many clusters the interval is too wide to rank anything, and the honest reading is
+# that the run cannot tell the models apart. Same threshold `simulation/operations.py` applies to
+# its own clusters.
+MIN_SERIES_FOR_INFERENCE = 8
+
 
 def _exclude_holdout(df: pd.DataFrame) -> pd.DataFrame:
     """Drop the holdout fold so global summaries don't mix it with walk-forward folds."""
@@ -104,7 +111,92 @@ def _attach_rel_mae_naive(summary: pd.DataFrame, group_cols: list[str]) -> pd.Da
     return summary
 
 
-def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
+def _scope_key(frame: pd.DataFrame, scope: list[str]) -> pd.Series:
+    """One string per row identifying its comparison group, or a constant when there is none."""
+    if not scope:
+        return pd.Series("", index=frame.index)
+    return frame[scope].astype(str).agg("|".join, axis=1)
+
+
+def _attach_cost_gap_naive(
+    summary: pd.DataFrame,
+    predictions: pd.DataFrame,
+    group_cols: list[str],
+    random_seed: int,
+) -> pd.DataFrame:
+    """Each model's total-cost gap against the seasonal naive, with a paired bootstrap interval.
+
+    Without this the run reports a cost per model and nothing about whether the gap between two
+    of them is real. The champion comparison turned on a 0.05% difference, which is plainly
+    within noise -- but "plainly" is not a measurement, and the methodology this project declares
+    requires that a difference exceed the experiment's own variability before it counts.
+
+    Resamples whole SERIES as clusters. `simulation/operations.py` runs the same statistic over
+    whole ORIGINS, and the difference is deliberate: there the scoring grid is one origin per
+    week and the series inside a week share that week's demand shock. Here the comparison is
+    PAIRED on identical rows, so the day's shock reaches both models and cancels in the
+    difference, leaving series-idiosyncratic misfit. Series are also the better-powered unit in
+    this design, which has 500 of them against 21 validation dates.
+    """
+    for column in ("cost_change_pct", "ci95_low_pct", "ci95_high_pct"):
+        summary[column] = float("nan")
+    summary["conclusive"] = False
+    if summary.empty or "series_id" not in predictions.columns:
+        return summary
+
+    scope = [column for column in group_cols if column not in ("model_name", "backend_name")]
+    predictions = predictions.assign(_scope=_scope_key(predictions, scope))
+    rng = np.random.default_rng(random_seed)
+    gaps: dict[tuple[str, str], dict[str, float | bool]] = {}
+
+    for scope_value, subset in predictions.groupby("_scope", dropna=False):
+        paired = subset.pivot_table(
+            index="series_id",
+            columns="model_name",
+            values="total_cost",
+            aggfunc="sum",
+            fill_value=0.0,
+        )
+        if NAIVE_MODEL_NAME not in paired.columns or paired.empty:
+            continue
+        baseline = paired[NAIVE_MODEL_NAME].to_numpy(dtype=float)
+        n_series = len(paired)
+        total_baseline = float(baseline.sum())
+        draws = rng.integers(0, n_series, size=(N_BOOTSTRAP_RESAMPLES, n_series))
+        resampled_baseline = baseline[draws].sum(axis=1)
+
+        for model in paired.columns:
+            delta = paired[model].to_numpy(dtype=float) - baseline
+            change = 100.0 * float(delta.sum()) / total_baseline if total_baseline else float("nan")
+            with np.errstate(invalid="ignore", divide="ignore"):
+                boot = 100.0 * delta[draws].sum(axis=1) / resampled_baseline
+            finite = boot[np.isfinite(boot)]
+            low, high = (
+                (float(x) for x in np.percentile(finite, [2.5, 97.5]))
+                if finite.size
+                else (float("nan"), float("nan"))
+            )
+            gaps[(str(scope_value), str(model))] = {
+                "cost_change_pct": change,
+                "ci95_low_pct": low,
+                "ci95_high_pct": high,
+                # The naive against itself is a zero gap by construction, never a finding.
+                "conclusive": bool(
+                    model != NAIVE_MODEL_NAME
+                    and n_series >= MIN_SERIES_FOR_INFERENCE
+                    and (low > 0.0 or high < 0.0)
+                ),
+            }
+
+    keys = list(zip(_scope_key(summary, scope), summary["model_name"].astype(str), strict=True))
+    for column in ("cost_change_pct", "ci95_low_pct", "ci95_high_pct"):
+        summary[column] = [float(gaps.get(key, {}).get(column, float("nan"))) for key in keys]
+    # Default False rather than missing: a model with no comparison has not been shown to differ.
+    summary["conclusive"] = [bool(gaps.get(key, {}).get("conclusive", False)) for key in keys]
+    return summary
+
+
+def summarize_costs(predictions: pd.DataFrame, random_seed: int = 42) -> pd.DataFrame:
     enriched = predictions.copy()
     enriched["service_level_hit"] = (
         enriched["stockout_units"].to_numpy(dtype=float) <= 0.0
@@ -147,7 +239,9 @@ def summarize_costs(predictions: pd.DataFrame) -> pd.DataFrame:
         .sort_values("total_cost")
         .reset_index(drop=True)
     )
-    return summary
+    return _attach_cost_gap_naive(
+        summary, _exclude_holdout(enriched), group_cols, random_seed=random_seed
+    )
 
 
 def _ratio_of_sums(numerator: float, denominator: float) -> float:

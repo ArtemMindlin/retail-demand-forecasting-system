@@ -413,10 +413,24 @@ Expected columns:
 | `total_stockout_cost` | aggregate stockout cost |
 | `total_cost` | primary economic ranking metric |
 | `mean_cost` | per-row mean cost |
+| `fill_rate` | served share of demand |
+| `cost_change_pct` | total-cost gap against the seasonal naive, in % |
+| `ci95_low_pct` / `ci95_high_pct` | bootstrap 95% interval of that gap, in % |
+| `conclusive` | whether the interval clears zero on enough clusters to rank the two |
 
 Expected ordering:
 
 - sorted ascending by `total_cost`
+
+Invariants:
+
+- the gap is PAIRED: both models are scored on the same rows, so the day's demand shock reaches
+  both and cancels in the difference
+- the bootstrap resamples whole SERIES as clusters. `simulation/operations.py` runs the same
+  statistic over whole ORIGINS, and the difference is deliberate — see `_attach_cost_gap_naive`
+- `conclusive` is False whenever the seasonal naive is absent, when the interval straddles zero,
+  or when there are fewer than `MIN_SERIES_FOR_INFERENCE` clusters. A model that has not been
+  shown to differ is never marked as differing
 
 ## Fair Cost Summary
 
