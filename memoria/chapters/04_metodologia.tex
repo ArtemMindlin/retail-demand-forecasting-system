@@ -533,7 +533,7 @@ El sistema implementa un \textbf{backtesting walk-forward} con $K=3$ folds tempo
 
 donde $H = 7$ días es el horizonte de planificación. El \textit{gap} no es un detalle de implementación, sino una condición necesaria de este diseño: dado que la etiqueta $Y_{s,t}$ es la demanda \emph{acumulada} de los $H$ días siguientes a $t$ (Sección~\ref{sec:pinball}), un origen de predicción situado a menos de $H$ días del corte tendría su etiqueta parcialmente solapada con el periodo de test. Al retroceder la última fecha de entrenamiento en $H$ días se garantiza que ninguna etiqueta de entrenamiento contiene información del periodo evaluado. Esta invariante se verifica automáticamente en la batería de tests anti-\textit{data leakage} descrita en la Sección~\ref{sec:testing}.
 
-El sistema utiliza una estrategia de \textbf{ventana de entrenamiento expansiva} (expanding window), donde todos los folds comienzan al inicio del histórico y su fecha de finalización se desplaza progresivamente. La calibración conformal descrita en la sección anterior se realiza sobre una ventana fija correspondiente a los últimos $21$ días de cada conjunto de entrenamiento (por tanto, anteriores al \textit{gap}), la cual actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el ajuste del modelo base. La Figura~\ref{fig:backtesting_walkforward} ilustra la estructura de los tres folds.
+El sistema utiliza una estrategia de \textbf{ventana de entrenamiento expansiva} (expanding window), donde todos los folds comienzan al inicio del histórico y su fecha de finalización se desplaza progresivamente. La calibración conformal descrita en la sección anterior se realiza sobre una ventana fija correspondiente a los últimos $14$ días de cada conjunto de entrenamiento (por tanto, anteriores al \textit{gap}), la cual actúa como conjunto de holdout para calcular los scores de no-conformidad sin contaminar el ajuste del modelo base. La Figura~\ref{fig:backtesting_walkforward} ilustra la estructura de los tres folds.
 
 \begin{figure}[H]
 \centering
@@ -578,7 +578,7 @@ El sistema utiliza una estrategia de \textbf{ventana de entrenamiento expansiva}
 \end{tikzpicture}
 \shorthandon{>}%
 \caption{Esquema del \textit{backtesting walk-forward} con $K=3$ folds temporales. El conjunto
-de entrenamiento (azul) se expande progresivamente con cada fold; los últimos 21 días de cada ventana
+de entrenamiento (azul) se expande progresivamente con cada fold; los últimos 14 días de cada ventana
 de entrenamiento se reservan como calibración conformal (violeta); un intervalo de guarda de $H$ días
 (gris) separa el entrenamiento del test para impedir que la etiqueta acumulada del último origen de
 predicción solape con el periodo evaluado; la evaluación se realiza sobre los 7 días siguientes al
