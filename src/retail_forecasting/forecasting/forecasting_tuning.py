@@ -45,6 +45,10 @@ from retail_forecasting.data.dataset import load_prepared_panel, panel_cache_fil
 from retail_forecasting.drift import label_all_regimes
 from retail_forecasting.features.engineering import build_supervised_frame
 from retail_forecasting.forecasting.imputation_tuning import hhmm, pace_seconds
+from retail_forecasting.forecasting.pipeline import (
+    _split_train_calibration,
+    _train_conformal_model,
+)
 from retail_forecasting.forecasting.tuned_params import (
     CORE_PARAMS,
     _drop_backend_block,
@@ -86,6 +90,14 @@ _FINISHED_STATES = (optuna.trial.TrialState.COMPLETE,)
 
 # One experiment for both backends: they answer the same question about the same panel, and a
 # `backend` tag separates them without splitting the history in two.
+# Bumped whenever `_draw_cost` changes WHAT IT MEASURES. Optuna resumes by study name, so a
+# study whose trials were scored under a different objective would be reused in silence: the
+# search would see `trials_todo == 0`, return at once, and the gate would validate a winner
+# selected under the old cost against defaults measured under the new one -- a mixed verdict
+# that looks complete. v1 scored the raw model; v2 scores it through the conformal layer, which
+# is the policy the pipeline actually deploys.
+_OBJECTIVE_VERSION = 2
+
 _MLFLOW_EXPERIMENT = "forecasting_tuning"
 
 # Searched under the DATACLASS's names, not the backend's, so the space and the persisted JSON
@@ -366,9 +378,18 @@ def _draw_cost(
     Cost, not MAE or Winkler: it is the criterion the champion is selected by, and the only
     one that prices the 4:1 asymmetry between a stockout and a unit of overstock. Point-error
     and cost rankings do invert, so optimizing the wrong one picks the wrong model.
+
+    The candidate is scored THROUGH the conformal layer, and reusing the pipeline's own
+    `_split_train_calibration` and `_train_conformal_model` rather than reimplementing them is
+    the point: there must be one definition of the deployed decision path. Scoring the raw
+    model instead was measuring a policy the system never runs. Conformal widens the outer
+    quantiles by the calibrated radius, and `choose_order_quantity` interpolates the critical
+    fractile between the median and the upper quantile, so the deployed order sits `0.75 * q_hat`
+    above the raw one -- measured on the persisted champion, 4.57 units against a panel whose
+    99th percentile of demand is 5.8. Optimizing without it selects for a different decision.
     """
     fit_frame = window.fit_frame.iloc[draw]
-    model = _BACKENDS[backend](
+    base_model = _BACKENDS[backend](
         quantiles=settings.models.quantiles,
         random_seed=settings.project.random_seed,
         n_estimators=int(params["n_estimators"]),
@@ -379,10 +400,21 @@ def _draw_cost(
         n_jobs=_TUNING_MODEL_THREADS,
         extra_params={k: v for k, v in params.items() if k not in CORE_PARAMS},
     )
-    model.fit(fit_frame.loc[:, feature_columns], fit_frame[target_column])
+    # Carved out of the resampled fit rows, with the same embargo the pipeline applies: the
+    # calibration slice is the tail of the training calendar and the model trains on what
+    # precedes it by at least `horizon` days.
+    sub_train, calib, calib_groups = _split_train_calibration(fit_frame, settings)
+    model = _train_conformal_model(
+        base_model, sub_train, calib, calib_groups, feature_columns, settings
+    )
 
     features = window.eval_frame.loc[:, feature_columns]
-    quantiles = model.predict_quantiles(features)
+    eval_groups = (
+        window.eval_frame["third_category_id"]
+        if "third_category_id" in window.eval_frame.columns
+        else None
+    )
+    quantiles = model.predict_quantiles(features, group_ids=eval_groups)
     levels = sorted(set(settings.models.quantiles))
     columns = list(quantiles)
     if len(columns) != len(levels):
@@ -453,7 +485,7 @@ def _open_study(backend: BoostingBackend, seed: int, models_dir: Path) -> optuna
         ),
         pruner=optuna.pruners.NopPruner(),
         storage=f"sqlite:///{models_dir / 'forecasting_tuning_studies.db'}",
-        study_name=f"forecasting_{backend}",
+        study_name=f"forecasting_{backend}_v{_OBJECTIVE_VERSION}",
         load_if_exists=True,
     )
 

@@ -550,3 +550,32 @@ See `docs/web_layer.md` for the full description.
     `imputer_params_tuned`, since `LatentDemandImputer` falls back to the untuned defaults in
     silence when the file is absent, and a teacher size is unreadable without knowing whether
     a params file was read at all.
+
+45. A hyperparameter search selected by simulated cost must score its candidates through the
+    conformal layer, because that layer is part of the deployed decision.
+
+    `run_mode = tune_forecasting` fitted the base model and priced its RAW quantiles. The
+    pipeline does not: it wraps the model in a `ConformalForecaster`, and calibration widens the
+    outer quantiles by the calibrated radius while leaving the median alone. Since
+    `choose_order_quantity` interpolates the critical fractile between the median and the upper
+    quantile, the deployed order sits `0.75 * q_hat` above the raw one. Measured on the persisted
+    champion, `q_hat` is 6.09 globally (per group: 0.11 to 22.07), so the omitted term is 4.57
+    units against a panel whose 99th percentile of demand is 5.8. Scored on the same candidate
+    and the same draw, the two objectives gave 15.52 and 39.28 -- a 153% gap. The search was
+    optimising a policy the system never runs.
+
+    The correction reuses the pipeline's own `_split_train_calibration` and
+    `_train_conformal_model` rather than reimplementing them. That is deliberate: there must be
+    ONE definition of the deployed decision path, and this defect is what two definitions
+    produce.
+
+    It is the same failure as invariant 44 one module over. There the evaluation added a safety
+    term the deployment does not have; here it omitted one the deployment does. Any comparison
+    by simulated cost has to price the policy that ships, and the way to guarantee that is to
+    call the shipping code.
+
+    `_OBJECTIVE_VERSION` exists because Optuna resumes by study name with `load_if_exists=True`.
+    A study holding trials scored under the previous objective would be reused in silence: the
+    search would see nothing left to do, return at once, and the gate would validate a winner
+    selected under the old cost against defaults measured under the new one. Bump it whenever
+    `_draw_cost` changes what it measures.

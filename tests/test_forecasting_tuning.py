@@ -361,3 +361,42 @@ def test_the_objective_prices_a_worse_model_higher(backend: str, tmp_path: Path)
     assert baseline.shape == crippled.shape == (1,)
     assert (baseline > 0).all(), "a cost of zero would mean perfect foresight"
     assert crippled[0] > baseline[0], "one tree at a glacial rate must cost more"
+
+
+def test_the_objective_scores_through_the_conformal_layer() -> None:
+    """The tuning must optimise the policy the pipeline deploys, not the raw model's.
+
+    Conformal widens the outer quantiles by the calibrated radius, and `choose_order_quantity`
+    interpolates the critical fractile between the median and the upper quantile, so the
+    deployed order sits `0.75 * q_hat` above the raw one. Scoring the raw model measured a
+    policy the system never runs: on the real panel the two costs came out 15.52 against 39.28,
+    a 153% gap. This pins that `_draw_cost` goes through the calibrated forecaster.
+    """
+    import inspect
+
+    from retail_forecasting.forecasting import forecasting_tuning as module
+
+    source = inspect.getsource(module._draw_cost)
+
+    assert "_train_conformal_model" in source
+    assert "_split_train_calibration" in source
+    # And the Mondrian group has to reach prediction, or the calibration is only global.
+    assert "group_ids=eval_groups" in source
+
+
+def test_the_study_name_carries_the_objective_version() -> None:
+    """A changed objective must not resume trials scored under the old one.
+
+    Optuna resumes by study name with `load_if_exists=True`. Without a version in the name, a
+    study holding 300 trials from the previous objective would be reused in silence: the search
+    would see nothing left to do, return at once, and the gate would validate a winner selected
+    under the old cost against defaults measured under the new one.
+    """
+    import inspect
+
+    from retail_forecasting.forecasting import forecasting_tuning as module
+
+    assert module._OBJECTIVE_VERSION >= 2
+    source = inspect.getsource(module._open_study)
+    assert "_OBJECTIVE_VERSION" in source
+    assert 'study_name=f"forecasting_{backend}"' not in source
