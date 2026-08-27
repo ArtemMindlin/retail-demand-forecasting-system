@@ -400,3 +400,37 @@ def test_the_study_name_carries_the_objective_version() -> None:
     source = inspect.getsource(module._open_study)
     assert "_OBJECTIVE_VERSION" in source
     assert 'study_name=f"forecasting_{backend}"' not in source
+
+
+def test_the_mondrian_radius_survives_a_categorical_grouping_column() -> None:
+    """The crash this guards is data-dependent, which is why a single draw hid it.
+
+    The static ids are cast to pandas `category`, and mapping a Categorical maps the CATEGORIES:
+    pandas hands back another Categorical whenever every category resolves to a distinct value,
+    and the global fallback is then an unknown category that `fillna` refuses. It therefore
+    raises in the GOOD case -- calibration covering every group present at scoring time -- so
+    one draw passed and ten did not, and `run_experiment` carried the same latent crash from the
+    moment the ids became categorical.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from retail_forecasting.models.conformal import ConformalForecaster
+
+    class _Base:
+        def fit(self, features: object, target: object) -> None: ...
+
+        def predict(self, features: object) -> np.ndarray:
+            return np.full(len(features), 5.0)  # type: ignore[arg-type]
+
+    forecaster = ConformalForecaster(_Base())  # type: ignore[arg-type]
+    forecaster.q_hat = 29.5
+    forecaster.mondrian_q_hat = {"a": 1.0, "b": 2.0}
+
+    covered = pd.Series(pd.Categorical(["a", "b"], categories=["a", "b"]))
+    partial = pd.Series(pd.Categorical(["a", "z"], categories=["a", "z"]))
+    absent = pd.Series(pd.Categorical(["x", "y"], categories=["x", "y"]))
+
+    assert list(forecaster._resolve_q_hat_vector(np.zeros(2), covered)) == [1.0, 2.0]
+    assert list(forecaster._resolve_q_hat_vector(np.zeros(2), partial)) == [1.0, 29.5]
+    assert list(forecaster._resolve_q_hat_vector(np.zeros(2), absent)) == [29.5, 29.5]

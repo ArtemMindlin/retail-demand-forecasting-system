@@ -132,11 +132,22 @@ class ConformalForecaster:
         return self._synthesize_quantiles(y_pred, q_hat_vec)
 
     def _resolve_q_hat_vector(self, y_pred: np.ndarray, group_ids: pd.Series | None) -> np.ndarray:
-        """Per-row conformal radius: Mondrian group value when available, else the global q_hat."""
+        """Per-row conformal radius: Mondrian group value when available, else the global q_hat.
+
+        The grouping column arrives as a pandas `category` (the static ids are cast to it so the
+        boosting backends handle them natively), and mapping a Categorical is not the same
+        operation as mapping an object column: pandas maps the CATEGORIES and hands back another
+        Categorical whenever every category resolves to a distinct value, so the fallback below
+        would then be an unknown category and `fillna` would raise. It raises precisely in the
+        good case -- calibration covering every group present at scoring time -- which is why a
+        single draw passes and ten do not. Mapping through a plain object Series removes the
+        dependence on that behaviour entirely.
+        """
         if group_ids is not None and self.mondrian_q_hat:
+            resolved = group_ids.astype(object).map(self.mondrian_q_hat)
             return cast(
                 np.ndarray,
-                group_ids.map(self.mondrian_q_hat).fillna(self.q_hat).to_numpy(),
+                resolved.astype(float).fillna(self.q_hat).to_numpy(dtype=float),
             )
         return np.full(len(y_pred), self.q_hat)
 
