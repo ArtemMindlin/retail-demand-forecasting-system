@@ -175,38 +175,16 @@ recuperación de demanda censurada, y lo hace sobre un \textit{benchmark} public
 
 \begin{enumerate}
     \item \textbf{El protocolo estándar para medir la reconstrucción de demanda censurada es
-    circular, y se cuantifica cuánto.} Medir un imputador exige conocer la demanda real de un día
-    con rotura, que es justo lo que nunca se observa. El protocolo habitual lo resuelve
-    falsificándola: toma días \emph{sin} rotura, donde la demanda real sí se conoce, y finge que
-    la tuvieron multiplicándola por $(1-r)$, siendo $r$ la fracción de la jornada sin producto.
-    Un día de 10 unidades con media jornada vacía queda anotado como una venta de 5, y esas 10
-    unidades pasan a ser la respuesta contra la que se puntúa.
-
-    El problema es que esa relación se despeja: $\text{real} = \text{observado}/(1-r)$, y $r$
-    está anotado en los datos. Una regla que se limite a dividir por $(1-r)$ recupera la
-    respuesta \textbf{exactamente}, sin modelo y sin entrenar nada, mientras que un imputador que
-    estime la demanda de jornada completa se queda cerca pero no clavado. Medido sobre el panel
-    de este trabajo, esa regla trivial obtiene el menor error de reconstrucción de todas las
-    estrategias evaluadas.
-
-    Y no por ello es la mejor forma de reconstruir demanda, sino la peor de las cuatro por el
-    motivo que importa: la proporcionalidad $\text{observado} = \text{real}\cdot(1-r)$ es un
-    supuesto del simulador, no un hecho del mundo. En una rotura real no se pierde exactamente la
-    fracción de demanda correspondiente a la fracción de jornada sin producto. Parte de los
-    clientes vuelve más tarde, parte sustituye el producto y parte se va a otro establecimiento, y
-    la demanda tampoco se reparte de forma uniforme a lo largo del día, de modo que una rotura en
-    hora punta y otra en hora muerta no cuestan lo mismo. Esa regla acierta sobre
-    los días falsificados porque los falsificó ella misma, y no tiene ninguna garantía sobre los
-    días censurados de verdad. El error de reconstrucción no mide, por tanto, la calidad de la
-    reconstrucción: mide el parecido entre la fórmula del imputador y la fórmula con la que se
-    falsificaron los datos.
-
-    De ahí las dos consecuencias que recorren esta memoria. Las estrategias de imputación se
-    ordenan por el coste de inventario que inducen frente a una verdad común, nunca por su error
-    de reconstrucción (Sección~\ref{sec:imputacion_censura_sintetica}). Y la búsqueda de
-    hiperparámetros del imputador sí es válida sobre este mismo protocolo, porque todos sus
-    candidatos comparten una única fórmula: la circularidad les afecta por igual y se cancela al
-    compararlos entre sí.
+    circular, y ninguna métrica calculada sobre él ordena reglas de reconciliación.} El protocolo
+    fabrica su verdad-terreno reduciendo la venta de días limpios en proporción a una rotura
+    inventada, de modo que una regla que se limite a deshacer esa proporción recupera la
+    respuesta exacta sin modelo alguno y obtiene el menor error de reconstrucción de todas las
+    estrategias evaluadas, siendo la que menos garantía ofrece sobre una rotura real. El
+    favoritismo alcanza igualmente a la evaluación por coste, que se puntúa sobre los mismos días.
+    De ahí que la elección entre reglas se argumente aquí sobre bases de modelado, que la
+    comparación de hiperparámetros dentro de una misma regla siga siendo válida, y que la ventaja
+    medida para la corrección de censura se declare como cota superior
+    (Sección~\ref{sec:imputacion_censura_sintetica}).
 
     \item \textbf{Los hiperparámetros del imputador no transfieren entre tamaños de ajuste, y el
     efecto cambia de signo.} La búsqueda mejora al ajuste por defecto con pocos cientos de filas

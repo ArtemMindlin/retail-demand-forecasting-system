@@ -50,7 +50,7 @@ models:
   max_depth: 6
   use_tuning: false
   tuning_trials: 300
-  tuning_backend: lightgbm
+  tuning_backend: catboost
 
 
 inventory:

@@ -520,6 +520,15 @@ See `docs/web_layer.md` for the full description.
     was correct and necessary -- but costs weight the outcome while the scale is part of the
     decision rule, and flattening the second removes the sensitivity being measured.
 
+    And the cost route does NOT neutralise what invariant 42 describes: it inherits it. The cost
+    is scored on the same synthetically censored days, so the rule that inverts the generator is
+    also the cheapest -- measured, 176 against the supervised imputer's 275 with no cushion. No
+    metric computed on this protocol's synthetic days can rank reconciliation rules. What follows
+    is that the choice between rules is argued on modelling grounds, and that the measured
+    advantage of correcting censoring is an UPPER BOUND rather than an unbiased estimate: the
+    supervised rule uses the very ratio the generator deflated by, so on these days its
+    assumption holds by construction. Chapter 6 states this where the figure is read.
+
     The artifact carries no reconstruction MAE either, and that is invariant 42 applied rather
     than a second opinion: these four differ in RECONCILIATION rule, and the generator's
     `observed = truth * (1 - r)` favours the one whose form inverts it. Measured, a rule using
