@@ -1,13 +1,11 @@
-version: '3.8'
-
 services:
   # Django dashboard + operational JSON API
   api:
     build: .
     container_name: retail_forecasting_api
-    expose:
-      - "8000"
-    command: ["uvicorn", "retail_forecasting.api.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "retail_forecasting.api.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info", "--access-log"]
     volumes:
       - ./configs:/app/configs
       - ./data:/app/data
@@ -28,7 +26,6 @@ services:
     networks:
       - default
       - caddy
-
 
 networks:
   caddy:

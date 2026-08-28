@@ -31,4 +31,4 @@ RUN DJANGO_DEBUG=false DJANGO_SECRET_KEY=build-time-only \
 EXPOSE 8000
 
 # Serve the Django app over ASGI. PORT is injected by the platform when present.
-CMD ["sh", "-c", "uvicorn retail_forecasting.api.asgi:application --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn retail_forecasting.api.asgi:application --host 0.0.0.0 --port ${PORT:-8000} --log-level info --access-log"]
