@@ -367,7 +367,29 @@ def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
     dirs: dict[str, Path] = {}
     for run in found:
         name = run.info.run_name
-        path = Path(run.info.artifact_uri.removeprefix("file://"))
+        raw_uri = run.info.artifact_uri.removeprefix("file://")
+        path = Path(raw_uri)
+        if not path.is_dir():
+            parts = path.parts
+            if "mlruns" in parts:
+                idx = parts.index("mlruns")
+                candidate = Path("mlruns") / Path(*parts[idx + 1 :])
+                if candidate.is_dir():
+                    path = candidate
+                elif (Path.cwd() / Path(*parts[idx:])).is_dir():
+                    path = Path.cwd() / Path(*parts[idx:])
+            if not path.is_dir():
+                c1 = Path("mlruns") / str(run.info.run_id) / "artifacts"
+                c2 = (
+                    Path("mlruns")
+                    / str(run.info.experiment_id)
+                    / str(run.info.run_id)
+                    / "artifacts"
+                )
+                if c1.is_dir():
+                    path = c1
+                elif c2.is_dir():
+                    path = c2
         if name and name not in dirs and path.is_dir():
             dirs[name] = path
     return dirs

@@ -198,9 +198,16 @@ class ArtifactStore:
 
         strategy, model = self.champion()
         if "data_strategy" in df.columns:
-            df = df[df["data_strategy"] == strategy]
+            if strategy in df["data_strategy"].values:
+                df = df[df["data_strategy"] == strategy]
+            elif len(df["data_strategy"].unique()) > 0:
+                df = df[df["data_strategy"] == df["data_strategy"].unique()[0]]
+
         if "model_name" in df.columns:
-            df = df[df["model_name"] == model]
+            if model in df["model_name"].values:
+                df = df[df["model_name"] == model]
+            elif len(df["model_name"].unique()) > 0:
+                df = df[df["model_name"] == df["model_name"].unique()[0]]
 
         grouped = {str(series_id): group for series_id, group in df.groupby("series_id")}
 
