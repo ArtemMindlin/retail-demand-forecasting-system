@@ -72,9 +72,10 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     store = get_store()
     params = _params(request)
     selected_sku = request.GET.get("sku")
+    selected_run = request.GET.get("run")
 
     try:
-        grouped = store.grouped_predictions()
+        grouped = store.grouped_predictions(selected_run)
     except Exception:
         grouped = {}
 
@@ -103,8 +104,11 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     observations = data.get("observations", 0)
     sample = f"n = {observations}"
     psi = kpis["driftPSI"]["value"]
+    runs = store.list_runs()
 
     context = {
+        "runs": runs,
+        "run": selected_run or (runs[0] if runs else None),
         "sku": data["sku"],
         "recommendation": data["recommendation"],
         "chart_svg": chart["svg"],
@@ -169,15 +173,16 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
 
 def academic_modal(request: HttpRequest, module_id: str) -> HttpResponse:
-    """Expanded detail for one mathematical module, swapped in by htmx."""
+    """Academic module slide-over: formula, assumptions, literature references."""
     module = academic.MODULES_BY_ID.get(module_id)
     if module is None:
         raise Http404("Unknown academic module.")
 
     params = _params(request)
     store = get_store()
+    selected_run = request.GET.get("run")
     try:
-        grouped = store.grouped_predictions()
+        grouped = store.grouped_predictions(selected_run)
     except ArtifactError:
         grouped = {}
 
@@ -198,9 +203,10 @@ def academic_modal(request: HttpRequest, module_id: str) -> HttpResponse:
 def drift(request: HttpRequest) -> HttpResponse:
     """Feature-drift monitor: per-feature PSI with reference-vs-current histograms."""
     store = get_store()
+    selected_run = request.GET.get("run")
     try:
-        run_path = store.latest_run_path()
-    except ArtifactError:
+        run_path = store.resolve_run(selected_run) if selected_run else store.latest_run_path()
+    except Exception:
         run_path = None
 
     features = forecast_service.load_feature_drift(run_path)
@@ -229,8 +235,11 @@ def drift(request: HttpRequest) -> HttpResponse:
 
     critical_count = sum(1 for f in rows if f["status"] == "critical")
     average_psi = sum(f["psi"] for f in rows) / len(rows) if rows else None
+    runs = store.list_runs()
 
     context = {
+        "runs": runs,
+        "run": selected_run or (runs[0] if runs else None),
         "features": rows,
         "critical_count": critical_count,
         "feature_count": len(rows),
@@ -283,9 +292,10 @@ def skus(request: HttpRequest) -> HttpResponse:
     """
     store = get_store()
     params = _params(request)
+    selected_run = request.GET.get("run")
 
     try:
-        grouped = store.grouped_predictions()
+        grouped = store.grouped_predictions(selected_run)
     except Exception:
         grouped = {}
 
@@ -362,10 +372,13 @@ def skus(request: HttpRequest) -> HttpResponse:
         else:
             column["next_dir"] = "desc"
 
+    runs = store.list_runs()
     return render(
         request,
         "views/skus.html",
         {
+            "runs": runs,
+            "run": selected_run or (runs[0] if runs else None),
             "rows": rows,
             "counts": counts,
             "status_filter": status_filter,

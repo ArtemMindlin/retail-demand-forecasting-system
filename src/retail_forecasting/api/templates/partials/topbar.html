@@ -1,7 +1,21 @@
-{% comment %}Page header: title, alerts trigger, configuration and pipeline
+{% comment %}Page header: title, run selector, alerts trigger, configuration and pipeline
 controls. Each opens an overlay swapped into #overlay-slot.{% endcomment %}
 <div class="topbar">
-  <div class="h-display topbar-title">Analítica Predictiva &amp; Decisiones de Inventario</div>
+  <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+    <div class="h-display topbar-title">Analítica Predictiva &amp; Decisiones de Inventario</div>
+    {% if runs|length > 1 %}
+      <form method="get" action="" hx-get="" hx-trigger="change" hx-target="#view-content" hx-select="#view-content" hx-push-url="true" style="margin: 0; display: inline-flex; align-items: center;">
+        {% include "partials/whatif_hidden.html" %}
+        <select name="run" class="ops-series-select" aria-label="Seleccionar Run" style="padding: 3px 10px; font-size: 11px; height: 28px; background: rgba(var(--rgb-slate), 0.1); border: 1px solid var(--border); border-radius: 6px; color: var(--text-1);">
+          {% for r in runs %}
+            <option value="{{ r }}"{% if r == run %} selected{% endif %}>Run: {{ r }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    {% elif run %}
+      <span class="run-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(var(--rgb-slate), 0.08); border: 1px solid var(--border); color: var(--text-2);">{{ run }}</span>
+    {% endif %}
+  </div>
 
   <div class="topbar-actions">
     <button type="button" class="btn-ghost btn-ghost-rel"

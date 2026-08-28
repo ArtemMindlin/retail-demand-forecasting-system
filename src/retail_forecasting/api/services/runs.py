@@ -174,26 +174,19 @@ class ArtifactStore:
             str(settings.business.champion_model_name),
         )
 
-    def latest_predictions(self) -> pd.DataFrame:
-        """Champion-filtered predictions frame from the latest run, cached.
+    def latest_predictions(self, run_name: str | None = None) -> pd.DataFrame:
+        """Champion-filtered predictions frame for the specified or latest run, cached."""
+        cache_key = f"df_{run_name or 'latest'}"
+        with self._lock:
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached
 
-        Prefers ``validation_predictions.csv``, which carries every validation origin,
-        over ``predictions.csv``, which the dynamic simulation narrows to one decision
-        row per series and fold. The dashboard reports forecast quality (coverage, MAE,
-        drift), so it needs all the origins: on the decision frame a 7-day fold
-        collapses to a single point and every per-SKU statistic runs on three
-        observations. Runs written before that artifact existed fall back to the
-        decision frame, and the sample size travels with the payload so the views can
-        say which one they are showing.
+        if run_name:
+            run_path = self.resolve_run(run_name)
+        else:
+            run_path = self.latest_run_path()
 
-        Raises:
-            NoPredictionsError: if no run with predictions exists.
-        """
-        cached = self._cache.get("df")
-        if cached is not None:
-            return cached
-
-        run_path = self.latest_run_path()
         predictions_csv = run_path / "validation_predictions.csv"
         if not predictions_csv.exists():
             predictions_csv = run_path / "predictions.csv"
@@ -209,17 +202,17 @@ class ArtifactStore:
         if "model_name" in df.columns:
             df = df[df["model_name"] == model]
 
+        grouped = {str(series_id): group for series_id, group in df.groupby("series_id")}
+
         with self._lock:
-            self._cache["df"] = df
-            self._cache["grouped"] = {
-                str(series_id): group for series_id, group in df.groupby("series_id")
-            }
+            self._cache[cache_key] = df
+            self._cache[f"grouped_{run_name or 'latest'}"] = grouped
         return df
 
-    def grouped_predictions(self) -> dict[str, pd.DataFrame]:
-        """``{series_id: frame}`` for the latest predictions, cached alongside it."""
-        self.latest_predictions()
-        grouped: dict[str, pd.DataFrame] = self._cache.get("grouped", {})
+    def grouped_predictions(self, run_name: str | None = None) -> dict[str, pd.DataFrame]:
+        """``{series_id: frame}`` for the specified or latest predictions, cached."""
+        self.latest_predictions(run_name)
+        grouped: dict[str, pd.DataFrame] = self._cache.get(f"grouped_{run_name or 'latest'}", {})
         return grouped
 
     def read_csv(self, run_path: Path, filename: str) -> pd.DataFrame | None:
