@@ -6,14 +6,20 @@ controls. Each opens an overlay swapped into #overlay-slot.{% endcomment %}
     {% if runs|length > 1 %}
       <form method="get" action="" hx-get="" hx-trigger="change" hx-target="#view-content" hx-select="#view-content" hx-push-url="true" style="margin: 0; display: inline-flex; align-items: center;">
         {% include "partials/whatif_hidden.html" %}
-        <select name="run" class="ops-series-select" aria-label="Seleccionar Run" style="padding: 3px 10px; font-size: 11px; height: 28px; background: rgba(var(--rgb-slate), 0.1); border: 1px solid var(--border); border-radius: 6px; color: var(--text-1);">
-          {% for r in runs %}
-            <option value="{{ r }}"{% if r == run %} selected{% endif %}>Run: {{ r }}</option>
-          {% endfor %}
-        </select>
+        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; background: rgba(var(--rgb-white), 0.03); border: 1px solid var(--border); box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);">
+          {% icon "activity" 12 "var(--c-ai-bright)" %}
+          <select name="run" aria-label="Seleccionar Run" style="background: transparent; border: none; outline: none; color: var(--text-1); font-family: var(--font-mono); font-size: 11.5px; cursor: pointer;">
+            {% for r in runs %}
+              <option value="{{ r }}"{% if r == run %} selected{% endif %} style="background: #111418; color: #fff;">{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </form>
     {% elif run %}
-      <span class="run-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(var(--rgb-slate), 0.08); border: 1px solid var(--border); color: var(--text-2);">{{ run }}</span>
+      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; background: rgba(var(--rgb-white), 0.03); border: 1px solid var(--border); font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);">
+        {% icon "activity" 12 "var(--c-ai-bright)" %}
+        <span>{{ run }}</span>
+      </div>
     {% endif %}
   </div>
 

@@ -48,25 +48,21 @@ which needs the per-point geometry the server already computed.
   </div>
 
   <div class="chart-stats">
-    <div>
+    <div class="chart-stat-pill">
       <div class="label-mono">q* newsvendor</div>
       <div class="tnum chart-stat-value">{{ recommendation.qStar|fmt_units }}<span>u</span></div>
     </div>
-    {% comment %}
-      Standard-normal equivalent of the service level, shown for reference only: q*
-      comes from the empirical residual quantile, not from mu + z*sigma.
-    {% endcomment %}
-    <div>
+    <div class="chart-stat-pill">
       <div class="label-mono">z equivalente (ref.)</div>
       <div class="tnum chart-stat-value">{{ recommendation.z|floatformat:"2u" }}</div>
     </div>
-    <div>
+    <div class="chart-stat-pill">
       <div class="label-mono">
         critical ratio{% if recommendation.criticalRatioSource == "series" %} · serie{% endif %}
       </div>
       <div class="tnum chart-stat-value">{{ recommendation.criticalRatio|floatformat:"3u" }}</div>
     </div>
-    <div>
+    <div class="chart-stat-pill">
       <div class="label-mono">capacity util</div>
       <div class="tnum chart-stat-value">{{ recommendation.utilization|floatformat:"1u" }}<span>%</span></div>
     </div>
