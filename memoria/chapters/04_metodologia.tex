@@ -33,16 +33,17 @@ El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamient
 \section{Bloque I: Investigación}
 % ==============================================================================
 
-Este bloque recorre, en este orden, la cadena completa de decisiones que separan el histórico
-de ventas de una recomendación de pedido: cómo se formula el problema y se corrige la censura
-por rotura de stock antes de que llegue al modelo, qué información temporal se codifica en cada
-fila del panel supervisado, cómo se entrena el modelo para producir cuantiles en lugar de un
-único valor esperado, por qué se implementan dos \textit{backends} de \textit{Gradient Boosting}
-en paralelo, cómo se corrige el cruce de cuantiles que introduce entrenarlos por separado, cómo
-se buscan sus hiperparámetros bajo dos objetivos en conflicto, cómo se calibra la incertidumbre
-resultante por categoría de producto, y bajo qué protocolo de \textit{backtesting} se mide todo
-lo anterior sin fuga de información. Cierra el bloque la discusión del supuesto de costes
-uniformes que sostiene la decisión final de inventario.
+Este bloque constituye la fase metodológica e investigadora del sistema. Su propósito es diseñar, entrenar y evaluar fuera de línea el motor de previsión probabilística y calibración de incertidumbre que sustenta las decisiones de reposición.
+
+Para ello, este bloque recorre en secuencia lógica la cadena completa de decisiones formales y experimentales:
+\begin{enumerate}
+    \item \textbf{Formulación y corrección de censura}: Se formaliza la variable objetivo a horizonte $H$ y se corrige el sesgo introducido por las roturas de stock históricas antes de alimentar el modelo.
+    \item \textbf{Ingeniería de características}: Se estructuran los retardos, ventanas rodantes, variables exógenas e identificadores categóricos que transforman el panel temporal en una matriz supervisada.
+    \item \textbf{Modelado cuantílico y backends}: Se justifica el uso de la función de pérdida \textit{Pinball} (su equivalencia directa con el \textit{Newsvendor}) y se argumenta la coexistencia de LightGBM y CatBoost.
+    \item \textbf{Arquitectura multi-modelo y refinamiento}: Se aborda la estimación independiente por cuantiles y su corrección de monotonía mediante el \textit{rearrangement} de Chernozhukov.
+    \item \textbf{Optimización multiobjetivo y calibración}: Se formula la búsqueda de hiperparámetros sobre el frente de Pareto y se aplica la calibración conformal adaptativa por categoría (\textit{Mondrian Conformal Prediction}).
+    \item \textbf{Protocolo de evaluación y supuestos de coste}: Se detalla la estrategia de \textit{backtesting walk-forward} causal sin fuga temporal y se analizan los supuestos económicos de inventario.
+\end{enumerate}
 
 \subsection{Formulación del Problema}
 
@@ -54,13 +55,13 @@ un pedido al almacén). La siguiente notación formaliza estas ideas.
 \paragraph{Notación.}
 Sea $\mathcal{S}$ el conjunto de series temporales (pares SKU--tienda) y $\mathcal{T}$ el conjunto de instantes de decisión disponibles. Se denota la demanda diaria observada de la serie $s \in \mathcal{S}$ en el instante $t \in \mathcal{T}$ como $y_{s,t}$.
 
-El objetivo operativo es determinar la cantidad de pedido que debe emitir el responsable de reposición para cada SKU y cada fecha de decisión. Para ello, el sistema predice probabilísticamente la demanda acumulada durante un horizonte $H$ días (equivalente al \textit{lead time} del proveedor $L$, con $H \equiv L$): no solo la cantidad esperada, sino también la incertidumbre asociada, para poder tomar la decisión de pedido con garantías estadísticas. Formalmente, la variable objetivo es:
+El objetivo operativo es determinar la cantidad de pedido que debe emitir el responsable de reposición para cada SKU y cada fecha de decisión. Para ello, el sistema predice probabilísticamente la demanda acumulada durante un horizonte de $H$ días (equivalente al \textit{lead time} del proveedor $L$, con $H \equiv L$): no solo la cantidad esperada, sino también la incertidumbre asociada, para poder tomar la decisión de pedido con garantías estadísticas. Formalmente, la variable objetivo es:
 
 \begin{equation}
     Y_{s,t} = \sum_{i=0}^{H-1} y_{s, t+i}
 \end{equation}
 
-donde $H$ es el horizonte de agregación del pronóstico, idéntico al \textit{lead time} operativo del sistema de inventario subyacente. Un modelo probabilístico $f_{\theta}$ aprende a estimar los cuantiles de $Y_{s,t}$ a partir del vector de covariables $\mathbf{x}_{s,t}$ disponible en $t$:
+donde $H$ es el horizonte de agregación del pronóstico, idéntico al \textit{lead time} operativo del sistema de inventario subyacente. Un modelo probabilístico $f_{\theta}$ aprende a estimar los cuantiles de $Y_{s,t}$ a partir del vector de covariables $\mathbf{x}_{s,t}$ disponible en el instante de decisión $t$:
 
 \begin{equation}
     \hat{Q}_{s,t}(\tau) = f_{\theta}(\mathbf{x}_{s,t}), \quad \tau \in \mathcal{Q}
@@ -69,6 +70,8 @@ donde $H$ es el horizonte de agregación del pronóstico, idéntico al \textit{l
 siendo $\mathcal{Q}$ el conjunto de cuantiles objetivo (véase Sección~\ref{sec:pinball}). Esta formulación sigue el enfoque de predicción directa (\textit{direct multi-step forecasting}), que agrega la demanda al nivel del \textit{lead time} antes del entrenamiento, evitando la acumulación de errores de estrategias iterativas.
 
 Para evitar la fuga de información futura (\textit{data leakage}), los valores futuros de $y_{s,t}$ se usan únicamente para construir la etiqueta $Y_{s,t}$ durante el entrenamiento, mientras que las variables explicativas $\mathbf{x}_{s,t}$ se calculan exclusivamente con información disponible en el instante $t$.
+
+Sin embargo, esta formulación asume implícitamente que las ventas observadas $y_{s,t}$ coinciden con la demanda real del mercado. En presencia de roturas de stock, esta equivalencia se quiebra, exigiendo un paso previo de corrección antes de calcular la etiqueta $Y_{s,t}$ y las covariables históricas del modelo.
 
 \subsubsection{Corrección de la Demanda Censurada por Stockout}
 \label{sec:demanda_censurada}
@@ -147,37 +150,25 @@ Para corregirlo, el sistema implementa un preprocesador dinámico que estima la 
     \end{equation}
 
     \item \textbf{Media Histórica Local}: Reemplaza el valor censurado por el máximo entre
-    la demanda observada y el promedio de ventas en los días libres de stockout ($\mathcal{T}_{\text{clean}}$)
+    la demanda observada y el promedio de ventas en los días libres de stockout ($\mathcal{T}_{\text{clean},s}$)
     para dicha serie temporal específica:
     \begin{equation}
-        \tilde{y}_{s,t} = \max \left( y_{s,t}, \, \frac{1}{|\mathcal{T}_{\text{clean}}|}
-        \sum_{\tau \in \mathcal{T}_{\text{clean}}} y_{s,\tau} \right)
+        \tilde{y}_{s,t} = \max \left( y_{s,t}, \, \frac{1}{|\mathcal{T}_{\text{clean},s}|}
+        \sum_{\tau \in \mathcal{T}_{\text{clean},s}} y_{s,\tau} \right)
     \end{equation}
 
     \item \textbf{Supervisada (LightGBM)}: Entrena un modelo LightGBM auxiliar
-    $\hat{g}$ sobre los registros históricos no afectados por stockouts, que aprende a
-    predecir la demanda de un \textbf{día completo sin rotura}. El vector de covariables
-    $x_{s,t}$ incluye: identificador de serie, mes, día de la semana, día del mes, media
-    histórica de días limpios de la serie como prior, e indicadores contextuales
-    disponibles en el dataset (descuento, festivo, temperatura, precipitación, humedad y
-    viento). El ratio de stockout $h_{s,t}/16$ se excluye deliberadamente de $x_{s,t}$:
-    entrenado únicamente con días limpios, donde ese ratio vale siempre 0, \textit{LightGBM}
-    no puede dividir sobre una constante y la variable no aportaba ninguna importancia al
-    modelo, pese a leerse en el código como si el regresor conociera la severidad del día
-    que reconstruye.
-
-    La severidad entra en cambio en la \textbf{reconciliación}, no en el regresor: puesto
-    que $\hat{g}$ predice un día completo, la fracción del día perdida por la rotura es
-    $r_{s,t} = \text{clip}(h_{s,t}/16,\ 0,\ 1)$, y la demanda latente se estima recomponiendo
-    lo observado con esa fracción de lo predicho:
+    $\hat{g}$ sobre los registros históricos no afectados por stockouts, que predice la
+    demanda de un \textbf{día completo sin rotura}. El vector de covariables $\mathbf{x}_{s,t}^{\text{imp}}$
+    incluye: identificador de serie, mes, día de la semana, día del mes, media histórica
+    de días limpios de la serie como prior, e indicadores contextuales disponibles en el
+    dataset (descuento, festivo, temperatura, precipitación, humedad y viento). La
+    severidad de la rotura se incorpora en la \textbf{reconciliación}: sea
+    $r_{s,t} = h_{s,t}/16 \in [0, 1]$ la fracción del día perdida por el stockout, la demanda
+    latente se estima recomponiendo lo observado con esa fracción de lo predicho:
     \begin{equation}
-        \tilde{y}_{s,t} = y_{s,t} + r_{s,t} \cdot \max\!\left( \hat{g}(x_{s,t}),\, 0 \right)
+        \tilde{y}_{s,t} = y_{s,t} + r_{s,t} \cdot \max\!\left( \hat{g}(\mathbf{x}_{s,t}^{\text{imp}}),\, 0 \right)
     \end{equation}
-    Esta regla sustituye a un $\max(y_{s,t}, \hat{g}(x_{s,t}))$ inicial, que descartaba la
-    venta observada en roturas leves --precisamente donde es la evidencia más fiable-- en
-    favor de la predicción íntegra del modelo. Las estrategias \textit{Clipped Scaling} y
-    \textit{Media Histórica Local} conservan esa regla de máximo, adecuada cuando no hay una
-    predicción de día completo con la que recomponer proporcionalmente.
 \end{itemize}
 
 En el benchmark oficial del propio dataset \cite{freshretailnet2025} se evalúan enfoques de aprendizaje profundo (TimesNet, CSDI, SAITS) que obtienen mejores métricas de recuperación, pero a un coste computacional incompatible con un despliegue operacional ligero; las tres estrategias aquí propuestas priorizan interpretabilidad y velocidad de inferencia. La estrategia \textbf{Supervisada (LightGBM)} es la seleccionada en el sistema final por obtener el menor coste de inventario bajo evaluación justa, que es el único criterio con el que este protocolo puede ordenarlas; la comparación empírica entre las tres estrategias se discute en la Sección~\ref{sec:resultados_imputacion}. Los hiperparámetros de ese regresor auxiliar son objeto de una búsqueda propia, independiente del ajuste del modelo de \textit{forecasting} y ejecutada como un modo de ejecución separado del sistema. El protocolo y las mediciones se recogen en el Anexo~\ref{anx:tuning_imputador}, pero el resultado de esa búsqueda no se queda en el anexo: el fichero de hiperparámetros que persiste es leído por el modo de experimento y por el \textit{backtest} de coste justo, de modo que forma parte de la configuración con la que se producen las cifras finales, no solo de un apéndice documental. Esa dependencia tiene un límite conocido: la ganancia que mide la búsqueda depende del tamaño del conjunto sobre el que se ajusta el imputador, y se invierte cuando se aplica a una escala distinta de aquella en la que el sistema opera. Por eso la validez del fichero queda acotada al tamaño de ajuste con el que se obtuvo: los metadatos de la búsqueda registran esa escala, pero es una condición documentada para quien lea el artefacto, no una comprobación que el sistema haga por sí mismo al cargarlo.
@@ -192,7 +183,7 @@ Las características se organizan en cinco grupos funcionales:
 \begin{enumerate}
     \item \textbf{Características Calendáricas}: Codifican la posición temporal del origen de predicción. Incluyen el día de la semana ($\in [0,6]$), el día del mes, el mes, la semana del año, un indicador binario de fin de semana, un indicador de festivo (\texttt{holiday\_flag}) y un indicador de actividad promocional especial (\texttt{activity\_flag}). Estas variables capturan la estacionalidad semanal y mensual identificada en el análisis exploratorio (véase Capítulo~\ref{chap:analisis_datos}).
 
-    \item \textbf{Lags de Demanda y Ventanas Deslizantes}: Para capturar la autocorrelación de la serie, se calculan lags de la demanda observada en los instantes $t-1$, $t-7$ y $t-14$. La elección no es arbitraria: el análisis de la función de autocorrelación (ACF) del Capítulo~\ref{chap:analisis_datos} reveló picos significativos en los retardos 7 y 14, correspondientes a la estacionalidad semanal dominante del dataset. El lag $t-1$ captura inercia de corto plazo (efecto del día anterior); $t-7$ y $t-14$ recogen la estacionalidad semanal dominante detectada en el ACF; un cuarto retardo a $t-28$, que aproximaba el ciclo mensual de reposición, se retiró del conjunto final: con 96 días de historia disponible su coste no está en el número de columnas sino en el arranque en frío, porque el primer origen predecible de cada serie se retrasa hasta que el retardo más largo tiene dato: 28 días en lugar de 14, lo que cuesta catorce orígenes por serie. Sobre ventanas de 7 y 14 días se calculan además la media, la suma y la desviación estándar rodantes. Todos los estadísticos se computan con desplazamiento de un día (\texttt{shift(1)}) para garantizar ausencia de \textit{data leakage}.
+    \item \textbf{Lags de Demanda y Ventanas Deslizantes}: Para capturar la autocorrelación de la serie, se calculan lags de la demanda observada en los instantes $t-1$, $t-7$ y $t-14$. La elección no es arbitraria: el análisis de la función de autocorrelación (ACF) del Capítulo~\ref{chap:analisis_datos} reveló picos significativos en los cuatro retardos múltiplos de 7 (7, 14, 21 y 28), con amplitud decreciente de 0,62 a 0,39, confirmando la estacionalidad semanal dominante del dataset. El lag $t-1$ captura inercia de corto plazo (efecto del día anterior); $t-7$ y $t-14$ recogen el ciclo semanal y quincenal, los dos de mayor autocorrelación tras el propio $t-1$; un cuarto retardo a $t-28$, que aproximaba el ciclo mensual de reposición y cuya autocorrelación seguía siendo significativa, se probó y se retiró del conjunto final: con 90 días de historia disponible su coste no está en el número de columnas sino en el arranque en frío, porque el primer origen predecible de cada serie se retrasa hasta que el retardo más largo tiene dato: 28 días en lugar de 14, lo que cuesta catorce orígenes por serie. Sobre ventanas de 7 y 14 días se calculan además la media, la suma y la desviación estándar rodantes. Todos los estadísticos se computan con desplazamiento de un día (\texttt{shift(1)}) para garantizar ausencia de \textit{data leakage}.
 
     \item \textbf{Lags de Variables Exógenas Externas}: Se construyen lags en los instantes $t-1$, $t-7$ y $t-14$ para la variable de descuento (\texttt{discount}) y las cuatro variables meteorológicas (temperatura, precipitación, humedad y viento). Son covariables externas al sistema de inventario que modulan la demanda sin depender del estado del stock.
 

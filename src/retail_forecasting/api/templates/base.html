@@ -17,6 +17,12 @@
   dashboard did. Self-hosting it means vendoring the stylesheet and ~20 font
   files.{% endcomment %}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script>
+    (function() {
+      var saved = localStorage.getItem('forecast_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', saved);
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" defer></script>
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'vendor/alpine.min.js' %}" defer></script>
@@ -55,7 +61,7 @@
 
       <div class="api-footer">
         <span>POST /api/forecast · GET /api/skus · GET /api/download/predictions</span>
-        <span>django 6.1 · python 3.12</span>
+        <span>MLflow: <code>{{ mlflow_short_id }}</code> · Git: <code>{{ git_short_commit }}</code> · django 6.1 · python 3.12</span>
       </div>
     </div>
   </main>

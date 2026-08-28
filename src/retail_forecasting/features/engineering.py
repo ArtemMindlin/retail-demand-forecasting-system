@@ -172,6 +172,7 @@ def build_supervised_frame(
     frame["target_lead_time_demand"] = pd.concat(future_demand, axis=1).sum(
         axis=1, min_count=horizon
     )
+    frame["target_horizon_days"] = horizon
 
     before_target_drop = len(frame)
     frame = frame.loc[frame["target_lead_time_demand"].notna()].copy()
@@ -190,6 +191,9 @@ def build_supervised_frame(
         input_rows=before_feature_drop,
         dropped_rows=dropped_rows_missing_features,
     )
+
+    if frame.empty:
+        raise ValueError("Feature engineering produced no usable rows for supervised mode.")
 
     return frame, FeatureMetadata(
         mode="supervised",

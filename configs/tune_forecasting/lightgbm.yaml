@@ -1,0 +1,69 @@
+# Hyperparameter search for the forecasting models (run_mode = tune_forecasting).
+#
+# Identical to default.yaml except tuning_backend: the two searches share every other
+# setting (panel scale, features, calibration window), so the only thing that can make one
+# search's winner differ from the other's is the backend itself. Kept as its own file rather
+# than a CLI override because tune_forecasting_models has none -- the backend is read straight
+# off models.tuning_backend, one search per config.
+#
+# `dataset`, `preprocessing` and `features` mirror configs/experiment/large.yaml on purpose.
+# The 500 series are not a detail of the measurement: invariant 41 measured a search that
+# inherited a 50-series panel by accident, and its winner was 12% WORSE than not tuning at
+# 500. Tune at the scale you deploy -- the same reason tune_imputation runs at 500.
+project:
+  random_seed: 42
+  run_mode: tune_forecasting
+
+
+dataset:
+  hf_dataset_id: Dingdong-Inc/FreshRetailNet-50K
+  splits:
+    train: data/train.parquet
+    eval: data/eval.parquet
+  local_cache_dir: data/raw/fresh_retailnet
+  processed_panel_dir: data/processed
+  use_cache: true
+  top_n_series: 500
+  min_history_days: 70
+  max_rows: null
+  horizon: 7
+
+
+preprocessing:
+  drop_negative_sales: true
+  fill_missing_values: true
+  imputation_strategy: supervised
+
+
+features:
+  lags: [1, 7, 14]
+  rolling_windows: [7, 14]
+  include_weather_lags: true
+  include_discount_lags: true
+  include_stockout_lags: true
+
+
+# _draw_cost scores candidates through the same conformal calibration split
+# configs/experiment/default.yaml uses, via the pipeline's own `_split_train_calibration`.
+# Only `calibration_days` reaches that helper; the fold-layout fields below are unused here
+# (this mode cuts its own selection/validation windows) and stay at their class default.
+validation:
+  calibration_days: 14
+
+
+models:
+  models_dir: models
+  quantiles: [0.1, 0.5, 0.9]
+  seasonal_period: 7
+  n_estimators: 200
+  learning_rate: 0.05
+  max_depth: 6
+  use_tuning: false
+  tuning_trials: 60
+  tuning_backend: lightgbm
+
+
+inventory:
+  overstock_cost: 1.0
+  stockout_cost: 4.0
+  clip_negative_orders: true

@@ -14,7 +14,7 @@ TUNE_CONFIG = configs/tune_imputation/default.yaml
 TUNE_FORECASTING_CONFIG = configs/tune_forecasting/default.yaml
 OPS_SPLIT = data/processed/ops_sim/.built
 SNAPSHOT = current
-.PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf
+.PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf presentation
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -83,6 +83,9 @@ format: ## Format the code (ruff)
 
 pdf: ## Compile memoria/main.tex with tectonic
 	cd memoria && tectonic main.tex
+
+presentation: ## Compile presentacion/main.tex with tectonic
+	cd presentacion && tectonic main.tex
 
 clean: ## Clean temporary files and Python caches
 	find . -type d -name "__pycache__" -exec rm -rf {} +

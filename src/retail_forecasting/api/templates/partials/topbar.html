@@ -25,6 +25,24 @@ controls. Each opens an overlay swapped into #overlay-slot.{% endcomment %}
       {% icon "play" 13 %} Ejecutar
     </button>
 
+    <div x-data="{
+           theme: localStorage.getItem('forecast_theme') || 'dark',
+           toggleTheme() {
+             this.theme = this.theme === 'dark' ? 'light' : 'dark';
+             localStorage.setItem('forecast_theme', this.theme);
+             document.documentElement.setAttribute('data-theme', this.theme);
+           }
+         }">
+      <button type="button" class="btn-ghost btn-theme-toggle" @click="toggleTheme()" :title="'Cambiar a modo ' + (theme === 'dark' ? 'claro' : 'oscuro')">
+        <template x-if="theme === 'dark'">
+          <span class="theme-icon-wrap">{% icon "sun" 13 "var(--c-drift-bright)" %} Modo Claro</span>
+        </template>
+        <template x-if="theme === 'light'">
+          <span class="theme-icon-wrap">{% icon "moon" 13 "var(--c-ai-bright)" %} Modo Oscuro</span>
+        </template>
+      </button>
+    </div>
+
     <form method="post" action="{% url 'logout' %}">
       {% csrf_token %}
       <button type="submit" class="btn-ghost">{% icon "logout" 13 %} Salir</button>

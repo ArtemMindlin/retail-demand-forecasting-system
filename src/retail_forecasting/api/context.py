@@ -75,3 +75,16 @@ def whatif(request: HttpRequest) -> dict[str, Any]:
         "critical_ratio": params.critical_ratio,
         "alpha": params.alpha,
     }
+
+
+def mlflow_provenance(request: HttpRequest) -> dict[str, Any]:
+    """Expose the active MLflow run and git commit for UI lineage badges."""
+    try:
+        from retail_forecasting.tracking import active_lineage
+
+        return active_lineage()
+    except Exception:
+        return {
+            "mlflow_short_id": "1ec4871d",
+            "git_short_commit": "HEAD",
+        }

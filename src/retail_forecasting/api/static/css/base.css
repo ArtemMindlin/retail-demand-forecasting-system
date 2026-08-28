@@ -19,20 +19,23 @@ body {
 .canvas-bg {
   background-color: var(--bg-1);
   background-image:
-    radial-gradient(rgba(var(--rgb-slate), 0.06) 1px, transparent 1px);
+    radial-gradient(rgba(var(--rgb-slate), 0.08) 1px, transparent 1px);
   background-size: 24px 24px;
   background-position: -8px -8px;
+  transition: background-color 0.25s ease;
 }
 
-/* Glass surface */
+/* Premium Glass surface */
 .glass {
   background:
-    linear-gradient(180deg, rgba(var(--rgb-white), 0.02), rgba(var(--rgb-white), 0.01)),
-    rgba(var(--rgb-surface), 0.7);
+    linear-gradient(135deg, rgba(var(--rgb-white), 0.03) 0%, rgba(var(--rgb-white), 0.005) 100%),
+    var(--surface-glass);
   border: 1px solid var(--border);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
   border-radius: 14px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Scrollbar */

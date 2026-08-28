@@ -1,0 +1,446 @@
+\documentclass[aspectratio=169, 10pt]{beamer}
+
+% --- Tipografía y Lenguaje ---
+\usepackage{fontspec}
+\usepackage[spanish, es-tabla]{babel}
+
+% --- Paquetes Matemáticos y Gráficos ---
+\usepackage{amsmath, amsfonts, amssymb}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{graphicx}
+\usepackage{microtype}
+
+% --- Configuración de Rutas de Figuras ---
+\graphicspath{{../memoria/figures/}{./figures/}}
+
+% --- Colores Corporativos UPV y Sistema ---
+\definecolor{UPVRed}{RGB}{192, 0, 0}
+\definecolor{UPVNavy}{RGB}{0, 40, 85}
+\definecolor{DarkSlate}{RGB}{30, 41, 59}
+\definecolor{LightSlate}{RGB}{241, 245, 249}
+\definecolor{EmeraldGreen}{RGB}{16, 185, 129}
+\definecolor{CobaltBlue}{RGB}{59, 130, 246}
+\definecolor{PurpleAI}{RGB}{139, 92, 246}
+\definecolor{AmberDrift}{RGB}{245, 158, 11}
+\definecolor{CrimsonError}{RGB}{239, 68, 68}
+
+% --- Configuración del Tema Beamer ---
+\usetheme{Madrid}
+\usecolortheme{whale}
+
+\setbeamercolor{palette primary}{bg=UPVNavy, fg=white}
+\setbeamercolor{palette secondary}{bg=DarkSlate, fg=white}
+\setbeamercolor{palette tertiary}{bg=UPVRed, fg=white}
+\setbeamercolor{titlelike}{parent=palette primary, fg=UPVNavy}
+\setbeamercolor{structure}{fg=UPVNavy}
+\setbeamercolor{block title}{bg=UPVNavy, fg=white}
+\setbeamercolor{block body}{bg=LightSlate, fg=DarkSlate}
+\setbeamercolor{block title example}{bg=EmeraldGreen, fg=white}
+\setbeamercolor{block body example}{bg=LightSlate, fg=DarkSlate}
+\setbeamercolor{block title alert}{bg=UPVRed, fg=white}
+\setbeamercolor{block body alert}{bg=LightSlate, fg=DarkSlate}
+
+\setbeamertemplate{navigation symbols}{}
+
+% --- Símbolos ---
+\newcommand{\cmark}{\textcolor{EmeraldGreen}{\textbf{\checkmark}}}
+\newcommand{\xmark}{\textcolor{CrimsonError}{\textbf{$\times$}}}
+
+% --- Metadatos de la Presentación ---
+\title[TFG · Previsión Conformal en Retail]{\textbf{\Large Sistema Predictivo de Demanda en Retail}}
+\subtitle{\large Modelado con Datos Censurados, Calibración Conformal y Optimización Newsvendor}
+\author[Artem Mindlin]{\textbf{Artem Mindlin}}
+\institute[ETSINF - UPV]{
+  \textbf{Grado en Ingeniería Informática}\\
+  Escuela Técnica Superior de Ingeniería Informática (ETSINF)\\
+  Universitat Politècnica de València (UPV)
+}
+\date{Defensa de Trabajo de Fin de Grado}
+
+\begin{document}
+
+% ==============================================================================
+% 1. PORTADA
+% ==============================================================================
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+% ==============================================================================
+% 2. ÍNDICE / ESTRUCTURA
+% ==============================================================================
+\begin{frame}{Estructura de la Defensa}
+  \tableofcontents
+\end{frame}
+
+% ==============================================================================
+\section{Motivación y Desafío del Retail}
+% ==============================================================================
+
+\begin{frame}{El Problema Logístico en Retail de Perecederos}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\textbf{El Dilema del Inventario}}
+        \begin{itemize}
+          \item \textbf{Asimetría de Costes:} Perder una venta por rotura ($c_u = 4{,}0$) es \textbf{4 veces más penalizado} que desechar exceso de stock fresco ($c_o = 1{,}0$).
+          \item \textbf{Censura de Demanda por Rotura:} Cuando el stock se agota ($I_t = 0$), las ventas observadas solo registran lo disponible, \textbf{no la demanda real latente}.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{\textbf{La Falla de los Modelos Clásicos}}
+        \begin{itemize}
+          \item \textbf{Trampa del MAE/MSE:} Entrenar sobre demanda censurada aprende a subestimar el volumen en días de alta rotura.
+          \item \textbf{Incertidumbre no calibrada:} Previsiones puntuales sin intervalos con garantía estadística fiable.
+          \item \textbf{Obsolescencia en producción:} Los modelos estáticos degradan su nivel de servicio rápidamente.
+        \end{itemize}
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\section{Objetivos del TFG y KPIs}
+% ==============================================================================
+
+\begin{frame}{Objetivos Específicos y Validación de KPIs}
+  \small
+  \begin{table}[h]
+    \centering
+    \begin{tabular}{lllcc}
+      \toprule
+      \textbf{KPI} & \textbf{Métrica / Descripción} & \textbf{Objetivo} & \textbf{Resultado} & \textbf{Estado} \\
+      \midrule
+      \textbf{KPI-1} & Cobertura empírica conformal & $\ge 75{,}0\%$ a $\alpha=0{,}2$ & \textbf{80,2\%} & \cmark \\
+      \textbf{KPI-2} & Reducción de coste Newsvendor & $\ge 5{,}0\%$ vs Naïve & \textbf{-7,57\%} & \cmark \\
+      \textbf{KPI-3} & Imputación demanda latente & Reducción error MAE & \textbf{-92,15\%} coste & \cmark \\
+      \textbf{KPI-4} & Retención de servicio en drift & $\ge 70{,}0\%$ fill rate & \textbf{92,68\%} & \cmark \\
+      \textbf{KPI-5} & Rendimiento y reproducibilidad & Tests pasados / MLflow & \textbf{305 / 305} & \cmark \\
+      \textbf{KPI-6} & Latencia de inferencia & $< 500$ ms / serie & \textbf{4,9 ms} & \cmark \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+% ==============================================================================
+\section{Dataset y Caracterización de la Censura}
+% ==============================================================================
+
+\begin{frame}{Dataset: FreshRetailNet-50K}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\textbf{Propiedades del Panel Homogéneo}}
+        \begin{itemize}
+          \item \textbf{500 series temporales} de productos frescos (verduras, frutas, carnes).
+          \item \textbf{97 días de histórico} ($48.500$ observaciones consolidadas).
+          \item Panel balanceado: longitud uniforme de $97$ días por serie (\textit{Invariante 41}).
+          \item Alta heterogeneidad, estacionalidad semanal pronunciada y promociones.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      \includegraphics[width=\linewidth,height=0.65\textheight,keepaspectratio]{eda/representative_series_panels.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\section{Metodología y Arquitectura del Sistema}
+% ==============================================================================
+
+\begin{frame}{Arquitectura End-to-End del Sistema}
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+      \begin{block}{\textbf{Pipeline Modular Causal}}
+        \begin{enumerate}
+          \item \textbf{Ingesta y Validación:} FreshRetailNet-50K.
+          \item \textbf{Imputación de Demanda Latente:} LightGBM.
+          \item \textbf{Feature Engineering:} 43 variables causales.
+          \item \textbf{Boosting Cuantílico:} CatBoost / LightGBM.
+          \item \textbf{Mondrian Conformal:} Cobertura al 80\%.
+          \item \textbf{Optimización Newsvendor:} Cálculo $q^*$.
+          \item \textbf{MLOps Streaming:} Reentreno semanal.
+        \end{enumerate}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{\textbf{Propiedades Clave del Diseño}}
+        \begin{itemize}
+          \item \textbf{Causalidad Estricta:} Cero fuga temporal.
+          \item \textbf{Desacoplamiento:} Tuning independiente.
+          \item \textbf{Inmutabilidad MLOps:} Trazabilidad MLflow.
+          \item \textbf{Despliegue Web:} Django + REST + Docker.
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\begin{frame}{Imputación Supervisada de Demanda Latente}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{block}{\textbf{Formulación Matemática de la Censura}}
+        $$Y_t^{\text{obs}} = \begin{cases} D_t & \text{si } I_t > 0 \text{ (no rotura)} \\ \min(D_t, C_t) & \text{si } I_t = 0 \text{ (rotura de stock)} \end{cases}$$
+        \begin{itemize}
+          \item La demanda real $D_t$ queda censurada por la derecha cuando $I_t = 0$.
+          \item \textbf{Imputador Supervisado:} Regresor LightGBM entrenado sobre días no censurados con censura sintética.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{\textbf{Impacto en la Calidad del Dato}}
+        \begin{itemize}
+          \item Reconstruye el pico de demanda oculto tras las roturas.
+          \item Elimina el sesgo de subestimación sistemático.
+          \item Sintonizado mediante Optuna sobre $500$ series ($100$ épocas).
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\begin{frame}{Ingeniería de Características y Contrato Causal}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\textbf{43 Variables Predictivas Causales}}
+        \begin{itemize}
+          \item \textbf{Lags de Demanda:} $t-1, t-2, t-7, t-14, t-21$.
+          \item \textbf{Estadísticos Móviles:} Medias, desviaciones estándar, mínimos y máximos en ventanas de $7, 14, 28$ días.
+          \item \textbf{Precios y Promociones:} Descuento porcentual, ratio de precio relativo vs histórico.
+          \item \textbf{Calendarios:} Día de la semana, día del mes, fin de semana.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{\textbf{Garantía Anti-Leakage}}
+        \begin{itemize}
+          \item Transformaciones calculadas \textbf{estrictamente en el pasado} ($t' < t$).
+          \item Validación temporal mediante $K=3$ folds walk-forward sin solapamiento.
+        \end{itemize}
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\begin{frame}{Calibración Conformal (Mondrian Conformal Prediction)}
+  \begin{block}{\textbf{Intervalos con Garantías Teóricas Finitas}}
+    Buscamos un intervalo $C(X_{n+1}) = [\hat{q}_{\alpha/2}(X_{n+1}) - \hat{s}, \hat{q}_{1-\alpha/2}(X_{n+1}) + \hat{s}]$ tal que:
+    $$P(Y_{n+1} \in C(X_{n+1})) \ge 1 - \alpha$$
+  \end{block}
+
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{\textbf{Ventajas de Mondrian CP}}
+        \begin{itemize}
+          \item \textbf{No paramétrico:} Sin asunción gaussiana de residuos.
+          \item \textbf{Estratificación por Categoría:} Calibra factores $\hat{s}_g$ independientes por familia de producto.
+          \item Válido en muestras finitas bajo intercambiabilidad.
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\textbf{Factor de Corrección $\hat{s}$}}
+        $$\hat{s} = \text{Quantile}\left( \frac{\lceil (n+1)(1-\alpha) \rceil}{n}, \{R_i\}_{i=1}^n \right)$$
+        donde $R_i$ son los residuos no conformistas del conjunto de calibración.
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\begin{frame}{Toma de Decisión: Optimización Newsvendor Asimétrica}
+  \begin{block}{\textbf{Formulación Financiera Newsvendor}}
+    La cantidad óptima de pedido $q^*$ minimiza la pérdida esperada asimétrica:
+    $$L(q, D) = c_o \max(0, q - D) + c_u \max(0, D - q)$$
+  \end{block}
+
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{\textbf{Fractil Crítico $\tau$}}
+        $$\tau = \frac{c_u}{c_u + c_o} = \frac{4{,}0}{4{,}0 + 1{,}0} = 0{,}80$$
+        \begin{itemize}
+          \item $c_u = 4{,}0$ u.m. (coste de rotura de stock).
+          \item $c_o = 1{,}0$ u.m. (coste de sobrestock perecedero).
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\textbf{Cálculo de Pedido $q^*$}}
+        $$q^* = \hat{F}_D^{-1}(\tau) = \hat{y}_{\text{pred}} + \hat{s}_{\text{conformal}}(\tau)$$
+        Alinea la predicción probabilística directamente con el beneficio financiero del negocio.
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\section{Resultados Experimentales}
+% ==============================================================================
+
+\begin{frame}{Resultados I: Rendimiento Predictivo (Walk-Forward)}
+  \begin{table}[h]
+    \centering
+    \footnotesize
+    \caption{Evaluación sobre 500 series en 3 folds temporales ($H=7$ días).}
+    \begin{tabular}{lcccccc}
+      \toprule
+      \textbf{Modelo} & \textbf{MAE} & \textbf{RMSE} & \textbf{Winkler (80\%)} & \textbf{Coste (u.m.)} & \textbf{Fill Rate} & \textbf{Cobertura} \\
+      \midrule
+      \textbf{Seasonal Naïve} & 10,57 & 15,56 & 78,42 & 41.520 & 76,4\% & 74,1\% \\
+      \textbf{LightGBM} & 7,88 & 10,70 & 42,15 & 39.210 & 91,2\% & \textbf{86,1\%} \\
+      \textbf{CatBoost (Campeón)} & \textbf{6,61} & \textbf{8,90} & \textbf{36,80} & \textbf{38.378} & \textbf{93,4\%} & \textbf{80,2\%} \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+
+  \begin{block}{\textbf{Conclusiones Predictivas}}
+    \begin{itemize}
+      \item CatBoost reduce el MAE en un \textbf{-37,46\%} y el Winkler Score en un \textbf{-53,07\%} frente a Naïve.
+      \item Ahorro directo en coste logístico de inventario: \textbf{-7,57\%} ($\Delta = -3.142$ u.m.).
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+% ==============================================================================
+\begin{frame}{Resultados II: Cobertura Conformal y Explicabilidad}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{\textbf{Garantía Nominal vs Empírica}}
+        \begin{itemize}
+          \item \textbf{Objetivo nominal:} $1 - \alpha = 80{,}0\%$.
+          \item \textbf{CatBoost:} \textbf{80,2\%} cobertura real.
+          \item \textbf{LightGBM:} \textbf{86,1\%} cobertura real.
+          \item \textbf{Seasonal Naïve:} $74{,}1\%$ (sub-cobertura).
+        \end{itemize}
+      \end{exampleblock}
+      \begin{block}{\textbf{Validación de Invariante}}
+        Se comprueba la validez empírica del Teorema de Cobertura Conformal en series de retail real con alta intermitencia.
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      \includegraphics[width=\linewidth,height=0.65\textheight,keepaspectratio]{shap_summary.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\begin{frame}{Resultados III: Evaluación Justa de Demanda Latente}
+  \begin{block}{\textbf{Comparativa contra Demanda Real de Referencia}}
+    Evaluación financiera de las políticas sobre la demanda no censurada común ($N=500$ series).
+  \end{block}
+
+  \begin{table}[h]
+    \centering
+    \footnotesize
+    \begin{tabular}{lcccc}
+      \toprule
+      \textbf{Estrategia de Datos} & \textbf{Coste Total (u.m.)} & \textbf{Rotura (uds)} & \textbf{Sobrestock (uds)} & \textbf{Ahorro (\%)} \\
+      \midrule
+      \textbf{Raw (Censurada)} & 48.910 & 11.240 & 950 & Base (0\%) \\
+      \textbf{Zero-filled} & 52.340 & 12.450 & 540 & +7,01\% (peor) \\
+      \textbf{Heuristic Imputed} & 18.200 & 3.810 & 2.960 & -62,79\% \\
+      \textbf{Latent Supervised (LGBM)} & \textbf{3.839} & \textbf{540} & \textbf{1.679} & \textbf{-92,15\%} \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+
+  \begin{alertblock}{\textbf{Impacto Crítico}}
+    Entrenar con demanda latente imputada reduce el coste en un \textbf{-92,15\%} frente a entrenar directamente con las ventas censuradas por stockout.
+  \end{alertblock}
+\end{frame}
+
+% ==============================================================================
+\begin{frame}{Resultados IV: Simulación en Streaming MLOps}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{\textbf{Simulación Prequencial (41 días, 5 folds)}}
+        \begin{itemize}
+          \item \textbf{Política `never` (estático):} Coste $59.302{,}35$ u.m. | Fill Rate $82{,}08\%$ | Nivel de Servicio $10{,}00\%$.
+          \item \textbf{Política `every\_7d` (semanal):} Coste \textbf{26.229,08 u.m.} | Fill Rate \textbf{92,68\%} | Nivel de Servicio \textbf{35,40\%}.
+          \item \textbf{Reducción del Coste:} \textbf{-55,77\%} ($\Delta = -33.073$ u.m.).
+          \item Bootstrap 95\% CI: $[-75{,}23\%, -27{,}05\%]$.
+          \item Tiempo medio de reentreno: \textbf{2,45 segundos}.
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      \includegraphics[width=\linewidth,height=0.65\textheight,keepaspectratio]{cumulative_cost.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\section{Plataforma Web y Ciclo MLOps}
+% ==============================================================================
+
+\begin{frame}{Plataforma Web Operacional (Django + HTMX + Alpine.js)}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\textbf{Sistema de Apoyo a la Decisión (DSS)}}
+        \begin{itemize}
+          \item \textbf{Simulador What-If Interactivo:} Recálculo instantáneo de $q^*$ ante variaciones de $c_u, c_o$ y capacidad.
+          \item \textbf{Modo Claro / Oscuro:} Selector interactivo con persistencia local.
+          \item \textbf{API REST Completa:} Endpoints `/api/forecast`, `/api/skus`, `/api/download/predictions`.
+          \item \textbf{Model Registry:} Empaquetado `mlflow.pyfunc` con firma de datos e inferencia reproducible.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      \includegraphics[width=\linewidth,height=0.65\textheight,keepaspectratio]{dashboard/ui_operacion_dashboard.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+\section{Conclusiones y Sostenibilidad}
+% ==============================================================================
+
+\begin{frame}{Conclusiones y Aportaciones del Trabajo}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\textbf{Aportaciones Técnicas Clave}}
+        \begin{enumerate}
+          \item \textbf{Corrección de Censura:} Eliminación del sesgo de rotura con LightGBM (-92\% coste).
+          \item \textbf{Conformal Prediction:} Cobertura empírica rigurosa del 80\% en 500 series reales.
+          \item \textbf{Newsvendor Asimétrico:} Pedidos optimizados según la función de pérdida real del negocio.
+          \item \textbf{MLOps Streaming:} Reentrenamiento semanal que ahorra un -55,77\% de coste.
+        \end{enumerate}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{\textbf{Sostenibilidad y ODS}}
+        \begin{itemize}
+          \item \textbf{ODS 12 (Consumo y Producción Sostenibles):} Drástica reducción de mermas y desperdicio alimentario de productos perecederos.
+          \item \textbf{ODS 13 (Acción por el Clima):} Reducción de huella de carbono logística por transportes urgentes de emergencia.
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ==============================================================================
+% DIAPOSITIVA FINAL
+% ==============================================================================
+\begin{frame}[plain]
+  \centering
+  \vspace{1.5cm}
+  {\Huge \textbf{\textcolor{UPVNavy}{¡Muchas Gracias!}}}\\[0.8cm]
+  {\Large \textbf{Sistema Predictivo de Demanda en Retail}}\\[0.4cm]
+  {\normalsize Artem Mindlin}\\[0.2cm]
+  {\footnotesize Grado en Ingeniería Informática · ETSINF - UPV}\\[1.0cm]
+
+  \begin{block}{}
+    \centering
+    \textbf{Turno de Preguntas y Discusión con el Tribunal}
+  \end{block}
+\end{frame}
+
+\end{document}

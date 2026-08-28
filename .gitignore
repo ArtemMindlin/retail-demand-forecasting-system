@@ -72,6 +72,15 @@ memoria/.build/*
 !memoria/.build/.gitkeep
 memoria/figures/eda/*
 !memoria/figures/eda/.gitkeep
+presentacion/*.pdf
+presentacion/*.log
+presentacion/*.aux
+presentacion/*.toc
+presentacion/*.nav
+presentacion/*.snm
+presentacion/*.vrb
+presentacion/*.out
+presentacion/*.synctex.gz
 
 
 # Claude Code. Session state and worktrees are local, but launch.json is shared

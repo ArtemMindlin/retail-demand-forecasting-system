@@ -21,10 +21,9 @@ class LightGBMModel(QuantileForecasterMixin):
     max_depth: int
     overstock_cost: float = 1.0
     stockout_cost: float = 4.0  # must be > 0; drives the critical fractile q* = cu/(cu+co)
-    # Cores per fit. -1 takes them all, right for one fit at a time and wrong when a caller
-    # fits many models in parallel: `tune_forecasting` pins this to 1 and parallelizes across
-    # draws instead, the same trade `censorship.py` already hardcodes for the imputer's LGBM.
-    n_jobs: int = -1
+    # Cores per fit. Pinned to 1 for OpenMP thread-safety across macOS and Linux,
+    # matching the convention in `censorship.py` and `forecasting_tuning.py`.
+    n_jobs: int = 1
     # Backend kwargs beyond the three the pipeline configures, keyed by the backend's own
     # parameter names. `tune_forecasting` searches over these; anything here overrides the
     # defaults below, so a tuned winner is reproducible by passing the same dict back.

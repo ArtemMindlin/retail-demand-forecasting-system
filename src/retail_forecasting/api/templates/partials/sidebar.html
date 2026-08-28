@@ -38,6 +38,9 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
            target="_blank" rel="noopener noreferrer" class="status-link">
           {% icon "shield" 11 "var(--c-conf)" %}<span>SISTEMA: ONLINE</span>
         </a>
+        <a href="http://127.0.0.1:5000" target="_blank" rel="noopener noreferrer" class="status-link" title="Abrir MLflow Tracking UI">
+          {% icon "activity" 11 "var(--c-ai-bright)" %}<span>MLFLOW · {{ mlflow_short_id }}</span>
+        </a>
         <a href="{% url 'api-index' %}" class="status-link">
           {% icon "terminal" 11 "var(--c-ai)" %}<span>API JSON</span>
         </a>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,7 +36,11 @@ from retail_forecasting.features.engineering import (
     build_supervised_frame,
 )
 from retail_forecasting.forecasting.backtesting import build_walk_forward_folds
-from retail_forecasting.forecasting.tuned_params import CORE_PARAMS, resolve_backend_params
+from retail_forecasting.forecasting.tuned_params import (
+    CORE_PARAMS,
+    BoostingBackend,
+    resolve_backend_params,
+)
 from retail_forecasting.inventory.newsvendor import (
     attach_inventory_costs,
     choose_order_quantity,
@@ -46,6 +51,7 @@ from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.models.conformal import ConformalForecaster
 from retail_forecasting.models.naive import SeasonalNaiveModel
 from retail_forecasting.models.optimization import HyperparameterTuner
+from retail_forecasting.tracking import EXPERIMENT_RUNS, log_retrain_metadata, open_run_directory
 from retail_forecasting.utils.io import (
     HOLDOUT_FOLD_ID,
     model_file_path,
@@ -838,26 +844,29 @@ def _build_model_predictions(
     )
 
 
-def _instantiate_champion_base_model(settings: Settings) -> CatBoostingModel | LightGBMModel:
-    backend = settings.business.champion_backend_name
-    if backend == "conformal_catboost_official":
-        return CatBoostingModel(
-            quantiles=settings.models.quantiles,
-            random_seed=settings.project.random_seed,
-            n_estimators=settings.models.n_estimators,
-            learning_rate=settings.models.learning_rate,
-            max_depth=settings.models.max_depth,
-            overstock_cost=settings.inventory.overstock_cost,
-            stockout_cost=settings.inventory.stockout_cost,
-        )
-    return LightGBMModel(
+def _instantiate_champion_base_model(
+    settings: Settings, n_series: int | None = None
+) -> CatBoostingModel | LightGBMModel:
+    backend_key: BoostingBackend = (
+        "catboost"
+        if settings.business.champion_backend_name == "conformal_catboost_official"
+        or settings.business.champion_model_name == "catboost"
+        else "lightgbm"
+    )
+    series_count = n_series if n_series is not None else (settings.dataset.top_n_series or 500)
+    resolved_params, source = resolve_backend_params(settings, backend_key, series_count)
+    fields(logger, {f"campeón ({backend_key})": source})
+
+    model_cls = CatBoostingModel if backend_key == "catboost" else LightGBMModel
+    return model_cls(
         quantiles=settings.models.quantiles,
         random_seed=settings.project.random_seed,
-        n_estimators=settings.models.n_estimators,
-        learning_rate=settings.models.learning_rate,
-        max_depth=settings.models.max_depth,
+        n_estimators=int(resolved_params["n_estimators"]),
+        learning_rate=float(resolved_params["learning_rate"]),
+        max_depth=int(resolved_params["max_depth"]),
         overstock_cost=settings.inventory.overstock_cost,
         stockout_cost=settings.inventory.stockout_cost,
+        extra_params={k: v for k, v in resolved_params.items() if k not in CORE_PARAMS},
     )
 
 
@@ -876,8 +885,9 @@ def train_and_save_champion(
 
     train_frame, calib_frame, calib_group_ids = _split_train_calibration(supervised_frame, settings)
 
+    n_series = int(panel["series_id"].nunique())
     conformal = _train_conformal_model(
-        _instantiate_champion_base_model(settings),
+        _instantiate_champion_base_model(settings, n_series),
         train_frame,
         calib_frame,
         calib_group_ids,
@@ -893,7 +903,7 @@ def train_and_save_champion(
 
 
 def run_retrain(settings: Settings) -> Path:
-    """Load every split, train the champion on all of it, and write the model to disk."""
+    """Load every split, train the champion on all of it, and write the model to disk + MLflow."""
     rule(logger, "reentreno del campeón")
     started = time.monotonic()
 
@@ -920,18 +930,53 @@ def run_retrain(settings: Settings) -> Path:
     quality_report = validate_prepared_panel(raw_panel, settings)
     raise_on_blocking_data_quality(quality_report)
 
+    strategy = settings.preprocessing.imputation_strategy
+    if strategy != "none":
+        imputer = LatentDemandImputer(
+            strategy=strategy,
+            model_path=settings.models.models_dir / settings.models.imputation_params_filename,
+        )
+        raw_panel = imputer.impute(raw_panel)
+
+    n_series = int(raw_panel["series_id"].nunique())
     fields(
         logger,
         {
-            "panel": f"{thousands(raw_panel['series_id'].nunique())} series, "
-            f"{thousands(len(raw_panel))} filas",
+            "panel": f"{thousands(n_series)} series, {thousands(len(raw_panel))} filas",
             "ventana": f"{raw_panel['date'].min().date()} → {raw_panel['date'].max().date()}",
             "campeón": settings.business.champion_backend_name,
             "calidad": f"{quality_report.warning_count} avisos",
         },
     )
 
-    model_path = train_and_save_champion(settings, raw_panel)
+    run_name = (
+        settings.reporting.run_name
+        if settings.reporting and settings.reporting.run_name
+        else "retrain_champion"
+    )
+    with open_run_directory(run_name, EXPERIMENT_RUNS) as run_dir:
+        model_path = train_and_save_champion(settings, raw_panel)
+        shutil.copy2(model_path, run_dir / model_path.name)
+
+        try:
+            sample_supervised, feat_meta = build_supervised_frame(
+                panel=raw_panel.tail(200),
+                feature_config=settings.features,
+                horizon=settings.dataset.horizon,
+            )
+            sample_input = sample_supervised.loc[:, feat_meta.feature_columns].dropna().head(10)
+        except Exception:
+            sample_input = None
+
+        log_retrain_metadata(
+            settings=settings,
+            model_path=model_path,
+            n_series=n_series,
+            panel_rows=len(raw_panel),
+            supervised_rows=len(raw_panel),
+            sample_input=sample_input,
+        )
+
     fields(
         logger,
         {"escrito": model_path, "tiempo": f"{time.monotonic() - started:.0f}s"},
@@ -950,6 +995,8 @@ def run_scoring(
     (train split + champion model on disk), enabling reuse from the streaming
     simulation without duplicating the inference plumbing.
     """
+    rule(logger, "scoring diario de reposición")
+    started = time.monotonic()
     if panel is None:
         panel = load_prepared_panel(
             dataset_config=settings.dataset,
@@ -968,7 +1015,6 @@ def run_scoring(
     if not model_path.exists():
         raise FileNotFoundError(f"No saved model at {model_path}. Run a backtest or retrain first.")
     model = ConformalForecaster.load(model_path)
-    fields(logger, {"campeón cargado": f"{model.backend_name} desde {model_path}"})
 
     prepared_panel = label_all_regimes(panel)
 
@@ -994,7 +1040,21 @@ def run_scoring(
         cost_summary=pd.DataFrame(),
         data_quality_report=quality_report,
     )
-    return write_run_artifacts(artifacts, settings)
+    result = write_run_artifacts(artifacts, settings)
+
+    n_exceptions = len(result.exceptions) if result.exceptions is not None else 0
+    decision_date = str(predictions["decision_date"].iloc[0]) if not predictions.empty else "-"
+    fields(
+        logger,
+        {
+            "campeón": f"{model.backend_name}",
+            "series": f"{thousands(len(predictions))}",
+            "fecha decisión": decision_date,
+            "excepciones": f"{n_exceptions} avisos",
+            "tiempo": f"{time.monotonic() - started:.1f}s",
+        },
+    )
+    return result
 
 
 def _build_scoring_predictions(

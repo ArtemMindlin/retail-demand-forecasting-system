@@ -29,7 +29,7 @@ class CatBoostingModel(QuantileForecasterMixin):
     overstock_cost: float = 1.0
     stockout_cost: float = 4.0  # must be > 0; drives the critical fractile q* = cu/(cu+co)
     # Cores per fit; see the note on `LightGBMModel.n_jobs`. CatBoost calls it `thread_count`.
-    n_jobs: int = -1
+    n_jobs: int = 1
     # See the note on `LightGBMModel.extra_params`.
     extra_params: dict[str, Any] = field(default_factory=dict)
     model_name: str = "catboost"

@@ -20,12 +20,16 @@ from retail_forecasting.forecasting.imputation_tuning import (
     _INT_BOUNDS,
     _MLFLOW_EXPERIMENT,
     _build_holdout_set,
-    _hhmm,
     _holdout_maes,
     _objective_mae,
-    _pace_seconds,
     _split_temporal_windows,
     tune_imputation_lgbm,
+)
+from retail_forecasting.forecasting.imputation_tuning import (
+    hhmm as _hhmm,
+)
+from retail_forecasting.forecasting.imputation_tuning import (
+    pace_seconds as _pace_seconds,
 )
 from tests import make_synthetic_panel
 

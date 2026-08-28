@@ -68,6 +68,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "retail_forecasting.api.context.navigation",
                 "retail_forecasting.api.context.whatif",
+                "retail_forecasting.api.context.mlflow_provenance",
             ],
             "builtins": ["retail_forecasting.api.templatetags.dashboard"],
         },

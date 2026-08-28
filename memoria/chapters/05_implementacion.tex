@@ -184,16 +184,20 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
 \section{Modos de Ejecución y Ciclo Operacional}
 \label{sec:run_modes}
 
-El sistema distingue explícitamente entre operaciones de investigación y operaciones de producción mediante cuatro modos de ejecución configurables a través del parámetro \texttt{run\_mode}:
+El sistema distingue explícitamente entre operaciones de investigación, sintonización desacoplada y operaciones de producción mediante seis modos de ejecución configurables a través del parámetro \texttt{run\_mode}:
 
 \begin{enumerate}
     \item \textbf{\texttt{experiment}}: Modo de investigación completo. Ejecuta el \textit{backtesting walk-forward} con múltiples \textit{folds} temporales para una estrategia de demanda ---observada o latente, según \texttt{imputation\_strategy}---, selecciona el modelo \textit{champion} entre los de esa misma estrategia mediante \textit{promotion logic} y genera artefactos de análisis exhaustivos (\texttt{metrics\_summary.csv}, \texttt{cost\_summary.csv}, \texttt{champion\_registry.json}, gráficos de Pareto). Es el modo utilizado para validar el sistema antes de su despliegue.
 
-    \item \textbf{\texttt{retrain}}: Modo de refresco operacional. Entrena el modelo \textit{champion} sobre la totalidad de los datos disponibles sin realizar evaluación por \textit{folds}. Guarda el modelo en disco en formato \texttt{.pkl}. Se ejecuta periódicamente en producción para mantener el modelo actualizado con los datos más recientes.
+    \item \textbf{\texttt{retrain}}: Modo de refresco operacional. Entrena el modelo \textit{champion} sobre la totalidad de los datos disponibles ($48.500$ filas del panel consolidado) sin realizar evaluación por \textit{folds}, reconstruyendo previamente la demanda latente con el imputador supervisado y empaquetando el artefacto conformal en formato \texttt{.pkl} con trazabilidad completa registrada en MLflow. Se ejecuta periódicamente en producción para mantener el modelo actualizado con los datos más recientes.
 
     \item \begin{sloppypar}\textbf{\texttt{score\_daily}}: Modo de producción diario. Carga el modelo \textit{champion} guardado, construye el \textit{inference frame} con los datos más recientes y genera \texttt{reorder\_}\allowbreak\texttt{recommendations.csv}: una fila por par tienda-producto con la \texttt{order\_quantity} óptima para el horizonte $H$, los tres cuantiles calibrados (\texttt{q\_0.1},\allowbreak{} \texttt{q\_0.5},\allowbreak{} \texttt{q\_0.9}) y la fecha de decisión. Este fichero es el entregable que consumiría el sistema de compras o el responsable de reposición.\end{sloppypar}
 
     \item \textbf{\texttt{simulate\_ops}}: Modo de investigación MLOps. Ejecuta la simulación operacional en \textit{streaming} descrita en la Sección~\ref{sec:simulate_ops}, comparando múltiples cadencias de reentrenamiento sobre el split de evaluación.
+
+    \item \textbf{\texttt{tune\_imputation}}: Modo de sintonización desacoplado del imputador supervisado. Entrena el regresor LightGBM auxiliar sobre días limpios del panel y busca sus hiperparámetros óptimos mediante Optuna bajo censura sintética, persistiendo el resultado en \texttt{models/imputation\_lgbm\_params.json}.
+
+    \item \textbf{\texttt{tune\_forecasting}}: Modo de sintonización desacoplado del modelo de previsión probabilística. Ejecuta una búsqueda de Optuna de dos capas (ventana de selección de $N=30$ sorteos y validación fuera de muestra de $N=25$ sorteos con CIs bootstrap al 95\%) evaluando directamente a través de la capa de \textit{Conformal Prediction} ($14$ días de calibración). Persiste los hiperparámetros validados en \texttt{models/forecasting\_params.json}.
 \end{enumerate}
 
 \subsection{Ciclo de Vida de los Hiperparámetros: Optimización vs. Reentrenamiento}
@@ -207,8 +211,8 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
         % Nodos
         \node[draw, rectangle, rounded corners, fill=blue!10] (data) {Datos Recientes};
         \node[draw, rectangle, rounded corners, fill=green!10, below of=data] (retrain) {\textbf{run\_retrain} \\ (Diario)};
-        \node[draw, rectangle, rounded corners, fill=red!10, left of=retrain, xshift=-2.5cm] (optuna) {\textbf{run\_experiment} \\ (Mensual/Optuna)};
-        \node[draw, rectangle, rounded corners, fill=yellow!10, below of=retrain] (deploy) {Configuración\\Estable (YAML)};
+        \node[draw, rectangle, rounded corners, fill=red!10, left of=retrain, xshift=-2.5cm] (optuna) {\textbf{tune\_forecasting} \\ (Desacoplado / Optuna)};
+        \node[draw, rectangle, rounded corners, fill=yellow!10, below of=retrain] (deploy) {Parámetros Persistidos\\(\texttt{forecasting\_params.json})};
 
         % Flujo
         \draw[->, thick] (data) -- (retrain);
@@ -219,14 +223,13 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
         \node[above of=optuna, yshift=-0.5cm] {\textbf{Optimización}\\\textbf{Estructural}};
         \node[above of=data, yshift=-0.4cm] {\textbf{Adaptación}\\\textbf{Operativa}};
     \end{tikzpicture}
-    \caption{Ciclo de vida MLOps: Optimización mensual vs. Reentrenamiento operativo.}
+    \caption{Ciclo de vida MLOps: Optimización desacoplada vs. Reentrenamiento operativo.}
     \label{fig:mlops_flow}
 \end{figure}
 
 \begin{enumerate}
-    \item \begin{sloppypar}\textbf{Fase de Optimización Mensual (Optuna)}: Ejecutado mediante el modo \texttt{experiment}, este ciclo realiza una búsqueda exhaustiva en el espacio de hiperparámetros utilizando \textit{Optuna}. Dado el volumen de datos (4.5M de filas), el sistema implementa un \textbf{muestreo estratificado por serie temporal}, limitando el entrenamiento del tuning a un máximo de 500k registros representativos. Esto garantiza que la convergencia de Optuna sea ágil sin perder la significancia estadística. Los resultados son validados mediante un análisis humano de estabilidad (comparando Pinball Loss en $q^*$ y Winkler Score), y si se identifican mejoras significativas, se actualiza el archivo \texttt{configs/\allowbreak default.yaml}.\end{sloppypar}
-    \item \textbf{Fase de Reentrenamiento Operacional (Daily)}: Ejecutado mediante el modo \texttt{retrain}, este proceso es determinista y utiliza la configuración fija definida en \texttt{default.yaml}. Su función es la integración de los datos de ventas más recientes, manteniendo la lógica del modelo estable.
-\end{enumerate}
+    \item \begin{sloppypar}\textbf{Fase de Optimización Desacoplada (\texttt{tune\_forecasting})}: Ejecutado en modo dedicado, este ciclo realiza una búsqueda exhaustiva en el espacio de hiperparámetros utilizando \textit{Optuna} sobre el panel de 500 series. Cada configuración candidata se evalúa tras ser ajustada por la capa de \textit{Conformal Prediction} y se contrasta contra la baseline por defecto en validación fuera de muestra. Si el candidato supera el umbral estadístico (diferencia emparejada con CI 95\% íntegramente negativa), el artefacto \texttt{models/forecasting\_params.json} se actualiza automáticamente.\end{sloppypar}
+    \item \textbf{Fase de Reentrenamiento Operacional (Daily)}: Ejecutado mediante el modo \texttt{retrain}, este proceso es determinista y lee los hiperparámetros guardados en \texttt{models/forecasting\_params.json}. Su función es la integración de los datos de ventas más recientes ($48.500$ filas históricas) sobre el modelo campeón con calibración conformal y versionado automático en MLflow, manteniendo la estructura de hiperparámetros estable.\end{enumerate}
 
 Esta separación hace que el comportamiento del sistema sea predecible y auditable: si los hiperparámetros cambian cada día resulta muy difícil diagnosticar por qué una predicción fue mala. Fijar los parámetros y revisarlos con periodicidad mensual es un compromiso razonable entre adaptarse a nuevos patrones de demanda y mantener la estabilidad del sistema en producción.
 

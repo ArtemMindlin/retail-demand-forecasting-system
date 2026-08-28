@@ -131,33 +131,57 @@ input[type="range"]:focus { outline: none; }
   padding: 18px 18px 16px 22px;
   overflow: hidden;
   border-radius: 14px;
-  transition: transform 0.15s ease, border-color 0.15s ease;
+  background:
+    linear-gradient(135deg, rgba(var(--rgb-white), 0.03) 0%, rgba(var(--rgb-white), 0.005) 100%),
+    var(--surface-glass);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .kpi::before {
   content: "";
   position: absolute;
   left: 0; top: 12px; bottom: 12px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
   background: linear-gradient(180deg, var(--kpi-color, var(--c-inv)) 0%, transparent 100%);
+  box-shadow: 0 0 12px var(--kpi-color, var(--c-inv));
+}
+.kpi::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 100px; height: 100px;
+  background: radial-gradient(circle at 100% 0%, var(--kpi-color, var(--c-inv)), transparent 70%);
+  opacity: 0.08;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
 }
 .kpi:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: var(--border-2);
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.3), 0 0 20px -4px var(--kpi-color, var(--c-inv));
+}
+.kpi:hover::after {
+  opacity: 0.16;
 }
 
 /* Academic card */
 .academic {
   padding: 20px;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
+  box-shadow: var(--shadow-card);
 }
 .academic:hover {
   border-color: var(--border-2);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   background:
-    linear-gradient(180deg, rgba(var(--rgb-white), 0.02), rgba(var(--rgb-white), 0.01)),
-    rgba(var(--rgb-surface), 0.85);
+    linear-gradient(180deg, rgba(var(--rgb-white), 0.03), rgba(var(--rgb-white), 0.01)),
+    var(--surface-glass);
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.3);
 }
 
 /* Tooltip on segment chips */
@@ -578,21 +602,32 @@ input[type="range"]:focus { outline: none; }
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(var(--rgb-white), 0.02);
+  padding: 8px 14px;
+  border-radius: 9px;
+  background: rgba(var(--rgb-white), 0.03);
   border: 1px solid var(--border);
   color: var(--text-2);
   font-family: var(--font-body);
   font-size: 12.5px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .btn-ghost:hover {
   color: var(--text-1);
   border-color: var(--border-2);
-  background: rgba(var(--rgb-white), 0.06);
+  background: rgba(var(--rgb-white), 0.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.theme-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* ── Navigation ────────────────────────────────────────────────────────────── */

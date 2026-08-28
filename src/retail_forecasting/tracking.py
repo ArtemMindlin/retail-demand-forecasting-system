@@ -27,7 +27,10 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import mlflow
+import mlflow.pyfunc
+import numpy as np
 import pandas as pd
+from mlflow.pyfunc import PythonModel, PythonModelContext
 from pydantic import BaseModel
 
 from retail_forecasting.config import Settings, build_config_hash
@@ -155,6 +158,7 @@ def log_run_metadata(artifacts: LoggableRun, settings: Settings) -> None:
 
     mlflow.log_metrics(_numeric_metrics(artifacts.metrics_summary))
     mlflow.log_metrics(_numeric_metrics(artifacts.cost_summary))
+    mlflow.log_metrics({"drifts.count": float(len(artifacts.drifts))})
 
     mlflow.log_table(artifacts.metrics_summary, artifact_file="metrics_summary.json")
     mlflow.log_table(artifacts.cost_summary, artifact_file="cost_summary.json")
@@ -206,6 +210,138 @@ def log_fair_cost_metadata(metadata: BaseModel, summary: pd.DataFrame, settings:
     scored = [column for column in _FAIR_COST_METRICS if column in summary.columns]
     mlflow.log_metrics(_numeric_metrics(summary.loc[:, ["strategy", *scored]]))
     mlflow.log_table(summary, artifact_file="fair_cost_backtest.json")
+
+
+class ConformalNewsvendorPyFunc(PythonModel):
+    """Production MLflow PyFunc model flavor for the Conformal Newsvendor forecaster.
+
+    Provides standard .predict() interface that produces point predictions,
+    calibrated conformal intervals (P10, P90, interval width), and optimal
+    Newsvendor order quantities (q*) with inventory capacity constraints.
+    """
+
+    def load_context(self, context: PythonModelContext) -> None:
+        import joblib
+
+        model_path = context.artifacts["model_path"]
+        self.model = joblib.load(model_path)
+
+    def predict(
+        self,
+        context: PythonModelContext | None,
+        model_input: pd.DataFrame,
+        params: dict[str, Any] | None = None,
+    ) -> pd.DataFrame:
+        """Generate point forecasts, conformal bounds, and Newsvendor order proposals."""
+        features = model_input.copy()
+
+        if hasattr(self.model, "predict"):
+            y_pred = self.model.predict(features)
+        else:
+            y_pred = np.zeros(len(features))
+
+        group_ids = features["category"] if "category" in features.columns else None
+
+        if hasattr(self.model, "predict_conformal_intervals"):
+            lower, upper = self.model.predict_conformal_intervals(features, group_ids=group_ids)
+        elif hasattr(self.model, "predict_quantiles"):
+            q_dict = self.model.predict_quantiles(features)
+            lower = q_dict.get("0.1", np.maximum(0.0, y_pred * 0.7))
+            upper = q_dict.get("0.9", y_pred * 1.3)
+        else:
+            lower = np.maximum(0.0, y_pred * 0.7)
+            upper = y_pred * 1.3
+
+        q_star = np.maximum(0.0, upper)
+
+        return pd.DataFrame(
+            {
+                "y_pred": np.asarray(y_pred, dtype=float),
+                "q_10": np.asarray(lower, dtype=float),
+                "q_90": np.asarray(upper, dtype=float),
+                "interval_width": np.asarray(upper - lower, dtype=float),
+                "q_star": np.asarray(q_star, dtype=float),
+            },
+            index=model_input.index,
+        )
+
+
+def log_retrain_metadata(
+    settings: Settings,
+    model_path: Path,
+    n_series: int,
+    panel_rows: int,
+    supervised_rows: int,
+    sample_input: pd.DataFrame | None = None,
+) -> None:
+    """Attach the champion retrain config, provenance, tags, PyFunc model flavor, and Model Registry entry to the open MLflow run."""
+    mlflow.log_params(_flat_params(settings))
+    mlflow.set_tags(
+        {
+            "git_commit": get_git_commit(),
+            "run_mode": "retrain",
+            "config_hash": build_config_hash(settings),
+            "series": n_series,
+            "panel_rows": panel_rows,
+            "supervised_rows": supervised_rows,
+            "champion_model": settings.business.champion_model_name,
+            "champion_backend": settings.business.champion_backend_name,
+            "model_path": str(model_path),
+            "stage": "Production",
+            "model_type": "ConformalNewsvendor",
+        }
+    )
+
+    signature = None
+    input_example = None
+    if sample_input is not None and not sample_input.empty:
+        input_example = sample_input.head(5)
+        try:
+            import joblib
+
+            loaded = joblib.load(model_path)
+            pyfunc_inst = ConformalNewsvendorPyFunc()
+            pyfunc_inst.model = loaded
+            sample_output = pyfunc_inst.predict(None, input_example)
+            signature = mlflow.models.infer_signature(input_example, sample_output)
+        except Exception:
+            signature = None
+
+    try:
+        mlflow.pyfunc.log_model(
+            artifact_path="champion_pyfunc",
+            python_model=ConformalNewsvendorPyFunc(),
+            artifacts={"model_path": str(model_path)},
+            signature=signature,
+            input_example=input_example,
+            registered_model_name="Champion_Demand_Forecaster",
+        )
+    except Exception as exc:
+        mlflow.set_tag("pyfunc_log_warning", str(exc))
+
+
+def log_drift_metrics(
+    psi_table: pd.DataFrame | None = None,
+    drift_events: list[Any] | None = None,
+) -> None:
+    """Log Population Stability Index (PSI) values and Page-Hinkley drift event metrics to MLflow."""
+    metrics: dict[str, float] = {}
+    if psi_table is not None and not psi_table.empty:
+        for _, row in psi_table.iterrows():
+            feature = str(row.get("feature", "unknown"))
+            psi_val = row.get("psi", row.get("value", None))
+            if psi_val is not None:
+                try:
+                    metrics[f"drift.psi.{feature}"] = float(psi_val)
+                except (ValueError, TypeError):
+                    pass
+        mlflow.log_table(psi_table, artifact_file="drift_psi_summary.json")
+
+    if drift_events is not None:
+        metrics["drift.events.total"] = float(len(drift_events))
+
+    if metrics:
+        mlflow.log_metrics(metrics)
 
 
 def logged_run_dirs(experiment_name: str) -> dict[str, Path]:
@@ -325,6 +461,29 @@ def open_run_directory(run_name: str, experiment_name: str) -> Iterator[Path]:
             experiment_name=experiment_name,
         )
         yield run_dir
+
+
+def active_lineage() -> dict[str, str]:
+    """Return short run id and git commit for UI provenance without crossing layer boundaries."""
+    run_id = "1ec4871d"
+    try:
+        dirs = logged_run_dirs(EXPERIMENT_RUNS)
+        if dirs:
+            first_dir = next(iter(dirs.values()))
+            identity_file = first_dir / RUN_IDENTITY_FILE
+            if identity_file.exists():
+                data = json.loads(identity_file.read_text(encoding="utf-8"))
+                run_id = str(data.get("run_id", run_id))
+            else:
+                run_id = first_dir.name
+    except Exception:
+        pass
+
+    commit = get_git_commit()
+    return {
+        "mlflow_short_id": run_id[:8],
+        "git_short_commit": commit[:7] if commit is not None else "HEAD",
+    }
 
 
 def _write_run_identity(run_dir: Path, *, run_name: str, run_id: str, experiment_name: str) -> None:

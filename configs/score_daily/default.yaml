@@ -59,8 +59,7 @@ business:
   flag_high_uncertainty: true
   high_uncertainty_interval_quantile: 0.95
   flag_extreme_order_quantity: true
-  extreme_order_quantity_quantile: 0.99
-  champion_data_strategy: Observed
+  champion_data_strategy: Latent_supervised
   champion_model_name: catboost
   champion_backend_name: conformal_catboost_official
   champion_min_cost_improvement_pct: 0.0
@@ -68,5 +67,5 @@ business:
 
 
 reporting:
-  run_name: fresh_retailnet_v2
-  make_plots: true
+  run_name: score_daily
+  make_plots: false
