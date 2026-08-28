@@ -85,8 +85,13 @@ SESSION_COOKIE_SAMESITE = "Lax"
 # so local dev sets COOKIE_SECURE=false. Production keeps the secure default.
 SESSION_COOKIE_SECURE = _env_flag("COOKIE_SECURE", True)
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
-CSRF_TRUSTED_ORIGINS = [
-    o for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o
+_custom_origins = [o for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o]
+CSRF_TRUSTED_ORIGINS = _custom_origins or [
+    "https://artemmindlin.site",
+    "http://artemmindlin.site",
+    "https://*.artemmindlin.site",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 # Single operator account, supplied by environment — same contract as before.

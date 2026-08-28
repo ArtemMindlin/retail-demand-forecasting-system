@@ -1,0 +1,27 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error del Servidor · Forecast.ai</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
+  <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'css/components.css' %}">
+  <link rel="stylesheet" href="{% static 'css/views.css' %}">
+</head>
+<body class="login-body">
+  <div class="login-card glass" style="max-width: 540px; text-align: center;">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+    <h2 class="h-display" style="font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--c-drift);">Error Interno del Servidor (500)</h2>
+    <p class="empty-state-body" style="margin-bottom: 1.5rem; color: var(--text-muted);">
+      Ha ocurrido un error inesperado al procesar la solicitud. Si estás desplegando por primera vez, asegúrate de haber ejecutado una corrida inicial del pipeline para generar el modelo y los artefactos de datos.
+    </p>
+    <div style="display: flex; gap: 0.75rem; justify-content: center;">
+      <a href="/dashboard/" class="btn-run" style="text-decoration: none; padding: 0.6rem 1.2rem;">Volver al Dashboard</a>
+      <a href="/login/" class="btn-ghost" style="text-decoration: none; padding: 0.6rem 1.2rem;">Iniciar Sesión</a>
+    </div>
+  </div>
+</body>
+</html>

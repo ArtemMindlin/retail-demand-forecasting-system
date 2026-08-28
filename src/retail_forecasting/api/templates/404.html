@@ -1,0 +1,24 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Página No Encontrada · Forecast.ai</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
+  <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'css/components.css' %}">
+  <link rel="stylesheet" href="{% static 'css/views.css' %}">
+</head>
+<body class="login-body">
+  <div class="login-card glass" style="max-width: 500px; text-align: center;">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+    <h2 class="h-display" style="font-size: 1.5rem; margin-bottom: 0.5rem;">Página No Encontrada (404)</h2>
+    <p class="empty-state-body" style="margin-bottom: 1.5rem; color: var(--text-muted);">
+      La ruta solicitada no existe o no está disponible en este momento.
+    </p>
+    <a href="/dashboard/" class="btn-run" style="text-decoration: none; padding: 0.6rem 1.2rem;">Ir al Dashboard</a>
+  </div>
+</body>
+</html>

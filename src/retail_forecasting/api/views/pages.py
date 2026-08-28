@@ -75,10 +75,14 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     try:
         grouped = store.grouped_predictions()
-    except ArtifactError:
+    except Exception:
         grouped = {}
 
-    data = forecast_service.compute_forecast(grouped, params, selected_sku)
+    try:
+        data = forecast_service.compute_forecast(grouped, params, selected_sku)
+    except Exception:
+        data = {"status": "no_predictions"}
+
     if data.get("status") == "no_predictions":
         return empty_state(
             request,
@@ -282,10 +286,14 @@ def skus(request: HttpRequest) -> HttpResponse:
 
     try:
         grouped = store.grouped_predictions()
-    except ArtifactError:
+    except Exception:
         grouped = {}
 
-    rows = forecast_service.compute_sku_table(grouped, params)
+    try:
+        rows = forecast_service.compute_sku_table(grouped, params)
+    except Exception:
+        rows = []
+
     if not rows:
         return empty_state(
             request,

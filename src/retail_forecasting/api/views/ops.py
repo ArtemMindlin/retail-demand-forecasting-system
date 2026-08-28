@@ -89,7 +89,7 @@ def ops(request: HttpRequest) -> HttpResponse:
     """Week-by-week playback comparing retrain cadences for one series."""
     try:
         summary = weekly_summary(get_simulation())
-    except SimulationNotFoundError as exc:
+    except Exception as exc:
         return empty_state(
             request,
             icon="activity",
