@@ -1000,7 +1000,7 @@ input[type="range"]:focus { outline: none; }
 .chart-tooltip-row .tnum { color: var(--text-1); font-size: 12px; font-weight: 500; }
 .chart-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   padding-top: 20px;
   margin-top: 16px;

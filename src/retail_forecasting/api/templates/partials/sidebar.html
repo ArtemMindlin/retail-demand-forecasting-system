@@ -12,7 +12,6 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
          serviceLevel: {{ params.service_level|unlocalize }},
          shortageCost: {{ params.shortage_cost|unlocalize }},
          holdingCost: {{ params.holding_cost|unlocalize }},
-         capacity: {{ params.capacity|unlocalize }},
          get criticalRatio() {
            return (this.shortageCost / (this.shortageCost + this.holdingCost)).toFixed(3);
          },
@@ -107,20 +106,6 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
       <input type="range" name="holding_cost" min="1" max="20" step="0.5"
              x-model.number="holdingCost"
              :style="`--track-fill: var(--c-inv); --track-percent: ${((holdingCost - 1) / 19) * 100}%`">
-    </div>
-
-    <div class="slider-field">
-      <div class="slider-head">
-        <div>
-          <div class="slider-label">Capacidad de Almacén</div>
-          <div class="slider-hint">Máximo de unidades almacenables</div>
-        </div>
-        <div class="tnum slider-value paint-text paint-ai"
-             x-text="(capacity / 1000).toFixed(1) + 'k u'"></div>
-      </div>
-      <input type="range" name="capacity" min="5000" max="25000" step="500"
-             x-model.number="capacity"
-             :style="`--track-fill: var(--c-ai); --track-percent: ${((capacity - 5000) / 20000) * 100}%`">
     </div>
 
     <div class="derived-box">

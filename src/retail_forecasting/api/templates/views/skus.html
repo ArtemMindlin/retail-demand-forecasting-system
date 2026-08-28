@@ -51,14 +51,6 @@ localStorage, as they always have, and never reach the backend.{% endcomment %}
       <div class="label-mono">Ajustes Manuales</div>
       <div class="sku-summary-value tnum" x-text="overrideCount"></div>
     </div>
-    <div>
-      <div class="label-mono">Capacidad Utilizada</div>
-      <div class="sku-summary-value tnum"
-           :style="totalVolume > {{ params.capacity|unlocalize }} ? 'color: var(--c-drift)' : ''">
-        <span x-text="((totalVolume / {{ params.capacity|unlocalize }}) * 100).toFixed(1) + '%'"></span>
-        <span class="sku-over" x-show="totalVolume > {{ params.capacity|unlocalize }}">¡SOBREPASADA!</span>
-      </div>
-    </div>
   </div>
 
   <div class="sku-filters">

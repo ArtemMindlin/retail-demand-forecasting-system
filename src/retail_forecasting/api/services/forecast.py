@@ -164,8 +164,8 @@ def aggregate_inventory_cost(
     for row in sku_df.itertuples():
         pred = float(row.y_pred)
         demand = float(row.y_true)
-        q = min(max(0.0, pred + cr_quantile), params.capacity)
-        q_naive = min(pred, params.capacity)
+        q = max(0.0, pred + cr_quantile)
+        q_naive = max(0.0, pred)
         total += (
             (demand - q) * params.shortage_cost
             if demand > q
@@ -207,7 +207,7 @@ def compute_forecast(
     cr_quantile = float(np.quantile(conformal.residuals, series_cr if series_cr else cr))
 
     last_pred = float(sku_df.iloc[-1]["y_pred"])
-    q_star = min(max(0.0, last_pred + cr_quantile), params.capacity)
+    q_star = max(0.0, last_pred + cr_quantile)
 
     mae = float(conformal.abs_residuals.mean())
     half = len(conformal.abs_residuals) // 2
@@ -299,7 +299,7 @@ def compute_sku_table(
         cr_quantile = float(np.quantile(conformal.residuals, cr))
 
         last = sku_df.iloc[-1]
-        q_star = min(max(0.0, float(last["y_pred"]) + cr_quantile), params.capacity)
+        q_star = max(0.0, float(last["y_pred"]) + cr_quantile)
         drift_psi = per_sku_psi(sku_df["y_true"].to_numpy(dtype=float))
 
         # Cost-asymmetry proxy: the real per-SKU critical fractile when the
