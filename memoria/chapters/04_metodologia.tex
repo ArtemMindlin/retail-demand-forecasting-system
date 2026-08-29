@@ -231,7 +231,7 @@ O bien, expresada en su forma condicional por tramos para enfatizar la asimetrí
 \begin{equation}
     \mathcal{L}_q(y, \hat{y}_q) =
     \begin{cases}
-        q \cdot (y - \hat{y}_q) & \text{si } y \ge \hat{y}_q \quad \text{(infraestimación)} \\
+        q \cdot (y - \hat{y}_q) & \text{si } y \ge \hat{y}_q \quad \text{(subestimación)} \\
         (1 - q) \cdot (\hat{y}_q - y) & \text{si } y < \hat{y}_q \quad \text{(sobreestimación)}
     \end{cases}
 \end{equation}
@@ -281,15 +281,13 @@ $q \cdot 100\%$ de las observaciones históricas.
 \begin{center}
 \fbox{\begin{minipage}{0.88\textwidth}
 \textbf{Nexo metodológico: Pinball Loss $\leftrightarrow$ Newsvendor.}\\[4pt]
-El modelo del \textit{Newsvendor} \cite{silver1998inventory} demuestra que la cantidad óptima de pedido bajo costes asimétricos es el \textit{fractil crítico}:
+El modelo del \textit{Newsvendor} \cite{silver1998inventory} demuestra que el nivel de cobertura óptimo bajo costes asimétricos viene determinado por el \textit{fractil crítico}:
 $$q^* = \frac{c_u}{c_u + c_o}$$
-donde $c_u$ es el coste por unidad no servida (rotura de stock) y $c_o$ el coste por unidad sobrante. Este es exactamente el cuantil que minimiza la Pinball Loss. Por tanto, \textbf{entrenar el modelo con Pinball en $q = q^*$ es equivalente a optimizar directamente la política de pedido}, sin ninguna etapa de postproceso adicional. Esto diferencia al sistema de los enfoques que predicen la media y después aplican un nivel de servicio fijo: aquí la decisión de inventario está integrada en el proceso de entrenamiento.
+donde $c_u$ es el coste por unidad no servida (rotura de stock) y $c_o$ el coste por unidad sobrante, siendo la cantidad óptima de pedido el cuantil de demanda correspondiente $y^* = F_Y^{-1}(q^*)$. Este es exactamente el cuantil que minimiza la Pinball Loss. Por tanto, \textbf{entrenar el modelo con Pinball en $q = q^*$ es equivalente a optimizar directamente la política de pedido}, sin ninguna etapa de postproceso adicional. Esto diferencia al sistema de los enfoques que predicen la media y después aplican un nivel de servicio fijo: aquí la decisión de inventario está integrada en el proceso de entrenamiento.
 \end{minipage}}
 \end{center}
 
-En la práctica, el modelo minimiza la pérdida esperada de forma conjunta
-sobre todas las series $s \in \mathcal{S}$ y todos los instantes de decisión
-$t \in \mathcal{T}$:
+En la formulación general, el modelo minimiza la pérdida esperada de forma conjunta sobre todas las series $s \in \mathcal{S}$ y todos los instantes de decisión $t \in \mathcal{T}$:
 
 \begin{equation}
     \hat{\theta} = \arg\min_{\theta}
@@ -299,12 +297,9 @@ $t \in \mathcal{T}$:
     \label{eq:training_objective}
 \end{equation}
 
-donde $q_s^*$ es el fractil crítico específico de la serie $s$
-(Sección~\ref{sec:cost_profiles}) y $f_\theta(\mathbf{x}_{s,t})$ es la
-predicción del modelo en el cuantil $q_s^*$ condicionada al vector de
-covariables disponible en $t$.
+donde $q_s^*$ representa el fractil crítico específico de la serie $s$ en función de sus márgenes comerciales y costes de merma individuales. En un entorno productivo con contabilidad analítica por referencia, este fractil variará por producto; no obstante, al no disponer en el conjunto de datos de partida de los costes desglosados por SKU, el sistema evalúa de manera homogénea una política de catálogo canónica (como se detalla y justifica en la Sección~\ref{sec:cost_profiles}).
 
-Al entrenar con RMSE o MAE se minimiza el error estadístico pero no el coste logístico, lo que es inconsistente con el objetivo operativo del sistema. Por eso el entrenamiento orientado a costes es el único modo disponible.
+Al entrenar con RMSE o MAE se minimiza el error estadístico pero no el coste logístico, lo que es inconsistente con el objetivo operativo del sistema. Por eso el entrenamiento orientado a cuantiles de coste es el pilar central de la arquitectura. Para resolver eficientemente este problema de optimización no diferenciable por tramos, la siguiente subsección examina las implementaciones de \textit{Gradient Boosting} seleccionadas.
 
 \subsection{Selección de las Implementaciones de Boosting}
 \label{sec:eleccion_backends}
