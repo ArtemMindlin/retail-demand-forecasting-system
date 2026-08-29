@@ -80,3 +80,68 @@ def _plot_error_cost_tradeoff(
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
+
+
+def render_pareto_front(
+    pareto_df: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    """Render the multi-objective Pareto front (Pinball Loss vs. Winkler Score) to disk."""
+    if pareto_df.empty or "pinball" not in pareto_df.columns or "winkler" not in pareto_df.columns:
+        return
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+    if "is_on_front" in pareto_df.columns:
+        dominated = pareto_df[~pareto_df["is_on_front"]]
+        front = pareto_df[pareto_df["is_on_front"]].sort_values("pinball")
+        if not dominated.empty:
+            ax.scatter(
+                dominated["pinball"],
+                dominated["winkler"],
+                color="#94a3b8",
+                alpha=0.6,
+                label="Evaluaciones dominadas",
+            )
+        if not front.empty:
+            ax.scatter(
+                front["pinball"],
+                front["winkler"],
+                color="#3b82f6",
+                s=70,
+                label="Frontera de Pareto",
+            )
+            ax.plot(
+                front["pinball"],
+                front["winkler"],
+                color="#3b82f6",
+                linestyle="--",
+                alpha=0.5,
+            )
+        if "is_selected" in pareto_df.columns:
+            selected = pareto_df[pareto_df["is_selected"]]
+            if not selected.empty:
+                ax.scatter(
+                    selected["pinball"],
+                    selected["winkler"],
+                    color="#ef4444",
+                    s=130,
+                    zorder=5,
+                    label="Configuración seleccionada",
+                )
+    else:
+        ax.scatter(
+            pareto_df["pinball"],
+            pareto_df["winkler"],
+            color="#3b82f6",
+            s=70,
+            label="Frontera de Pareto",
+        )
+
+    ax.set_xlabel("Pinball Loss (q*) [Decisión de Inventario]")
+    ax.set_ylabel("Winkler Score (P10-P90) [Calidad de Intervalo]")
+    ax.set_title("Frente de Pareto Multiobjetivo (Optuna)")
+    ax.grid(True, linestyle=":", alpha=0.6)
+    ax.legend(frameon=True)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)

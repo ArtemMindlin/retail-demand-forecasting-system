@@ -167,6 +167,14 @@ def _render_experiment_plots(run_dir: Path, artifacts: RunArtifacts) -> None:
         cost_summary=artifacts.cost_summary,
         output_dir=run_dir,
     )
+    if artifacts.tuning_pareto is not None and not artifacts.tuning_pareto.empty:
+        from retail_forecasting.visualization.plots import render_pareto_front
+
+        render_pareto_front(
+            pareto_df=artifacts.tuning_pareto,
+            output_path=run_dir / "pareto_front.png",
+        )
+
     if artifacts.shap_values is None:
         return
 
