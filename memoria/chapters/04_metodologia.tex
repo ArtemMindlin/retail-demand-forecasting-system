@@ -309,12 +309,8 @@ De las tres implementaciones de referencia revisadas en el Estado del Arte, el s
 \begin{itemize}
     \item \textbf{Descarte razonado de XGBoost:} Aunque desde su versión 1.5 XGBoost soporta particionamiento categórico nativo sin requerir \textit{one-hot encoding}, comparte con LightGBM el mismo principio algorítmico: ordenar las categorías mediante el estadístico del gradiente. Incorporar un tercer motor con idéntica lógica de partición duplicaría el coste computacional del protocolo de \textit{backtesting} sin aportar un contraste metodológico real.
     \item \textbf{Ortogonalidad de CatBoost:} Es la única de las tres librerías que introduce un mecanismo conceptualmente diferenciado: los \textit{Ordered Target Statistics}, que proporcionan una defensa matemática explícita frente a la fuga de información (\textit{target leakage}) en identificadores de alta cardinalidad (como los 500 SKUs del catálogo), y los árboles simétricos (\textit{oblivious trees}), que actúan como regularizadores estructurales en series con historial temporal corto.
+    \item \textbf{Criterio de selección y paridad experimental:} La elección final del modelo campeón \textbf{no se basa en preferencias teóricas de diseño, sino en los resultados empíricos} del protocolo de evaluación (Sección~\ref{sec:promocion}). Esta distinción es crucial, ya que el orden de rendimiento según error puntual (RMSE) no coincide necesariamente con el orden según coste de inventario real. Asimismo, para garantizar una comparación en estricta igualdad de condiciones, la estimación nativa de incertidumbre de CatBoost no se utiliza: ambos motores operan bajo el mismo envoltorio multi-cuantil y la misma capa de calibración Conformal.
 \end{itemize}
-
-\paragraph{Criterio de selección y paridad experimental.}
-La elección final del modelo campeón \textbf{no se basa en preferencias teóricas de diseño, sino en los resultados empíricos} del protocolo de evaluación (Sección~\ref{sec:promocion}). Esta distinción es crucial, ya que el orden de rendimiento según error puntual (RMSE) no coincide necesariamente con el orden según coste de inventario real.
-
-Asimismo, para garantizar una comparación en estricta igualdad de condiciones, la estimación nativa de incertidumbre de CatBoost no se utiliza: ambos motores operan bajo el mismo envoltorio multi-cuantil y la misma capa de calibración Conformal.
 
 \subsection{Arquitectura Multi-Modelo y Corrección del Quantile Crossing}
 \label{sec:crossing}
