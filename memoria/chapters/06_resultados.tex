@@ -35,7 +35,7 @@ El protocolo divide temporalmente la búsqueda en dos ventanas independientes pa
     \item \textbf{Ventana de Validación Out-of-Sample} ($N=25$ sorteos independientes posteriores): La configuración ganadora se evalúa fuera de muestra contra los hiperparámetros por defecto, computando intervalos de confianza bootstrap al 95\% sobre la diferencia emparejada de costes.
 \end{enumerate}
 
-La Tabla~\ref{tab:forecasting_tuning_results} resume los resultados cuantitativos obtenidos para los dos \textit{backends} de \textit{Gradient Boosting} sobre el panel de 500 series.
+La Tabla~\ref{tab:forecasting_tuning_results} y la Figura~\ref{fig:tuning_convergence_60trials} resumen los resultados cuantitativos y la dinámica de convergencia obtenidos para los dos \textit{backends} de \textit{Gradient Boosting} sobre el panel de 500 series.
 
 \begin{table}[htbp]
     \centering
@@ -53,11 +53,18 @@ La Tabla~\ref{tab:forecasting_tuning_results} resume los resultados cuantitativo
     \label{tab:forecasting_tuning_results}
 \end{table}
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/tuning_comparison_60trials.png}
+    \caption{Historial de sintonización de hiperparámetros (60 \textit{trials} por motor) y veredicto de validación \textit{out-of-sample}. A la izquierda, convergencia del coste logístico durante la fase de selección con Optuna. A la derecha, reducción del coste logístico entre la configuración por defecto y los modelos ganadores evaluados en 25 extracciones de validación independiente.}
+    \label{fig:tuning_convergence_60trials}
+\end{figure}
+
 Los resultados aportan dos conclusiones metodológicas fundamentales sobre el comportamiento de los modelos:
 
 \begin{itemize}
-    \item \textbf{Degradación out-of-sample en LightGBM}: Durante la fase de selección, LightGBM alcanza un coste inferior al de CatBoost ($22{,}39$ frente a $23{,}97$). Sin embargo, en la ventana de validación posterior, el coste de LightGBM aumenta a $33{,}66$, evidenciando una alta sensibilidad y un sobreajuste a la ventana temporal de selección.
-    \item \textbf{Estabilidad estructural de CatBoost}: CatBoost muestra un comportamiento marcadamente más estable entre ventanas ($23{,}97$ en selección frente a $28{,}89$ en validación). En la evaluación \textit{out-of-sample}, \textbf{CatBoost resulta un $14{,}2\%$ más económico que LightGBM} ($28{,}89$ vs. $33{,}66$ u.m.).
+    \item \textbf{Degradación out-of-sample en LightGBM}: Durante la fase de selección, LightGBM alcanza un coste inferior al de CatBoost ($22{,}39$ frente a $23{,}97$, Panel izquierdo de la Figura~\ref{fig:tuning_convergence_60trials}). Sin embargo, en la ventana de validación posterior, el coste de LightGBM aumenta a $33{,}66$, evidenciando una alta sensibilidad y un sobreajuste a la ventana temporal de selección.
+    \item \textbf{Estabilidad estructural de CatBoost}: CatBoost muestra un comportamiento marcadamente más estable entre ventanas ($23{,}97$ en selección frente a $28{,}89$ en validación). En la evaluación \textit{out-of-sample}, \textbf{CatBoost resulta un $14{,}2\%$ más económico que LightGBM} ($28{,}89$ vs. $33{,}66$ u.m., Panel derecho de la Figura~\ref{fig:tuning_convergence_60trials}).
 \end{itemize}
 
 Esta estabilidad fuera de muestra confirma la superioridad de CatBoost en este dominio: sus árboles \textit{oblivious} actúan como un regularizador estructural eficaz y sus \textit{Ordered Target Statistics} gestionan los identificadores categóricos de alta cardinalidad sin introducir fuga de información. Por esta razón, el orquestador valida y persiste los hiperparámetros en \texttt{models/forecasting\_params.json}, ratificando a CatBoost como el \textit{backend} campeón para el despliegue operacional.
