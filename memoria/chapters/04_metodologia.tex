@@ -337,19 +337,27 @@ Este procedimiento es computacionalmente ligero ($\mathcal{O}(M \log M)$, equiva
 \paragraph{Descarte de la Regresión Isotónica (PAVA).}
 Frente al \textit{rearrangement}, la alternativa clásica para forzar monotonicidad es la regresión isotónica mediante el algoritmo \textbf{PAVA} (\textit{Pool Adjacent Violators Algorithm}) \cite{barlow1972isotonic}. PAVA recorre el vector y promedia sucesivamente los pares adyacentes que violan el orden para encontrar la proyección más cercana en norma $L_2$. Sin embargo, PAVA no ofrece garantías de mejora sobre la función de pérdida \textit{Pinball} y modifica activamente los valores predichos al promediarlos, mientras que el \textit{rearrangement} preserva exactamente los cuantiles aprendidos por el modelo reorganizando únicamente sus posiciones.
 
-\subsection{Optimización Multi-Objetivo y Frente de Pareto}
+\subsection{Sintonización Guiada por Coste Logístico y Validación Temporal}
+\label{sec:tuning_metodologia}
 \label{sec:pareto}
-Históricamente, los modelos de \textit{demand forecasting} minimizaban una única métrica de error promedio, como el MAE o el RMSE. Sin embargo, en un problema de optimización de inventarios donde la gestión de la incertidumbre es vital, buscar únicamente reducir la media del error puede resultar en modelos con varianza infraestimada o sobreajustada.
 
-Para abordar este problema, el sistema implementa una \textbf{Búsqueda de Hiperparámetros Multi-Objetivo}
-utilizando \textit{Optuna} \cite{akiba2019optuna}. Durante la fase de sintonización, el muestreador
-multiobjetivo de Optuna optimiza simultáneamente dos funciones de pérdida en conflicto: la Pinball Loss en el fractil crítico (ya definida en la Sección~\ref{sec:pinball}) y el \textbf{Winkler Score}, que se define a continuación. La implementación emplea el muestreador multiobjetivo por defecto de la librería (TPE multiobjetivo) en lugar de un algoritmo evolutivo como NSGA-II \cite{deb2002nsga2}, alternativa igualmente disponible en Optuna; la aportación metodológica reside en la formulación biobjetivo de la búsqueda, no en el muestreador concreto que la recorre.
+Históricamente, los sistemas de predicción de demanda sintonizan sus hiperparámetros minimizando funciones de error simétrico promedio (como el MAE o el RMSE). Sin embargo, en un entorno de inventario con costes fuertemente asimétricos, una mejora en el error cuadrático medio no se traduce necesariamente en una reducción de los costes operativos reales.
 
-\subsubsection{Winkler Score: Métrica de Calidad de Intervalos}
+Para resolver este desacoplamiento, el sistema implementa una \textbf{Sintonización de Hiperparámetros Guiada por Coste Logístico} (\textit{Cost-Driven Hyperparameter Optimization}) utilizando \textit{Optuna} \cite{akiba2019optuna} y el algoritmo TPE (\textit{Tree-structured Parzen Estimator}). En lugar de evaluar los candidatos con una función de pérdida abstracta, cada configuración de hiperparámetros se somete al flujo operacional completo: se ajustan los modelos multi-cuantil, se calibran sus residuos mediante la capa de \textit{Mondrian Conformal Prediction} (Sección~\ref{sec:conformal}) y se calcula el coste económico total del modelo \textit{Newsvendor} ($c_s \cdot \text{rotura} + c_h \cdot \text{almacenamiento}$) sobre la ventana de evaluación.
+
+\paragraph{Protocolo de Doble Ventana Temporal y Puerta de Validación.}
+Para evitar que el optimizador sobreajuste los hiperparámetros a una ventana temporal específica, la búsqueda se estructura en un protocolo estricto de dos etapas desacopladas:
+
+\begin{enumerate}
+    \item \textbf{Ventana de Selección ($N=30$ extracciones temporales):} Optuna explora el espacio de búsqueda sobre un conjunto histórico cerrado, guiando la propuesta de candidatos hacia configuraciones que minimizan el coste logístico medio simulado.
+    \item \textbf{Ventana de Validación \textit{Out-of-Sample} ($N=25$ extracciones independientes posteriores):} La configuración con menor coste de selección no se adopta automáticamente. Se somete a una \textbf{puerta de validación} (\textit{validation gate}) donde compite contra los hiperparámetros por defecto sobre una ventana temporal futura genuinamente no observada. Se calcula un intervalo de confianza \textit{bootstrap} al 95\% sobre la diferencia pareada de costes: solo si la mejora es estadísticamente significativa ($\text{IC}_{95\%}^{\text{sup}} < 0$), los nuevos parámetros son persistidos en \texttt{models/forecasting\_params.json} para su uso en el \textit{backtesting} global.
+\end{enumerate}
+
+\subsubsection{Evaluación de la Calidad de los Intervalos: Winkler Score}
 \label{sec:winkler}
-El \textbf{Winkler Score} \cite{winkler1972scoring} evalúa simultáneamente la \emph{nitidez} (intervalos estrechos) y la \emph{cobertura} (el valor real cae dentro del intervalo) en una sola cifra. En el contexto del tuning, se aplica sobre los cuantiles extremos $P10$ y $P90$ que produce el modelo (ya rearreglados para garantizar monotonicidad, Sección~\ref{sec:crossing}) con el único fin de discriminar entre configuraciones de hiperparámetros. En la evaluación final, la misma fórmula se aplica sobre las columnas de cuantiles del DataFrame de predicciones, que en ese punto ya contienen los valores ajustados por la capa de calibración (Sección~\ref{sec:conformal}).
+Junto al coste logístico de inventario, el sistema requiere evaluar la calidad intrínseca de los intervalos de incertidumbre producidos por la distribución predicha. Para ello se adopta el \textbf{Winkler Score} \cite{winkler1972scoring}, una regla de puntuación estrictamente propia (\textit{strictly proper scoring rule}) que penaliza simultáneamente la amplitud del intervalo (\textit{nitidez}) y los fallos de cobertura en una única métrica consolidada.
 
-Para un intervalo $[L_{s,t},\, U_{s,t}]$ con nivel de significancia $\alpha$ ($\alpha = 0{,}2$ para el intervalo P10--P90, que deja fuera el $10\%$ inferior y el $10\%$ superior de la distribución):
+Para un intervalo central $[L_{s,t},\, U_{s,t}]$ con nivel de significancia nominal $\alpha$ ($\alpha = 0{,}2$ para el intervalo central P10--P90, que deja fuera el $10\%$ en cada cola):
 
 \begin{equation}
     W(L, U, y) = \begin{cases}
@@ -361,41 +369,18 @@ Para un intervalo $[L_{s,t},\, U_{s,t}]$ con nivel de significancia $\alpha$ ($\
     \end{cases}
 \end{equation}
 
-El primer caso es el \emph{pago base}: siempre se paga la amplitud del intervalo $(U - L)$, incentivando intervalos ajustados. Si el valor real cae \emph{fuera} del intervalo se añade una penalización proporcional a la distancia al borde, amplificada por el factor $2/\alpha$ (en nuestro caso $\times 10$). La métrica se promedia sobre todas las series y horizontes; \textbf{valores más bajos son mejores}.
+El primer término representa el \emph{pago base} correspondiente a la amplitud del intervalo $(U - L)$, incentivando bandas estrechas. Cuando la demanda real $y_{s,t}$ cae fuera del intervalo, se añade una penalización lineal a la distancia al borde multiplicada por el factor $2/\alpha$ (en este caso, un factor amplificador de $\times 10$). La métrica se promedia sobre todas las series y horizontes evaluados (\textbf{valores más bajos indican mejor calibración}).
 
 \medskip
-\noindent\textbf{Ejemplo numérico.} Supóngase que el modelo predice el intervalo $[10, 20]$ kg para la demanda de mañana (amplitud $= 10$ kg, $\alpha = 0{,}2$):
+\noindent\textbf{Ejemplo numérico.} Supóngase que el modelo predice el intervalo $[10, 20]$ unidades para la demanda acumulada (amplitud $= 10$, $\alpha = 0{,}2$):
 
 \begin{itemize}
-    \item \textbf{Caso 1 (acierto):} la demanda real es $y = 15$ kg (dentro del intervalo). $W = 20 - 10 = \mathbf{10}$. Solo se paga la amplitud.
-    \item \textbf{Caso 2 (fallo por abajo):} la demanda real es $y = 5$ kg (por debajo de $L = 10$). $W = 10 + \frac{2}{0{,}2}(10 - 5) = 10 + 50 = \mathbf{60}$. El fallo de cobertura multiplica por seis el coste del intervalo válido.
-    \item \textbf{Caso 3 (fallo por arriba):} la demanda real es $y = 25$ kg (por encima de $U = 20$). $W = 10 + \frac{2}{0{,}2}(25 - 20) = 10 + 50 = \mathbf{60}$. Mismo coste que el caso anterior.
+    \item \textbf{Caso 1 (acierto):} si la demanda real es $y = 15$ (dentro del intervalo), $W = 20 - 10 = \mathbf{10}$. Solo se penaliza la amplitud.
+    \item \textbf{Caso 2 (fallo por defecto):} si la demanda real es $y = 5$ ($y < L$), $W = 10 + \frac{2}{0{,}2}(10 - 5) = 10 + 50 = \mathbf{60}$. El fallo de cobertura multiplica por seis la penalización.
+    \item \textbf{Caso 3 (fallo por exceso):} si la demanda real es $y = 25$ ($y > U$), $W = 10 + \frac{2}{0{,}2}(25 - 20) = 10 + 50 = \mathbf{60}$.
 \end{itemize}
 
-Si en cambio el modelo hubiera predicho el intervalo vago $[0, 100]$ kg (amplitud $= 100$ kg), habría acertado siempre pero pagando $W = 100$ en cada predicción, mucho peor que el acierto del intervalo ajustado ($W = 10$). La métrica desincentiva así tanto los intervalos vagos como los que fallan.
-
-\bigskip
-Los dos objetivos que minimiza el algoritmo son por tanto:
-
-\begin{enumerate}
-    \item \textbf{Coste de Predicción Puntual (Pinball Loss en $q^*$)}: Evalúa el error del modelo en el fractil crítico, es decir, con la misma función de pérdida con la que fue entrenado. Esta coherencia garantiza que los hiperparámetros se seleccionen en función del coste logístico real, no de una métrica estadística genérica como el MAE.
-    \item \textbf{Nitidez Probabilística (Winkler Score)}: Penaliza simultáneamente la amplitud de los intervalos predichos y los fallos de cobertura, tal como se define en la sección anterior.
-\end{enumerate}
-
-El resultado no es una única configuración de hiperparámetros ``óptima'', sino un \textbf{Frente de Pareto} donde cada punto representa un compromiso inmejorable entre el coste logístico de la predicción central y la fiabilidad de las cotas de incertidumbre. El orquestador selecciona el punto del frente que minimiza la suma $\text{Pinball}(q^*) + \text{Winkler}$ (ambos objetivos con igual peso) antes de iniciar el \textit{backtesting} global.
-
-La suma con pesos iguales no pretende ser una ponderación óptima, sino un criterio neutro y
-reproducible que automatiza la elección a falta de una preferencia declarada por parte del negocio.
-Conviene precisar su efecto real, porque los dos objetivos no comparten escala: el Winkler Score
-incorpora las penalizaciones por fallo de cobertura y toma valores de un orden de magnitud superior
-a la Pinball Loss en $q^*$, de modo que la suma inclina la selección hacia configuraciones con
-intervalos fiables antes que hacia el mejor error puntual. Ese sesgo es coherente con el propósito
-del sistema, pues es la calidad de la distribución predicha, y no el acierto de su valor central, la
-que sostiene la decisión de inventario. Conviene, no obstante, atribuirlo a las escalas respectivas
-de ambas métricas y no al reparto equitativo de los pesos. El frente completo se conserva entre los
-artefactos de la ejecución y se publica en el cuadro de mandos
-(Figura~\ref{fig:ui_pareto_tuning}), de manera que una organización con una preferencia distinta
-entre coste puntual y fiabilidad del intervalo puede escoger otro punto sin repetir la búsqueda.
+Si en cambio el modelo produjera un intervalo trivial e hiper-conservador $[0, 100]$ unidades, cubriría siempre la demanda real pero incurriría en un pago constante de $W = 100$, muy superior al del intervalo ajustado. El Winkler Score se emplea en el módulo de evaluación final y en el cuadro de mandos (Sección~\ref{sec:metricas_evaluacion}) para auditar la fiabilidad de las bandas de incertidumbre antes y después de la calibración conformal.
 
 \subsection{Calibración: Mondrian Conformal Prediction}
 \label{sec:conformal}
