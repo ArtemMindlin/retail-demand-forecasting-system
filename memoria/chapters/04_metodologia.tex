@@ -316,17 +316,26 @@ De las tres implementaciones de referencia revisadas en el Estado del Arte, el s
 \label{sec:crossing}
 Dado que los frameworks estándar de Gradient Boosting están diseñados para optimizar un único objetivo escalar por modelo, el sistema implementa un \textbf{Wrapper Cuantílico Multi-Modelo}. Este componente instancia y entrena de forma independiente $M$ estimadores, cada uno sintonizado para un cuantil específico del conjunto $\mathcal{Q} = \{q_1, q_2, \dots, q_M\}$, donde $q_1 < q_2 < \dots < q_M$.
 
-Sin embargo, esta aproximación introduce el \textbf{cruzamiento de cuantiles} (\textit{quantile crossing}) \cite{koenker2005quantile}: al entrenarse cada modelo sin información sobre las predicciones de los demás, nada impide que el modelo del cuantil 0{,}7 prediga un valor mayor que el del cuantil 0{,}9 en alguna observación concreta. Para corregirlo, se aplica el \textbf{\textit{rearrangement}} de Chernozhukov \cite{chernozhukov2010quantile}: dado el vector de predicciones crudas $\tilde{\mathbf{y}}_{s,t} = (\tilde{y}_{s,t}^{(1)}, \dots, \tilde{y}_{s,t}^{(M)})$, simplemente se reordenan en orden ascendente. Este procedimiento, equivalente a aplicar \texttt{np.sort} sobre el eje de cuantiles, tiene complejidad $\mathcal{O}(M \log M)$ y posee una propiedad teórica relevante \cite{chernozhukov2010quantile}: el \textit{rearrangement} reduce la pérdida cuantílica \textbf{integrada sobre todos los niveles de cuantil} respecto a las estimaciones originales, mientras que la regresión isotónica, al minimizar la proyección L2, no ofrece garantías equivalentes sobre la pérdida \textit{Pinball}. La alternativa isotónica se resolvería mediante el algoritmo \textbf{PAVA} (\textit{Pool Adjacent Violators Algorithm}) \cite{barlow1972isotonic}, que recorre el vector y, cada vez que detecta dos valores adyacentes que violan la monotonía, los promedia (\textit{pool}) hasta obtener la secuencia no decreciente más cercana al original en norma L2. Frente al \textit{rearrangement}, que únicamente reordena los valores conservándolos, PAVA los \textit{modifica} al promediarlos, lo que justifica su descarte en este contexto. Formalmente:
+\paragraph{El fenómeno del \textit{Quantile Crossing}.}
+Al entrenarse cada estimador sin comunicación con los demás, esta arquitectura introduce el riesgo de \textbf{cruzamiento de cuantiles} (\textit{quantile crossing}) \cite{koenker2005quantile}: una patología en la que, para una observación concreta, el modelo de un cuantil inferior predice un valor mayor que el de un cuantil superior (por ejemplo, $\hat{y}_{0{,}7} > \hat{y}_{0{,}9}$), violando la monotonicidad axiomática de las funciones de distribución acumulada.
+
+\paragraph{Corrección mediante \textit{Rearrangement} de Chernozhukov.}
+Para restaurar la monotonicidad sin distorsionar las estimaciones, el sistema aplica el \textbf{\textit{rearrangement}} propuesto por Chernozhukov et al. \cite{chernozhukov2010quantile}. Dado el vector de predicciones crudas $\tilde{\mathbf{y}}_{s,t} = (\tilde{y}_{s,t}^{(1)}, \dots, \tilde{y}_{s,t}^{(M)})$, el método consiste en reordenar sus componentes en orden no decreciente:
 
 \begin{equation}
     \hat{\mathbf{y}}_{s,t} = \text{sort}\!\left(\tilde{\mathbf{y}}_{s,t}\right)
 \end{equation}
 
-Esta operación garantiza:
+Esta operación garantiza formalmente la monotonicidad de la rejilla estimada:
 
 \begin{equation}
     \hat{y}_{s,t}^{(1)} \le \hat{y}_{s,t}^{(2)} \le \dots \le \hat{y}_{s,t}^{(M)}
 \end{equation}
+
+Este procedimiento es computacionalmente ligero ($\mathcal{O}(M \log M)$, equivalente a ordenar con \texttt{np.sort} sobre el eje de cuantiles) y posee una propiedad teórica fundamental \cite{chernozhukov2010quantile}: el \textit{rearrangement} reduce (o mantiene) la pérdida cuantílica integrada sobre todos los niveles de cuantil respecto a las estimaciones originales.
+
+\paragraph{Descarte de la Regresión Isotónica (PAVA).}
+Frente al \textit{rearrangement}, la alternativa clásica para forzar monotonicidad es la regresión isotónica mediante el algoritmo \textbf{PAVA} (\textit{Pool Adjacent Violators Algorithm}) \cite{barlow1972isotonic}. PAVA recorre el vector y promedia sucesivamente los pares adyacentes que violan el orden para encontrar la proyección más cercana en norma $L_2$. Sin embargo, PAVA no ofrece garantías de mejora sobre la función de pérdida \textit{Pinball} y modifica activamente los valores predichos al promediarlos, mientras que el \textit{rearrangement} preserva exactamente los cuantiles aprendidos por el modelo reorganizando únicamente sus posiciones.
 
 \subsection{Optimización Multi-Objetivo y Frente de Pareto}
 \label{sec:pareto}
