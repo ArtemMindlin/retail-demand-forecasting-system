@@ -86,8 +86,15 @@ class PromotionDecisionMetadata(BaseModel):
     champion_service_level: float = Field(ge=0.0, le=1.0)
     challenger_service_level: float = Field(ge=0.0, le=1.0)
     service_level_delta: float
+    # None when the run produced no Winkler for one of the two models (a heuristic baseline has
+    # no interval), in which case the weighted term is dropped and the score is the cost alone.
+    champion_winkler_score: float | None = None
+    challenger_winkler_score: float | None = None
+    winkler_improvement_pct: float | None = None
+    weighted_score: float
     min_cost_improvement_pct: float = Field(ge=0.0)
     max_service_level_degradation: float = Field(ge=0.0, le=1.0)
+    winkler_weight: float = Field(default=0.0, ge=0.0)
     promote: bool
     decision_reason: str
 
@@ -420,6 +427,49 @@ def build_exceptions_frame(recommendations: pd.DataFrame) -> pd.DataFrame:
     return exceptions.loc[:, output_columns]
 
 
+def _attach_winkler_improvement(
+    challengers: pd.DataFrame,
+    champion: pd.Series,
+    metrics_summary: pd.DataFrame,
+) -> tuple[float | None, pd.DataFrame]:
+    """Join each challenger's Winkler Score and its relative improvement over the champion.
+
+    `metrics_summary` groups on the same keys as `cost_summary` and excludes the same holdout
+    fold, so this is a straight lookup rather than a recomputation. Returns the champion's own
+    score alongside the enriched frame; both are None/NaN when the run carries no Winkler --
+    a heuristic baseline has no interval to score, and a run predating the column has none at all.
+    """
+    challengers = challengers.copy()
+    challengers["challenger_winkler_score"] = float("nan")
+    challengers["winkler_improvement_pct"] = float("nan")
+    if metrics_summary is None or metrics_summary.empty:
+        return None, challengers
+    if "winkler_score" not in metrics_summary.columns:
+        return None, challengers
+
+    keys = [c for c in ("data_strategy", "model_name", "backend_name") if c in metrics_summary]
+    if not {"model_name", "backend_name"}.issubset(keys):
+        return None, challengers
+
+    lookup = {
+        tuple(str(row[k]) for k in keys): float(row["winkler_score"])
+        for _, row in metrics_summary.iterrows()
+        if pd.notna(row.get("winkler_score"))
+    }
+    champion_winkler = lookup.get(tuple(str(champion.get(k)) for k in keys))
+
+    scores = [lookup.get(tuple(str(row.get(k)) for k in keys)) for _, row in challengers.iterrows()]
+    challengers["challenger_winkler_score"] = [float("nan") if s is None else s for s in scores]
+    if champion_winkler is None or champion_winkler <= 0.0:
+        return champion_winkler, challengers
+
+    # Lower Winkler is better, so the improvement has the same sign convention as the cost one.
+    challengers["winkler_improvement_pct"] = (
+        (champion_winkler - challengers["challenger_winkler_score"]) / champion_winkler * 100.0
+    )
+    return champion_winkler, challengers
+
+
 def build_promotion_decision(
     artifacts: RunArtifacts,
     settings: Settings,
@@ -471,6 +521,18 @@ def build_promotion_decision(
     challengers["service_level_delta"] = (
         challengers["service_level"].astype(float) - champion_service_level
     )
+
+    winkler_weight = float(settings.business.champion_winkler_weight)
+    champion_winkler, challengers = _attach_winkler_improvement(
+        challengers, champion, artifacts.metrics_summary
+    )
+    # The score the promotion ranks and gates on. With the default weight of 0.0 the Winkler term
+    # vanishes and this is exactly `cost_improvement_pct`, so the historical behaviour is intact;
+    # a positive weight is a declared business preference for interval quality, priced in points
+    # of cost improvement. Rows with no Winkler on either side keep their cost term alone rather
+    # than being penalised for a metric that does not exist for them.
+    weighted_winkler = challengers["winkler_improvement_pct"].fillna(0.0) * winkler_weight
+    challengers["weighted_score"] = challengers["cost_improvement_pct"] + weighted_winkler
     # Three conditions, and the third is the one that stops a coin flip from replacing a
     # champion. `champion_min_cost_improvement_pct` defaults to 0.0, so on its own the cost gate
     # admits any improvement at all -- the previous champion comparison turned on 0.05%, which is
@@ -479,7 +541,7 @@ def build_promotion_decision(
     # clusters. A run whose cost_summary predates that column has no `conclusive` field, and the
     # gate then falls back to the two configured thresholds rather than refusing to decide.
     meets_cost = (
-        challengers["cost_improvement_pct"] >= settings.business.champion_min_cost_improvement_pct
+        challengers["weighted_score"] >= settings.business.champion_min_cost_improvement_pct
     )
     keeps_service = (
         challengers["service_level_delta"]
@@ -495,21 +557,22 @@ def build_promotion_decision(
     promotable = challengers.loc[challengers["promote"]].copy()
     if not promotable.empty:
         selected = promotable.sort_values(
-            ["total_cost", "service_level"],
-            ascending=[True, False],
+            ["weighted_score", "service_level"],
+            ascending=[False, False],
         ).iloc[0]
         decision_reason = (
-            "Challenger improves total cost and respects the configured service-level tolerance."
+            "Challenger improves the weighted cost/Winkler score and respects the configured "
+            "service-level tolerance."
         )
         promote = True
     else:
         selected = challengers.sort_values(
-            ["total_cost", "service_level"],
-            ascending=[True, False],
+            ["weighted_score", "service_level"],
+            ascending=[False, False],
         ).iloc[0]
         decision_reason = (
-            "No challenger satisfied the minimum cost improvement, the service-level guardrail "
-            "and a cost gap whose interval clears zero."
+            "No challenger satisfied the minimum weighted cost/Winkler improvement, the "
+            "service-level guardrail and a cost gap whose interval clears zero."
         )
         promote = False
 
@@ -527,8 +590,13 @@ def build_promotion_decision(
         champion_service_level=champion_service_level,
         challenger_service_level=float(selected["service_level"]),
         service_level_delta=float(selected["service_level_delta"]),
+        champion_winkler_score=champion_winkler,
+        challenger_winkler_score=_optional_float(selected.get("challenger_winkler_score")),
+        winkler_improvement_pct=_optional_float(selected.get("winkler_improvement_pct")),
+        weighted_score=float(selected["weighted_score"]),
         min_cost_improvement_pct=settings.business.champion_min_cost_improvement_pct,
         max_service_level_degradation=settings.business.champion_max_service_level_degradation,
+        winkler_weight=winkler_weight,
         promote=promote,
         decision_reason=decision_reason,
     )
@@ -684,3 +752,9 @@ def _optional_string(value: object) -> str | None:
     if value is None or pd.isna(value):
         return None
     return str(value)
+
+
+def _optional_float(value: object) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    return float(value)  # type: ignore[arg-type]

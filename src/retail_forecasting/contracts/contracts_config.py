@@ -262,6 +262,12 @@ class BusinessConfig(BaseModel):
     champion_backend_name: str = "conformal_catboost_official"
     champion_min_cost_improvement_pct: float = Field(default=0.0, ge=0.0)
     champion_max_service_level_degradation: float = Field(default=0.02, ge=0.0, le=1.0)
+    # How many points of relative COST improvement one point of relative WINKLER improvement is
+    # worth when promoting. A declared business preference, like the c_u/c_o pair: 0.0 ranks on
+    # cost alone (the behaviour every figure in the thesis was produced under), higher values buy
+    # interval quality with cost. Both terms are relative improvements over the incumbent, so the
+    # weight is unit-free and reads directly as an exchange rate.
+    champion_winkler_weight: float = Field(default=0.0, ge=0.0)
 
 
 class SimulationConfig(BaseModel):
