@@ -28,6 +28,7 @@ ALLOWED_LAYER_IMPORTS = {
         "models",
         "tracking",
         "utils",
+        "visualization",
     },
     "inventory": {"config"},
     "models": {"config", "contracts", "utils"},

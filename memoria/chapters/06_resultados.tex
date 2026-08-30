@@ -45,11 +45,11 @@ La Tabla~\ref{tab:forecasting_tuning_results} y la Figura~\ref{fig:tuning_conver
         \toprule
         \textbf{Backend} & \textbf{Trials} & \textbf{Coste Sel.} & \textbf{Coste Val.} & \textbf{Coste Def.} & \textbf{Mejora (\%)} & \textbf{IC 95\% Mejora} \\
         \midrule
-        LightGBM & 60 & 22{,}39 & 33{,}66 & 44{,}00 & -23{,}52\% & $[-11{,}45\%,\; -9{,}24\%]$ \\
-        CatBoost & 60 & 23{,}97 & \textbf{28{,}89} & 33{,}26 & -13{,}15\% & $[-5{,}07\%,\; -3{,}68\%]$ \\
+        LightGBM & 60 & 22{,}07 & 34{,}03 & 44{,}00 & -22{,}66\% & $[-11{,}03\%,\; -8{,}92\%]$ \\
+        CatBoost & 60 & 23{,}77 & \textbf{29{,}93} & 33{,}26 & -10{,}01\% & $[-4{,}50\%,\; -2{,}16\%]$ \\
         \bottomrule
     \end{tabular}
-    \caption{Resultados de la sintonización de hiperparámetros del modelo de forecasting (régimen \texttt{v3}) evaluados a través de la capa de calibración conformal de 14 días. El coste de validación refleja el rendimiento \textit{out-of-sample}.}
+    \caption{Resultados de la sintonización de hiperparámetros del modelo de forecasting (régimen biobjetivo) evaluados a través de la capa de calibración conformal de 14 días. El coste de validación refleja el rendimiento \textit{out-of-sample}.}
     \label{tab:forecasting_tuning_results}
 \end{table}
 
@@ -63,11 +63,23 @@ La Tabla~\ref{tab:forecasting_tuning_results} y la Figura~\ref{fig:tuning_conver
 Los resultados aportan dos conclusiones metodológicas fundamentales sobre el comportamiento de los modelos:
 
 \begin{itemize}
-    \item \textbf{Degradación out-of-sample en LightGBM}: Durante la fase de selección, LightGBM alcanza un coste inferior al de CatBoost ($22{,}39$ frente a $23{,}97$, Panel izquierdo de la Figura~\ref{fig:tuning_convergence_60trials}). Sin embargo, en la ventana de validación posterior, el coste de LightGBM aumenta a $33{,}66$, evidenciando una alta sensibilidad y un sobreajuste a la ventana temporal de selección.
-    \item \textbf{Estabilidad estructural de CatBoost}: CatBoost muestra un comportamiento marcadamente más estable entre ventanas ($23{,}97$ en selección frente a $28{,}89$ en validación). En la evaluación \textit{out-of-sample}, \textbf{CatBoost resulta un $14{,}2\%$ más económico que LightGBM} ($28{,}89$ vs. $33{,}66$ u.m., Panel derecho de la Figura~\ref{fig:tuning_convergence_60trials}).
+    \item \textbf{Degradación out-of-sample en LightGBM}: Durante la fase de selección, LightGBM alcanza un coste inferior al de CatBoost ($22{,}07$ frente a $23{,}77$, Panel izquierdo de la Figura~\ref{fig:tuning_convergence_60trials}). Sin embargo, en la ventana de validación posterior, el coste de LightGBM aumenta a $34{,}03$, evidenciando una alta sensibilidad y un sobreajuste a la ventana temporal de selección.
+    \item \textbf{Estabilidad estructural de CatBoost}: CatBoost muestra un comportamiento marcadamente más estable entre ventanas ($23{,}77$ en selección frente a $29{,}93$ en validación). En la evaluación \textit{out-of-sample}, \textbf{CatBoost resulta un $12{,}0\%$ más económico que LightGBM} ($29{,}93$ vs. $34{,}03$ u.m., Panel derecho de la Figura~\ref{fig:tuning_convergence_60trials}).
 \end{itemize}
 
 Esta estabilidad fuera de muestra confirma la superioridad de CatBoost en este dominio: sus árboles \textit{oblivious} actúan como un regularizador estructural eficaz y sus \textit{Ordered Target Statistics} gestionan los identificadores categóricos de alta cardinalidad sin introducir fuga de información. Por esta razón, el orquestador valida y persiste los hiperparámetros en \texttt{models/forecasting\_params.json}, ratificando a CatBoost como el \textit{backend} campeón para el despliegue operacional.
+
+\paragraph{Frontera de Pareto: Compromiso Coste vs. Calibración de Incertidumbre.}
+La formulación biobjetivo implementada permite analizar empíricamente la estructura del espacio de búsqueda para ambos motores. La Figura~\ref{fig:pareto_front_60trials} ilustra las fronteras de Pareto resultantes en el espacio bi-criterio (\textit{Coste Logístico de Inventario} frente a \textit{Winkler Score P10--P90}):
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/pareto_front_60trials.png}
+    \caption{Fronteras de Pareto empíricas obtenidas mediante optimización biobjetivo (Optuna MOTPE multivariante, 60 ensayos por motor). A la izquierda, espacio de búsqueda de LightGBM; a la derecha, espacio de búsqueda de CatBoost con sus 5 soluciones no dominadas y el óptimo seleccionado.}
+    \label{fig:pareto_front_60trials}
+\end{figure}
+
+En el caso de LightGBM, la exploración converge hacia un único punto extremal dominante (Trial 21, coste $22{,}07$, Winkler $58{,}34$). En CatBoost, por el contrario, la búsqueda revela una rica frontera de 5 soluciones no dominadas que exhibe el compromiso clásico entre nitidez/cobertura y coste de rotura: la configuración ganadora (Trial 46) alcanza el mínimo coste de inventario ($23{,}77$) manteniendo un Winkler Score equilibrado ($65{,}59$), descartando aquellas configuraciones con intervalos deformados.
 
 \subsection{Las Tres Estrategias de Imputación y sus Dos Rutas de Evaluación}
 \label{sec:resultados_imputacion}

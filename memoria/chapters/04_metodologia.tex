@@ -337,25 +337,32 @@ Este procedimiento es computacionalmente ligero ($\mathcal{O}(M \log M)$, equiva
 \paragraph{Descarte de la Regresión Isotónica (PAVA).}
 Frente al \textit{rearrangement}, la alternativa clásica para forzar monotonicidad es la regresión isotónica mediante el algoritmo \textbf{PAVA} (\textit{Pool Adjacent Violators Algorithm}) \cite{barlow1972isotonic}. PAVA recorre el vector y promedia sucesivamente los pares adyacentes que violan el orden para encontrar la proyección más cercana en norma $L_2$. Sin embargo, PAVA no ofrece garantías de mejora sobre la función de pérdida \textit{Pinball} y modifica activamente los valores predichos al promediarlos, mientras que el \textit{rearrangement} preserva exactamente los cuantiles aprendidos por el modelo reorganizando únicamente sus posiciones.
 
-\subsection{Sintonización Guiada por Coste Logístico y Validación Temporal}
+\subsection{Sintonización Biobjetivo y Frente de Pareto: Coste Logístico vs. Winkler Score}
 \label{sec:tuning_metodologia}
 \label{sec:pareto}
 
-Históricamente, los sistemas de predicción de demanda sintonizan sus hiperparámetros minimizando funciones de error simétrico promedio (como el MAE o el RMSE). Sin embargo, en un entorno de inventario con costes fuertemente asimétricos, una mejora en el error cuadrático medio no se traduce necesariamente en una reducción de los costes operativos reales.
+Históricamente, los sistemas de predicción de demanda sintonizan sus hiperparámetros minimizando funciones de error simétrico promedio (como el MAE o el RMSE). Sin embargo, en un entorno de inventario con costes fuertemente asimétricos, una mejora en el error cuadrático medio no se traduce necesariamente en una reducción de los costes operativos reales, y optimizar un único cuantil aislado puede deformar la dispersión del resto de la distribución predicha.
 
-Para resolver este desacoplamiento, el sistema implementa una \textbf{Sintonización de Hiperparámetros Guiada por Coste Logístico} (\textit{Cost-Driven Hyperparameter Optimization}) utilizando \textit{Optuna} \cite{akiba2019optuna} y el algoritmo TPE (\textit{Tree-structured Parzen Estimator}). En lugar de evaluar los candidatos con una función de pérdida abstracta, cada configuración de hiperparámetros se somete al flujo operacional completo: se ajustan los modelos multi-cuantil, se calibran sus residuos mediante la capa de \textit{Mondrian Conformal Prediction} (Sección~\ref{sec:conformal}) y se calcula el coste económico total del modelo \textit{Newsvendor} ($c_s \cdot \text{rotura} + c_h \cdot \text{almacenamiento}$) sobre la ventana de evaluación.
+Para resolver este compromiso, el sistema implementa una \textbf{Búsqueda de Hiperparámetros Biobjetivo} utilizando \textit{Optuna} \cite{akiba2019optuna} y el algoritmo TPE multiobjetivo multivariante (\textit{Tree-structured Parzen Estimator}). En cada iteración, el optimizador evalúa simultáneamente dos objetivos en conflicto sobre la ventana de evaluación calibrada conformalmente:
+
+\begin{enumerate}
+    \item \textbf{Objetivo 1 (Coste Logístico de Inventario):} Evalúa el coste económico total del modelo \textit{Newsvendor} ($c_u \cdot \text{rotura} + c_o \cdot \text{exceso}$) inducido por la decisión de compra en el fractil crítico.
+    \item \textbf{Objetivo 2 (Calidad de la Incertidumbre - Winkler Score):} Evalúa la nitidez y cobertura del intervalo central $[P10, P90]$ mediante la regla de puntuación estrictamente propia definida a continuación.
+\end{enumerate}
+
+Esta formulación produce una \textbf{Frontera de Pareto empírica} que identifica las configuraciones no dominadas (aquellas donde es imposible reducir el coste logístico sin degradar la fiabilidad de las bandas de incertidumbre). El sistema selecciona el candidato óptimo de la frontera y lo somete al protocolo de validación temporal.
 
 \paragraph{Protocolo de Doble Ventana Temporal y Puerta de Validación.}
 Para evitar que el optimizador sobreajuste los hiperparámetros a una ventana temporal específica, la búsqueda se estructura en un protocolo estricto de dos etapas desacopladas:
 
 \begin{enumerate}
-    \item \textbf{Ventana de Selección ($N=30$ extracciones temporales):} Optuna explora el espacio de búsqueda sobre un conjunto histórico cerrado, guiando la propuesta de candidatos hacia configuraciones que minimizan el coste logístico medio simulado.
-    \item \textbf{Ventana de Validación \textit{Out-of-Sample} ($N=25$ extracciones independientes posteriores):} La configuración con menor coste de selección no se adopta automáticamente. Se somete a una \textbf{puerta de validación} (\textit{validation gate}) donde compite contra los hiperparámetros por defecto sobre una ventana temporal futura genuinamente no observada. Se calcula un intervalo de confianza \textit{bootstrap} al 95\% sobre la diferencia pareada de costes: solo si la mejora es estadísticamente significativa ($\text{IC}_{95\%}^{\text{sup}} < 0$), los nuevos parámetros son persistidos en \texttt{models/forecasting\_params.json} para su uso en el \textit{backtesting} global.
+    \item \textbf{Ventana de Selección ($N=30$ extracciones temporales):} Optuna explora el espacio de búsqueda biobjetivo sobre un conjunto histórico cerrado, construyendo la frontera de Pareto de candidatos.
+    \item \textbf{Ventana de Validación \textit{Out-of-Sample} ($N=25$ extracciones independientes posteriores):} La configuración seleccionada en la frontera de Pareto no se adopta automáticamente. Se somete a una \textbf{puerta de validación} donde compite contra los hiperparámetros por defecto sobre una ventana temporal futura genuinamente no observada. Se calcula un intervalo de confianza \textit{bootstrap} al 95\% sobre la diferencia pareada de costes: solo si la mejora es estadísticamente significativa ($\text{IC}_{95\%}^{\text{sup}} < 0$), los nuevos parámetros son persistidos en \texttt{models/forecasting\_params.json} para su uso en el \textit{backtesting} global.
 \end{enumerate}
 
 \subsubsection{Evaluación de la Calidad de los Intervalos: Winkler Score}
 \label{sec:winkler}
-Junto al coste logístico de inventario, el sistema requiere evaluar la calidad intrínseca de los intervalos de incertidumbre producidos por la distribución predicha. Para ello se adopta el \textbf{Winkler Score} \cite{winkler1972scoring}, una regla de puntuación estrictamente propia (\textit{strictly proper scoring rule}) que penaliza simultáneamente la amplitud del intervalo (\textit{nitidez}) y los fallos de cobertura en una única métrica consolidada.
+El \textbf{Winkler Score} \cite{winkler1972scoring} es una regla de puntuación estrictamente propia que penaliza simultáneamente la amplitud del intervalo (\textit{nitidez}) y los fallos de cobertura en una única métrica consolidada.
 
 Para un intervalo central $[L_{s,t},\, U_{s,t}]$ con nivel de significancia nominal $\alpha$ ($\alpha = 0{,}2$ para el intervalo central P10--P90, que deja fuera el $10\%$ en cada cola):
 
@@ -380,7 +387,7 @@ El primer término representa el \emph{pago base} correspondiente a la amplitud 
     \item \textbf{Caso 3 (fallo por exceso):} si la demanda real es $y = 25$ ($y > U$), $W = 10 + \frac{2}{0{,}2}(25 - 20) = 10 + 50 = \mathbf{60}$.
 \end{itemize}
 
-Si en cambio el modelo produjera un intervalo trivial e hiper-conservador $[0, 100]$ unidades, cubriría siempre la demanda real pero incurriría en un pago constante de $W = 100$, muy superior al del intervalo ajustado. El Winkler Score se emplea en el módulo de evaluación final y en el cuadro de mandos (Sección~\ref{sec:metricas_evaluacion}) para auditar la fiabilidad de las bandas de incertidumbre antes y después de la calibración conformal.
+Si en cambio el modelo produjera un intervalo trivial e hiper-conservador $[0, 100]$ unidades, cubriría siempre la demanda real pero incurriría en un pago constante de $W = 100$, muy superior al del intervalo ajustado. Por estas propiedades, el \textbf{Winkler Score se integra directamente como el segundo objetivo en la búsqueda biobjetivo}: actúa penalizando activamente aquellas configuraciones de hiperparámetros que logren reducir el coste logístico a expensas de deformar, ensanchar o descalibrar los intervalos de incertidumbre predichos.
 
 \subsection{Calibración: Mondrian Conformal Prediction}
 \label{sec:conformal}
@@ -436,19 +443,13 @@ siguiente:
     penalizaría. El $\hat{q}_g$ del paso siguiente recoge cuánto hay que ensanchar el
     intervalo para que este tipo de fallos no supere el $\alpha\%$ de las veces.
 
-    \item \textbf{Factor de Corrección por Categoría}: Para cada grupo taxonómico $g$,
-    se recopila el subconjunto de scores locales $\mathcal{S}_g = \{s_i : \text{SKU}_i \in g\}$.
-    El factor de corrección $\hat{q}_g$ se obtiene como el cuantil empírico inflado de esa
-    distribución, que incorpora la corrección de muestra finita estándar de la predicción
-    conformal (el factor $(|\mathcal{S}_g|+1)/|\mathcal{S}_g|$):
+    \item \textbf{Factor de Corrección por Categoría y Salvaguarda Global}: Para cada grupo taxonómico $g$, se recopila el subconjunto de scores locales $\mathcal{S}_g = \{s_i : \text{SKU}_i \in g\}$ y se ordenan de forma no decreciente $s_{g,(1)} \le s_{g,(2)} \le \dots \le s_{g,(n_g)}$ donde $n_g = |\mathcal{S}_g|$. El factor de corrección $\hat{q}_g$ se calcula determinando la posición del estadístico de orden con corrección de muestra finita:
     \begin{equation}
-        \hat{q}_g = \text{Quantile} \left( \mathcal{S}_g, \;
-        (1 - \alpha) \left(1 + \frac{1}{|\mathcal{S}_g|}\right) \right)
+        k_g = \min\left( \left\lceil (n_g + 1)(1 - \alpha) \right\rceil,\; n_g \right), \qquad \hat{q}_g = \max\left( s_{g,(k_g)},\; 0 \right)
     \end{equation}
+    Si una categoría no cuenta con observaciones en la ventana de calibración ($n_g = 0$) o aparece por primera vez durante la inferencia, el sistema recurre automáticamente al factor de corrección global $\hat{q}_{\text{global}}$ calculado sobre la totalidad de $\mathcal{I}_{\text{cal}}$ como salvaguarda (\textit{fallback}).
 
-    \item \textbf{Ajuste Simétrico de los Cuantiles}: En predicción, el factor $\hat{q}_g$
-    se aplica simétricamente: se resta a los cuantiles inferiores (ensanchando el borde bajo)
-    y se suma a los superiores (ensanchando el borde alto), dejando la mediana intacta:
+    \item \textbf{Ajuste Simétrico y Traslación Operativa al Fractil Crítico}: En inferencia, el factor corrector $\hat{q}_g$ se aplica simétricamente a los cuantiles periféricos acotando el límite inferior en cero para evitar predicciones físicas imposibles:
     \begin{equation}
         \hat{y}_{q}^{\,\text{adj}}(x) =
         \begin{cases}
@@ -457,9 +458,7 @@ siguiente:
             \max\!\left(\hat{y}_q(x) + \hat{q}_g,\; 0\right) & \text{si } q > 0{,}5
         \end{cases}
     \end{equation}
-    El resultado es que cada categoría recibe su propio nivel de ensanchamiento: productos
-    con alta incertidumbre obtienen intervalos más anchos, mientras que los estables los
-    mantienen ajustados, con cobertura condicional garantizada dentro de cada grupo.
+    Este ensanchamiento produce bandas con cobertura condicional garantizada dentro de cada grupo y, simultáneamente, traslada una ventaja directa a la operativa de compras: al calcular la cantidad de pedido $q^*$ interpolando el fractil crítico ($q^* = 0{,}80$) entre la mediana y el cuantil superior $P90$ calibrado (Sección~\ref{sec:newsvendor}), la orden se incrementa proporcionalmente en $+0{,}75 \cdot \hat{q}_g$. Esto genera automáticamente un \textbf{colchón de stock de seguridad adaptativo por categoría} que protege al almacén contra el coste asimétrico de rotura ($c_u = 4{,}0$ frente a $c_o = 1{,}0$) en función de la verdadera dispersión empírica de cada familia de productos.
 \end{enumerate}
 
 \paragraph{Limitación: intercambiabilidad en series temporales.}
@@ -524,10 +523,10 @@ El sistema utiliza una estrategia de \textbf{ventana de entrenamiento expansiva}
 \centering
 \shorthandoff{>}%
 \begin{tikzpicture}[xscale=0.97, yscale=1.0,
-    train/.style={fill=blue!40, draw=blue!60, minimum height=0.48cm},
-    calib/.style={fill=violet!35, draw=violet!60, minimum height=0.48cm},
-    gap/.style={fill=gray!18, draw=gray!55, minimum height=0.48cm},
-    test/.style={fill=orange!55, draw=orange!70, minimum height=0.48cm},
+    train/.style={fill=cyan!60!blue!70, draw=blue!80, minimum height=0.48cm},
+    calib/.style={fill=purple!60, draw=purple!85, minimum height=0.48cm},
+    gap/.style={fill=gray!25, draw=gray!60, minimum height=0.48cm},
+    test/.style={fill=orange!75, draw=orange!90, minimum height=0.48cm},
     fold/.style={font=\sffamily\scriptsize, anchor=east}]
   % Time axis
   \draw[->,thick] (-0.15,0.1) -- (10.5,0.1) node[right,font=\sffamily\footnotesize] {tiempo};
@@ -555,11 +554,14 @@ El sistema utiliza una estrategia de \textbf{ventana de entrenamiento expansiva}
   \node[gap,   minimum width=0.3cm, anchor=west] at (7.2,0.85) {};
   \node[test,  minimum width=0.9cm, anchor=west] at (7.5,0.85) {};
   % Legend (two rows)
-  \fill[blue!40]   (0.0,3.95) rectangle (0.55,4.25); \node[right,font=\sffamily\scriptsize] at (0.6,4.10) {Entrenamiento};
-  \fill[violet!35] (3.3,3.95) rectangle (3.85,4.25); \node[right,font=\sffamily\scriptsize] at (3.9,4.10) {Calibración conformal};
-  \fill[gray!18]   (0.0,3.50) rectangle (0.55,3.80); \draw[gray!55] (0.0,3.50) rectangle (0.55,3.80);
+  \fill[cyan!60!blue!70] (0.0,3.95) rectangle (0.55,4.25); \draw[blue!80] (0.0,3.95) rectangle (0.55,4.25);
+  \node[right,font=\sffamily\scriptsize] at (0.6,4.10) {Entrenamiento};
+  \fill[purple!60] (3.3,3.95) rectangle (3.85,4.25); \draw[purple!85] (3.3,3.95) rectangle (3.85,4.25);
+  \node[right,font=\sffamily\scriptsize] at (3.9,4.10) {Calibración conformal};
+  \fill[gray!25] (0.0,3.50) rectangle (0.55,3.80); \draw[gray!60] (0.0,3.50) rectangle (0.55,3.80);
   \node[right,font=\sffamily\scriptsize] at (0.6,3.65) {Gap ($H=7$d)};
-  \fill[orange!55] (3.3,3.50) rectangle (3.85,3.80); \node[right,font=\sffamily\scriptsize] at (3.9,3.65) {Test ($H=7$d)};
+  \fill[orange!75] (3.3,3.50) rectangle (3.85,3.80); \draw[orange!90] (3.3,3.50) rectangle (3.85,3.80);
+  \node[right,font=\sffamily\scriptsize] at (3.9,3.65) {Test ($H=7$d)};
 \end{tikzpicture}
 \shorthandon{>}%
 \caption{Esquema del \textit{backtesting walk-forward} con $K=3$ folds temporales. El conjunto
@@ -571,71 +573,38 @@ corte $t_k$ (naranja).}
 \label{fig:backtesting_walkforward}
 \end{figure}
 
-El modelo \textbf{baseline} de referencia es el \textit{Seasonal Naïve}: para cada serie y fecha de predicción, replica la demanda observada en el mismo día de la semana hace 7 días. Este baseline es el más exigente en contextos con estacionalidad semanal fuerte (como el confirmado en el análisis exploratorio) y es el estándar de comparación utilizado en la competición M5 \cite{makridakis2022m5}. Un modelo que no supere al \textit{Seasonal Naïve} en Winkler Score no aporta valor respecto a una heurística trivial.
+El modelo \textbf{baseline} de referencia es el \textit{Seasonal Naïve}: para cada serie y fecha de predicción, replica la demanda observada en el mismo día de la semana hace 7 días. Este baseline es el más exigente en contextos con estacionalidad semanal fuerte (como el confirmado en el análisis de autocorrelación y estacionalidad de la Sección~\ref{sec:eda_temporal}, Figura~\ref{fig:eda_acf_demand}) y es el estándar de comparación utilizado en la competición M5 \cite{makridakis2022m5}. Un modelo probabilístico o de aprendizaje automático que no supere al \textit{Seasonal Naïve} en coste logístico o en error relativo (\textit{RelMAE}) no aporta valor operativo frente a una heurística determinista trivial.
 
 \subsubsection{Variación de los Targets de Validación por Estrategia}
 
 Es importante destacar un detalle del protocolo de evaluación predictiva cuando se comparan diferentes estrategias de tratamiento de la censura. Bajo el flujo de validación convencional del backtesting walk-forward:
 \begin{itemize}
     \item Para la estrategia sin corrección (\textit{Observed}), la variable objetivo en validación ($y_{\text{true}}$) son las ventas reales registradas.
-    \item Para las estrategias con corrección (\textit{Latent}), la variable objetivo en validación es la demanda ya imputada (por ejemplo, mediante el estimador supervisado).
+    \item Para las estrategias con corrección (\textit{Latent}), la variable objetivo en validación es la demanda ya imputada (por ejemplo, mediante el estimador supervisado de la Sección~\ref{sec:demanda_censurada}).
 \end{itemize}
-Dado que el proceso de imputación genera una señal suavizada y con menor varianza estocástica que las ventas observadas (las cuales sufren caídas drásticas por roturas de stock), predecir este target imputado resulta matemáticamente más sencillo. Esto genera un sesgo de evaluación que puede inflar la reducción de error (MAE y RMSE). Por ello, para realizar comparaciones rigurosas, este trabajo complementa la evaluación predictiva con una metodología de evaluación directa mediante censura sintética y análisis de costes bajo un \textit{ground-truth} común (Sección~\ref{sec:imputacion_censura_sintetica} y Sección~\ref{sec:resultados_gemelo}).
+Dado que el proceso de imputación genera una señal suavizada y con menor varianza estocástica que las ventas observadas (las cuales sufren caídas drásticas por roturas de stock), predecir este target imputado resulta matemáticamente más sencillo. Esto genera un sesgo de evaluación que puede inflar artificialmente la reducción de métricas simétricas tradicionales (como el MAE y el RMSE). Dado que el objetivo del sistema de \textit{forecasting} no es minimizar el error puntual medio sino optimizar la rentabilidad operativa y la calibración de la incertidumbre (Coste \textit{Newsvendor} y \textit{Winkler Score}), este trabajo complementa la tabla de métricas predictivas estándar con una metodología de evaluación directa de Coste Justo (\textit{Fair Cost}) mediante censura sintética y análisis financiero bajo un \textit{ground-truth} común (Sección~\ref{sec:imputacion_censura_sintetica} y Sección~\ref{sec:resultados_gemelo}).
 
 
 \subsection{Costes de Inventario Uniformes: un Supuesto Asumido}
 \label{sec:cost_profiles}
 
-Un supuesto limitante en muchas aplicaciones académicas de inventario es la utilización de
-costes de rotura ($c_u$) y exceso ($c_o$) uniformes para todo el catálogo. En un entorno real
-de \textit{retail} fresco la penalización por una rotura en un producto básico es muy superior
-a la de un producto de nicho, del mismo modo que el coste de exceso es crítico en productos de
-alta caducidad. Este trabajo \textbf{asume deliberadamente ese supuesto}, y esta sección
-justifica por qué.
+Un supuesto limitante en muchas aplicaciones académicas de inventario es la utilización de costes de rotura ($c_u$, \textit{underage}) y exceso o sobrestock ($c_o$, \textit{overage}) uniformes para todo el catálogo. En un entorno real de \textit{retail} fresco la penalización por una rotura en un producto básico es muy superior a la de un producto de nicho, del mismo modo que el coste de exceso es crítico en productos de alta caducidad. Este trabajo \textbf{asume deliberadamente ese supuesto}, y esta sección justifica por qué.
 
-La razón es que \textit{FreshRetailNet-50K} no publica ninguna de las magnitudes que
-permitirían levantarlo: no contiene vida útil, ni margen, ni coste de adquisición. Diferenciar
-los costes por SKU exige por tanto \emph{inferirlos}, y una inferencia sin verdad terreno
-introduce un problema más grave que el que resuelve.
+La razón es que \textit{FreshRetailNet-50K} no publica ninguna de las magnitudes que permitirían levantarlo: no contiene vida útil, ni margen, ni coste de adquisición. Diferenciar los costes por SKU exige por tanto \emph{inferirlos}, y una inferencia sin verdad terreno introduce un problema más grave que el que resuelve.
 
-Se implementó y se midió esa alternativa antes de descartarla. El sistema derivaba $c_o$ y
-$c_u$ por serie a partir de \textit{proxies} de la forma de la serie de ventas ---intermitencia
-de la categoría, variabilidad de la categoría y tensión histórica de rotura--- combinados
-mediante nueve constantes heurísticas. Tres hallazgos motivaron su retirada:
+Se implementó y se midió esa alternativa antes de descartarla. El sistema derivaba $c_o$ y $c_u$ por serie a partir de variables aproximadas (\textit{proxies}) de la forma de la serie de ventas (como la intermitencia, la variabilidad de la categoría y la tensión histórica de rotura), combinadas mediante nueve constantes heurísticas. Tres hallazgos motivaron su retirada:
 
 \begin{enumerate}
-    \item \textbf{El coste resultante no era dinero.} El \texttt{total\_cost} que producía era
-    el número de unidades multiplicado por coeficientes inventados, sin ningún anclaje en un
-    hecho de negocio. Como ese mismo \texttt{total\_cost} es el criterio de selección del
-    modelo campeón, la elección se realizaba en una unidad arbitraria; y las cifras no eran
-    comparables con las del \textit{backtest} de coste justo, que cobra de forma uniforme.
+    \item \textbf{El coste resultante no era dinero.} El \texttt{total\_cost} que producía era el número de unidades multiplicado por coeficientes inventados, sin ningún anclaje en un hecho de negocio. Como ese mismo \texttt{total\_cost} es el criterio de selección del modelo campeón, la elección se realizaba en una unidad arbitraria; y las cifras no eran comparables con las del \textit{backtest} de coste justo, que cobra de forma uniforme.
 
-    \item \textbf{El \textit{proxy} no medía lo que su nombre indicaba.} La puntuación de
-    perecibilidad se calculaba a partir de la irregularidad de las ventas, que no permite
-    distinguir un producto que se deteriora rápido de uno que simplemente no se vende.
+    \item \textbf{El \textit{proxy} no medía lo que su nombre indicaba.} La puntuación de perecibilidad se calculaba a partir de la irregularidad de las ventas, que no permite distinguir un producto que se deteriora rápido de uno que simplemente no se vende.
 
-    \item \textbf{La diferenciación no resultaba rentable de forma consistente.} Medida sobre
-    el panel de 500 series manteniendo fijas las predicciones y comparando ambas reglas de
-    decisión bajo una contabilidad común, la diferenciación reducía el coste un $2{,}05\%$
-    sobre demanda reconstruida pero lo \textbf{aumentaba} un $3{,}66\%$ sobre demanda
-    censurada. El ganador era el mismo con las dos contabilidades posibles, de modo que el
-    resultado no es un artefacto de la métrica elegida. La explicación es que el fractil
-    crítico es óptimo únicamente si la distribución predicha es la verdadera: sobre demanda
-    censurada los cuantiles están sesgados a la baja, y un ajuste que reduce el fractil empuja
-    a la baja un pedido que ya iba corto.
+    \item \textbf{La diferenciación no resultaba rentable de forma consistente.} Medida sobre el panel de 500 series manteniendo fijas las predicciones y comparando ambas reglas de decisión bajo una contabilidad común, la diferenciación reducía el coste un $2{,}05\%$ sobre demanda reconstruida pero lo \textbf{aumentaba} un $3{,}66\%$ sobre demanda censurada. El ganador era el mismo con las dos contabilidades posibles, de modo que el resultado no es un artefacto de la métrica elegida. La explicación es que el fractil crítico es óptimo únicamente si la distribución predicha es la verdadera: sobre demanda censurada los cuantiles están sesgados a la baja, y un ajuste que reduce el fractil empuja a la baja un pedido que ya iba corto.
 \end{enumerate}
 
-En consecuencia, $c_o$ y $c_u$ son constantes de configuración declaradas, y la robustez del
-sistema frente a ellas se establece por la vía correcta: el análisis de sensibilidad recorre
-el ratio $C_u/C_o$ y reporta cómo se desplazan coste y nivel de servicio, en lugar de fijar
-una diferenciación por SKU que no puede validarse.
+En consecuencia, $c_o$ y $c_u$ son constantes de configuración declaradas ($c_u = 4{,}0$, $c_o = 1{,}0$), y la robustez del sistema frente a ellas se establece por la vía correcta: el análisis de sensibilidad recorre el ratio $c_u/c_o$ (desde 1:1 hasta 10:1) y reporta cómo se desplazan coste y nivel de servicio, en lugar de fijar una diferenciación por SKU que no puede validarse empíricamente.
 
-Conviene precisar el alcance de este supuesto: \textbf{las decisiones siguen siendo
-específicas de cada serie}. Cada SKU tiene su propia distribución predictiva, de modo que el
-pedido difiere entre series aunque el fractil crítico sea común. Lo que se renuncia a modelar
-es la heterogeneidad \emph{económica} entre productos, no la heterogeneidad de su demanda. En
-un despliegue real con costes de negocio efectivos, ese es el punto exacto de entrada
-(\texttt{attach\_series\_costs}).
+Conviene precisar el alcance de este supuesto: \textbf{las decisiones siguen siendo específicas de cada serie}. Cada SKU tiene su propia distribución predictiva, de modo que el pedido difiere entre series aunque el fractil crítico sea común. Lo que se renuncia a modelar es la heterogeneidad \emph{económica} entre productos, no la heterogeneidad de su demanda.
 
 \section{Bloque II: Operación}
 % ==============================================================================

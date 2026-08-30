@@ -60,9 +60,11 @@ from retail_forecasting.inventory.newsvendor import attach_inventory_costs, choo
 from retail_forecasting.models.boosting import LightGBMModel
 from retail_forecasting.models.catboosting import CatBoostingModel
 from retail_forecasting.tracking import MLFLOW_TRACKING_URI
+from retail_forecasting.utils.io import winkler_score
 from retail_forecasting.utils.logging import Table, fields, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
 from retail_forecasting.utils.stats import mean_ci95
+from retail_forecasting.visualization.plots import render_pareto_front
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +100,7 @@ _FINISHED_STATES = (optuna.trial.TrialState.COMPLETE,)
 # calibrated on the class default of 21 days because `validation` was not wired into this
 # mode's settings; v3 calibrates on the 14 days configs/experiment/default.yaml actually
 # deploys.
-_OBJECTIVE_VERSION = 3
+_OBJECTIVE_VERSION = 4
 
 _MLFLOW_EXPERIMENT = "forecasting_tuning"
 
@@ -374,7 +376,7 @@ def _draw_cost(
     settings: Settings,
     feature_columns: list[str],
     target_column: str,
-) -> float:
+) -> tuple[float, float]:
     """Mean simulated inventory cost of one hyperparameter set on one bootstrap draw.
 
     Cost, not MAE or Winkler: it is the criterion the champion is selected by, and the only
@@ -437,7 +439,39 @@ def _draw_cost(
         quantile_levels=levels,
     )
     evaluated = attach_inventory_costs(predictions, settings.inventory)
-    return float(evaluated["total_cost"].mean())
+    cost = float(evaluated["total_cost"].mean())
+    winkler = winkler_score(
+        predictions["y_true"],
+        predictions[columns[0]],
+        predictions[columns[-1]],
+        alpha=0.2,
+    )
+    return cost, winkler
+
+
+def draw_metrics(
+    draw_set: DrawSet,
+    backend: BoostingBackend,
+    params: dict[str, Any],
+    settings: Settings,
+    feature_columns: list[str],
+    target_column: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Cost and Winkler score of one hyperparameter set on each draw.
+
+    Parallel over draws with each fit pinned to one thread, so the cores go to the 30
+    independent fits rather than to one fit that cannot use them.
+    """
+    n_jobs = min(len(draw_set.draws), cpu_count())
+    results = Parallel(n_jobs=n_jobs, prefer="threads")(
+        delayed(_draw_cost)(
+            draw, draw_set.window, backend, params, settings, feature_columns, target_column
+        )
+        for draw in draw_set.draws
+    )
+    costs = np.asarray([r[0] for r in results], dtype=float)
+    winklers = np.asarray([r[1] for r in results], dtype=float)
+    return costs, winklers
 
 
 def draw_costs(
@@ -448,44 +482,28 @@ def draw_costs(
     feature_columns: list[str],
     target_column: str,
 ) -> np.ndarray:
-    """Cost of one hyperparameter set on each draw, one value per draw.
-
-    Parallel over draws with each fit pinned to one thread, so the cores go to the 30
-    independent fits rather than to one fit that cannot use them.
-    """
-    n_jobs = min(len(draw_set.draws), cpu_count())
-    costs = Parallel(n_jobs=n_jobs, prefer="threads")(
-        delayed(_draw_cost)(
-            draw, draw_set.window, backend, params, settings, feature_columns, target_column
-        )
-        for draw in draw_set.draws
-    )
-    return np.asarray(costs, dtype=float)
+    """Cost of one hyperparameter set on each draw, one value per draw."""
+    costs, _ = draw_metrics(draw_set, backend, params, settings, feature_columns, target_column)
+    return costs
 
 
 def _open_study(backend: BoostingBackend, seed: int, models_dir: Path) -> optuna.Study:
-    """Open (or resume) the study for one backend.
+    """Open (or resume) the multi-objective study for one backend.
 
     Persisted to SQLite so a search killed at hour four continues where it stopped, and keyed
     by backend so the two searches never share trials -- their spaces do not even have the same
     parameter names.
-
-    The sampler is GPSampler, not TPE: `docs/sampler_ab.md` measured the two on the imputer's
-    search and found no quality difference (0.50pp apart against a 2.26pp spread), with GP 34%
-    faster. `deterministic_objective` is true because the draws and the model seed are fixed,
-    so re-evaluating a candidate returns the same cost.
     """
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
     models_dir.mkdir(parents=True, exist_ok=True)
     return optuna.create_study(
-        direction="minimize",
-        sampler=optuna.samplers.GPSampler(
+        directions=["minimize", "minimize"],
+        sampler=optuna.samplers.TPESampler(
             seed=seed,
             n_startup_trials=_N_STARTUP_TRIALS,
-            deterministic_objective=True,
+            multivariate=True,
         ),
-        pruner=optuna.pruners.NopPruner(),
         storage=f"sqlite:///{models_dir / 'forecasting_tuning_studies.db'}",
         study_name=f"forecasting_{backend}_v{_OBJECTIVE_VERSION}",
         load_if_exists=True,
@@ -501,27 +519,15 @@ def run_search(
     n_trials: int,
     seed: int,
 ) -> optuna.Study:
-    """Search `backend`'s hyperparameters on the selection window.
-
-    The untuned defaults are NOT enqueued as a trial, unlike in the imputer. There the defaults
-    are a full parameter dict; here they are three config values plus whatever the model class
-    hardcodes, and enqueueing a three-key dict would have Optuna fill the other eight at
-    random -- a "reference" trial that is not the reference. The gate measures the defaults
-    directly instead.
-
-    Returns:
-        The study, whose `best_params` is the winner on selection. That value is in-sample for
-        the search and must never be quoted as the improvement.
-    """
+    """Search `backend`'s hyperparameters on the selection window via multi-objective TPE."""
     study = _open_study(backend, seed, settings.models.models_dir)
 
-    def objective(trial: optuna.Trial) -> float:
+    def objective(trial: optuna.Trial) -> tuple[float, float]:
         params = suggest_params(trial, backend)
-        return float(
-            np.mean(
-                draw_costs(selection, backend, params, settings, feature_columns, target_column)
-            )
+        costs, winklers = draw_metrics(
+            selection, backend, params, settings, feature_columns, target_column
         )
+        return float(np.mean(costs)), float(np.mean(winklers))
 
     # `n_trials` is a TARGET, not an increment: on a resumed study Optuna would otherwise run
     # that many MORE trials on top of the ones already stored.
@@ -538,7 +544,9 @@ def run_search(
         {
             "trial": len(f"{n_trials}/{n_trials}"),
             "coste": 8,
-            "mejor": 8,
+            "winkler": 8,
+            "mejor_coste": 11,
+            "mejor_winkler": 13,
             "s/trial": 7,
             "pasado": 6,
             "queda": 6,
@@ -546,17 +554,28 @@ def run_search(
     )
 
     def report_progress(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
-        # `trial.number` counts from the start of the study, resumed trials included, so it is
-        # the right numerator against the target rather than against what is left to run.
         done = trial.number + 1
         if done % _PROGRESS_EVERY_TRIALS and done != n_trials:
             return
         pace = pace_seconds(study, _N_STARTUP_TRIALS)
+        cost_val = trial.values[0] if trial.values else None
+        winkler_val = trial.values[1] if trial.values and len(trial.values) > 1 else None
+        best_candidate = (
+            min(study.best_trials, key=lambda t: t.values[0]) if study.best_trials else None
+        )
+        best_cost = best_candidate.values[0] if best_candidate else float("nan")
+        best_winkler = (
+            best_candidate.values[1]
+            if best_candidate and len(best_candidate.values) > 1
+            else float("nan")
+        )
         table.row(
             {
                 "trial": f"{done}/{n_trials}",
-                "coste": "-" if trial.value is None else f"{trial.value:.4f}",
-                "mejor": f"{study.best_value:.4f}",
+                "coste": "-" if cost_val is None else f"{cost_val:.4f}",
+                "winkler": "-" if winkler_val is None else f"{winkler_val:.4f}",
+                "mejor_coste": f"{best_cost:.4f}",
+                "mejor_winkler": f"{best_winkler:.4f}",
                 "s/trial": "-" if pace is None else f"{pace:.0f}",
                 "pasado": hhmm(time.monotonic() - started),
                 "queda": "-" if pace is None else hhmm(pace * max(n_trials - done, 0)),
@@ -660,10 +679,11 @@ def _build_metadata(
     incumbent_tuned_on: dict[str, Any] | None,
 ) -> ForecastingTuningMetadata:
     """Assemble the decision record, written whether or not the winner is persisted."""
+    min_cost = min((t.values[0] for t in study.best_trials), default=0.0)
     return ForecastingTuningMetadata(
         backend=backend,
         n_trials_requested=n_trials,
-        best_cost_selection=float(study.best_value),
+        best_cost_selection=float(min_cost),
         best_cost_validation=verdict.best_cost,
         default_cost_validation=verdict.default_cost,
         improvement_pct=verdict.improvement_pct,
@@ -803,20 +823,29 @@ def _log_study_to_mlflow(
         )
 
         # Two views of the same trials. The metric series draws the convergence curve; the
-        # nested run per trial carries that trial's own hyperparameters, which a step number
-        # cannot hold. Only the nested form lets the UI plot a hyperparameter against the cost.
-        mlflow.log_param("best_trial_number", study.best_trial.number)
-        best_so_far = float("inf")
+        # nested run per trial carries that trial's own hyperparameters.
+        best_cost_trial = min(study.best_trials, key=lambda t: t.values[0])
+        mlflow.log_param("best_trial_number", best_cost_trial.number)
+        mlflow.log_param("n_pareto_trials", len(study.best_trials))
+        best_cost_so_far = float("inf")
+        best_winkler_so_far = float("inf")
         for trial in study.trials:
-            if trial.value is None:
+            if not trial.values or len(trial.values) < 2:
                 continue
-            best_so_far = min(best_so_far, trial.value)
-            mlflow.log_metric("trial_cost", trial.value, step=trial.number)
-            mlflow.log_metric("trial_cost_best_so_far", best_so_far, step=trial.number)
+            cost_val = float(trial.values[0])
+            winkler_val = float(trial.values[1])
+            best_cost_so_far = min(best_cost_so_far, cost_val)
+            best_winkler_so_far = min(best_winkler_so_far, winkler_val)
+            mlflow.log_metric("trial_cost", cost_val, step=trial.number)
+            mlflow.log_metric("trial_cost_best_so_far", best_cost_so_far, step=trial.number)
+            mlflow.log_metric("trial_winkler", winkler_val, step=trial.number)
+            mlflow.log_metric("trial_winkler_best_so_far", best_winkler_so_far, step=trial.number)
             # Zero-padded so the UI's alphabetical list runs 0001, 0002, ... not 1, 10, 100.
             with mlflow.start_run(run_name=f"trial-{trial.number:04d}", nested=True):
                 mlflow.log_params(trial.params)
-                mlflow.log_metric("cost", trial.value)
+                mlflow.log_metric("cost", cost_val)
+                mlflow.log_metric("winkler", winkler_val)
+                mlflow.log_metric("is_on_front", 1.0 if trial in study.best_trials else 0.0)
                 if trial.duration is not None:
                     mlflow.log_metric("duration_seconds", trial.duration.total_seconds())
 
@@ -935,15 +964,43 @@ def tune_forecasting_models(
         n_trials=n_trials,
         seed=seed,
     )
-    winner_params = suggest_params(optuna.trial.FixedTrial(study.best_params), backend)
-    rule(logger, "mejor trial")
+    winner_trial = min(study.best_trials, key=lambda t: t.values[0])
+    winner_params = suggest_params(optuna.trial.FixedTrial(winner_trial.params), backend)
+    rule(logger, "mejor trial (frontera de pareto)")
     fields(
         logger,
         {
-            "coste selección": f"{study.best_value:.4f} (in-sample, no es la mejora)",
+            "coste selección": f"{winner_trial.values[0]:.4f} (in-sample)",
+            "winkler selección": f"{winner_trial.values[1]:.4f}",
+            "trials en frente pareto": f"{len(study.best_trials)}/{len(study.trials)}",
             "parámetros": ", ".join(f"{k}={v}" for k, v in sorted(winner_params.items())),
         },
     )
+
+    # Export Pareto front artifacts to reports/figures
+    pareto_records = []
+    for trial in study.trials:
+        if not trial.values or len(trial.values) < 2:
+            continue
+        is_front = trial in study.best_trials
+        is_selected = trial.number == winner_trial.number
+        pareto_records.append(
+            {
+                "trial_number": trial.number,
+                "cost": float(trial.values[0]),
+                "winkler": float(trial.values[1]),
+                "pinball": float(trial.values[0]),
+                "is_on_front": is_front,
+                "is_selected": is_selected,
+                **trial.params,
+            }
+        )
+    if pareto_records:
+        pareto_df = pd.DataFrame(pareto_records)
+        reports_fig_dir = Path("reports/figures")
+        reports_fig_dir.mkdir(parents=True, exist_ok=True)
+        pareto_df.to_csv(reports_fig_dir / f"pareto_{backend}.csv", index=False)
+        render_pareto_front(pareto_df, reports_fig_dir / f"pareto_front_{backend}.png")
 
     models_dir = settings.models.models_dir
     params_path = models_dir / settings.models.forecasting_params_filename

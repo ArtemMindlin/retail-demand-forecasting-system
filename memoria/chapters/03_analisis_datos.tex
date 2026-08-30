@@ -134,6 +134,7 @@ La Figura~\ref{fig:eda_observed_demand_boxplot} desglosa la heterogeneidad a niv
 Las series de alto volumen presentan medianas en torno a las 20 unidades diarias, con rangos intercuartílicos amplios (aproximadamente 10--28). Las series de medio y bajo volumen, en cambio, tienen medianas inferiores a 1 unidad diaria y sus cajas se comprimen casi completamente en torno a cero. Esta diferencia de escala de un orden de magnitud confirma que el panel no es homogéneo: conviven series con demanda sostenida y regular junto a series altamente intermitentes. Esta evidencia justifica el uso de modelos globales con contexto de serie, en lugar de asumir una dinámica compartida.
 
 \section{Patrones Temporales y Estacionalidad}
+\label{sec:eda_temporal}
 
 La existencia de patrones temporales recurrentes es una de las propiedades más valiosas en cualquier serie de demanda: si la demanda sigue un ciclo estable y predecible, el modelo puede aprender a anticiparlo en lugar de limitarse a reaccionar. En el sector retail de producto fresco, el ciclo semanal es el candidato más natural, dado que el comportamiento de compra de los consumidores varía sistemáticamente a lo largo de la semana. Confirmar esta hipótesis y cuantificar su intensidad es esencial para decidir qué variables de calendario y qué retardos temporales incluir como predictores.
 

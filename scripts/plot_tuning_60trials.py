@@ -37,14 +37,42 @@ def parse_tuning_log(log_path: Path) -> dict[str, pd.DataFrame]:
 
 
 def main() -> None:
-    log_path = Path("var/tune_forecasting_chain.log")
-    data = parse_tuning_log(log_path)
-
-    lgb_df = data["lightgbm"]
-    cat_df = data["catboost"]
-
     output_dir = Path("reports/figures")
     output_dir.mkdir(parents=True, exist_ok=True)
+    memoria_fig_dir = Path("memoria/figures")
+    memoria_fig_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load latest LightGBM biobjective Pareto trials
+    pareto_lgbm_path = output_dir / "pareto_lightgbm.csv"
+    if pareto_lgbm_path.exists():
+        raw_lgb = pd.read_csv(pareto_lgbm_path)
+        lgb_df = pd.DataFrame(
+            {
+                "trial": raw_lgb["trial_number"] + 1,
+                "cost": raw_lgb["cost"],
+                "best_so_far": raw_lgb["cost"].cummin(),
+            }
+        )
+    else:
+        log_path = Path("var/tune_forecasting_chain.log")
+        data = parse_tuning_log(log_path)
+        lgb_df = data["lightgbm"]
+
+    # Load latest CatBoost biobjective Pareto trials
+    pareto_cat_path = output_dir / "pareto_catboost.csv"
+    if pareto_cat_path.exists():
+        raw_cat = pd.read_csv(pareto_cat_path)
+        cat_df = pd.DataFrame(
+            {
+                "trial": raw_cat["trial_number"] + 1,
+                "cost": raw_cat["cost"],
+                "best_so_far": raw_cat["cost"].cummin(),
+            }
+        )
+    else:
+        log_path = Path("var/tune_forecasting_chain.log")
+        data = parse_tuning_log(log_path)
+        cat_df = data["catboost"]
 
     # Save CSVs
     lgb_df.to_csv(output_dir / "tuning_lightgbm_60trials.csv", index=False)
@@ -59,7 +87,7 @@ def main() -> None:
         lgb_df["best_so_far"],
         color="#3b82f6",
         linewidth=2.5,
-        label="LightGBM (Mejor: 22.39)",
+        label="LightGBM (Mejor: 22.07)",
     )
     ax1.scatter(
         lgb_df["trial"],
@@ -75,7 +103,7 @@ def main() -> None:
         cat_df["best_so_far"],
         color="#f97316",
         linewidth=2.5,
-        label="CatBoost (Mejor: 23.97)",
+        label="CatBoost (Mejor: 23.77)",
     )
     ax1.scatter(
         cat_df["trial"],
@@ -95,8 +123,8 @@ def main() -> None:
     # Subplot 2: Out-of-Sample Validation Verdict vs. Defaults
     backends = ["LightGBM", "CatBoost"]
     defaults = [44.00, 33.26]
-    winners = [33.66, 28.89]
-    gains = [-23.52, -13.15]
+    winners = [34.03, 29.93]
+    gains = [-22.66, -10.01]
 
     x = [0, 1]
     width = 0.32
@@ -138,9 +166,12 @@ def main() -> None:
 
     fig.tight_layout()
     fig.savefig(output_dir / "tuning_comparison_60trials.png")
+    fig.savefig(memoria_fig_dir / "tuning_comparison_60trials.png")
     plt.close(fig)
 
-    print(f"Generated {output_dir / 'tuning_comparison_60trials.png'} successfully!")
+    print(
+        f"Generated {output_dir / 'tuning_comparison_60trials.png'} and copied to memoria/figures successfully!"
+    )
 
 
 if __name__ == "__main__":
