@@ -263,10 +263,15 @@ class BusinessConfig(BaseModel):
     champion_min_cost_improvement_pct: float = Field(default=0.0, ge=0.0)
     champion_max_service_level_degradation: float = Field(default=0.02, ge=0.0, le=1.0)
     # How many points of relative COST improvement one point of relative WINKLER improvement is
-    # worth when promoting. A declared business preference, like the c_u/c_o pair: 0.0 ranks on
-    # cost alone (the behaviour every figure in the thesis was produced under), higher values buy
-    # interval quality with cost. Both terms are relative improvements over the incumbent, so the
-    # weight is unit-free and reads directly as an exchange rate.
+    # worth when promoting. Both terms are relative improvements over the incumbent, so the weight
+    # is unit-free and reads directly as an exchange rate.
+    #
+    # The default is 0.0 -- cost alone -- because the library should not impose a business
+    # preference; the configs declare this system's, 0.5. That value is DERIVED, not picked: it
+    # caps the Winkler term at the noise half-width of the cost estimate itself (~8.3 points, from
+    # the paired bootstrap of the third promotion gate) divided by the observed Winkler gap between
+    # backends (~14.8%). Below it, interval quality can only decide when the cost gap is inside the
+    # band where the bootstrap says cost cannot discriminate anyway.
     champion_winkler_weight: float = Field(default=0.0, ge=0.0)
 
 
