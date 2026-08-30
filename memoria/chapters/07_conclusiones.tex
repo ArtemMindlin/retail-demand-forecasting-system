@@ -54,10 +54,11 @@ de ética algorítmica, responsabilidad social corporativa y cumplimiento legal:
 \begin{itemize}
     \item \textbf{Ética de la Automatización y Explicabilidad}: El sistema se propone como una
     herramienta de soporte a la decisión, no de sustitución del criterio humano. El uso de
-    \textbf{SHAP} para desglosar la contribución de cada feature a cada predicción, junto al módulo
-    de autodiagnóstico \textit{Post-Mortem} que clasifica los fallos entre intermitencia estructural,
-    \textit{cold start} y \textit{concept drift}, fomenta una colaboración humano-máquina transparente
-    y auditable.
+    \textbf{SHAP} para desglosar la contribución de cada feature a cada predicción, junto al
+    listado de excepciones que marca cada recomendación de riesgo con su causa ---ausencia de
+    modelo por \textit{cold start}, deriva detectada, incertidumbre anómala o pedido extremo---,
+    fomenta una colaboración humano-máquina transparente y auditable: el sistema declara dónde
+    tiene menos base para decidir en lugar de presentar todas sus salidas como equivalentes.
     \item \textbf{Consumo Energético}: El entrenamiento de modelos globales de \textit{Gradient Boosting}
     sobre 4,5 millones de observaciones requiere recursos computacionales no despreciables. No
     obstante, la arquitectura MLOps de dos niveles (optimización mensual de hiperparámetros y

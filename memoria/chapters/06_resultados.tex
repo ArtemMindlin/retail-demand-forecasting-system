@@ -325,7 +325,7 @@ Los datos de la Tabla~\ref{tab:metrics_cost} evidencian tres conclusiones cuanti
 \end{enumerate}
 
 A escala de catálogo completo (500 series), la ventaja de la corrección de censura se modera debido al fenómeno de no-intercambiabilidad temporal entre los periodos de calibración y test, y el beneficio queda focalizado en series con regímenes de stockout severos. No obstante, bajo una métrica de evaluación justa aislada del sesgo temporal, la recuperación de la señal latente mediante modelos supervisados demuestra de forma consistente su viabilidad económica.
-\section{Explicabilidad y Diagnóstico Automático}
+\section{Explicabilidad del Modelo Campeón}
 \label{sec:resultados_xai}
 
 El sistema fue evaluado también por su capacidad de justificar sus decisiones, requisito indispensable para la adopción en entornos logísticos industriales donde los responsables de compra deben validar las recomendaciones. Para abrir la ``caja negra'' de los modelos basados en árboles, se emplearon los valores de Shapley (SHAP). Esta técnica permite cuantificar exactamente cuánto aporta cada variable al valor final predicho y confirmar que el algoritmo está aprendiendo relaciones lógicas y no artefactos espurios de los datos.
@@ -347,7 +347,6 @@ Del análisis de esta figura se extraen las siguientes conclusiones, que validan
     \item \textbf{Modulación climática:} Las variables meteorológicas como la humedad media (\texttt{avg\_humidity\_lag\_14}) y el nivel de viento (\texttt{avg\_wind\_level\_lag\_14}) se sitúan en las últimas posiciones. En lugar de forzar una dependencia general irreal, el algoritmo las utiliza sutilmente para ajustar los cuantiles extremos únicamente en categorías específicas.
 \end{itemize}
 
-Finalmente, más allá del impacto global de las variables, el sistema implementa un \textbf{Diagnóstico Post-Mortem} a nivel de ítem. El módulo identificó los SKUs con mayor contribución al coste total durante la simulación y, en los casos más problemáticos, atribuyó las pérdidas a una de dos causas: alta intermitencia estructural (series con más del 60\% de días con venta cero, donde cualquier predicción positiva genera sobrestock continuo) o derivas bruscas de tendencia detectadas tarde por el detector Page-Hinkley. Esta trazabilidad convierte los fallos estadísticos en información financiera accionable para el responsable logístico.
 
 \section{Simulación Operacional en Streaming y Política de Reentrenamiento MLOps}
 \label{sec:resultados_simulacion}
