@@ -29,6 +29,9 @@ from retail_forecasting.evaluation.reporting import (
     ModelRunMetadata,
     RunArtifacts,
     ValidationMetadata,
+    champion_registry_path,
+    load_champion_registry,
+    resolve_champion_reference,
     write_run_artifacts,
 )
 from retail_forecasting.evaluation.xai import calculate_shap_values
@@ -846,12 +849,23 @@ def _build_model_predictions(
 
 
 def _instantiate_champion_base_model(
-    settings: Settings, n_series: int | None = None
+    settings: Settings,
+    n_series: int | None = None,
+    backend_name: str | None = None,
+    model_name: str | None = None,
 ) -> CatBoostingModel | LightGBMModel:
+    """Build the champion's base model for the given backend/model identity.
+
+    `backend_name`/`model_name` default to the static config when omitted, but callers that
+    resolve a live champion (`resolve_champion_reference`) should pass those in explicitly --
+    the config fields are only a fallback for the first run, before a registry exists.
+    """
+    resolved_backend_name = backend_name or settings.business.champion_backend_name
+    resolved_model_name = model_name or settings.business.champion_model_name
     backend_key: BoostingBackend = (
         "catboost"
-        if settings.business.champion_backend_name == "conformal_catboost_official"
-        or settings.business.champion_model_name == "catboost"
+        if resolved_backend_name == "conformal_catboost_official"
+        or resolved_model_name == "catboost"
         else "lightgbm"
     )
     series_count = n_series if n_series is not None else (settings.dataset.top_n_series or 500)
@@ -875,8 +889,15 @@ def train_and_save_champion(
     settings: Settings,
     panel: pd.DataFrame,
     models_dir: Path | None = None,
+    backend_name: str | None = None,
+    model_name: str | None = None,
 ) -> Path:
-    """Fit the configured champion model on the full panel and persist it to disk."""
+    """Fit the champion model on the full panel and persist it to disk.
+
+    `backend_name`/`model_name` identify which architecture to train; omit them to fall
+    back to the static `BusinessConfig` fields (only correct before a champion registry
+    exists -- callers with a registry should resolve it and pass the identity in).
+    """
     supervised_frame, feature_metadata = build_supervised_frame(
         panel=panel,
         feature_config=settings.features,
@@ -888,7 +909,7 @@ def train_and_save_champion(
 
     n_series = int(panel["series_id"].nunique())
     conformal = _train_conformal_model(
-        _instantiate_champion_base_model(settings, n_series),
+        _instantiate_champion_base_model(settings, n_series, backend_name, model_name),
         train_frame,
         calib_frame,
         calib_group_ids,
@@ -939,13 +960,16 @@ def run_retrain(settings: Settings) -> Path:
         )
         raw_panel = imputer.impute(raw_panel)
 
+    champion_registry = load_champion_registry(champion_registry_path(settings))
+    champion_reference = resolve_champion_reference(settings, champion_registry)
+
     n_series = int(raw_panel["series_id"].nunique())
     fields(
         logger,
         {
             "panel": f"{thousands(n_series)} series, {thousands(len(raw_panel))} filas",
             "ventana": f"{raw_panel['date'].min().date()} → {raw_panel['date'].max().date()}",
-            "campeón": settings.business.champion_backend_name,
+            "campeón": f"{champion_reference.backend_name} (fuente: {champion_reference.source})",
             "calidad": f"{quality_report.warning_count} avisos",
         },
     )
@@ -956,7 +980,12 @@ def run_retrain(settings: Settings) -> Path:
         else "retrain_champion"
     )
     with open_run_directory(run_name, EXPERIMENT_RUNS) as run_dir:
-        model_path = train_and_save_champion(settings, raw_panel)
+        model_path = train_and_save_champion(
+            settings,
+            raw_panel,
+            backend_name=champion_reference.backend_name,
+            model_name=champion_reference.model_name,
+        )
         shutil.copy2(model_path, run_dir / model_path.name)
 
         try:
@@ -1011,8 +1040,10 @@ def run_scoring(
 
     if model_path is None:
         models_dir = settings.models.models_dir
-        champion_backend = settings.business.champion_backend_name
-        model_path = model_file_path(models_dir, champion_backend)
+        champion_reference = resolve_champion_reference(
+            settings, load_champion_registry(champion_registry_path(settings))
+        )
+        model_path = model_file_path(models_dir, champion_reference.backend_name)
     if not model_path.exists():
         raise FileNotFoundError(f"No saved model at {model_path}. Run a backtest or retrain first.")
     model = ConformalForecaster.load(model_path)
