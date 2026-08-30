@@ -48,7 +48,7 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
     $\;\to\;$ Dashboard Django};
 
   %% ── Registro de ejecuciones lateral ─────────────────────────────
-  \node[mlf] (mlflow) at (7.8,-3.2) {\texttt{reports/}\\Registro de\\ejecuciones};
+  \node[mlf] (mlflow) at (7.8,-3.2) {MLflow\\\texttt{mlflow.db} + \texttt{mlruns/}};
 
   %% ── ETIQUETAS DE CAPA ──────────────────────────────────────────
   \node[lbl, left=0.15cm of datos] {Datos};
@@ -69,7 +69,7 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
 \end{tikzpicture}%
 }
 \shorthandon{>}%
-\caption{Arquitectura del sistema: flujo de datos y decisiones entre las cuatro capas funcionales (Datos, Features, Modelado y Decisión), con persistencia de cada ejecución en un directorio versionado bajo \texttt{reports/} para trazabilidad.}
+\caption{Arquitectura del sistema: flujo de datos y decisiones entre las cuatro capas funcionales (Datos, Features, Modelado y Decisión), con persistencia de cada ejecución en el almacén de MLflow para trazabilidad.}
 \label{fig:arquitectura_sistema}
 \end{figure}
 
@@ -77,7 +77,7 @@ La estructura del código se organiza en torno a cuatro capas especializadas:
 
 \begin{enumerate}
     \item \textbf{Capa de Datos}: Ingesta desde Hugging Face con validación del panel preparado ante anomalías (datos obsoletos, duplicados o series incompletas) antes de contaminar los modelos.
-    \item \textbf{Capa de Features}: Corrección de demanda censurada por stockout e ingeniería de 50 características temporales, exógenas y estáticas sin \textit{data leakage}.
+    \item \textbf{Capa de Features}: Corrección de demanda censurada por stockout e ingeniería de 43 características temporales, exógenas y estáticas sin \textit{data leakage}.
     \item \textbf{Capa de Modelado}: Búsqueda Pareto de hiperparámetros (Optuna, TPE multiobjetivo), entrenamiento multi-cuantil (CatBoost con Pinball Loss) y calibración de intervalos (Mondrian Conformal Prediction).
     \item \textbf{Capa de Decisión}: Transformación de cuantiles en órdenes de pedido vía el fractil crítico del Newsvendor, y evaluación del coste de inventario y del nivel de servicio que esa política induce.
 \end{enumerate}
@@ -116,7 +116,7 @@ Las decisiones más relevantes se justifican a continuación:
 
     \item \begin{sloppypar}\textbf{Optuna sobre Hyperopt o GridSearch}: Optuna implementa el sampler TPE (\textit{Tree-structured Parzen Estimator}) con soporte nativo para optimización multi\-objetivo, \textit{pruning} de trials poco prometedores y paralelización. GridSearch es inviable a escala (espacio de hiperparámetros continuo) e Hyperopt no soporta nativamente Pareto multi\-objetivo sin extensiones.\end{sloppypar}
 
-    \item \textbf{Django sobre FastAPI o Flask}: el sistema no tiene base de datos ni servicio en línea: el estado son los artefactos que cada ejecución escribe en \texttt{reports/}, y la interfaz es un cuadro de mandos que los lee. Con ese perfil, lo que se necesita de un \textit{framework} no es asincronía sino un motor de plantillas, enrutado, sesiones y protección CSRF de serie. Django los aporta sin dependencias adicionales; FastAPI resolvía bien la superficie JSON pero obligaba a construir la capa de presentación aparte, que fue exactamente el origen de la interfaz monolítica descrita más abajo. El ORM y el sistema de migraciones quedan deliberadamente sin usar (\texttt{DATABASES} vacío), de modo que un acceso accidental a base de datos falla de forma explícita en lugar de crear un almacén silencioso.
+    \item \textbf{Django sobre FastAPI o Flask}: el sistema no tiene base de datos de aplicación ni servicio en línea: el estado son los artefactos que cada ejecución escribe en su directorio del almacén de MLflow, y la interfaz es un cuadro de mandos que los lee. Con ese perfil, lo que se necesita de un \textit{framework} no es asincronía sino un motor de plantillas, enrutado, sesiones y protección CSRF de serie. Django los aporta sin dependencias adicionales; FastAPI resolvía bien la superficie JSON pero obligaba a construir la capa de presentación aparte, que fue exactamente el origen de la interfaz monolítica descrita más abajo. El ORM y el sistema de migraciones quedan deliberadamente sin usar (\texttt{DATABASES} vacío), de modo que un acceso accidental a base de datos falla de forma explícita en lugar de crear un almacén silencioso.
 
     \item \textbf{Pydantic v2 sobre dataclasses}: Pydantic valida y convierte tipos en tiempo de ejecución, no solo en tiempo de análisis estático. Esto permite rechazar configuraciones incoherentes (ej. un horizonte negativo o una ruta de modelo inexistente) antes de que lleguen al pipeline, convirtiendo los errores tardíos en fallos rápidos y auditables.
 
@@ -236,15 +236,17 @@ Esta separación hace que el comportamiento del sistema sea predecible y auditab
 \subsection{Lógica de Promoción del Modelo Campeón}
 \label{sec:champion_promotion}
 
-Al término de cada ejecución en modo \texttt{experiment}, el sistema evalúa automáticamente si algún modelo \textit{challenger} debe reemplazar al \textit{champion} actualmente registrado en \texttt{champion\_registry.json}. La decisión sigue un protocolo con dos guardarraíles configurables:
+Al término de cada ejecución en modo \texttt{experiment}, el sistema evalúa automáticamente si algún modelo \textit{challenger} debe reemplazar al \textit{champion} actualmente registrado en \texttt{champion\_registry.json}. La Sección~\ref{sec:promocion} justifica por qué son tres los guardarraíles y qué certifica cada uno; esta sección recoge cómo se parametrizan y dónde queda constancia de la decisión.
 
 \begin{enumerate}
     \item \textbf{Mejora de coste mínima}: Se calcula la mejora relativa en coste de inventario simulado respecto al campeón actual como $\Delta_{\text{cost}} = \frac{C_{\text{champion}} - C_{\text{challenger}}}{C_{\text{champion}}} \times 100$\%. El \textit{challenger} solo es candidato si $\Delta_{\text{cost}} \geq \theta_{\text{cost}}$, donde $\theta_{\text{cost}}$ es el umbral \texttt{champion\_}\allowbreak\texttt{min\_}\allowbreak\texttt{cost\_}\allowbreak\texttt{improvement\_}\allowbreak\texttt{pct} (por defecto 0\%, modificable en \texttt{BusinessConfig}).
 
-    \item \begin{sloppypar}\textbf{Guardarraíl de nivel de servicio}: El \textit{challenger} no debe degradar el nivel de servicio más allá de un margen configurable (\texttt{champion\_}\allowbreak\texttt{max\_}\allowbreak\texttt{service\_}\allowbreak\texttt{level\_}\allowbreak\texttt{degradation}). Si $\Delta_{\text{sl}} < -\delta_{\text{sl}}$, el candidato es descartado aunque mejore el coste.\end{sloppypar}
+    \item \begin{sloppypar}\textbf{Guardarraíl de nivel de servicio}: El \textit{challenger} no debe degradar el nivel de servicio más allá de un margen configurable (\texttt{champion\_}\allowbreak\texttt{max\_}\allowbreak\texttt{service\_}\allowbreak\texttt{level\_}\allowbreak\texttt{degradation}, por defecto $0{,}02$). Si $\Delta_{\text{sl}} < -\delta_{\text{sl}}$, el candidato es descartado aunque mejore el coste.\end{sloppypar}
+
+    \item \textbf{Separación del azar}: El \textit{challenger} debe llegar marcado como concluyente en el \texttt{cost\_}\allowbreak\texttt{summary} de la ejecución, es decir, con el intervalo al 95\% de su hueco de coste frente al \textit{naive} estacional despejando el cero. El intervalo procede de un \textit{bootstrap} emparejado de $2.000$ remuestreos por conglomerados de serie, y exige un mínimo de ocho series para pronunciarse. A diferencia de los dos anteriores este guardarraíl no es configurable: un \texttt{cost\_summary} anterior a la introducción de la columna carece del campo, y en ese caso la puerta cede a los dos umbrales configurados en lugar de negarse a decidir.
 \end{enumerate}
 
-Entre todos los \textit{challengers} que superan ambos guardarraíles, se selecciona el de menor coste total (con el nivel de servicio como criterio de desempate). La decisión (incluyendo los valores exactos de $\Delta_{\text{cost}}$, $\Delta_{\text{sl}}$, el motivo de aceptación o rechazo y los identificadores de ambos modelos) queda registrada en el campo \texttt{promotion} del metadato de la ejecución, garantizando una trazabilidad completa del historial de cambios de modelo. La Figura~\ref{fig:champion_promotion} muestra el flujo de decisión completo.
+Entre todos los \textit{challengers} que superan los tres guardarraíles, se selecciona el de menor coste total (con el nivel de servicio como criterio de desempate). La decisión ---los valores exactos de $\Delta_{\text{cost}}$ y $\Delta_{\text{sl}}$, los umbrales vigentes, el motivo de aceptación o rechazo y los identificadores de ambos modelos--- se escribe como \texttt{promotion\_}\allowbreak\texttt{decision.json} en el directorio de la ejecución y se registra además en los metadatos de la corrida, garantizando una trazabilidad completa del historial de cambios de modelo. La Figura~\ref{fig:champion_promotion} muestra el flujo de decisión completo.
 
 \begin{figure}[H]
 \centering
@@ -269,38 +271,81 @@ Entre todos los \textit{challengers} que superan ambos guardarraíles, se selecc
   \node[box]  (start)  {Ejecutar \texttt{experiment}\\evaluar modelos candidatos};
   \node[dec,  below=of start]  (c1) {$\Delta_{\text{cost}} \geq \theta_{\text{cost}}$?};
   \node[dec,  below=of c1]     (c2) {$\Delta_{\text{sl}} \geq -\delta_{\text{sl}}$?};
-  \node[box,  below=of c2]     (sel){Seleccionar \textit{challenger}\\de menor coste};
+  \node[dec,  below=of c2]     (c3) {IC 95\% del hueco\\despeja el cero?};
+  \node[box,  below=of c3]     (sel){Seleccionar \textit{challenger}\\de menor coste};
   \node[ok,   below=of sel]    (promo){Promover \textit{challenger}\\como nuevo campeón};
   \node[rej,  right=of c1]     (rj1){Mantener\\campeón actual};
   \node[rej,  right=of c2]     (rj2){Mantener\\campeón actual};
+  \node[rej,  right=of c3]     (rj3){Mantener\\campeón actual};
   % Arrows
   \draw[->,thick] (start) -- (c1);
   \draw[->,thick] (c1)    -- node[yes]{Sí} (c2);
   \draw[->,thick] (c1)    -- node[no]{No} (rj1);
-  \draw[->,thick] (c2)    -- node[yes]{Sí} (sel);
+  \draw[->,thick] (c2)    -- node[yes]{Sí} (c3);
   \draw[->,thick] (c2)    -- node[no]{No} (rj2);
+  \draw[->,thick] (c3)    -- node[yes]{Sí} (sel);
+  \draw[->,thick] (c3)    -- node[no]{No} (rj3);
   \draw[->,thick] (sel)   -- (promo);
 \end{tikzpicture}
 \shorthandon{>}%
 \caption{Flujo de decisión de la \textit{promotion logic} del campeón. Un \textit{challenger}
 solo reemplaza al modelo actual si supera simultáneamente el umbral de mejora de coste
-($\theta_{\text{cost}}$) y el guardarraíl de nivel de servicio ($\delta_{\text{sl}}$).}
+($\theta_{\text{cost}}$), el guardarraíl de nivel de servicio ($\delta_{\text{sl}}$) y la
+condición de que su hueco de coste sea distinguible del azar.}
 \label{fig:champion_promotion}
 \end{figure}
 
 \subsection{Trazabilidad de Experimentos}
 \label{sec:experiment_tracking}
 
-Cada ejecución escribe un directorio propio bajo \texttt{reports/}, identificado por marca temporal, que constituye el registro completo y autocontenido del experimento. Se persisten cuatro categorías de información:
+Toda ejecución, sea del modo que sea, abre una corrida de MLflow y escribe sus artefactos
+directamente en el directorio que esa corrida tiene asignado. El matiz importa: con un almacén
+local, escribir en ese directorio \emph{es} registrar, de modo que no hay etapa de subida ni
+segunda copia de nada. El almacén se compone de dos piezas, \texttt{mlflow.db} para los
+metadatos y \texttt{mlruns/} para los ficheros, y se explora con la interfaz web de MLflow.
+
+Sobre los ficheros, la corrida registra además lo que un directorio por sí solo no puede
+responder, que es exactamente lo que permite comparar ejecuciones entre sí sin abrirlas una a una:
 
 \begin{itemize}
-    \item \textbf{Configuración y procedencia}: \texttt{backtest\_}\allowbreak\texttt{metadata.json} recoge el dataset, las \textit{features}, la definición de los \textit{folds}, los modelos evaluados, el \textit{hash} de la configuración y el \textit{commit} de Git con el que se generó. Esos dos últimos campos son los que permiten reconstruir el experimento exacto: el \textit{hash} identifica los parámetros y el \textit{commit} el código.
-    \item \textbf{Métricas}: \texttt{metrics\_}\allowbreak\texttt{summary.csv} y \texttt{cost\_}\allowbreak\texttt{summary.csv} contienen, por modelo y estrategia de datos, el coste de inventario simulado, el nivel de servicio, el Winkler Score, la cobertura condicional y el MAE.
-    \item \textbf{Predicciones y decisiones}: \texttt{predictions.csv} conserva la predicción puntual, los cuantiles calibrados y la cantidad de pedido para cada par serie-fecha de validación, de modo que cualquier métrica publicada es recomputable a posteriori sin volver a entrenar.
-    \item \textbf{Campeón vigente}: \texttt{champion\_}\allowbreak\texttt{registry.json} persiste entre ejecuciones qué modelo está operativo y bajo qué métricas fue promocionado, cerrando el ciclo con la \textit{promotion logic} de la Figura~\ref{fig:champion_promotion}.
+    \item \textbf{Configuración y procedencia}: los parámetros completos de la configuración
+    como \textit{params} de la corrida, y como \textit{tags} el \textit{hash} de configuración
+    y el \textit{commit} de Git con el que se generó. Esos dos últimos campos son los que
+    permiten reconstruir el experimento exacto: el \textit{hash} identifica los parámetros y el
+    \textit{commit} el código. Junto a ellos, \texttt{backtest\_}\allowbreak\texttt{metadata.json}
+    conserva en el propio directorio el dataset, las \textit{features}, la definición de los
+    \textit{folds} y los modelos evaluados.
+    \item \textbf{Métricas}: \texttt{metrics\_}\allowbreak\texttt{summary.csv} y
+    \texttt{cost\_}\allowbreak\texttt{summary.csv} contienen, por modelo y estrategia de datos,
+    el coste de inventario simulado, el nivel de servicio, el Winkler Score, la cobertura
+    condicional y el MAE. Sus columnas numéricas se registran también como métricas de la
+    corrida, de modo que una consulta sobre el almacén puede ordenar ejecuciones por cualquiera
+    de ellas.
+    \item \textbf{Predicciones y decisiones}: \texttt{predictions.csv} conserva la predicción
+    puntual, los cuantiles calibrados y la cantidad de pedido para cada par serie-fecha de
+    validación, de modo que cualquier métrica publicada es recomputable a posteriori sin volver
+    a entrenar. Junto a él,
+    \texttt{promotion\_}\allowbreak\texttt{decision.json},
+    \texttt{reorder\_}\allowbreak\texttt{recommendations.csv},
+    \texttt{exceptions.csv} y \texttt{drift\_}\allowbreak\texttt{report.json} registran,
+    respectivamente, la decisión de promoción, el plan de reposición, las excepciones marcadas
+    y la deriva medida.
+    \item \textbf{Campeón vigente}: \texttt{champion\_}\allowbreak\texttt{registry.json} no vive
+    en la corrida sino junto a los modelos persistidos, precisamente porque su función es
+    sobrevivir a la ejecución que lo escribió: guarda qué modelo está operativo y bajo qué
+    métricas fue promocionado, cerrando el ciclo con la \textit{promotion logic} de la
+    Figura~\ref{fig:champion_promotion}.
 \end{itemize}
 
-Una versión anterior del sistema replicaba esta información en un servidor MLflow. Se retiró al constatar que era una segunda copia de datos que ya vivían en disco y que ninguna herramienta consumía: el cuadro de mandos lee los artefactos directamente. La trazabilidad efectiva la aportan el \textit{hash} de configuración y el \textit{commit} de Git, no el servidor; prescindir de él elimina una dependencia pesada y un contenedor sin reducir lo que puede auditarse.
+Dos decisiones de configuración del almacén merecen mención porque condicionan la
+reproducibilidad. La primera es que ni \texttt{mlflow.db} ni \texttt{mlruns/} se versionan, al
+tratarse de artefactos generados: por eso cada directorio de artefactos lleva un
+\texttt{mlflow\_run.json} que nombra la corrida a la que pertenece, sin el cual, con un almacén
+respaldado por base de datos, \texttt{mlruns/} contendría los ficheros y nada que los
+identificase. La segunda es que la ruta de artefactos que se graba en cada fila del almacén es
+\textbf{relativa}, lo que permite que la misma base de datos funcione tanto en el repositorio
+como montada dentro del contenedor; el precio es que una ejecución lanzada desde un
+subdirectorio no encuentra sus propios artefactos, y debe lanzarse desde la raíz del proyecto.
 
 \section{API REST e Interfaz Web}
 \label{sec:api}
@@ -341,7 +386,7 @@ El \textbf{plano de Operación} responde a las dos preguntas del ciclo diario: c
 \begin{itemize}
     \item \textbf{Simulación OPS}: reproducción semana a semana del \textit{backtest} \textit{walk-forward}, con la trayectoria de una serie (predicción, banda conformal y demanda revelada) y la comparación entre cadencias de reentrenamiento.
 
-    \item \textbf{Dashboard}: los cuatro KPIs principales (coste de inventario, cobertura empírica, MAE y PSI de \textit{drift}), el gráfico de demanda real frente a predicha con la banda conformal, y los módulos matemáticos que documentan las tres formulaciones del sistema (\textit{Conformal Prediction}, Newsvendor y optimización de capacidad).
+    \item \textbf{Dashboard}: los cuatro KPIs principales (coste de inventario, cobertura empírica, MAE y PSI de \textit{drift}), el gráfico de demanda real frente a predicha con la banda conformal, y los dos módulos matemáticos que documentan las formulaciones del sistema (\textit{Conformal Prediction} y Newsvendor).
 
     \item \textbf{Análisis SKU}: tabla de los SKUs activos con búsqueda, filtro por estado y ordenación, donde el gestor puede ajustar manualmente la cantidad propuesta antes de exportar el plan de reposición.
 
@@ -369,7 +414,7 @@ Para garantizar que la deuda técnica no limite el escalado del sistema, se han 
 \subsection{Estrategia de Testing: Pirámide de Verificación}
 \label{sec:testing}
 
-El sistema cuenta con 20 módulos de test organizados en cinco niveles, cada uno orientado a un tipo de fallo diferente (Tabla~\ref{tab:test_strategy}).
+El sistema cuenta con 29 módulos de test organizados en cinco niveles, cada uno orientado a un tipo de fallo diferente (Tabla~\ref{tab:test_strategy}).
 
 \begin{table}[htbp]
     \centering
@@ -385,7 +430,7 @@ El sistema cuenta con 20 módulos de test organizados en cinco niveles, cada uno
         Integración y humo & Pipeline end-to-end sobre datos sintéticos, vistas y \textit{endpoints} de la capa web, y CI/CD. \\
         \bottomrule
     \end{tabular}
-    \caption{Estrategia de testing por niveles: 20 módulos clasificados por tipo de fallo.}
+    \caption{Estrategia de testing por niveles: 29 módulos clasificados por tipo de fallo.}
     \label{tab:test_strategy}
 \end{table}
 
