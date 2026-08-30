@@ -56,7 +56,7 @@ sobre todo en cómo crecen el árbol y en cómo tratan las variables categórica
 por niveles; LightGBM por hojas, lo que le da ventaja en velocidad sobre paneles grandes;
 CatBoost construye árboles \textit{oblivious}, con la misma condición de división en todo un
 nivel, lo que actúa como regularizador estructural. En categóricas, las tres ofrecen soporte
-nativo ---XGBoost desde su versión 1.5---, pero por mecanismos distintos: XGBoost y LightGBM
+nativo (XGBoost desde su versión 1.5), pero por mecanismos distintos: XGBoost y LightGBM
 buscan la partición ordenando las categorías por el estadístico del gradiente, mientras que
 CatBoost calcula estadísticos de destino sobre una permutación previa
 (\textit{ordered target statistics}), construcción diseñada para que el valor de la etiqueta de
