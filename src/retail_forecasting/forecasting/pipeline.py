@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from retail_forecasting.config import Settings, build_config_hash
@@ -1105,4 +1106,12 @@ def _build_scoring_predictions(
         quantile_columns=quantile_columns,
         quantile_levels=[quantile_level_from_column(c) for c in quantile_columns],
     )
+    # Cold-start rows have no calibrated quantiles, so the interpolation above resolves to
+    # NaN for them. There is no distribution to apply a critical fractile to; the fallback
+    # mean IS the order quantity for these rows.
+    if cold_mask.any():
+        fallback_orders = frame.loc[cold_mask, "y_pred"].to_numpy(dtype=float)
+        if settings.inventory.clip_negative_orders:
+            fallback_orders = np.maximum(fallback_orders, 0.0)
+        frame.loc[cold_mask, "order_quantity"] = fallback_orders
     return attach_inventory_costs(frame, settings.inventory)
