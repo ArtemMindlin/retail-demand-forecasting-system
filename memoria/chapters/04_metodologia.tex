@@ -17,7 +17,7 @@ El capítulo se organiza en tres bloques, que se corresponden con las tres fases
     arr/.style={->, thick}
 ]
 \node[blk] (inv) {\textbf{Bloque I}\\ Investigación\\ \footnotesize Entrenar y evaluar};
-\node[blk, right=of inv] (ops) {\textbf{Bloque II}\\ Operación\\ \footnotesize Desplegar y recomendar};
+\node[blk, right=of inv] (ops) {\textbf{Bloque II}\\ Operación\\ \footnotesize Decidir y vigilar};
 \node[blk, right=of ops] (mlo) {\textbf{Bloque III}\\ MLOps\\ \footnotesize Monitorizar y reentrenar};
 \draw[arr] (inv) -- (ops);
 \draw[arr] (ops) -- (mlo);
@@ -27,7 +27,7 @@ El capítulo se organiza en tres bloques, que se corresponden con las tres fases
 \label{fig:bloques_metodologia}
 \end{figure}
 
-El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: reentrenamiento del modelo seleccionado y generación diaria de recomendaciones de pedido a partir del fractil crítico del \textit{Newsvendor}. El \textbf{Bloque III} cubre la fase MLOps: simulación en streaming para determinar la cadencia óptima de reentrenamiento en producción.
+El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: la puerta de promoción que decide qué modelo entra en producción, el reentrenamiento del modelo seleccionado, la conversión diaria de la distribución calibrada en una cantidad de pedido para todo el catálogo, y la vigilancia de un sistema cuya decisión no puede evaluarse cuando se emite. El \textbf{Bloque III} cubre la fase MLOps: simulación en streaming para determinar la cadencia óptima de reentrenamiento en producción.
 
 % ==============================================================================
 \section{Bloque I: Investigación}
@@ -458,7 +458,7 @@ siguiente:
             \max\!\left(\hat{y}_q(x) + \hat{q}_g,\; 0\right) & \text{si } q > 0{,}5
         \end{cases}
     \end{equation}
-    Este ensanchamiento produce bandas con cobertura condicional garantizada dentro de cada grupo y, simultáneamente, traslada una ventaja directa a la operativa de compras: al calcular la cantidad de pedido $q^*$ interpolando el fractil crítico ($q^* = 0{,}80$) entre la mediana y el cuantil superior $P90$ calibrado (Sección~\ref{sec:newsvendor}), la orden se incrementa proporcionalmente en $+0{,}75 \cdot \hat{q}_g$. Esto genera automáticamente un \textbf{colchón de stock de seguridad adaptativo por categoría} que protege al almacén contra el coste asimétrico de rotura ($c_u = 4{,}0$ frente a $c_o = 1{,}0$) en función de la verdadera dispersión empírica de cada familia de productos.
+    Este ensanchamiento produce bandas con cobertura condicional garantizada dentro de cada grupo y, simultáneamente, traslada una ventaja directa a la operativa de compras: al calcular la cantidad de pedido $q^*$ interpolando el fractil crítico ($q^* = 0{,}80$) entre la mediana y el cuantil superior $P90$ calibrado (Sección~\ref{sec:newsvendor_operativo}), la orden se incrementa proporcionalmente en $+0{,}75 \cdot \hat{q}_g$. Esto genera automáticamente un \textbf{colchón de stock de seguridad adaptativo por categoría} que protege al almacén contra el coste asimétrico de rotura ($c_u = 4{,}0$ frente a $c_o = 1{,}0$) en función de la verdadera dispersión empírica de cada familia de productos.
 \end{enumerate}
 
 \paragraph{Limitación: intercambiabilidad en series temporales.}
@@ -606,25 +606,164 @@ En consecuencia, $c_o$ y $c_u$ son constantes de configuración declaradas ($c_u
 
 Conviene precisar el alcance de este supuesto: \textbf{las decisiones siguen siendo específicas de cada serie}. Cada SKU tiene su propia distribución predictiva, de modo que el pedido difiere entre series aunque el fractil crítico sea común. Lo que se renuncia a modelar es la heterogeneidad \emph{económica} entre productos, no la heterogeneidad de su demanda.
 
-\section{Bloque II: Operación}
+% ==============================================================================
+\section{Bloque II: Operación y Gobierno del Modelo}
+\label{sec:bloque_operacion}
 % ==============================================================================
 
-Una vez identificado el modelo óptimo en la fase de investigación, el sistema entra en modo operacional. El modo \texttt{retrain} reentrena el modelo champion sobre la totalidad de los datos disponibles y lo persiste. El modo \texttt{score\_daily} carga ese modelo y genera diariamente las recomendaciones de pedido para cada SKU a partir del fractil crítico del \textit{Newsvendor}.
-\subsection{Criterio de Promoción del Modelo Campeón}
+El Bloque I produce un modelo evaluado; no produce un sistema que decida. Este bloque cubre el trayecto que separa ambas cosas, y responde a tres preguntas que el \textit{backtesting} no llega a formular: qué modelo tiene derecho a entrar en producción, cómo se convierte cada día una distribución predictiva en una cantidad de pedido para \emph{todo} el catálogo ---incluidas las series que el modelo no puede predecir---, y cómo se vigila un sistema cuya decisión no se puede evaluar en el instante en que se emite.
+
+Esa última asimetría gobierna el diseño del bloque entero. En el Bloque I cada predicción se contrasta contra una demanda que ya ocurrió; en operación, la demanda del horizonte $[t, t+H-1]$ todavía no existe cuando el pedido se emite, y no existirá hasta $H$ días después. El plano operacional, por tanto, \textbf{no puede autoevaluarse}, y debe apoyarse en tres mecanismos sustitutos que este bloque desarrolla: una puerta de entrada que solo admite modelos con evidencia previa (Sección~\ref{sec:promocion}), un marcado explícito de aquellas filas en las que el propio sistema sabe que su predicción es débil (Secciones~\ref{sec:cold_start} y~\ref{sec:excepciones}), y una vigilancia de los indicadores que sí son observables sin esperar a la demanda (Sección~\ref{sec:monitorizacion}). Esta estructura instancia la fase de \textit{Monitoring and Maintenance} que CRISP-ML(Q)~\cite{studer2021crispmlq} añade sobre CRISP-DM~\cite{chapman2000crispdm} y que el Capítulo~\ref{chap:introduccion} declara como marco metodológico del trabajo.
+
+\subsection{La Puerta a Producción: Criterio de Promoción del Campeón}
 \label{sec:promocion}
 
-El ciclo de operación no es estático: tras cada ejecución del modo \texttt{experiment}, el sistema evalúa si alguno de los modelos candidatos (\textit{challengers}) debe reemplazar al modelo actualmente en producción. La promoción no se decide por una única métrica, sino por tres guardarraíles independientes:
+Tras cada ejecución del modo \texttt{experiment}, el sistema evalúa si alguno de los modelos candidatos (\textit{challengers}) debe reemplazar al campeón registrado. La comparación se realiza sobre el \texttt{cost\_summary} del protocolo \textit{walk-forward} (Sección~\ref{sec:backtesting}), excluyendo el \textit{holdout} externo para no mezclar dos poblaciones de filas distintas. La promoción no se decide por una única métrica, sino por tres guardarraíles que deben cumplirse simultáneamente:
 
 \begin{enumerate}
-    \item \textbf{Mejora de coste mínima} ($\Delta_{\text{cost}}$): el \textit{challenger} debe reducir el coste de inventario simulado respecto al campeón actual en al menos un umbral configurable $\theta_{\text{cost}}$.
-    \item \textbf{Guardarraíl de nivel de servicio} ($\Delta_{\text{sl}}$): el \textit{challenger} no puede degradar el nivel de servicio por encima de un margen $\delta_{\text{sl}}$ configurable, aunque mejore el coste.
-    \item \textbf{Significación de la mejora}: el hueco de coste frente al campeón debe tener su intervalo de confianza al 95\% enteramente por debajo de cero. El intervalo procede de un \textit{bootstrap} emparejado que remuestrea series completas como conglomerados sobre las filas del protocolo de la Sección~\ref{sec:backtesting}.
+    \item \textbf{Mejora de coste mínima} ($\Delta_{\text{cost}}$): el \textit{challenger} debe reducir el coste de inventario simulado respecto al campeón actual en al menos un umbral configurable $\theta_{\text{cost}}$, donde
+    \[\Delta_{\text{cost}} = \frac{C_{\text{champion}} - C_{\text{challenger}}}{C_{\text{champion}}} \times 100\%.\]
+    \item \textbf{Guardarraíl de nivel de servicio} ($\Delta_{\text{sl}}$): el \textit{challenger} no puede degradar el nivel de servicio más de un margen $\delta_{\text{sl}}$ configurable (por defecto $2$ puntos porcentuales), aunque mejore el coste.
+    \item \textbf{Separación del azar}: el coste del \textit{challenger} debe distinguirse de forma concluyente del de la referencia \textit{naive} estacional. La distinción se establece con un \textit{bootstrap} emparejado de $2.000$ remuestreos que trata cada \textbf{serie completa} como conglomerado, y exige que el intervalo al 95\% del hueco de coste no contenga el cero, sobre un mínimo de ocho series.
 \end{enumerate}
 
-El tercer guardarraíl existe porque los dos primeros no bastan. El umbral de mejora de coste es configurable y su valor por defecto es cero, de modo que por sí solo admite cualquier mejora por pequeña que sea: la comparación entre los dos \textit{backends} de este trabajo se decidía por una diferencia de coste del orden de la centésima de punto porcentual, magnitud que está dentro del propio ruido del experimento. Exigir que el intervalo despeje el cero traslada a esta decisión el mismo criterio que el resto del trabajo aplica a cualquier comparación entre alternativas.
+El tercer guardarraíl existe porque los dos primeros no bastan. El umbral de mejora de coste es configurable y su valor por defecto es cero, de modo que por sí solo admite cualquier mejora por pequeña que sea: la comparación entre los dos \textit{backends} de este trabajo se decidía por una diferencia de coste del orden de la centésima de punto porcentual, magnitud que está dentro del propio ruido del experimento. Exigir evidencia estadística traslada a esta decisión el mismo criterio que el resto del trabajo aplica a cualquier comparación entre alternativas.
 
-Este diseño prioriza la estabilidad operacional frente a la optimización agresiva: un modelo que recorte costes a costa de roturas frecuentes nunca alcanzará producción, y uno que las recorte por una diferencia indistinguible del azar tampoco. La implementación detallada y el flujo de decisión se describen en la Sección~\ref{sec:champion_promotion}.
+\paragraph{Alcance exacto del tercer guardarraíl.} Conviene precisar qué certifica y qué no. El intervalo se calcula sobre el hueco frente al \textit{naive} estacional, no frente al campeón vigente: lo que el guardarraíl garantiza es que el \textit{challenger} bate de forma no atribuible al azar a la referencia trivial del dominio, condición necesaria pero no suficiente para afirmar que bate al campeón. El remuestreo se hace por series, y no por fechas, porque la comparación está \emph{emparejada} sobre filas idénticas: el choque de demanda de un día alcanza por igual a ambos modelos y se cancela en la diferencia, de modo que lo que queda es el desajuste idiosincrásico de cada serie; además, este diseño dispone de $500$ series frente a $21$ fechas de validación, con lo que la serie es también la unidad con más potencia estadística. Cerrar el hueco restante ---un intervalo emparejado \textit{challenger} contra campeón--- se recoge como línea de trabajo futuro en el Capítulo~\ref{chap:conclusiones}.
 
+Entre todos los \textit{challengers} que superan los tres guardarraíles se promociona el de menor coste total, con el nivel de servicio como criterio de desempate. La decisión completa ---ambos identificadores de modelo, $\Delta_{\text{cost}}$, $\Delta_{\text{sl}}$ y el motivo de aceptación o rechazo--- se persiste junto a la ejecución, de modo que el historial de cambios de modelo es auditable a posteriori. Este diseño prioriza la estabilidad operacional frente a la optimización agresiva: un modelo que recorte costes a costa de roturas frecuentes nunca alcanzará producción, y uno que las recorte por una diferencia indistinguible del azar tampoco. El flujo de decisión y los parámetros de configuración se detallan en la Sección~\ref{sec:champion_promotion}.
+
+\subsection{Contrato de la Fase Operacional}
+\label{sec:contrato_operacional}
+
+Superada la puerta, el sistema opera en dos modos encadenados que responden a periodicidades distintas: un \textbf{refresco} del modelo, poco frecuente, y una \textbf{emisión de recomendaciones}, diaria.
+
+\paragraph{Refresco del modelo (\texttt{retrain}).} El reentrenamiento consolida todos los \textit{splits} disponibles en un único panel, aplica la misma estrategia de reconstrucción de censura que el experimento que seleccionó al campeón (Sección~\ref{sec:demanda_censurada}) y ajusta un solo modelo, sin evaluación por \textit{folds}. Tres propiedades hacen que este ajuste sea homólogo al del \textit{backtesting} y no un procedimiento distinto:
+
+\begin{itemize}
+    \item \textbf{La partición de calibración es la misma regla.} Los últimos $c$ días del panel ($c = 14$) se reservan para la calibración conformal, y el ajuste del modelo base termina $H$ días antes de que esa ventana empiece. Ese hueco de $H$ días no es una holgura de conveniencia: sin él, las etiquetas de entrenamiento ---que agregan demanda hasta $t+H-1$--- solaparían con el periodo de calibración, y los residuos conformales se medirían sobre datos que el modelo ya ha visto. Es el mismo embargo temporal que impone el protocolo de la Sección~\ref{sec:backtesting}, y el Capítulo~\ref{chap:resultados} documenta el experimento de control que mide qué ocurre cuando se suprime.
+    \item \textbf{Los hiperparámetros están congelados.} El reentrenamiento lee los parámetros persistidos por la fase de sintonización desacoplada y no busca ninguno. La justificación de esta separación ---predictibilidad y auditabilidad frente a adaptación continua--- se desarrolla en la Sección~\ref{sec:mlops_workflow}.
+    \item \textbf{La calidad del panel se valida antes de ajustar.} Un panel que incumple las comprobaciones bloqueantes de calidad detiene el reentrenamiento en lugar de producir un modelo silenciosamente peor.
+\end{itemize}
+
+\paragraph{Emisión de recomendaciones (\texttt{score\_daily}).} El modo diario no reentrena: carga el artefacto conformal persistido y construye un \textbf{marco de inferencia} con \emph{una sola fila por serie}, correspondiente al último origen disponible de cada una. Esta fila tiene una propiedad que la distingue estructuralmente de cualquier fila del Bloque I: \textbf{no tiene etiqueta}. La demanda acumulada del horizonte que se está prediciendo es, por definición, futura, y el marco de inferencia no la contiene.
+
+De ahí se sigue el contrato de este bloque, y merece enunciarse explícitamente porque condiciona todo lo que viene después:
+
+\begin{quote}
+\textit{Ninguna métrica de error, cobertura o coste puede calcularse sobre la salida del plano operacional en el momento en que se emite. Toda evidencia sobre la calidad de esas decisiones procede del Bloque I, medida sobre datos históricos, y se transfiere al presente bajo el supuesto de que las condiciones de operación no han cambiado.}
+\end{quote}
+
+Vigilar ese supuesto ---y no volver a medir el error--- es la función de la Sección~\ref{sec:monitorizacion}. El entregable del modo diario es un fichero de recomendaciones con una fila por par tienda--producto, que contiene la fecha de decisión, la cantidad de pedido, los cuantiles calibrados y las marcas de riesgo que la Sección~\ref{sec:excepciones} define.
+
+\subsection{De la Distribución Calibrada a la Cantidad de Pedido}
+\label{sec:newsvendor_operativo}
+
+La Sección~\ref{sec:pinball} estableció la equivalencia entre el fractil crítico del \textit{Newsvendor} y el cuantil que minimiza la \textit{pinball loss}. Esta sección concreta cómo se aplica esa equivalencia cuando el modelo no estima el cuantil $q^\star$ directamente, sino un conjunto discreto de cuantiles $\mathcal{Q}$.
+
+El sistema estima $\mathcal{Q} = \{0{,}1;\ 0{,}5;\ 0{,}9\}$ y opera con $c_u = 4{,}0$ y $c_o = 1{,}0$, de modo que el fractil crítico es
+\begin{equation}
+    q^\star = \frac{c_u}{c_u + c_o} = 0{,}80,
+\end{equation}
+que no pertenece a $\mathcal{Q}$. La cantidad de pedido se obtiene interpolando linealmente la función cuantil calibrada entre los dos niveles estimados que rodean a $q^\star$:
+
+\begin{equation}
+\label{eq:order_quantity}
+    Q_{s,t} = \max\!\left(0,\ \hat{Q}_{s,t}(\tau_k) + \frac{q^\star - \tau_k}{\tau_{k+1} - \tau_k}\Big[\hat{Q}_{s,t}(\tau_{k+1}) - \hat{Q}_{s,t}(\tau_k)\Big]\right),
+    \qquad \tau_k \leq q^\star \leq \tau_{k+1},
+\end{equation}
+
+con $\tau_k, \tau_{k+1} \in \mathcal{Q}$ consecutivos. Con la configuración del sistema, $\tau_k = 0{,}5$ y $\tau_{k+1} = 0{,}9$, y el peso de interpolación es $(0{,}80 - 0{,}50)/(0{,}90 - 0{,}50) = 0{,}75$. La regla se reduce por tanto a
+\begin{equation}
+    Q_{s,t} = \max\!\left(0,\ \hat{Q}_{s,t}(0{,}5) + 0{,}75 \cdot \big[\hat{Q}_{s,t}(0{,}9) - \hat{Q}_{s,t}(0{,}5)\big]\right),
+\end{equation}
+es decir, la mediana predicha más tres cuartas partes de la semianchura superior del intervalo conformal. Este es el mecanismo concreto por el que el ensanchamiento por categoría de la calibración Mondrian (Sección~\ref{sec:conformal}) se traduce en un colchón de seguridad adaptativo: una categoría con mayor dispersión empírica recibe un $\hat{Q}(0{,}9)$ más alto y, con ello, un pedido proporcionalmente mayor, sin que ninguna regla adicional lo estipule.
+
+\paragraph{Por qué se interpola en lugar de entrenar en $q^\star$.} Entrenar un cuarto cuantil en $0{,}80$ habría evitado la interpolación, pero desacopla la decisión de la calibración: los tres cuantiles actuales sirven simultáneamente al intervalo de predicción ($0{,}1$--$0{,}9$) y a la decisión, y son los tres que la capa conformal corrige. Con la interpolación, además, \textbf{un cambio en la asimetría de costes no exige reentrenar}: basta reevaluar la Ecuación~\ref{eq:order_quantity} con otro $q^\star$ sobre las mismas predicciones. Es esta propiedad la que hace posible el análisis de sensibilidad al ratio $c_u/c_o$ que reporta el Capítulo~\ref{chap:resultados}, en el que las predicciones permanecen fijas y solo cambia la regla de decisión.
+
+\paragraph{Saturación en los extremos.} La contrapartida es que la regla no puede extrapolar fuera del rango estimado: si $q^\star$ cae por encima de $\max \mathcal{Q} = 0{,}9$, la interpolación satura en $\hat{Q}(0{,}9)$. El análisis de sensibilidad recorre ratios $\{1, 2, 4, 8, 10\}$, y el último de ellos implica $q^\star = 10/11 \approx 0{,}909$, ya fuera del rango. El punto correspondiente de la curva de sensibilidad está por tanto truncado y debe leerse como una cota inferior del pedido que un fractil de $0{,}909$ prescribiría, no como su valor. Ampliar $\mathcal{Q}$ es la corrección natural si el sistema hubiera de operar de forma sostenida con ratios superiores a 9:1.
+
+\paragraph{Alcance de la decisión.} La Ecuación~\ref{eq:order_quantity} resuelve un problema de \emph{un solo periodo} por origen de predicción. No hay posición de inventario que descontar, ni arrastre de existencias entre orígenes consecutivos, ni coste fijo de pedido: cada fecha de decisión se resuelve de forma independiente. Como se argumentó en la Sección~\ref{sec:newsvendor}, esto basta para ordenar políticas por su coste y su nivel de servicio, que es el uso que este trabajo da a la magnitud, pero no reproduce la dinámica de una política $(s, S)$ real. Es la limitación de alcance más relevante del bloque y se recoge como tal en las conclusiones.
+
+\subsection{Cobertura del Catálogo: Arranque en Frío y Respaldo Jerárquico}
+\label{sec:cold_start}
+
+Un sistema de reposición debe emitir una recomendación para \emph{cada} referencia activa del surtido. Un modelo global entrenado sobre retardos y ventanas rodantes, en cambio, solo puede predecir series cuyo historial cubra el retardo más largo que consume: una referencia dada de alta hace tres días no tiene $y_{s,t-7}$ ni media rodante de 14 días, y sus características son nulas. Ignorarlas dejaría al comprador sin recomendación precisamente en las referencias en las que su juicio menos apoyo tiene.
+
+El sistema resuelve esta tensión enrutando cada fila del marco de inferencia por una de dos vías, y dejando constancia de cuál:
+
+\begin{enumerate}
+    \item \textbf{Vía del modelo}: la fila tiene \emph{todas} sus características informadas y se predice con el campeón conformal. El criterio es deliberadamente estricto ---ausencia total de nulos, no una fracción tolerable--- porque un retardo nulo imputado silenciosamente a cero es indistinguible, para un modelo de \textit{boosting}, de una serie que efectivamente no vendió.
+    \item \textbf{Vía de respaldo}: la fila conserva su lugar en la salida, pero recibe una estimación construida con la media de demanda observada del nivel jerárquico más específico del que se disponga de historia, escalada al horizonte:
+    \begin{equation}
+        \hat{Y}^{\text{resp}}_{s,t} = H \cdot \overline{y}_{\ell(s)},
+    \end{equation}
+    donde $\overline{y}_{\ell}$ es la media de demanda observada al nivel $\ell$, y el nivel
+    empleado es el primero de la cascada que dispone de historia:
+    \begin{equation}
+        \ell(s) = \begin{cases}
+            \text{serie} & \text{si } s \text{ tiene historia propia,}\\
+            \text{producto} & \text{si no, y la tiene en otras tiendas,}\\
+            \text{categoría} & \text{si no, y la tiene su categoría,}\\
+            \text{global} & \text{en otro caso.}
+        \end{cases}
+    \end{equation}
+\end{enumerate}
+
+La cascada recorre de lo específico a lo general y se detiene en el primer nivel con dato, de modo que un producto nuevo en una tienda hereda el comportamiento de ese mismo producto en el resto de la red antes de recurrir a su categoría. Las medias se calculan exclusivamente sobre la historia disponible en el origen de predicción ---el panel de entrenamiento, o las filas estrictamente anteriores a la fecha de decisión cuando la llamada procede de la simulación en \textit{streaming}---, de modo que la vía de respaldo respeta el mismo contrato causal que la vía del modelo.
+
+Dos consecuencias metodológicas merecen enunciarse. La primera es que el nivel empleado se registra fila a fila, lo que convierte una degradación silenciosa en un dato auditable: la proporción de recomendaciones que salen de cada nivel de respaldo es una medida directa de cuánta cobertura del surtido descansa realmente en el modelo. La segunda es que \textbf{una fila de respaldo no lleva intervalo conformal}: la cascada produce un valor central, no una distribución, de modo que la garantía de cobertura de la Sección~\ref{sec:conformal} no la ampara y el fractil crítico no puede aplicársele. Por eso estas filas no se entregan como una recomendación más, sino marcadas para revisión humana, que es el objeto de la sección siguiente.
+
+\subsection{Gestión por Excepciones: el Sistema como Copiloto}
+\label{sec:excepciones}
+
+Una salida de $500$ recomendaciones diarias que el responsable de reposición deba revisar íntegramente no reduce su carga de trabajo: la traslada. Pero aceptarlas todas a ciegas tampoco es aceptable, porque el sistema no distingue por sí solo una predicción sólida de una que apenas se sostiene. El diseño adoptado es el intermedio: el sistema emite \emph{todas} las recomendaciones y, sobre ellas, marca el subconjunto que reúne los indicios de riesgo, generando un listado de excepciones que es lo que el operador revisa.
+
+Se evalúan cuatro banderas, en orden de precedencia estricta, de modo que cada fila lleva a lo sumo una y siempre la de mayor prioridad:
+
+\begin{enumerate}
+    \item \texttt{cold\_start}: la recomendación procede de la vía de respaldo de la Sección~\ref{sec:cold_start} y por tanto no tiene ni modelo ni intervalo detrás.
+    \item \texttt{drift\_watch}: la fila pertenece a un tramo temporal en el que el detector de deriva de la Sección~\ref{sec:monitorizacion} disparó una alerta.
+    \item \texttt{high\_uncertainty}: la anchura del intervalo conformal $\hat{Q}(0{,}9) - \hat{Q}(0{,}1)$ está en el $5\%$ superior de la propia corrida.
+    \item \texttt{extreme\_order\_quantity}: la cantidad de pedido está en el $1\%$ superior de la propia corrida.
+\end{enumerate}
+
+La precedencia no es un detalle de implementación. Sin ella, una serie en arranque en frío con un pedido alto aparecería etiquetada por su cantidad, cuando la causa raíz que el operador necesita conocer es que detrás no hay modelo. El orden va, por tanto, de la causa más estructural a la más sintomática.
+
+\paragraph{Umbrales relativos, no absolutos.} Las dos últimas banderas se definen sobre cuantiles de la \emph{distribución empírica de la propia ejecución} y no sobre constantes en unidades. La razón es que ni la anchura del intervalo ni la cantidad de pedido tienen una escala estable: dependen del surtido incluido, del régimen de demanda del periodo y de la asimetría de costes configurada, y un umbral absoluto calibrado sobre una corrida deja de tener sentido en la siguiente. Definirlos por cuantil fija en cambio la magnitud que de verdad importa a efectos operativos, que es \textbf{el tamaño del listado de excepciones}: estas dos causas aportan por construcción en torno al $5$--$6\%$ del catálogo, con independencia de la escala del panel o del régimen del periodo. Las dos primeras banderas no admiten esa acotación ---\texttt{cold\_start} depende de cuántas referencias carezcan de historia suficiente, y \texttt{drift\_watch} marca un tramo temporal completo cuando se dispara---, lo que es coherente con su naturaleza: señalan un fallo de cobertura o de validez, y su volumen es en sí mismo la información relevante. La contrapartida, que conviene no ocultar, es que estas dos banderas son intrínsecamente relativas: en una corrida en la que todas las predicciones fueran igual de inciertas, seguirían señalando un $5\%$ de ellas.
+
+Esta arquitectura es la que sostiene el posicionamiento del sistema como \textbf{copiloto y no como piloto automático}: la decisión rutinaria se automatiza, y la atención humana se concentra donde el propio sistema declara tener menos base para decidir.
+
+\subsection{Monitorización: Deriva de la Entrada y Deriva del Error}
+\label{sec:monitorizacion}
+
+La Sección~\ref{sec:contrato_operacional} estableció que el plano operacional no puede medir su propio error en el momento de decidir. La monitorización es la respuesta a esa limitación, y se articula en dos niveles que vigilan objetos distintos y responden a preguntas distintas.
+
+\paragraph{Nivel 1: deriva de la distribución de entrada (PSI).} Vigila si las variables que alimentan al modelo siguen pareciéndose a aquellas sobre las que se ajustó. Es observable de inmediato, sin esperar a la demanda, y por eso es el nivel que puede operar en tiempo real. Para cada variable se calcula el \textit{Population Stability Index} entre una ventana de referencia y una ventana actual:
+
+\begin{equation}
+    \text{PSI} = \sum_{i=1}^{B} \left(p^{\text{act}}_i - p^{\text{ref}}_i\right) \ln \frac{p^{\text{act}}_i}{p^{\text{ref}}_i},
+\end{equation}
+
+donde $p^{\text{ref}}_i$ y $p^{\text{act}}_i$ son las proporciones de observaciones que caen en el intervalo $i$ de una discretización en $B = 10$ tramos. Tres decisiones de cálculo condicionan la interpretación de la cifra. Primera, los bordes de los tramos son los \textbf{deciles de la distribución de referencia}, no una rejilla equiespaciada: sobre variables de demanda fuertemente asimétricas, una rejilla uniforme concentraría casi toda la masa en un tramo y el índice perdería resolución justo donde la tiene el fenómeno. Segunda, la ventana de referencia es la mitad \emph{más antigua} de las observaciones y la actual la mitad más reciente, con el corte en la fecha mediana: la deriva se mide así ``desde el entrenamiento'', que es la pregunta operativa. Tercera, el índice se reporta únicamente para las variables de mayor importancia según los valores SHAP del modelo explicado, porque una deriva en una variable que el modelo apenas usa no es un riesgo operativo sino ruido en el panel de alertas.
+
+La lectura sigue las bandas convencionales del índice: por debajo de $0{,}10$ la distribución se considera estable, entre $0{,}10$ y $0{,}20$ hay un desplazamiento que merece seguimiento, y por encima de $0{,}20$ el desplazamiento es lo bastante grande como para cuestionar la validez del modelo ajustado.
+
+\paragraph{Nivel 2: deriva del error del modelo (Page-Hinkley).} Vigila la magnitud que de verdad importa ---si el modelo está empeorando--- y por eso solo puede evaluarse a posteriori, cuando la demanda del horizonte se ha revelado. Se emplea una variante unilateral del contraste secuencial de Page-Hinkley sobre la serie de errores de validación: se acumula la desviación del error respecto a su media corriente, descontada una holgura $\delta$, y se declara deriva cuando esa acumulación excede su mínimo histórico en más de un umbral $\lambda$:
+
+\begin{equation}
+    m_T = \sum_{t=1}^{T}\left(e_t - \bar{e}_T - \delta\right),
+    \qquad
+    \text{PH}_T = m_T - \min_{t \leq T} m_t,
+    \qquad
+    \text{alerta si } \text{PH}_T > \lambda .
+\end{equation}
+
+Es \emph{unilateral} de forma deliberada: el contraste clásico detecta cambios de media en cualquier dirección, mientras que aquí solo interesa el error que \textbf{crece}. Una caída del error no es un incidente que haya que atender, y tratarla como tal llenaría el panel de alertas sin contenido accionable. En la configuración del sistema, $\delta = 0{,}005$ y $\lambda = 15$, y el estadístico se alimenta con el MAE de cada \textit{fold} del protocolo \textit{walk-forward}, de modo que lo que se vigila es la evolución del error a lo largo de la secuencia temporal de validación.
+
+\paragraph{Qué dispara qué.} Conviene ser explícito sobre el alcance real de este subsistema, porque la distancia entre detectar y actuar es donde muchos sistemas de producción fallan silenciosamente. En el estado actual, \textbf{la detección informa y marca, pero no promueve por sí sola ningún reentrenamiento en caliente}: una alerta de Page-Hinkley marca las recomendaciones del tramo afectado con la bandera \texttt{drift\_watch} de la Sección~\ref{sec:excepciones} y queda registrada en la ejecución; el PSI por variable se persiste como informe y se sirve en el cuadro de mandos. El sistema contempla además la opción de forzar el reajuste del modelo en el \textit{fold} siguiente a una alerta, pero permanece desactivada en todas las configuraciones de este trabajo: un reentrenamiento disparado por deriva alteraría la política de actualización a mitad del protocolo y haría incomparables los \textit{folds} entre sí, precisamente la comparación que el Bloque III necesita mantener limpia.
+
+La decisión de cuándo reentrenar se toma, por tanto, por cadencia y no por alerta, y esa cadencia se elige empíricamente en el bloque siguiente.
 % ==============================================================================
 \section{Bloque III: MLOps}
 % ==============================================================================
