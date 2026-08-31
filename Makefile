@@ -37,7 +37,7 @@ simulate: $(OPS_SPLIT) ## Run rolling-origin production backtest comparing retra
 # The OPS plane streams a dedicated train/eval split carved out of the prepared
 # panel. Built once, on demand: `simulate` depends on the file, not the script.
 $(OPS_SPLIT):
-	$(PYTHON) scripts/build_ops_sim_split.py --train-days 49 --n-series 100
+	$(PYTHON) scripts/build_ops_sim_split.py --train-days 49 --n-series 500
 
 backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common ground truth (no training)
 	$(PYTHON) -m retail_forecasting.run --config $(FAIRCOST_CONFIG)

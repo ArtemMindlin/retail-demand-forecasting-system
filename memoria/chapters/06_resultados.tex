@@ -402,34 +402,44 @@ Este es además el único de los dos niveles que produce lectura en este trabajo
 \section{Simulación Operacional en Streaming y Política de Reentrenamiento MLOps}
 \label{sec:resultados_simulacion}
 
-Para responder a la pregunta fundamental de ingeniería sobre con qué frecuencia debe actualizarse el modelo en un entorno productivo real, se ejecutó la simulación en \textit{streaming} prequencial sobre una ventana continua de 41 días no vistos ($100$ series maestras, $4.100$ observaciones de evaluación) siguiendo el protocolo metodológico de la Sección~\ref{sec:simulate_ops}.
+Para responder a la pregunta de con qué frecuencia debe actualizarse el modelo en producción se ejecutó la simulación en \textit{streaming} prequencial sobre una ventana continua de 41 días no vistos ($500$ series, $20.500$ observaciones de evaluación) siguiendo el protocolo de la Sección~\ref{sec:simulate_ops}. La simulación entrena el campeón que declara el registro, LightGBM, con los hiperparámetros que la búsqueda de la Sección~\ref{sec:resultados_tuning_forecasting} persistió, y lo hace a la misma escala que el resto de los modos, de modo que lo que se mide es la política de actualización del modelo que efectivamente se despliega.
 
-Se contrastó la política de línea base estática (\texttt{never}, donde el modelo inicial nunca se reentrena tras el despliegue) frente a la política de refresco operacional semanal (\texttt{every\_7d}). La agregación de costes y métricas se realiza sobre $5$ orígenes semanales independientes no solapados ($500$ decisiones Newsvendor completas). La Tabla~\ref{tab:cadence_summary} recoge el resumen empírico de la simulación.
+Se contrastó la política estática (\texttt{never}, el modelo inicial nunca se reentrena tras el despliegue) frente al refresco semanal (\texttt{every\_7d}). La agregación se realiza sobre $5$ orígenes semanales independientes no solapados ($2.500$ decisiones Newsvendor completas).
 
 \begin{table}[htbp]
     \centering
     \small
     \resizebox{\textwidth}{!}{%
-    \begin{tabular}{lccccccr}
+    \begin{tabular}{lcccccr}
         \toprule
-        \textbf{Cadencia} & \textbf{Coste Total (u.m.)} & \textbf{Fill Rate (\%)} & \textbf{Nivel Servicio (\%)} & \textbf{Rotura (uds)} & \textbf{Sobrestock (uds)} & \textbf{Reentrenos} & \textbf{Tiempo Medio} \\
+        \textbf{Cadencia} & \textbf{Coste Total (u.m.)} & \textbf{Fill Rate} & \textbf{Nivel Servicio} & \textbf{Rotura (uds)} & \textbf{Reentrenos} & \textbf{Tiempo Medio} \\
         \midrule
-        \texttt{every\_7d} & \textbf{26.229{,}08} & \textbf{92{,}68\%} & \textbf{35{,}40\%} & \textbf{5.994{,}95} & 2.249{,}27 & 5 & 2{,}45 s \\
-        \texttt{never} & 59.302{,}35 & 82{,}08\% & 10{,}00\% & 14.670{,}58 & 620{,}02 & 0 & 0{,}00 s \\
+        \texttt{every\_7d} & \textbf{63.112{,}52} & \textbf{95{,}43\%} & \textbf{73{,}60\%} & \textbf{8.769{,}48} & 5 & 5{,}55 s \\
+        \texttt{never} & 105.676{,}74 & 89{,}64\% & 65{,}80\% & 19.866{,}80 & 0 & 0{,}00 s \\
         \bottomrule
     \end{tabular}%
     }
-    \caption{Resultados de la simulación operacional en streaming (ventana de 41 días, 100 series, 5 orígenes independientes). La política de reentrenamiento semanal reduce el coste logístico a más de la mitad frente al modelo estático.}
+    \caption{Simulación operacional en \textit{streaming} (ventana de 41 días, 500 series, 5 orígenes independientes, campeón LightGBM afinado). El refresco semanal reduce el coste de inventario un $40{,}28\%$ frente al modelo estático, con un intervalo al $95\%$ de $[-57{,}45\%,\ -17{,}00\%]$ que la Sección declara no concluyente por el número de orígenes disponibles.}
     \label{tab:cadence_summary}
 \end{table}
 
-Los resultados confirman cuantitativamente la necesidad crítica de un reentrenamiento periódico en producción:
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.86\textwidth]{figures/cadence_cost.pdf}
+    \caption{Coste de inventario acumulado por política a lo largo de los cinco orígenes independientes de la ventana de evaluación. Cada marcador es una de las decisiones semanales sobre las que se calcula la comparación, de modo que la curva no sugiere más evidencia de la que respalda el intervalo. La separación se abre de forma sostenida y no procede de una única semana adversa.}
+    \label{fig:cadence_cost}
+\end{figure}
+
+De la simulación se extraen cuatro lecturas:
+
 \begin{itemize}
-    \item \textbf{Obsolescencia del modelo estático:} El modelo no reentrenado (\texttt{never}) sufre una severa degradación conforme transcurren las semanas, acumulando $14.670{,}58$ unidades en rotura de stock y un nivel de servicio residual de tan solo el $10{,}00\%$ (rotura en 9 de cada 10 decisiones semanales).
-    \item \textbf{Reducción del coste logístico:} El reentrenamiento semanal (\texttt{every\_7d}) reduce el coste total de inventario de $59.302{,}35$ a $26.229{,}08$ u.m., lo que representa un ahorro del \textbf{$-55{,}77\%$} ($\Delta = -33.073{,}27$ u.m.). El intervalo de confianza bootstrap al 95\% emparejado por serie y origen es $[-75{,}23\%, -27{,}05\%]$, siendo íntegramente negativo y confirmando la superioridad de la política activa.
-    \item \textbf{Mejora en la disponibilidad de producto:} El \textit{fill rate} se incrementa en $+10{,}60$ puntos porcentuales ($92{,}68\%$ frente a $82{,}08\%$) y las unidades no servidas por falta de stock se reducen en un \textbf{$-59{,}13\%$}.
-    \item \textbf{Viabilidad computacional:} Cada ciclo de reentrenamiento y recalibración conformal de CatBoost tarda en promedio únicamente \textbf{2{,}45 segundos}, lo que demuestra que la política semanal es perfectamente viable en arquitecturas de producción estándar sin impacto en la latencia operativa.
+    \item \textbf{Degradación del modelo estático, sin colapso:} El modelo no reentrenado acumula $19.866{,}80$ unidades de rotura frente a las $8.769{,}48$ de la política activa, un $55{,}86\%$ más, y su nivel de servicio queda en el $65{,}80\%$ frente al $73{,}60\%$ del refresco semanal. La degradación es real y sostenida, como muestra la Figura~\ref{fig:cadence_cost}, pero conviene no exagerarla: un modelo correctamente sintonizado que no se actualiza durante seis semanas sigue atendiendo dos de cada tres decisiones sin rotura.
+    \item \textbf{Reducción del coste logístico:} El refresco semanal reduce el coste total de $105.676{,}74$ a $63.112{,}52$ u.m. ($\Delta = -42.564{,}23$ u.m.), un $-40{,}28\%$, con un intervalo \textit{bootstrap} al $95\%$ emparejado por origen de $[-57{,}45\%,\ -17{,}00\%]$.
+    \item \textbf{Mejora en la disponibilidad de producto:} El \textit{fill rate} se incrementa en $+5{,}79$ puntos porcentuales ($95{,}43\%$ frente a $89{,}64\%$), y el coste medio por decisión cae de $42{,}27$ a $25{,}25$ u.m.
+    \item \textbf{Viabilidad computacional:} Cada ciclo de reentrenamiento y recalibración conformal tarda en promedio $5{,}55$ segundos sobre el panel completo. Frente a una cadencia semanal, el coste de cómputo de la política activa es despreciable y no condiciona la decisión.
 \end{itemize}
+
+\paragraph{Por qué esta comparación no ordena las políticas.} El intervalo anterior queda íntegramente en la región negativa, y sin embargo el sistema marca la comparación como \textbf{no concluyente}. La razón es deliberada y merece enunciarse en lugar de resolverse a favor del resultado que conviene: el remuestreo toma el origen como unidad, porque las series de una misma semana comparten el choque de demanda y no son independientes, y la ventana solo proporciona \emph{cinco} orígenes no solapados. Un intervalo construido remuestreando cinco unidades es demasiado ancho para ordenar dos políticas, de modo que la exigencia de un mínimo de ocho orígenes se aplica antes de mirar dónde cae el intervalo. La lectura honesta es que esta ventana \emph{sugiere} con claridad que reentrenar sale más barato, y que los cinco orígenes de los que dispone no bastan para afirmarlo. Ampliar la ventana de evaluación es la corrección natural, y se recoge como línea de trabajo futura.
 
 \section{Verificación de Objetivos y KPIs}
 \label{sec:resultados_kpis}

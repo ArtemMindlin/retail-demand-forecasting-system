@@ -22,12 +22,22 @@ series on the current lags and windows). These three runs supersede everything b
 | `tab:metrics_predictive`, Observed arm | `tfg_observed_20260831_112611` | 500 series, 45 000 rows | 10 500 evaluation origins |
 | `tab:metrics_predictive`, Latent arm | `tfg_latent_20260831_113339` | 500 series, 45 000 rows | 10 500 evaluation origins |
 | `tab:metrics_cost` (fair cost) | `fresh_retailnet_v2_20260831_113728` | 30 sampled from 500 | 20 censoring draws, paired 95% interval |
+| `tab:cadence_summary`, `fig:cadence_cost` | `ops_sim_20260831_165703` | 500 series, 41-day eval window | 5 independent origins — the comparison is descriptive, not conclusive |
 
 The two experiment runs are a MATCHED PAIR: same commit, same config, same seed, differing
 only in `--imputation-strategy`. That is what makes the cross-arm percentages in §6.1
 attributable to the reconstruction instead of to the run. Chapter 6 previously mixed an
 11 Aug Observed arm with a 28 Aug Latent one, 17 days and an imputer change apart, and
 quoted a MAE reduction computed across the two.
+
+The OPS run is the first at the 500-series scale. Every earlier one streamed a 100-series
+split, which made `resolve_backend_params` reject the tuned file on its scale fingerprint and
+fall back to the YAML defaults: those runs measured a retraining policy for an untuned model.
+The 28 Aug one additionally trained CatBoost, because the plane read `business.champion_*`
+instead of the registry (fixed in `0b1f948`) and the YAML still named CatBoost 25 minutes after
+LightGBM had been promoted. The reported effect of fixing both is large and worth recording:
+the static baseline's service level goes from 10.0% to 65.8%, so the "catastrophic staleness"
+reading of the earlier numbers was an artefact of measuring a misconfigured model.
 
 Note for whoever reads the predictive table next: the point estimator is fitted at the
 critical fractile but is NOT calibrated there. Measured on these runs, the share of true
