@@ -524,28 +524,9 @@ La capa web es una aplicación Django que cumple dos funciones separadas: render
 
 El sistema no emplea base de datos: el estado son los artefactos en disco, y la única información propia de la capa web es la sesión del operador, transportada en una \textit{cookie} firmada. Un \textit{middleware} exige esa sesión en todas las rutas salvo dos (la pantalla de acceso y la sonda de disponibilidad) y distingue tres formas de rechazo, porque el mismo 401 no sirve a los tres clientes: una navegación de navegador se redirige al formulario conservando el destino, una petición JSON recibe el 401, y una petición htmx recibe una cabecera \texttt{HX-Redirect} para que el navegador recargue en lugar de incrustar la pantalla de acceso dentro de un fragmento.
 
-\paragraph{La superficie JSON.} El cuadro de mandos fue primero una \textit{Single Page Application} en React servida por FastAPI, y se reescribió como plantillas Django renderizadas en servidor por los motivos que recoge la Sección~\ref{sec:stack}. Aquella interfaz exponía treinta y cuatro rutas JSON, porque cada panel del cliente necesitaba la suya para pintarse; al pasar el renderizado al servidor, las que solo alimentaban a un componente se convirtieron en vistas HTML. Quedaron seis, las que constituyen una interfaz máquina-a-máquina real, descritas en la Tabla~\ref{tab:api_endpoints} y documentadas en la propia aplicación bajo la ruta \texttt{/api/}.
+\subsection{Cuadro de Mandos}
 
-\begin{table}[htbp]
-    \centering
-    \small
-    \begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{6.5cm}}
-        \toprule
-        \textbf{Método + Ruta} & \textbf{Nombre} & \textbf{Descripción} \\
-        \midrule
-        \texttt{POST /predict\_\allowbreak orders} & Scoring operacional & Ejecuta el modo \texttt{score\_daily} y devuelve \texttt{reorder\_recommendations}: una fila por par tienda-producto con \texttt{order\_quantity}, cuantiles calibrados y fecha de decisión. \\
-        \texttt{POST /api/forecast} & Simulador \textit{What-If} & Recalcula los cuantiles conformes empíricos y la cantidad óptima de pedido $O_{s,t}$ del Newsvendor para un \texttt{selectedSkuId}, a partir del nivel de servicio (\texttt{serviceLevel}) y del par de costes (\texttt{shortageCost}, \texttt{holdingCost}). \\
-        \texttt{GET /api/skus} & Catálogo de SKUs & Devuelve hasta 50 SKUs con métricas calculadas sobre las predicciones del último run: cobertura empírica, PSI de drift, cantidad de pedido $O_{s,t}$ y estado operacional (\textit{ok}/\textit{drift}/\textit{shortage}/\textit{overstock}). \\
-        \texttt{GET /api/\allowbreak download/\allowbreak predictions} & Descarga de predicciones & Sirve el \texttt{predictions.csv} de la ejecución más reciente, para análisis externo o auditoría. \\
-        \texttt{GET /api/\allowbreak download/costs} & Descarga de costes & Sirve el resumen de costes de la ejecución más reciente. \\
-        \texttt{GET /health} & Sonda de disponibilidad & Devuelve estado del servicio, versión, \textit{uptime} y si las predicciones están cargadas en caché; pensada para integrarse con herramientas de monitorización externas. Es el único endpoint público: el resto exige sesión. \\
-        \bottomrule
-    \end{tabular}
-    \caption{Superficie JSON documentada del sistema. El monitor de drift y las alertas, que antes eran \textit{endpoints}, se sirven ahora como vistas HTML renderizadas en servidor.}
-    \label{tab:api_endpoints}
-\end{table}
-
-\paragraph{El cuadro de mandos.} Se organiza en dos planos que reproducen la separación del propio sistema entre operación e investigación. El Apéndice~\ref{anexo:dashboard} recoge capturas de las seis vistas.
+El cuadro de mandos se organiza en dos planos que reproducen la separación del propio sistema entre operación e investigación. El Apéndice~\ref{anexo:dashboard} recoge capturas de las seis vistas.
 
 El \textbf{plano de Operación} responde a las dos preguntas del ciclo diario: cuánto pedir de cada SKU y qué excepciones revisar antes de aprobar el plan.
 
