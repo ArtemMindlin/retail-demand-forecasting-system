@@ -549,16 +549,14 @@ El cuadro de mandos también permite \textbf{lanzar una ejecución del \textit{p
 \section{Calidad, Verificación y Despliegue}
 \label{sec:calidad_despliegue}
 
-\paragraph{Despliegue.} El sistema se publica en un VPS de Hetzner bajo un dominio propio gestionado por DNS. La aplicación viaja contenerizada: \texttt{docker-compose.yml} levanta el servicio de la API, y el \textit{reverse proxy} \textbf{Caddy} que atiende el dominio y termina TLS \textbf{no forma parte de esta pila}, sino que corre a nivel de anfitrión dando servicio también a otros despliegues del mismo VPS. Esa separación es deliberada: la pila de este trabajo nunca toca los puertos 80 y 443, de modo que un despliegue fallido no puede dejar sin servicio al resto de la máquina, y Caddy redirige directamente al contenedor por la red externa que ambos comparten.
+\subsection{Prácticas de Calidad}
 
-La entrega es continua y se articula en dos flujos de GitHub Actions. El de \textbf{integración} (\texttt{ci.yml}) reproduce en cada empuje las mismas comprobaciones que los \textit{hooks} locales, esto es \textit{linter}, formato, tipado estático y la suite completa, de modo que la verificación no depende de que cada clon tenga los \textit{hooks} instalados. El de \textbf{despliegue} (\texttt{deploy.yml}) se conecta por SSH al anfitrión, sincroniza el repositorio con \texttt{origin/main} mediante \texttt{git reset --hard} y reconstruye el contenedor. El reinicio duro es intencionado y su alcance conviene precisarlo: descarta cualquier edición local de ficheros versionados, garantizando que lo desplegado es exactamente lo que la rama declara, mientras que la configuración específica de la máquina (variables de entorno y sobrescrituras de \textit{compose}) vive en ficheros no versionados que el reinicio no alcanza.
-
-\paragraph{Prácticas de calidad.} Sobre esa base se apoyan tres controles que actúan antes de que el código llegue a la máquina:
+Tres controles sostienen la confianza en lo que el sistema produce, y cada uno actúa en un momento distinto.
 
 \begin{itemize}
-    \item \textbf{Contratos estrictos}: toda la configuración y los metadatos transitan por esquemas validados y tipados estáticamente, de modo que una configuración incoherente se rechaza al cargarse y no a mitad de una ejecución de varios minutos.
-    \item \textbf{Verificación por capas}: los \textit{hooks} de \texttt{pre-commit} ejecutan \textit{linter}, formato y tipado en cada confirmación, y reservan la suite completa para el empuje, porque tres minutos son un precio razonable antes de que el código salga de la máquina pero no en cada confirmación. La contrapartida, que conviene conocer, es que una confirmación en verde no dice nada sobre si la suite pasa.
-    \item \textbf{Observabilidad}: cada recomendación pasa por el clasificador de riesgo que implementa \texttt{evaluation/}\allowbreak\texttt{reporting.py}, que le asigna la causa de mayor prioridad de entre las que le apliquen, según la precedencia que justifica la Sección~\ref{sec:excepciones}, y el sistema persiste los valores de Shapley del campeón que el Capítulo~\ref{chap:resultados} analiza.
+    \item \textbf{Al cargar la configuración, contratos estrictos}: toda la configuración y los metadatos transitan por esquemas validados y tipados estáticamente, de modo que una configuración incoherente se rechaza al arrancar y no a mitad de una ejecución de varios minutos.
+    \item \textbf{Al confirmar y al empujar, verificación por capas}: los \textit{hooks} de \texttt{pre-commit} ejecutan \textit{linter}, formato y tipado en cada confirmación, y reservan la suite completa para el empuje, porque tres minutos son un precio razonable antes de que el código salga de la máquina pero no en cada confirmación. La contrapartida, que conviene conocer, es que una confirmación en verde no dice nada sobre si la suite pasa.
+    \item \textbf{En ejecución, observabilidad}: cada recomendación pasa por el clasificador de riesgo que implementa \texttt{evaluation/}\allowbreak\texttt{reporting.py}, que le asigna la causa de mayor prioridad de entre las que le apliquen, según la precedencia que justifica la Sección~\ref{sec:excepciones}, y el sistema persiste los valores de Shapley del campeón que el Capítulo~\ref{chap:resultados} analiza.
 \end{itemize}
 
 \subsection{Estrategia de Testing: Pirámide de Verificación}
@@ -577,11 +575,19 @@ El sistema cuenta con 29 módulos de test organizados en cinco niveles, cada uno
         Anti-\textit{data leakage} & Que ninguna feature contiene información del periodo de predicción. \\
         Contratos de configuración & Que los guardarraíles experimentales se preservan ante cambios de config; correctitud aritmética de Pinball Loss por cuantil. \\
         Unitarios de lógica & Correctitud aritmética de lags, Winkler Score y Newsvendor. \\
-        Integración y humo & Pipeline end-to-end sobre datos sintéticos, vistas y \textit{endpoints} de la capa web, y CI/CD. \\
+        Integración y humo & Pipeline end-to-end sobre datos sintéticos, y vistas y \textit{endpoints} de la capa web. \\
         \bottomrule
     \end{tabular}
     \caption{Estrategia de testing por niveles: 29 módulos clasificados por tipo de fallo.}
     \label{tab:test_strategy}
 \end{table}
 
-El nivel más crítico es el de los \textbf{tests anti-\textit{data leakage}}, poco habitual en proyectos de ML pero imprescindible aquí: verifican que ningún lag usa el valor del propio día de predicción, que las covariables realizadas (descuento, stockout, clima) solo entran al modelo como pasado, y que el backtesting walk-forward respeta el gap de $H$ días entre el último día de entrenamiento y el primero de test. Estos tests se ejecutan automáticamente en el pipeline de CI antes de cada \textit{merge}.
+El nivel más crítico es el de los \textbf{tests anti-\textit{data leakage}}, poco habitual en proyectos de ML pero imprescindible aquí: verifican que ningún lag usa el valor del propio día de predicción, que las covariables realizadas (descuento, stockout, clima) solo entran al modelo como pasado, y que el backtesting walk-forward respeta el gap de $H$ días entre el último día de entrenamiento y el primero de test.
+
+\subsection{Despliegue}
+
+La entrega es continua y se articula en dos flujos de GitHub Actions que se disparan con el mismo empuje a \texttt{main}. El de \textbf{integración} (\texttt{ci.yml}) repite las comprobaciones de los \textit{hooks} locales (\textit{linter}, formato, tipado estático y la suite completa) sobre dos versiones de Python, de modo que la verificación no dependa de que cada clon tenga los \textit{hooks} instalados. El de \textbf{despliegue} (\texttt{deploy.yml}) se conecta por SSH al anfitrión, sincroniza el repositorio con \texttt{origin/main} mediante \texttt{git reset --hard} y reconstruye el contenedor. Ambos corren en paralelo y no en cadena, de modo que el flujo de integración informa del estado del código pero no bloquea el despliegue: la puerta efectiva sigue siendo el \textit{hook} de \texttt{pre-push}, que se ejecuta antes de que el empuje llegue a existir.
+
+El reinicio duro es intencionado y su alcance conviene precisarlo: descarta cualquier edición local de ficheros versionados, garantizando que lo desplegado es exactamente lo que la rama declara, mientras que la configuración específica de la máquina (variables de entorno y sobrescrituras de \textit{compose}) vive en ficheros no versionados que el reinicio no alcanza.
+
+El destino es un VPS de Hetzner bajo un dominio propio gestionado por DNS. La aplicación viaja contenerizada: \texttt{docker-compose.yml} levanta el servicio de la API, y el \textit{reverse proxy} \textbf{Caddy} que atiende el dominio y termina TLS \textbf{no forma parte de esta pila}, sino que corre a nivel de anfitrión dando servicio también a otros despliegues del mismo VPS. Esa separación es deliberada: la pila de este trabajo nunca toca los puertos 80 y 443, de modo que un despliegue fallido no puede dejar sin servicio al resto de la máquina, y Caddy redirige directamente al contenedor por la red externa que ambos comparten.
