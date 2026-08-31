@@ -542,11 +542,9 @@ El \textbf{plano de Operación} responde a las dos preguntas del ciclo diario: c
 
 El \textbf{plano de Análisis} sirve a la justificación metodológica: la vista de \textbf{EDA} publica las figuras del módulo exploratorio y \textbf{Pareto Tuning} muestra el frente multiobjetivo, la sensibilidad al ratio de costes y el \textit{backtest} de coste justo.
 
-Transversal a ambos planos, el simulador \textit{What-If} permite ajustar mediante \textit{sliders} el nivel de servicio objetivo y los costes de rotura y almacenamiento; el servidor recalcula la política y devuelve la región de contenido actualizada. Los tres viajan en la \textit{query string} y se propagan a través de las búsquedas y los filtros de la tabla, de modo que cualquier escenario explorado queda registrado en la URL y puede compartirse o reproducirse.
+En tres de las cuatro vistas del plano de Operación (\textbf{Dashboard}, \textbf{Análisis SKU} y \textbf{Monitor de Drift}), el simulador \textit{What-If} permite ajustar mediante \textit{sliders} el nivel de servicio objetivo y los costes de rotura y almacenamiento; el servidor recalcula la política y devuelve la región de contenido actualizada. Los tres viajan en la \textit{query string} y se propagan a través de las búsquedas y los filtros de la tabla, de modo que cualquier escenario explorado queda registrado en la URL y puede compartirse o reproducirse.
 
 El cuadro de mandos también permite \textbf{lanzar una ejecución del \textit{pipeline}} desde el navegador y seguir su registro en vivo, con un cerrojo que impide solapar dos ejecuciones.
-
-Dos decisiones de implementación merecen mención por su efecto en la defensa del sistema. La primera es que \textbf{los gráficos del cuadro de mandos se generan como SVG en el servidor}: la geometría se calcula en Python y se envía como marcado, sin librería de graficación en el cliente. La segunda es que \textbf{la ausencia de un artefacto se comunica explícitamente}: una ejecución sin \texttt{drift\_report.json} muestra un aviso que nombra el modo de ejecución que lo produce, en lugar de un panel vacío que podría confundirse con ``sin deriva detectada''.
 
 \section{Calidad, Verificación y Despliegue}
 \label{sec:calidad_despliegue}
