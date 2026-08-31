@@ -720,9 +720,16 @@ def run_experiment_from_frame(
     )
 
     # Optional: Explainability (SHAP) on the last fold-trained model (seen the most data).
+    # The model explained is the CHAMPION, resolved the same way every other consumer resolves
+    # it. Preferring CatBoost unconditionally, as this did, published an XAI figure for a model
+    # the registry had already replaced.
     shap_values = None
     if settings.reporting.make_plots:
-        model_to_explain = loop.cat_model if loop.cat_model is not None else loop.boosting_model
+        champion = resolve_champion_reference(
+            settings, load_champion_registry(champion_registry_path(settings))
+        )
+        by_name = {"catboost": loop.cat_model, "lightgbm": loop.boosting_model}
+        model_to_explain = by_name.get(champion.model_name) or loop.cat_model or loop.boosting_model
         if model_to_explain is not None:
             fields(logger, {"SHAP": model_to_explain.model_name})
             shap_values = calculate_shap_values(

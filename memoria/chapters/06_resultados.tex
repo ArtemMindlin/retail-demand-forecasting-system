@@ -183,8 +183,8 @@ Se reejecutó el protocolo de backtesting íntegro ampliando el subset de evalua
         \toprule
         \textbf{Modelo (Latent)} & \textbf{Fold 0} & \textbf{Fold 1} & \textbf{Fold 2} & \textbf{Promedio} \\
         \midrule
-        CatBoost  & 80{,}2\% & 79{,}6\% & 80{,}7\% & \textbf{80{,}2\%} \\
-        LightGBM  & 89{,}3\% & 84{,}1\% & 85{,}0\% & \textbf{86{,}1\%} \\
+        LightGBM  & 90{,}3\% & 85{,}8\% & 80{,}5\% & \textbf{85{,}5\%} \\
+        CatBoost  & 89{,}1\% & 81{,}5\% & 83{,}2\% & \textbf{84{,}6\%} \\
         \bottomrule
     \end{tabular}
     \caption{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold con 500 series (10.500 observaciones por modelo). Cobertura objetivo: $\geq 80\%$ ($\alpha = 0{,}20$).}
@@ -194,16 +194,16 @@ Se reejecutó el protocolo de backtesting íntegro ampliando el subset de evalua
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{figures/cobertura_folds.pdf}
-    \caption{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold para CatBoost (estrategia \textit{Latent Supervised}): subset base de 50 series frente a la validación a escala con 500 series. La línea discontinua marca la cobertura nominal del 80\% ($\alpha=0{,}20$) y las líneas punteadas la media de cada experimento. Al escalar y optimizar los hiperparámetros sobre la capa conformal, la cobertura media de CatBoost alcanza el 80{,}2\%, cumpliendo estrictamente el objetivo nominal con alta estabilidad entre folds.}
+    \caption{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold para LightGBM (estrategia \textit{Latent Supervised}): subset base de 50 series frente a la validación a escala con 500 series. La línea discontinua marca la cobertura nominal del 80\% ($\alpha=0{,}20$) y las líneas punteadas la media de cada experimento. El subset base infracubre gravemente (58{,}5\% de media, con dos folds por debajo del 53\%), mientras que a escala la cobertura media sube al 85{,}5\% y ningún fold baja del objetivo nominal.}
     \label{fig:cobertura_folds}
 \end{figure}
 
 Los resultados confirman el diagnóstico:
 
 \begin{itemize}
-    \item \textbf{La inestabilidad desaparece y se alcanza la calibración nominal}: con 500 series, la cobertura media de CatBoost alcanza el \textbf{80{,}2\%} (clavando la cobertura nominal del 80\% en los tres folds: 80{,}2\%, 79{,}6\% y 80{,}7\%), mientras que LightGBM alcanza una cobertura del \textbf{86{,}1\%}. La varianza entre folds prácticamente desaparece, confirmando que la infracobertura del subset de 50 series era un artefacto del tamaño reducido de calibración por estrato.
-    \item \textbf{Eficiencia probabilística y Winkler Score}: el \textbf{Winkler Score} de LightGBM (36{,}52) es inferior al de CatBoost (42{,}89), lo que indica intervalos más compactos. Sin embargo, ambos modelos probabilísticos proporcionan intervalos calibrados y válidos para la toma de decisiones en inventario.
-    \item \textbf{Rendimiento logístico y reducción de roturas}: LightGBM alcanza el menor coste logístico global ($150.018$ u.m.), reduciendo un \textbf{$-7{,}57\%$} el coste frente al baseline con significancia estadística (IC 95\% $[-14{,}17\%,\; -1{,}06\%]$), alcanzando un nivel de servicio del $83{,}84\%$ y un \textit{fill rate} del $98{,}86\%$. Por su parte, CatBoost alcanza un $79{,}66\%$ de nivel de servicio ($97{,}97\%$ \textit{fill rate}). En contraste, el \textit{Seasonal Naïve} sufre una rotura severa en casi la mitad de los días ($52{,}45\%$ de nivel de servicio), acumulando $123.858$ u.m. en penalizaciones por rotura de stock.
+    \item \textbf{La infracobertura desaparece}: con 500 series ningún fold de ninguno de los dos modelos baja del 80\% nominal, y las medias se sitúan en el \textbf{85{,}5\%} (LightGBM) y el \textbf{84{,}6\%} (CatBoost). El contraste con el subset de 50 series, donde LightGBM promediaba un 58{,}5\% con dos folds por debajo del 53\%, confirma que aquella infracobertura era un artefacto del tamaño reducido de la muestra de calibración por estrato. Conviene no sobrevender el resultado: la garantía se cumple por exceso, no con exactitud, y la dispersión entre folds sigue siendo apreciable (de 80{,}5\% a 90{,}3\% en LightGBM), lo que es coherente con la limitación de intercambiabilidad que la Sección~\ref{sec:conformal} declara.
+    \item \textbf{Eficiencia probabilística y Winkler Score}: el \textbf{Winkler Score} de LightGBM (36{,}11) es netamente inferior al de CatBoost (46{,}54), lo que indica intervalos más compactos para una cobertura equivalente: LightGBM cubre un punto porcentual más con una anchura media de $28{,}55$ unidades frente a las $35{,}25$ de CatBoost. Ambos, en todo caso, proporcionan intervalos calibrados y válidos para la decisión de inventario.
+    \item \textbf{Rendimiento logístico y reducción de roturas}: LightGBM alcanza el menor coste logístico global ($147.646$ u.m.), reduciendo un \textbf{$-9{,}03\%$} el coste frente al baseline con significancia estadística (IC 95\% $[-15{,}52\%,\; -2{,}68\%]$), alcanzando un nivel de servicio del $83{,}55\%$ y un \textit{fill rate} del $98{,}90\%$. Por su parte, CatBoost alcanza un $78{,}39\%$ de nivel de servicio ($97{,}99\%$ \textit{fill rate}) con un coste superior al del propio baseline. En contraste, el \textit{Seasonal Naïve} sufre una rotura severa en casi la mitad de los días ($52{,}45\%$ de nivel de servicio), acumulando $123.858$ u.m. en penalizaciones por rotura de stock.
 \end{itemize}
 
 \begin{figure}[htbp]
@@ -399,11 +399,11 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definid
         \midrule
         Corrección de censura mejora el coste vs.\ estrategia Observed & $> 0\%$ & $-92{,}15\%$ (Latent Supervised vs.\ Observed, coste justo, panel de 500 series) & \checkmark \\
         \midrule
-        Reducción de coste logístico frente a Seasonal Naïve & $> 0\%$ & $-7{,}57\%$ (LightGBM: 150.018 frente a 162.299 u.m., con $+31{,}39$ puntos más de nivel de servicio) & \checkmark \\
+        Reducción de coste logístico frente a Seasonal Naïve & $> 0\%$ & $-9{,}03\%$ (LightGBM: 147.646 frente a 162.299 u.m., con $+31{,}10$ puntos más de nivel de servicio) & \checkmark \\
         \midrule
-        Winkler Score del modelo probabilístico & Mínimo & LightGBM: 36{,}52; CatBoost: 42{,}89 & \checkmark \\
+        Winkler Score del modelo probabilístico & Mínimo & LightGBM: 36{,}11; CatBoost: 46{,}54 & \checkmark \\
         \midrule
-        Cobertura empírica $[q_{0{,}1}, q_{0{,}9}]$ ($\alpha = 0{,}20$) & $\geq 80\%$ & 80{,}2\% (CatBoost); 86{,}1\% (LightGBM) en el panel de 500 series & \checkmark \\
+        Cobertura empírica $[q_{0{,}1}, q_{0{,}9}]$ ($\alpha = 0{,}20$) & $\geq 80\%$ & 85{,}5\% (LightGBM); 84{,}6\% (CatBoost) en el panel de 500 series & \checkmark \\
         \bottomrule
     \end{tabular}%
     }
@@ -414,7 +414,7 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definid
 Todos los objetivos cuantitativos del trabajo se han alcanzado con éxito:
 \begin{enumerate}
     \item \textbf{Corrección de censura:} Se cumple holgadamente con una reducción del coste logístico del \textbf{$-92{,}15\%$} bajo evaluación de coste justo con demanda latente supervisada.
-    \item \textbf{Reducción de coste frente al baseline:} El modelo de \textit{Gradient Boosting} Conformal reduce el coste logístico un \textbf{$-7{,}57\%$} frente al \textit{Seasonal Naïve} ($150.018$ frente a $162.299$ u.m.), al tiempo que eleva el nivel de servicio del $52{,}45\%$ al $83{,}84\%$ ($+31{,}39$ puntos de demanda atendida sin rotura).
-    \item \textbf{Eficiencia probabilística (Winkler Score):} Los modelos probabilísticos calibrados mediante la capa conformal alcanzan puntuaciones compactas ($36{,}52$ en LightGBM y $42{,}89$ en CatBoost).
-    \item \textbf{Cobertura empírica conformal:} Se satisface plenamente la garantía de cobertura con un \textbf{80{,}2\%} en CatBoost y un \textbf{86{,}1\%} en LightGBM sobre el panel de 500 series, validando la estabilidad estadística del método \textit{Mondrian Conformal Prediction}.
+    \item \textbf{Reducción de coste frente al baseline:} El modelo de \textit{Gradient Boosting} Conformal reduce el coste logístico un \textbf{$-9{,}03\%$} frente al \textit{Seasonal Naïve} ($147.646$ frente a $162.299$ u.m.), al tiempo que eleva el nivel de servicio del $52{,}45\%$ al $83{,}55\%$ ($+31{,}10$ puntos de demanda atendida sin rotura).
+    \item \textbf{Eficiencia probabilística (Winkler Score):} Los modelos probabilísticos calibrados mediante la capa conformal alcanzan puntuaciones compactas ($36{,}11$ en LightGBM y $46{,}54$ en CatBoost).
+    \item \textbf{Cobertura empírica conformal:} Se satisface la garantía de cobertura con un \textbf{85{,}5\%} en LightGBM y un \textbf{84{,}6\%} en CatBoost sobre el panel de 500 series, en ambos casos por encima del 80\% nominal y sin ningún fold por debajo de él.
 \end{enumerate}

@@ -21,6 +21,7 @@ from pathlib import Path
 import matplotlib
 
 from retail_forecasting.tracking import resolve_run_dir
+from retail_forecasting.utils.io import HOLDOUT_FOLD_ID
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -51,9 +52,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def coverage_by_fold(run_dir: Path, model: str, strategy: str) -> pd.Series:
+    """Walk-forward coverage per fold, with the external holdout excluded.
+
+    The holdout rides in `fold_metrics.csv` under `HOLDOUT_FOLD_ID`, and it is one origin
+    per series rather than a fold: plotting it as "Fold 3" would compare a 7-day window
+    against three 7-day folds, and it silently desynchronised the two runs this figure
+    overlays once only the newer one carried it.
+    """
     frame = pd.read_csv(run_dir / "fold_metrics.csv")
     column = next(c for c in frame.columns if "coverage" in c)
-    selected = frame[(frame["model_name"] == model) & (frame["data_strategy"] == strategy)]
+    selected = frame[
+        (frame["model_name"] == model)
+        & (frame["data_strategy"] == strategy)
+        & (frame["fold_id"] != HOLDOUT_FOLD_ID)
+    ]
     if selected.empty:
         raise SystemExit(f"No rows for {model}/{strategy} in {run_dir}")
     return selected.set_index("fold_id")[column].sort_index()
