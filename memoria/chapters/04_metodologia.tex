@@ -829,14 +829,14 @@ La decisión de cuándo reentrenar se toma, por tanto, por cadencia y no por ale
 
 La validación cruzada temporal (\textit{walk-forward backtesting}) estima el rendimiento del modelo en condiciones experimentales controladas. Sin embargo, en producción surge una pregunta adicional de naturaleza MLOps: \emph{\textquestiondown con qué frecuencia debe reentrenarse el modelo a medida que llegan datos nuevos?} Reentrenar demasiado frecuentemente supone un coste computacional elevado; hacerlo demasiado esporádicamente puede degradar las predicciones conforme el modelo queda desactualizado respecto a los patrones recientes.
 
-Para responder esta pregunta de forma empírica sobre datos genuinamente no vistos, el sistema implementa una \textbf{Simulación Operacional en Streaming} sobre el split de evaluación. El esquema sigue el protocolo de \textbf{evaluación prequential} (\textit{interleaved test-then-train}), estándar en aprendizaje automático sobre flujos de datos: cada observación se evalúa primero y luego se incorpora al entrenamiento, eliminando cualquier filtración de información futura \cite{hyndman2021forecasting}. El procedimiento es el siguiente:
+Para responder esta pregunta de forma empírica sobre datos genuinamente no vistos, el sistema implementa una \textbf{Simulación Operacional en Streaming} sobre el split de evaluación. El esquema sigue el protocolo de \textbf{evaluación prequential} (\textit{interleaved test-then-train}), término acuñado por Dawid como contracción de \emph{predictive} y \emph{sequential} \cite{dawid1984prequential} y hoy estándar para evaluar aprendizaje sobre flujos de datos \cite{gama2013evaluating}. En lugar de partir los datos en conjuntos disjuntos, cada observación desempeña dos papeles en un orden fijo: primero sirve de prueba, porque el modelo la predice sin haberla visto, y solo después se incorpora al histórico disponible. De ahí que entrenamiento y prueba dejen de ser disjuntos sin que exista fuga alguna, y que el error pueda seguirse a lo largo del tiempo en vez de resumirse en una única cifra, que es justamente lo que un \textit{holdout} fijo no permite cuando la distribución se mueve. La variante que aquí se emplea difiere del esquema incremental clásico en un punto que constituye la propia variable del experimento: la observación entra en el histórico cada día, pero el modelo no se reajusta con ella hasta el siguiente reentrenamiento programado. El procedimiento es el siguiente:
 
 \begin{enumerate}
     \item Se entrena un modelo \textit{champion} inicial exclusivamente sobre el split de entrenamiento. Este modelo representa el estado del sistema en el día de despliegue, antes de que llegue ningún dato del periodo de evaluación.
     \item Se define un conjunto de \textbf{cadencias de reentrenamiento}:
     \[K = \{k_1, k_2, \ldots, k_n, \text{nunca}\},\]
     donde cada $k_i$ es el número de días entre reentrenamientos consecutivos. El parámetro \texttt{simulation\_\allowbreak{}days} limita la ventana de evaluación. La cadencia \textit{nunca} sirve como \textit{baseline}: el modelo inicial nunca se actualiza.
-    \item Se itera día a día sobre el split de evaluación. Para cada fecha de decisión $t$ y cada cadencia $k$:
+    \item Se itera día a día sobre el split de evaluación, según el bucle que ilustra la Figura~\ref{fig:prequential_loop}. Para cada fecha de decisión $t$ y cada cadencia $k$:
     \begin{itemize}
         \item Se construye la \textbf{historia disponible} $\mathcal{H}_t = \text{train} \cup \text{eval}[\text{date} < t]$, garantizando ausencia de \textit{leakage}.
         \item Si $(t_{\text{index}} + 1) \bmod k = 0$, se reentrena el modelo de esa cadencia sobre $\mathcal{H}_t$, incluyendo recalibración conformal.
@@ -845,5 +845,46 @@ Para responder esta pregunta de forma empírica sobre datos genuinamente no vist
     \end{itemize}
     \item Al finalizar el streaming, se dispone de curvas de \textbf{coste acumulado} por cadencia sobre el mismo periodo y los mismos datos, lo que permite una comparación directa y equitativa.
 \end{enumerate}
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+    every node/.style={font=\sffamily\footnotesize, align=center},
+    tick/.style={draw, thick, gray!55}
+]
+  % Eje de dias del split de evaluacion
+  \draw[->, thick] (-0.3,0) -- (10.6,0) node[right, font=\sffamily\footnotesize] {días};
+
+  % Historia disponible: se detiene ANTES de t
+  \fill[blue!12] (-0.3,0.12) rectangle (6,0.72);
+  \node[font=\sffamily\scriptsize] at (2.85,0.42)
+       {$\mathcal{H}_t = \text{train} \cup \text{eval}[\text{fecha} < t]$};
+  \draw[thick, blue!55] (6,0.08) -- (6,0.78);
+
+  % Frontera de decision
+  \draw[dashed, thick, gray!75] (6,-1.5) -- (6,1.35);
+  \node[font=\sffamily\footnotesize] at (6,1.6) {$t$};
+
+  % Horizonte de prediccion, hacia adelante
+  \fill[orange!18] (6,-0.72) rectangle (8.45,-0.12);
+  \node[font=\sffamily\scriptsize] at (7.2,-0.42) {predice $[t,\,t{+}H{-}1]$};
+  \draw[->, thick, orange!75!black] (6,-0.92) -- (8.45,-0.92);
+
+  % Reentrenos de la cadencia k
+  \foreach \x in {1.3, 3.65, 6, 8.35} { \draw[tick] (\x,-0.05) -- (\x,0.05); }
+  \foreach \x in {1.3, 3.65, 6, 8.35} {
+      \node[font=\sffamily\scriptsize, gray!60!black] at (\x,-1.72) {$\blacktriangle$};
+  }
+  \node[font=\sffamily\scriptsize, anchor=west] at (-0.3,-2.15)
+       {$\blacktriangle$ reentreno: días en que $(t_{\text{index}}+1) \bmod k = 0$};
+
+  \node[font=\sffamily\scriptsize, anchor=west, text width=4.4cm] at (6.25,1.05)
+       {la historia se corta aquí:\\ nada posterior a $t$ entra};
+\end{tikzpicture}
+\shorthandon{>}%
+\caption{Un paso del bucle prequential para una cadencia $k$. En cada fecha de decisión $t$ el modelo solo ve la historia estrictamente anterior, predice hacia adelante el horizonte completo y se puntúa cuando esos días se revelan; el reentrenamiento se dispara cada $k$ días sobre la historia disponible en ese momento. El corte en $t$ es lo que hace que la comparación entre cadencias mida la política de actualización y no una fuga de información.}
+\label{fig:prequential_loop}
+\end{figure}
 
 Esta simulación constituye la evidencia empírica que sostiene la política de reentrenamiento operacional del sistema.
