@@ -181,7 +181,7 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
 \label{fig:data_pipeline}
 \end{figure}
 
-\section{Modos de Ejecución y Ciclo Operacional}
+\section{Modos de Ejecución}
 \label{sec:run_modes}
 
 El sistema distingue explícitamente entre operaciones de investigación, sintonización desacoplada y operaciones de producción mediante seis modos de ejecución configurables a través del parámetro \texttt{run\_mode}:
@@ -199,6 +199,11 @@ El sistema distingue explícitamente entre operaciones de investigación, sinton
 
     \item \textbf{\texttt{tune\_forecasting}}: Modo de sintonización desacoplado del modelo de previsión probabilística. Ejecuta una búsqueda de Optuna de dos capas (ventana de selección de $N=30$ sorteos y validación fuera de muestra de $N=25$ sorteos con CIs bootstrap al 95\%) evaluando directamente a través de la capa de \textit{Conformal Prediction} ($14$ días de calibración). Persiste los hiperparámetros validados en \texttt{models/forecasting\_params.json}.
 \end{enumerate}
+
+\section{Gobierno del Modelo}
+\label{sec:gobierno_modelo}
+
+Los tres modos anteriores producen modelos; decidir cuál de ellos llega a producción, con qué hiperparámetros y dejando qué rastro es un problema distinto, y es el que esta sección recoge. El criterio que gobierna esas decisiones se deriva en el Capítulo~\ref{chap:metodologia}; lo que sigue es cómo queda implementado.
 
 \subsection{Ciclo de Vida de los Hiperparámetros: Optimización vs. Reentrenamiento}
 \label{sec:mlops_workflow}
@@ -399,16 +404,19 @@ Transversal a ambos planos, el simulador \textit{What-If} permite ajustar median
 
 Dos decisiones de implementación merecen mención por su efecto en la defensa del sistema. La primera es que \textbf{todos los gráficos se generan como SVG en el servidor}: la geometría se calcula en Python y se envía como marcado, sin librería de graficación en el cliente. La segunda es que \textbf{la ausencia de un artefacto se comunica explícitamente}: una ejecución sin \texttt{drift\_report.json} muestra un aviso que nombra el modo de ejecución que lo produce, en lugar de un panel vacío que podría confundirse con ``sin deriva detectada''.
 
-\section{Calidad de Software e Infraestructura CI/CD}
-Para garantizar que la deuda técnica no limite el escalado del sistema, se han aplicado prácticas fundamentales de \textit{DevOps}:
+\section{Calidad, Verificación y Despliegue}
+\label{sec:calidad_despliegue}
+
+\paragraph{Despliegue.} El sistema se publica en un VPS de Hetzner bajo un dominio propio gestionado por DNS. La aplicación viaja contenerizada: \texttt{docker-compose.yml} levanta el servicio de la API, y el \textit{reverse proxy} \textbf{Caddy} que atiende el dominio y termina TLS \textbf{no forma parte de esta pila}, sino que corre a nivel de anfitrión dando servicio también a otros despliegues del mismo VPS. Esa separación es deliberada: la pila de este trabajo nunca toca los puertos 80 y 443, de modo que un despliegue fallido no puede dejar sin servicio al resto de la máquina, y Caddy redirige directamente al contenedor por la red externa que ambos comparten.
+
+La entrega es continua y se articula en dos flujos de GitHub Actions. El de \textbf{integración} (\texttt{ci.yml}) reproduce en cada empuje las mismas comprobaciones que los \textit{hooks} locales, esto es \textit{linter}, formato, tipado estático y la suite completa, de modo que la verificación no depende de que cada clon tenga los \textit{hooks} instalados. El de \textbf{despliegue} (\texttt{deploy.yml}) se conecta por SSH al anfitrión, sincroniza el repositorio con \texttt{origin/main} mediante \texttt{git reset --hard} y reconstruye el contenedor. El reinicio duro es intencionado y su alcance conviene precisarlo: descarta cualquier edición local de ficheros versionados, garantizando que lo desplegado es exactamente lo que la rama declara, mientras que la configuración específica de la máquina (variables de entorno y sobrescrituras de \textit{compose}) vive en ficheros no versionados que el reinicio no alcanza.
+
+\paragraph{Prácticas de calidad.} Sobre esa base se apoyan tres controles que actúan antes de que el código llegue a la máquina:
+
 \begin{itemize}
-    \item \textbf{Contratos Estrictos (Pydantic)}: Toda la configuración y los metadatos transitan a través de esquemas validados y tipados estáticamente, rechazando configuraciones incoherentes o derivas de datos no controladas.
-    \item \textbf{Contenerización (Docker)}: La aplicación Django, que sirve tanto el cuadro
-    de mandos como la superficie JSON, se despliega sobre un servidor ASGI y se orquesta junto
-    a un proxy inverso Caddy mediante \texttt{docker-compose.yml}, garantizando que cualquier
-    investigador pueda levantar la arquitectura completa con un solo comando en cualquier
-    sistema operativo.
-    \item \textbf{Integración Continua (GitHub Actions)}: El repositorio cuenta con un pipeline de CI (\texttt{ci.yml}) que, ante cada nuevo \textit{commit}, despliega un entorno virgen, verifica el estilo y el formato del código (Ruff), comprueba los tipos estáticos (Mypy) y ejecuta la batería de tests automatizados descritos en la sección siguiente.
+    \item \textbf{Contratos estrictos}: toda la configuración y los metadatos transitan por esquemas validados y tipados estáticamente, de modo que una configuración incoherente se rechaza al cargarse y no a mitad de una ejecución de varios minutos.
+    \item \textbf{Verificación por capas}: los \textit{hooks} de \texttt{pre-commit} ejecutan \textit{linter}, formato y tipado en cada confirmación, y reservan la suite completa para el empuje, porque tres minutos son un precio razonable antes de que el código salga de la máquina pero no en cada confirmación. La contrapartida, que conviene conocer, es que una confirmación en verde no dice nada sobre si la suite pasa.
+    \item \textbf{Observabilidad}: cada recomendación atraviesa el clasificador de riesgo de \texttt{evaluation/}\allowbreak\texttt{reporting.py}, que le asigna la causa de mayor prioridad que le aplique según la precedencia que justifica la Sección~\ref{sec:excepciones}, y el sistema persiste los valores de Shapley del campeón que el Capítulo~\ref{chap:resultados} analiza.
 \end{itemize}
 
 \subsection{Estrategia de Testing: Pirámide de Verificación}
@@ -435,10 +443,3 @@ El sistema cuenta con 29 módulos de test organizados en cinco niveles, cada uno
 \end{table}
 
 El nivel más crítico es el de los \textbf{tests anti-\textit{data leakage}}, poco habitual en proyectos de ML pero imprescindible aquí: verifican que ningún lag usa el valor del propio día de predicción, que las covariables realizadas (descuento, stockout, clima) solo entran al modelo como pasado, y que el backtesting walk-forward respeta el gap de $H$ días entre el último día de entrenamiento y el primero de test. Estos tests se ejecutan automáticamente en el pipeline de CI antes de cada \textit{merge}.
-
-\section{Explicabilidad y Diagnóstico Automático}
-Un sistema de apoyo a la decisión en \textit{retail} pierde su valor si opera como una caja negra. Por ello, se han integrado módulos de observabilidad (\textit{Observability}):
-\begin{itemize}
-    \item \textbf{Explicabilidad Global (SHAP)}: El sistema genera valores de Shapley Aditivos \cite{lundberg2017shap} (\texttt{shap}) para el modelo Campeón, documentando gráficamente el peso real de los \textit{lags}, las variables climáticas o las jerarquías en la predicción.
-    \item \begin{sloppypar}\textbf{Diagnóstico Operacional por Excepción}: Cada recomendación atraviesa el clasificador de riesgo de \texttt{evaluation/}\allowbreak\texttt{reporting.py}, que le asigna la causa de mayor prioridad que le aplique (predicción sin modelo detrás, tramo con deriva detectada por Page-Hinkley, intervalo conformal anormalmente ancho o cantidad de pedido anormalmente alta) y vuelca las filas marcadas a \texttt{exceptions.csv}. La taxonomía completa y la razón de su orden de precedencia se detallan en la Sección~\ref{sec:excepciones}. El efecto práctico es que revisar el plan diario consiste en leer una lista corta con la causa ya nombrada, en lugar de inspeccionar los registros de ejecución para averiguar qué fue mal.\end{sloppypar}
-\end{itemize}
