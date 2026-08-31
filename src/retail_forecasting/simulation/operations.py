@@ -44,6 +44,9 @@ from retail_forecasting.drift import label_all_regimes
 from retail_forecasting.features.engineering import build_inference_frame_with_fallback
 from retail_forecasting.forecasting.pipeline import (
     _build_scoring_predictions,
+    champion_registry_path,
+    load_champion_registry,
+    resolve_champion_reference,
     train_and_save_champion,
 )
 from retail_forecasting.inventory.newsvendor import attach_inventory_costs
@@ -153,15 +156,26 @@ def _setup_cadence_models(
     settings: Settings,
     train_panel: pd.DataFrame,
     sim_models_root: Path,
+    champion: Any,
 ) -> tuple[dict[str, Path], dict[str, int | None]]:
     """Train the initial champion and seed one model copy per retrain cadence.
 
     Returns ``(cadence_paths, cadence_int)`` mapping each cadence label to its
     model file and to its retrain period (``None`` = never retrain).
     """
-    fields(logger, {"campeón inicial": f"entrenando sobre {thousands(len(train_panel))} filas"})
+    fields(
+        logger,
+        {
+            "campeón inicial": f"{champion.model_name} ({champion.source})",
+            "entrenando sobre": f"{thousands(len(train_panel))} filas",
+        },
+    )
     base_model_path = train_and_save_champion(
-        settings, train_panel, models_dir=sim_models_root / "initial"
+        settings,
+        train_panel,
+        models_dir=sim_models_root / "initial",
+        backend_name=champion.backend_name,
+        model_name=champion.model_name,
     )
     fields(logger, {"guardado": str(base_model_path)})
 
@@ -186,6 +200,7 @@ def _run_streaming_loop(
     cadence_int: dict[str, int | None],
     horizon: int,
     settings: Settings,
+    champion: Any,
 ) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     """Stream eval days: for each day×cadence score, retrain on schedule, cost the window.
 
@@ -227,7 +242,13 @@ def _run_streaming_loop(
             retrained_this_step = False
             if cadence_k is not None and (day_index + 1) % cadence_k == 0:
                 t0 = time.perf_counter()
-                train_and_save_champion(settings, available_history, models_dir=model_path.parent)
+                train_and_save_champion(
+                    settings,
+                    available_history,
+                    models_dir=model_path.parent,
+                    backend_name=champion.backend_name,
+                    model_name=champion.model_name,
+                )
                 retrain_events.append(
                     {
                         "cadence": label,
@@ -344,7 +365,17 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
         sim_models_root = sim_root / "models"
         sim_models_root.mkdir(parents=True, exist_ok=True)
 
-        cadence_paths, cadence_int = _setup_cadence_models(settings, train_panel, sim_models_root)
+        # Resolved once, from the registry, and passed down. Omitting the identity falls
+        # back to the static `business.champion_*` fields, and this plane was the last
+        # caller still doing so: the 28 Aug run streamed CatBoost while the registry had
+        # already promoted LightGBM, so it measured a retraining policy for a model that
+        # was no longer the champion.
+        champion = resolve_champion_reference(
+            settings, load_champion_registry(champion_registry_path(settings))
+        )
+        cadence_paths, cadence_int = _setup_cadence_models(
+            settings, train_panel, sim_models_root, champion
+        )
 
         # Combined panel keeps lag continuity across the train→eval boundary.
         combined_panel = pd.concat([train_panel, eval_panel], ignore_index=True)
@@ -358,6 +389,7 @@ def run_operational_simulation(settings: Settings) -> OperationalSimulationArtif
             cadence_int=cadence_int,
             horizon=horizon,
             settings=settings,
+            champion=champion,
         )
         cadence_summary = _summarize_cadences(predictions_by_day, retrain_events, horizon)
         cadence_comparison = _compare_cadences(
