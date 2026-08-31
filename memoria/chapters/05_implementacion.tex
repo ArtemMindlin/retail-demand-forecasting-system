@@ -549,6 +549,8 @@ El cuadro de mandos también permite \textbf{lanzar una ejecución del \textit{p
 \section{Calidad, Verificación y Despliegue}
 \label{sec:calidad_despliegue}
 
+Un trabajo experimental vale lo que valga la confianza en que sus cifras salen de lo que el texto dice que hacen. Esta sección recoge los tres mecanismos que la sostienen, y los recorre en el orden en que actúan: los controles que rechazan una configuración o un \textit{DataFrame} inválidos antes de que contaminen una ejecución, la suite que verifica las propiedades de las que dependen los resultados (la ausencia de fuga temporal por encima de todas), y el circuito que lleva el código al servidor sin poder saltarse ninguna de las dos.
+
 \subsection{Prácticas de Calidad}
 
 Tres controles sostienen la confianza en lo que el sistema produce, y cada uno actúa en un momento distinto.
