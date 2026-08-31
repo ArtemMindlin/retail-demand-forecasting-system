@@ -524,9 +524,7 @@ La capa web es una aplicación Django que cumple dos funciones separadas: render
 
 El sistema no emplea base de datos: el estado son los artefactos en disco, y la única información propia de la capa web es la sesión del operador, transportada en una \textit{cookie} firmada. Un \textit{middleware} exige esa sesión en todas las rutas salvo dos (la pantalla de acceso y la sonda de disponibilidad) y distingue tres formas de rechazo, porque el mismo 401 no sirve a los tres clientes: una navegación de navegador se redirige al formulario conservando el destino, una petición JSON recibe el 401, y una petición htmx recibe una cabecera \texttt{HX-Redirect} para que el navegador recargue en lugar de incrustar la pantalla de acceso dentro de un fragmento.
 
-\subsection{Superficie JSON}
-
-El cuadro de mandos fue primero una \textit{Single Page Application} en React servida por FastAPI, y se reescribió como plantillas Django renderizadas en servidor por los motivos que recoge la Sección~\ref{sec:stack}. Aquella interfaz exponía treinta y cuatro rutas JSON, porque cada panel del cliente necesitaba la suya para pintarse; al pasar el renderizado al servidor, las que solo alimentaban a un componente se convirtieron en vistas HTML. Quedaron seis, las que constituyen una interfaz máquina-a-máquina real, descritas en la Tabla~\ref{tab:api_endpoints} y documentadas en la propia aplicación bajo la ruta \texttt{/api/}.
+\paragraph{La superficie JSON.} El cuadro de mandos fue primero una \textit{Single Page Application} en React servida por FastAPI, y se reescribió como plantillas Django renderizadas en servidor por los motivos que recoge la Sección~\ref{sec:stack}. Aquella interfaz exponía treinta y cuatro rutas JSON, porque cada panel del cliente necesitaba la suya para pintarse; al pasar el renderizado al servidor, las que solo alimentaban a un componente se convirtieron en vistas HTML. Quedaron seis, las que constituyen una interfaz máquina-a-máquina real, descritas en la Tabla~\ref{tab:api_endpoints} y documentadas en la propia aplicación bajo la ruta \texttt{/api/}.
 
 \begin{table}[htbp]
     \centering
@@ -547,9 +545,7 @@ El cuadro de mandos fue primero una \textit{Single Page Application} en React se
     \label{tab:api_endpoints}
 \end{table}
 
-\subsection{Cuadro de Mandos}
-
-El cuadro de mandos se organiza en dos planos que reproducen la separación del propio sistema entre operación e investigación. El Apéndice~\ref{anexo:dashboard} recoge capturas de las seis vistas.
+\paragraph{El cuadro de mandos.} Se organiza en dos planos que reproducen la separación del propio sistema entre operación e investigación. El Apéndice~\ref{anexo:dashboard} recoge capturas de las seis vistas.
 
 El \textbf{plano de Operación} responde a las dos preguntas del ciclo diario: cuánto pedir de cada SKU y qué excepciones revisar antes de aprobar el plan.
 
