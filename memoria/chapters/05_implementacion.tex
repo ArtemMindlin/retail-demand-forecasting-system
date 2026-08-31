@@ -313,7 +313,7 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
     \begin{tikzpicture}[node distance=1.8cm, every node/.style={font=\sffamily\small, align=center}]
         % Nodos
         \node[draw, rectangle, rounded corners, fill=blue!10] (data) {Datos Recientes};
-        \node[draw, rectangle, rounded corners, fill=green!10, below of=data] (retrain) {\textbf{run\_retrain} \\ (Diario)};
+        \node[draw, rectangle, rounded corners, fill=green!10, below of=data] (retrain) {\textbf{retrain} \\ (poco frecuente)};
         \node[draw, rectangle, rounded corners, fill=red!10, left of=retrain, xshift=-2.5cm] (optuna) {\textbf{tune\_forecasting} \\ (Desacoplado / Optuna)};
         \node[draw, rectangle, rounded corners, fill=yellow!10, below of=retrain] (deploy) {Parámetros Persistidos\\(\texttt{forecasting\_params.json})};
 
@@ -331,10 +331,10 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
 \end{figure}
 
 \begin{enumerate}
-    \item \begin{sloppypar}\textbf{Fase de Optimización Desacoplada (\texttt{tune\_forecasting})}: Ejecutado en modo dedicado, este ciclo realiza una búsqueda exhaustiva en el espacio de hiperparámetros utilizando \textit{Optuna} sobre el panel de 500 series. Cada configuración candidata se evalúa tras ser ajustada por la capa de \textit{Conformal Prediction} y se contrasta contra la baseline por defecto en validación fuera de muestra. Si el candidato supera el umbral estadístico (diferencia emparejada con CI 95\% íntegramente negativa), el artefacto \texttt{models/forecasting\_params.json} se actualiza automáticamente.\end{sloppypar}
-    \item \textbf{Fase de Reentrenamiento Operacional (Daily)}: Ejecutado mediante el modo \texttt{retrain}, este proceso es determinista y lee los hiperparámetros guardados en \texttt{models/forecasting\_params.json}. Su función es la integración de los datos de ventas más recientes ($48.500$ filas históricas) sobre el modelo campeón con calibración conformal y versionado automático en MLflow, manteniendo la estructura de hiperparámetros estable.\end{enumerate}
+    \item \begin{sloppypar}\textbf{Fase de Optimización Desacoplada (\texttt{tune\_forecasting})}: Ejecutado en modo dedicado, este ciclo explora el espacio de hiperparámetros con \textit{Optuna} sobre el panel de 500 series, guiando el muestreo hacia las regiones prometedoras en lugar de recorrerlo, que es justamente lo que hace inviable una rejilla sobre un espacio continuo. Cada configuración candidata se evalúa tras ser ajustada por la capa de \textit{Conformal Prediction} y se contrasta contra la baseline por defecto en validación fuera de muestra. El artefacto \texttt{models/forecasting\_params.json} se actualiza solo si el candidato atraviesa \emph{dos} puertas: que gane a los valores por defecto con la diferencia emparejada y su intervalo al $95\%$ íntegramente por debajo de cero, y que además no pierda contra el titular que ya está en disco. La segunda evita que una búsqueda afortunada desplace a un ganador anterior mejor.\end{sloppypar}
+    \item \textbf{Fase de Reentrenamiento Operacional}: Ejecutado mediante el modo \texttt{retrain}, este proceso es determinista y lee los hiperparámetros guardados en \texttt{models/forecasting\_params.json}. No es diario, al contrario que la emisión de recomendaciones: su cadencia es la que la Sección~\ref{sec:simulate_ops} mide empíricamente. Su función es la integración de los datos de ventas más recientes ($48.500$ filas históricas) sobre el modelo campeón con calibración conformal y versionado automático en MLflow, manteniendo la estructura de hiperparámetros estable.\end{enumerate}
 
-Esta separación hace que el comportamiento del sistema sea predecible y auditable: si los hiperparámetros cambian cada día resulta muy difícil diagnosticar por qué una predicción fue mala. Fijar los parámetros y revisarlos con periodicidad mensual es un compromiso razonable entre adaptarse a nuevos patrones de demanda y mantener la estabilidad del sistema en producción.
+Esta separación hace que el comportamiento del sistema sea predecible y auditable: si los hiperparámetros cambian cada día resulta muy difícil diagnosticar por qué una predicción fue mala. Fijarlos y revisarlos de forma esporádica es el compromiso entre adaptarse a nuevos patrones de demanda y mantener estable el sistema en producción; con qué periodicidad conviene revisarlos es una decisión de despliegue que este trabajo no fija.
 
 \subsection{Lógica de Promoción del Modelo Campeón}
 \label{sec:champion_promotion}
@@ -418,10 +418,14 @@ responder, que es exactamente lo que permite comparar ejecuciones entre sí sin 
     \textit{commit} el código. Junto a ellos, \texttt{backtest\_}\allowbreak\texttt{metadata.json}
     conserva en el propio directorio el dataset, las \textit{features}, la definición de los
     \textit{folds} y los modelos evaluados.
-    \item \textbf{Métricas}: \texttt{metrics\_}\allowbreak\texttt{summary.csv} y
-    \texttt{cost\_}\allowbreak\texttt{summary.csv} contienen, por modelo y estrategia de datos,
-    el coste de inventario simulado, el nivel de servicio, el Winkler Score, la cobertura
-    condicional y el MAE. Sus columnas numéricas se registran también como métricas de la
+    \item \textbf{Métricas}: dos ficheros, y la separación entre ambos no es de conveniencia sino
+    la que el Capítulo~\ref{chap:resultados} explota, porque el orden por error puntual y el
+    orden por coste no coinciden. \texttt{metrics\_}\allowbreak\texttt{summary.csv} recoge la
+    calidad del pronóstico (MAE, RMSE, sesgo, Winkler Score, cobertura del intervalo y
+    \textit{pinball} por cuantil) y \texttt{cost\_}\allowbreak\texttt{summary.csv} la de la
+    decisión que induce (coste total, nivel de servicio, \textit{fill rate} y el intervalo
+    \textit{bootstrap} del hueco de coste con su marca de concluyente). Ambos se indexan por
+    modelo y estrategia de datos. Sus columnas numéricas se registran también como métricas de la
     corrida, de modo que una consulta sobre el almacén puede ordenar ejecuciones por cualquiera
     de ellas.
     \item \textbf{Predicciones y decisiones}: \texttt{predictions.csv} conserva la predicción
