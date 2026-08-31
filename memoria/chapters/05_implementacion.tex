@@ -592,4 +592,51 @@ La entrega es continua y se articula en dos flujos encadenados de GitHub Actions
 
 El reinicio duro es intencionado y su alcance conviene precisarlo: descarta cualquier edición local de ficheros versionados, garantizando que lo desplegado es exactamente lo que la rama declara, mientras que la configuración específica de la máquina (variables de entorno y sobrescrituras de \textit{compose}) vive en ficheros no versionados que el reinicio no alcanza.
 
-El destino es un VPS de Hetzner bajo un dominio propio gestionado por DNS. La aplicación viaja contenerizada: \texttt{docker-compose.yml} levanta el servicio de la API, y el \textit{reverse proxy} \textbf{Caddy} que atiende el dominio y termina TLS \textbf{no forma parte de esta pila}, sino que corre a nivel de anfitrión dando servicio también a otros despliegues del mismo VPS. Esa separación es deliberada y tiene dos consecuencias. La primera es que la pila de este trabajo nunca toca los puertos 80 y 443, de modo que un despliegue fallido no puede dejar sin servicio al resto de la máquina. La segunda es que el contenedor no publica ningún puerto en el anfitrión: Caddy lo alcanza por nombre a través de la red externa que ambos comparten, así que no existe ninguna vía de entrada que no pase antes por el \textit{proxy} y por su terminación TLS.
+El destino es un VPS de Hetzner bajo un dominio propio gestionado por DNS, cuya topología recoge la Figura~\ref{fig:topologia_vps}. La aplicación viaja contenerizada y \texttt{docker-compose.yml} levanta un único servicio, el de la API. El \textit{reverse proxy} \textbf{Caddy}, que atiende el dominio y termina TLS, es también un contenedor pero \textbf{no forma parte de esta pila}: lo gestiona el anfitrión y da servicio a otros seis despliegues de la misma máquina. Ambos se encuentran en una red Docker declarada como externa, que es la que permite a Caddy dirigirse al contenedor por su nombre.
+
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+    every node/.style={font=\sffamily\footnotesize, align=center},
+    host/.style={draw=gray!60, rounded corners=6pt, fill=gray!4},
+    red/.style={draw=teal!55, dashed, rounded corners=5pt, fill=teal!4},
+    cont/.style={draw, rectangle, rounded corners=4pt, minimum height=0.95cm,
+                 text width=3.2cm, fill=blue!10},
+    otros/.style={cont, fill=gray!12, draw=gray!55},
+    vol/.style={draw, rectangle, rounded corners=3pt, minimum height=0.8cm,
+                text width=6.8cm, fill=orange!12, font=\sffamily\scriptsize},
+    et/.style={font=\sffamily\scriptsize, gray!65},
+    arr/.style={->, thick},
+    varr/.style={->, thick, gray!55}
+]
+  \node[host, minimum width=12.8cm, minimum height=7.6cm] (vps) at (0,-2.0) {};
+  \node[et, anchor=north west] at (-6.25, 1.65) {VPS (Hetzner)};
+
+  \node[red, minimum width=11.4cm, minimum height=3.6cm] (net) at (0,-1.5) {};
+  \node[et, anchor=south east, teal!60] at (5.6,-3.22) {red Docker \texttt{caddy}, declarada externa};
+
+  \node[cont]  (cad) at (-3.4,-0.6) {\texttt{caddy}\\\textit{proxy} inverso + TLS};
+  \node[cont]  (api) at ( 1.9,-0.6) {\texttt{retail\_}\\\texttt{forecasting\_api}};
+  \node[otros] (otr) at (-3.4,-2.4) {otros 6 servicios\\del VPS};
+
+  \draw[arr] (cad) -- node[et, above] {\texttt{:8000}} (api);
+  \draw[arr] (cad) -- (otr);
+
+  %% ── Unica via de entrada: los puertos publicos son de Caddy ──────
+  \node[et, anchor=south] at (-3.4, 2.45) {Internet};
+  \draw[arr] (-3.4, 2.35) -- node[et, right, pos=0.3] {\texttt{:80} \texttt{:443}} (cad.north);
+
+  %% ── El estado que sobrevive a la reconstruccion de la imagen ─────
+  \node[vol] (vol) at (1.9,-4.8) {\texttt{mlflow.db} + \texttt{mlruns/} \quad \texttt{models/} \quad \texttt{var/} \quad \texttt{configs/}};
+  \node[et, anchor=east] at (-1.9,-4.8) {volúmenes\\del anfitrión};
+  \draw[varr] (vol.north) -- (api.south);
+
+\end{tikzpicture}%
+\shorthandon{>}%
+\caption{Topología del despliegue. Los puertos 80 y 443 los publica únicamente el contenedor de Caddy, que es el que termina TLS; el de la aplicación no publica ninguno y solo es alcanzable por su nombre dentro de la red Docker compartida, de modo que toda entrada pasa antes por el \textit{proxy}. Caddy queda fuera de esta pila porque otros seis servicios del mismo VPS dependen de él. El estado que debe sobrevivir a un despliegue se monta desde el anfitrión: reconstruir la imagen no alcanza al almacén de corridas ni al registro de campeón.}
+\label{fig:topologia_vps}
+\end{figure}
+
+Esa separación es deliberada y tiene dos consecuencias. La primera es que la pila de este trabajo nunca toca los puertos 80 y 443, de modo que un despliegue fallido no puede dejar sin servicio al resto de la máquina. La segunda es que el contenedor no publica ningún puerto en el anfitrión, así que no existe ninguna vía de entrada que no pase antes por el \textit{proxy} y por su terminación TLS. El estado que debe sobrevivir a un despliegue (el almacén de corridas, el registro de campeón y las configuraciones) vive en el anfitrión y se monta como volumen, de modo que reconstruir la imagen no lo alcanza.
