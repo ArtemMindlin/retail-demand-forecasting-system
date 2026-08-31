@@ -383,6 +383,17 @@ Variable & Importancia & PSI & Estado \\
 
 La lectura tiene dos partes. La primera es que el panel \textbf{no es temporalmente homogéneo}: las cuatro ventanas rodantes de demanda, que son las variables de las que el modelo extrae casi toda su señal, entran en la banda de seguimiento. El desplazamiento es moderado en magnitud pero afecta justo a lo que sostiene la predicción, y es una medida directa del fenómeno que la Sección~\ref{sec:resultados_escala} invoca para explicar la brecha de cobertura residual: si la distribución de entrada se mueve entre la ventana de calibración y la de test, el supuesto de intercambiabilidad que ampara la garantía conformal (Sección~\ref{sec:conformal}) se cumple solo de forma aproximada. El PSI cuantifica aquí lo que aquella sección argumentaba de forma cualitativa.
 
+La Figura~\ref{fig:psi_decomposition} abre uno de esos números para mostrar qué hay detrás. Como los bordes de los tramos son los deciles de la ventana de referencia, cada uno de ellos contenía por construcción el $10\%$ de las observaciones, de modo que la altura de cada barra se lee directamente contra esa línea: por encima, el decil ha ganado masa; por debajo, la ha perdido.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.86\textwidth]{figures/psi_decomposition.pdf}
+    \caption{Descomposición del PSI de \texttt{demand\_roll\_mean\_14} ($\text{PSI} = 0{,}139$) por decil de la distribución de referencia. La línea discontinua marca el $10\%$ que cada decil contenía en la ventana antigua. Los siete primeros tramos apenas se mueven; los deciles octavo y noveno se vacían y el superior duplica su masa, hasta el $20{,}5\%$. Esos tres tramos aportan el $96\%$ del índice.}
+    \label{fig:psi_decomposition}
+\end{figure}
+
+La lectura es inequívoca: la masa migra hacia el extremo alto. No se trata de un ensanchamiento simétrico ni de ruido repartido, sino de un desplazamiento del nivel de demanda entre la primera y la segunda mitad del periodo, que es exactamente la forma de deriva que rompe el supuesto de intercambiabilidad.
+
 La segunda es el valor extremo de \texttt{stockout\_}\allowbreak\texttt{roll\_}\allowbreak\texttt{mean\_7}, un orden de magnitud por encima del umbral crítico. Conviene interpretarlo con cuidado antes de leerlo como una alarma sobre el modelo: se trata de la variable menos influyente de las siete (un 3{,}3\,\% de la importancia), y mide la frecuencia de rotura, que es precisamente la magnitud que la reconstrucción de demanda censurada de la Sección~\ref{sec:demanda_censurada} altera aguas arriba. Un desplazamiento de esa envergadura en el régimen de rotura entre las dos mitades del periodo es un hecho del conjunto de datos antes que un defecto del sistema, y su bajo peso predictivo explica que no se traduzca en una degradación proporcional del error.
 
 Este es además el único de los dos niveles que produce lectura en este trabajo. El contraste de Page-Hinkley, por las razones de longitud de secuencia que la Sección~\ref{sec:monitorizacion} declara, no emite ninguna alerta sobre los tres \textit{folds} disponibles.
