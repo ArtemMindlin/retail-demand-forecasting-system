@@ -1,12 +1,11 @@
 """Render the SHAP beeswarm of the champion model used by the results chapter.
 
-The pipeline computes SHAP inline when `reporting.make_plots` is on, but that path
-segfaults on the LightGBM champion: `TreeExplainer` reaches LightGBM's `pred_contrib`,
-which is native code, and a SIGSEGV cannot be caught by the `try/except` in
-`evaluation.xai`, so the whole run dies after the folds are already trained. The crash
-does not reproduce outside the pipeline process (loaded model, freshly fitted model,
-real frame, CatBoost loaded first: all survive), so this script exists to produce the
-figure from the persisted champion instead of holding the chapter hostage to it.
+`TreeExplainer` on the LightGBM champion segfaults inside the full pipeline process,
+and the crash does not reproduce outside it (loaded model, freshly fitted model, real
+frame, CatBoost loaded first: all survive). `evaluation.xai` now runs the computation
+in a child process so that crash costs the figure rather than the whole run, but the
+figure still has to come from somewhere: this script produces it from the persisted
+champion, without paying for a backtest to redraw a plot.
 
 Reads the model the champion registry names, rebuilds the supervised frame the same
 way the experiment does, and writes the beeswarm. Reproducible from artifacts, which
@@ -85,6 +84,11 @@ def main() -> None:
 
     model = ConformalForecaster.load(model_path)
     shap_values = calculate_shap_values(model=model, X=features, sample_size=args.sample_size)
+    if shap_values is None:
+        raise SystemExit(
+            "SHAP no pudo calcularse; el aviso anterior dice por qué. La figura no se escribe: "
+            "sobrescribirla con una en blanco sería peor que dejar la anterior en su sitio."
+        )
 
     # Imported here, like the pipeline does, because the module forces the Agg backend.
     from retail_forecasting.visualization.plots import render_shap_summary
