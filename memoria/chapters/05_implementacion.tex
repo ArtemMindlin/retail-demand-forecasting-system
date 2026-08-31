@@ -459,7 +459,7 @@ subdirectorio no encuentra sus propios artefactos, y debe lanzarse desde la raí
 
 La capa web es una aplicación Django que cumple dos funciones separadas: renderiza el cuadro de mandos en servidor y expone una superficie JSON reducida para clientes máquina (sistemas de compras, \textit{scripts} de automatización). La separación es estricta: la lógica de dominio vive en \texttt{api/services/}, que no importa Django y opera sobre \textit{DataFrames}, mientras que las vistas se limitan a leer parámetros, invocar un servicio y renderizar. Esa frontera es la que permite verificar el cálculo conforme o la cantidad Newsvendor sin instanciar un cliente web.
 
-El sistema no emplea base de datos: el estado son los artefactos en disco, y la única información propia de la capa web es la sesión del operador, transportada en una \textit{cookie} firmada.
+El sistema no emplea base de datos: el estado son los artefactos en disco, y la única información propia de la capa web es la sesión del operador, transportada en una \textit{cookie} firmada. Un \textit{middleware} exige esa sesión en todas las rutas salvo dos (la pantalla de acceso y la sonda de disponibilidad) y distingue tres formas de rechazo, porque el mismo 401 no sirve a los tres clientes: una navegación de navegador se redirige al formulario conservando el destino, una petición JSON recibe el 401, y una petición htmx recibe una cabecera \texttt{HX-Redirect} para que el navegador recargue en lugar de incrustar la pantalla de acceso dentro de un fragmento.
 
 \subsection{Superficie JSON}
 
@@ -473,7 +473,7 @@ Durante la migración a renderizado en servidor, los \textit{endpoints} que exis
         \textbf{Método + Ruta} & \textbf{Nombre} & \textbf{Descripción} \\
         \midrule
         \texttt{POST /predict\_\allowbreak orders} & Scoring operacional & Ejecuta el modo \texttt{score\_daily} y devuelve \texttt{reorder\_recommendations}: una fila por par tienda-producto con \texttt{order\_quantity}, cuantiles calibrados y fecha de decisión. \\
-        \texttt{POST /api/forecast} & Simulador \textit{What-If} & Recalcula los cuantiles conformes empíricos y la cantidad óptima de pedido $O_{s,t}$ del Newsvendor dado un conjunto de parámetros (\texttt{serviceLevel}, \texttt{shortageCost}, \texttt{holdingCost}, \texttt{capacity}) y un \texttt{selectedSkuId}. \\
+        \texttt{POST /api/forecast} & Simulador \textit{What-If} & Recalcula los cuantiles conformes empíricos y la cantidad óptima de pedido $O_{s,t}$ del Newsvendor para un \texttt{selectedSkuId}, a partir del nivel de servicio (\texttt{serviceLevel}) y del par de costes (\texttt{shortageCost}, \texttt{holdingCost}). Admite también \texttt{capacity}, que no entra en la decisión: alimenta el indicador de utilización $O_{s,t}/\text{capacidad}$ que la interfaz muestra junto al pedido. \\
         \texttt{GET /api/skus} & Catálogo de SKUs & Devuelve hasta 50 SKUs con métricas calculadas sobre las predicciones del último run: cobertura empírica, PSI de drift, cantidad de pedido $O_{s,t}$ y estado operacional (\textit{ok}/\textit{drift}/\textit{shortage}/\textit{overstock}). \\
         \texttt{GET /api/\allowbreak download/\allowbreak predictions} & Descarga de predicciones & Sirve el \texttt{predictions.csv} de la ejecución más reciente, para análisis externo o auditoría. \\
         \texttt{GET /api/\allowbreak download/costs} & Descarga de costes & Sirve el resumen de costes de la ejecución más reciente. \\
@@ -486,7 +486,7 @@ Durante la migración a renderizado en servidor, los \textit{endpoints} que exis
 
 \subsection{Cuadro de Mandos}
 
-El cuadro de mandos se organiza en dos planos que reproducen la separación del propio sistema entre operación e investigación. El Apéndice~\ref{anexo:dashboard} recoge capturas de las siete vistas.
+El cuadro de mandos se organiza en dos planos que reproducen la separación del propio sistema entre operación e investigación. El Apéndice~\ref{anexo:dashboard} recoge capturas de las seis vistas.
 
 El \textbf{plano de Operación} responde a las dos preguntas del ciclo diario: cuánto pedir de cada SKU y qué excepciones revisar antes de aprobar el plan.
 
@@ -502,9 +502,11 @@ El \textbf{plano de Operación} responde a las dos preguntas del ciclo diario: c
 
 El \textbf{plano de Análisis} sirve a la justificación metodológica: la vista de \textbf{EDA} publica las figuras del módulo exploratorio y \textbf{Pareto Tuning} muestra el frente multiobjetivo, la sensibilidad al ratio de costes y el \textit{backtest} de coste justo. Hubo una tercera, \textbf{Demanda Latente}, que contrastaba las tres estrategias de reconstrucción y coronaba una ganadora: se retiró junto con el modo que la alimentaba, porque ese veredicto era un ranking por error de reconstrucción y la Sección~\ref{sec:imputacion_censura_sintetica} explica por qué este protocolo no puede emitirlo.
 
-Transversal a ambos planos, el simulador \textit{What-If} permite ajustar mediante \textit{sliders} el nivel de servicio objetivo, los costes de rotura y almacenamiento y la capacidad; el servidor recalcula la política y devuelve la región de contenido actualizada. Como esos parámetros viajan en la \textit{query string}, cualquier escenario explorado queda registrado en la URL y puede compartirse o reproducirse.
+Transversal a ambos planos, el simulador \textit{What-If} permite ajustar mediante \textit{sliders} el nivel de servicio objetivo y los costes de rotura y almacenamiento; el servidor recalcula la política y devuelve la región de contenido actualizada. Los tres viajan en la \textit{query string} y se propagan a través de las búsquedas y los filtros de la tabla, de modo que cualquier escenario explorado queda registrado en la URL y puede compartirse o reproducirse. La capacidad es el cuarto \textit{slider} y no comparte esa propiedad, porque tampoco participa en la decisión: la formulación de la Sección~\ref{sec:newsvendor_operativo} es no capacitada, y el asignador con restricción de capacidad conjunta se retiró del sistema.
 
-Dos decisiones de implementación merecen mención por su efecto en la defensa del sistema. La primera es que \textbf{todos los gráficos se generan como SVG en el servidor}: la geometría se calcula en Python y se envía como marcado, sin librería de graficación en el cliente. La segunda es que \textbf{la ausencia de un artefacto se comunica explícitamente}: una ejecución sin \texttt{drift\_report.json} muestra un aviso que nombra el modo de ejecución que lo produce, en lugar de un panel vacío que podría confundirse con ``sin deriva detectada''.
+El cuadro de mandos también permite \textbf{lanzar una ejecución del \textit{pipeline}} desde el navegador y seguir su registro en vivo. Es la única funcionalidad de la capa web que escribe en lugar de leer, y por eso lleva dos salvaguardas: un cerrojo que rechaza una segunda ejecución mientras haya una en curso, y un límite de tres lanzamientos por cliente cada diez minutos. El proceso escribe su registro en \texttt{var/active\_run.log}, que la consola relee mientras la ejecución está viva; los artefactos, en cambio, van al directorio de la corrida en el almacén de MLflow, de modo que ese fichero es estado efímero de la interfaz y no una copia de los resultados.
+
+Dos decisiones de implementación merecen mención por su efecto en la defensa del sistema. La primera es que \textbf{los gráficos del cuadro de mandos se generan como SVG en el servidor}: la geometría se calcula en Python y se envía como marcado, sin librería de graficación en el cliente. La única excepción son las figuras del módulo exploratorio, que se redibujan igualmente como SVG a partir de sus CSV pero conservan un enlace al PNG original a resolución completa, servido tal cual. La segunda es que \textbf{la ausencia de un artefacto se comunica explícitamente}: una ejecución sin \texttt{drift\_report.json} muestra un aviso que nombra el modo de ejecución que lo produce, en lugar de un panel vacío que podría confundirse con ``sin deriva detectada''.
 
 \section{Calidad, Verificación y Despliegue}
 \label{sec:calidad_despliegue}
