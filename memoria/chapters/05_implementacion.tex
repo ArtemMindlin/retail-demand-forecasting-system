@@ -40,7 +40,7 @@ El sistema se organiza en cuatro capas funcionales que transforman los datos bru
     $\;\to\;$ CatBoost Multi-Cuantil (Pinball Loss)
     $\;\to\;$ Mondrian Conformal Prediction};
 
-  \node[s4] (dec)    at (0,-4.8)  {Newsvendor $q^*$
+  \node[s4] (dec)    at (0,-4.8)  {Newsvendor $q^\star$
     $\;\to\;$ Coste de inventario
     $\;\to\;$ Nivel de servicio};
 
@@ -366,8 +366,8 @@ Durante la migración a renderizado en servidor, los \textit{endpoints} que exis
         \textbf{Método + Ruta} & \textbf{Nombre} & \textbf{Descripción} \\
         \midrule
         \texttt{POST /predict\_\allowbreak orders} & Scoring operacional & Ejecuta el modo \texttt{score\_daily} y devuelve \texttt{reorder\_recommendations}: una fila por par tienda-producto con \texttt{order\_quantity}, cuantiles calibrados y fecha de decisión. \\
-        \texttt{POST /api/forecast} & Simulador \textit{What-If} & Recalcula los cuantiles conformes empíricos y la cantidad óptima $q^*$ del Newsvendor dado un conjunto de parámetros (\texttt{serviceLevel}, \texttt{shortageCost}, \texttt{holdingCost}, \texttt{capacity}) y un \texttt{selectedSkuId}. \\
-        \texttt{GET /api/skus} & Catálogo de SKUs & Devuelve hasta 50 SKUs con métricas calculadas sobre las predicciones del último run: cobertura empírica, PSI de drift, $q^*$ y estado operacional (\textit{ok}/\textit{drift}/\textit{shortage}/\textit{overstock}). \\
+        \texttt{POST /api/forecast} & Simulador \textit{What-If} & Recalcula los cuantiles conformes empíricos y la cantidad óptima de pedido $O_{s,t}$ del Newsvendor dado un conjunto de parámetros (\texttt{serviceLevel}, \texttt{shortageCost}, \texttt{holdingCost}, \texttt{capacity}) y un \texttt{selectedSkuId}. \\
+        \texttt{GET /api/skus} & Catálogo de SKUs & Devuelve hasta 50 SKUs con métricas calculadas sobre las predicciones del último run: cobertura empírica, PSI de drift, cantidad de pedido $O_{s,t}$ y estado operacional (\textit{ok}/\textit{drift}/\textit{shortage}/\textit{overstock}). \\
         \texttt{GET /api/\allowbreak download/\allowbreak predictions} & Descarga de predicciones & Sirve el \texttt{predictions.csv} de la ejecución más reciente, para análisis externo o auditoría. \\
         \texttt{GET /api/\allowbreak download/costs} & Descarga de costes & Sirve el resumen de costes de la ejecución más reciente. \\
         \texttt{GET /health} & Sonda de disponibilidad & Devuelve estado del servicio, versión, \textit{uptime} y si las predicciones están cargadas en caché; pensada para integrarse con herramientas de monitorización externas. Es el único endpoint público: el resto exige sesión. \\

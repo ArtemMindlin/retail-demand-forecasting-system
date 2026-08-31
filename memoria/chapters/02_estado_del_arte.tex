@@ -129,7 +129,7 @@ La conexión entre el pronóstico y la acción operativa se realiza mediante la 
 
 La solución óptima viene dada por el \textit{fractil crítico}:
 \begin{equation}
-    P(D \leq Q^*) = \frac{c_u}{c_u + c_o}
+    P(D \leq O^\star) = \frac{c_u}{c_u + c_o}
 \end{equation}
 donde $D$ es la demanda aleatoria. Esta fórmula tiene una interpretación directa: si el coste de rotura es cuatro veces mayor que el de sobrestock ($c_u = 4, c_o = 1$), el fractil óptimo es 0,8, es decir, hay que pedir la cantidad que cubre el 80\% de los escenarios de demanda posibles. Nótese que el fractil óptimo es exactamente el cuantil $q_{0{,}8}$ de la distribución predicha, lo que establece un puente directo entre los intervalos de confianza generados por el modelo probabilístico y la decisión de pedido.
 

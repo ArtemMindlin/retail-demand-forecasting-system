@@ -282,8 +282,8 @@ $q \cdot 100\%$ de las observaciones históricas.
 \fbox{\begin{minipage}{0.88\textwidth}
 \textbf{Nexo metodológico: Pinball Loss $\leftrightarrow$ Newsvendor.}\\[4pt]
 El modelo del \textit{Newsvendor} \cite{silver1998inventory} demuestra que el nivel de cobertura óptimo bajo costes asimétricos viene determinado por el \textit{fractil crítico}:
-$$q^* = \frac{c_u}{c_u + c_o}$$
-donde $c_u$ es el coste por unidad no servida (rotura de stock) y $c_o$ el coste por unidad sobrante, siendo la cantidad óptima de pedido el cuantil de demanda correspondiente $y^* = F_Y^{-1}(q^*)$. Este es exactamente el cuantil que minimiza la Pinball Loss. Por tanto, \textbf{entrenar el modelo con Pinball en $q = q^*$ es equivalente a optimizar directamente la política de pedido}, sin ninguna etapa de postproceso adicional. Esto diferencia al sistema de los enfoques que predicen la media y después aplican un nivel de servicio fijo: aquí la decisión de inventario está integrada en el proceso de entrenamiento.
+$$q^\star = \frac{c_u}{c_u + c_o}$$
+donde $c_u$ es el coste por unidad no servida (rotura de stock) y $c_o$ el coste por unidad sobrante, siendo la cantidad óptima de pedido el cuantil de demanda correspondiente $O^\star = F_Y^{-1}(q^\star)$. Este es exactamente el cuantil que minimiza la Pinball Loss. Por tanto, \textbf{entrenar el modelo con Pinball en $q = q^\star$ es equivalente a optimizar directamente la política de pedido}, sin ninguna etapa de postproceso adicional. Esto diferencia al sistema de los enfoques que predicen la media y después aplican un nivel de servicio fijo: aquí la decisión de inventario está integrada en el proceso de entrenamiento.
 \end{minipage}}
 \end{center}
 
@@ -464,7 +464,7 @@ siguiente:
             \max\!\left(\hat{y}_q(x) + \hat{q}_g,\; 0\right) & \text{si } q > 0{,}5
         \end{cases}
     \end{equation}
-    Este ensanchamiento produce bandas con cobertura condicional garantizada dentro de cada grupo y, simultáneamente, traslada una ventaja directa a la operativa de compras: al calcular la cantidad de pedido $q^*$ interpolando el fractil crítico ($q^* = 0{,}80$) entre la mediana y el cuantil superior $P90$ calibrado (Sección~\ref{sec:newsvendor_operativo}), la orden se incrementa proporcionalmente en $+0{,}75 \cdot \hat{q}_g$. Esto genera automáticamente un \textbf{colchón de stock de seguridad adaptativo por categoría} que protege al almacén contra el coste asimétrico de rotura ($c_u = 4{,}0$ frente a $c_o = 1{,}0$) en función de la verdadera dispersión empírica de cada familia de productos.
+    Este ensanchamiento produce bandas con cobertura condicional garantizada dentro de cada grupo y, simultáneamente, traslada una ventaja directa a la operativa de compras: al calcular la cantidad de pedido $O_{s,t}$ interpolando en el fractil crítico ($q^\star = 0{,}80$) entre la mediana y el cuantil superior $P90$ calibrado (Sección~\ref{sec:newsvendor_operativo}), la orden se incrementa proporcionalmente en $+0{,}75 \cdot \hat{q}_g$. Esto genera automáticamente un \textbf{colchón de stock de seguridad adaptativo por categoría} que protege al almacén contra el coste asimétrico de rotura ($c_u = 4{,}0$ frente a $c_o = 1{,}0$) en función de la verdadera dispersión empírica de cada familia de productos.
 \end{enumerate}
 
 \paragraph{Limitación: intercambiabilidad en series temporales.}
@@ -688,17 +688,17 @@ El sistema estima $\mathcal{Q} = \{0{,}1;\ 0{,}5;\ 0{,}9\}$ y opera con $c_u = 4
 \begin{equation}
     q^\star = \frac{c_u}{c_u + c_o} = 0{,}80,
 \end{equation}
-que no pertenece a $\mathcal{Q}$. La cantidad de pedido se obtiene interpolando linealmente la función cuantil calibrada entre los dos niveles estimados que rodean a $q^\star$:
+que no pertenece a $\mathcal{Q}$. La cantidad de pedido se obtiene interpolando linealmente la función cuantil calibrada entre los dos niveles estimados que rodean a $q^\star$. Conviene fijar la notación antes de escribirla, porque intervienen cuatro objetos de naturaleza distinta: $\mathcal{Q}$ es el conjunto de \emph{niveles} estimados y $q^\star$ el \emph{nivel} objetivo, ambos probabilidades en $[0,1]$; $\hat{Q}_{s,t}(\tau)$ es la función cuantil calibrada, que devuelve \emph{unidades} de demanda para un nivel $\tau$; y $O_{s,t}$ es la \emph{cantidad de pedido} resultante, también en unidades. La ecuación traduce por tanto un nivel de probabilidad en una cantidad física:
 
 \begin{equation}
 \label{eq:order_quantity}
-    Q_{s,t} = \max\!\left(0,\ \hat{Q}_{s,t}(\tau_k) + \frac{q^\star - \tau_k}{\tau_{k+1} - \tau_k}\Big[\hat{Q}_{s,t}(\tau_{k+1}) - \hat{Q}_{s,t}(\tau_k)\Big]\right),
+    O_{s,t} = \max\!\left(0,\ \hat{Q}_{s,t}(\tau_k) + \frac{q^\star - \tau_k}{\tau_{k+1} - \tau_k}\Big[\hat{Q}_{s,t}(\tau_{k+1}) - \hat{Q}_{s,t}(\tau_k)\Big]\right),
     \qquad \tau_k \leq q^\star \leq \tau_{k+1},
 \end{equation}
 
 con $\tau_k, \tau_{k+1} \in \mathcal{Q}$ consecutivos. Con la configuración del sistema, $\tau_k = 0{,}5$ y $\tau_{k+1} = 0{,}9$, y el peso de interpolación es $(0{,}80 - 0{,}50)/(0{,}90 - 0{,}50) = 0{,}75$. La regla se reduce por tanto a
 \begin{equation}
-    Q_{s,t} = \max\!\left(0,\ \hat{Q}_{s,t}(0{,}5) + 0{,}75 \cdot \big[\hat{Q}_{s,t}(0{,}9) - \hat{Q}_{s,t}(0{,}5)\big]\right),
+    O_{s,t} = \max\!\left(0,\ \hat{Q}_{s,t}(0{,}5) + 0{,}75 \cdot \big[\hat{Q}_{s,t}(0{,}9) - \hat{Q}_{s,t}(0{,}5)\big]\right),
 \end{equation}
 es decir, la mediana predicha más tres cuartas partes de la semianchura superior del intervalo conformal. Este es el mecanismo concreto por el que el ensanchamiento por categoría de la calibración Mondrian (Sección~\ref{sec:conformal}) se traduce en un colchón de seguridad adaptativo: una categoría con mayor dispersión empírica recibe un $\hat{Q}(0{,}9)$ más alto y, con ello, un pedido proporcionalmente mayor, sin que ninguna regla adicional lo estipule.
 
