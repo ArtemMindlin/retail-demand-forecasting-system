@@ -108,6 +108,23 @@ def _tabular(
     )
 
 
+def _signed_pct_column(metrics_df: pd.DataFrame) -> pd.Series:
+    """Render `bias_pct` with an explicit sign, or `n/d` for runs that predate the metric.
+
+    Runs older than the metric carry no column at all, and a silent zero there would read as
+    an unbiased model rather than as a missing measurement.
+    """
+    if "bias_pct" not in metrics_df.columns:
+        return pd.Series(["n/d"] * len(metrics_df), index=metrics_df.index)
+    return metrics_df["bias_pct"].map(
+        lambda value: (
+            "n/d"
+            if pd.isna(value)
+            else f"{'+' if value >= 0 else '-'}{_es_number(abs(float(value)))}"
+        )
+    )
+
+
 def _cost_gap_column(costs_df: pd.DataFrame) -> pd.Series:
     """The paired cost gap against the baseline, rendered as ``mean [low; high]``.
 
@@ -201,23 +218,28 @@ def export_to_latex(
     metrics_df = pd.concat([pd.read_csv(path) for path in metrics_paths], ignore_index=True)
     costs_df = pd.read_csv(costs_path)
 
-    # 1. Predictive Metrics Table (MAE/RMSE) — keep only representative models.
+    # 1. Predictive Metrics Table (MAE/RMSE/bias) — keep only representative models.
     pred_cols = ["data_strategy", "model_name", "mae", "rmse"]
     mask = metrics_df["model_name"].isin(_REPORTED_MODELS)
     pred_table = metrics_df.loc[mask, pred_cols].sort_values(["data_strategy", "mae"])
     pred_table["model_name"] = _prettify(pred_table["model_name"])
     pred_table["data_strategy"] = _prettify(pred_table["data_strategy"])
+    # Signed, and beside the absolute errors on purpose: the point estimator is fitted at the
+    # critical fractile, so MAE alone cannot tell a systematic shift from raw dispersion.
+    pred_table["bias_pct"] = _signed_pct_column(metrics_df.loc[mask, :])
 
     panel = f", panel de {panel_series} series" if panel_series else ""
     latex_pred = _tabular(
         pred_table,
-        header=["Estrategia", "Modelo", "MAE", "RMSE"],
-        column_format="@{}llcc@{}",
+        header=["Estrategia", "Modelo", "MAE", "RMSE", "Sesgo (\\%)"],
+        column_format="@{}llccc@{}",
         caption=(
             "Comparativa de errores predictivos en el backtesting walk-forward "
             f"($K=3$ folds, $H=7$ días{panel}). Cada estrategia se mide contra su propio "
             "target, por lo que los errores no son comparables entre estrategias "
-            "(véase la discusión en la Sección~\\ref{sec:predictivo_walkforward})."
+            "(véase la discusión en la Sección~\\ref{sec:predictivo_walkforward}). El sesgo "
+            "es el error medio con signo como fracción de la demanda, positivo cuando el "
+            "modelo sobrestima."
         ),
         label="tab:metrics_predictive",
     )
