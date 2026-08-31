@@ -1,12 +1,23 @@
 name: Deploy to VPS
 
+# Chained behind CI rather than triggered by the push itself: both used to fire on the
+# same push and run in parallel, so a red suite still reached the VPS.
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types: [completed]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # `workflow_run` fires for every CI completion, including pull_request runs and failed
+    # ones, so all three conditions are needed. Manual dispatch bypasses them on purpose.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event == 'push')
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -33,6 +44,8 @@ jobs:
             # Caddy (fronting other services on this VPS) reverse-proxies
             # straight to retail_forecasting_api:8000, so this deploy never
             # touches ports 80/443.
+            # Deploys the tip of origin/main, not necessarily the commit CI just passed:
+            # a push landing while CI runs is picked up by this deploy instead of its own.
             git fetch origin main
             git reset --hard origin/main
             docker compose down || true
