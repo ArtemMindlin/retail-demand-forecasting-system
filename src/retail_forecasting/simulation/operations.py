@@ -134,13 +134,18 @@ def _score_one_step(
     model_path: Path,
     settings: Settings,
 ) -> pd.DataFrame:
-    """Reproduce the run_scoring inference path for one model at one origin."""
+    """Reproduce the run_scoring inference path for one model at one origin.
+
+    `data_strategy` is pinned to the observed signal: this plane never applies
+    `LatentDemandImputer`, whatever the config says.
+    """
     model = ConformalForecaster.load(model_path)
     return _build_scoring_predictions(
         inference_frame=inference_frame,
         feature_columns=feature_columns,
         model=model,
         settings=settings,
+        data_strategy="Observed",
     )
 
 

@@ -99,7 +99,7 @@ la sesion del operador, que viaja en una cookie firmada.
 
 | Servicio | Que resuelve |
 | --- | --- |
-| `services/runs.py` | `ArtifactStore`: descubrimiento de runs, cache de predicciones, validacion anti-traversal |
+| `services/runs.py` | `ArtifactStore`: descubrimiento de runs, cache de predicciones, validacion anti-traversal. El campeon que filtra las predicciones sale del registro, con la config como respaldo: la misma precedencia que aplica el pipeline |
 | `services/forecast.py` | Conformal empirico, Newsvendor, PSI por SKU, tabla de SKUs, drift, alertas |
 | `services/ops.py` | Lectura e indexado semanal del backtest de origen rodante (rejilla no solapada; excluye semanas parciales) |
 | `services/eda.py` | Catalogo de figuras y datos listos para graficar desde los CSV del EDA |

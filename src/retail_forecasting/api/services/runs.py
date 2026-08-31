@@ -159,20 +159,32 @@ class ArtifactStore:
     # ── Predictions ───────────────────────────────────────────────────────────
 
     def champion(self) -> tuple[str, str]:
-        """(data_strategy, model_name) of the champion, per the config file.
+        """(data_strategy, model_name) of the champion: the registry first, then the config.
 
-        Falls back to the historical defaults when the config cannot be read, so
-        a malformed config degrades the dashboard rather than breaking it.
+        Same precedence the pipeline applies when it resolves which model to retrain or
+        serve. Reading only the config made the dashboard name the configured champion
+        after a promotion had already replaced it. Falls back to the historical defaults
+        when neither can be read, so a malformed config degrades the dashboard rather than
+        breaking it.
         """
+        from retail_forecasting.forecasting.pipeline import (
+            champion_registry_path,
+            load_champion_registry,
+            resolve_champion_reference,
+        )
+
         try:
             settings = load_config(self.config_path)
         except Exception:
             logger.warning("Could not load %s; using default champion.", self.config_path)
             return "Observed", "catboost"
-        return (
-            str(settings.business.champion_data_strategy),
-            str(settings.business.champion_model_name),
-        )
+        try:
+            registry = load_champion_registry(champion_registry_path(settings))
+        except Exception:
+            logger.warning("Could not read the champion registry; falling back to the config.")
+            registry = None
+        reference = resolve_champion_reference(settings, registry)
+        return str(reference.data_strategy), str(reference.model_name)
 
     def latest_predictions(self, run_name: str | None = None) -> pd.DataFrame:
         """Champion-filtered predictions frame for the specified or latest run, cached."""

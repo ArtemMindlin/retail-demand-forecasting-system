@@ -337,6 +337,12 @@ de promocion comparar costes medidos contra targets distintos. Quien ordena estr
 `fair_cost_backtest`, contra una verdad comun. Para el otro brazo sin duplicar el YAML:
 `--imputation-strategy none`.
 
+Lo aplican `experiment`, `retrain` y `score_daily`, los tres con la misma regla: si el
+campeon se entrena sobre demanda reconstruida, el marco de inferencia diario tiene que
+construir sus lags y medias moviles sobre la misma senal, o el sesgo de censura vuelve por
+la puerta de las features. `simulate_ops` es la excepcion declarada: nunca reconstruye, y
+por eso su YAML omite el campo en lugar de fijarlo.
+
 Opciones implementadas:
 
 - `supervised`

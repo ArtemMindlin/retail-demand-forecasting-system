@@ -53,6 +53,7 @@ class LoggableRun(Protocol):
     promotion_decision: Any
     data_quality_report: Any
     backtest_metadata: Any
+    operational_metadata: Any
     drifts: list[Any]
 
 
@@ -155,6 +156,23 @@ def log_run_metadata(artifacts: LoggableRun, settings: Settings) -> None:
             "drifts_detected": len(artifacts.drifts),
         }
     )
+
+    operational = getattr(artifacts, "operational_metadata", None)
+    if settings.project.run_mode == "score_daily" and operational is not None:
+        # The `business.champion_*` params are the config as written; the registry is what
+        # the run resolved and loaded. Without these tags `search_runs` names the wrong model.
+        mlflow.set_tags(
+            {
+                "champion_model": operational.champion_model_name,
+                "champion_backend": operational.champion_backend_name,
+            }
+        )
+        mlflow.log_metrics(
+            {
+                "recommendation_rows": float(operational.recommendation_rows),
+                "exception_rows": float(operational.exception_rows),
+            }
+        )
 
     mlflow.log_metrics(_numeric_metrics(artifacts.metrics_summary))
     mlflow.log_metrics(_numeric_metrics(artifacts.cost_summary))
@@ -272,9 +290,17 @@ def log_retrain_metadata(
     n_series: int,
     panel_rows: int,
     supervised_rows: int,
+    champion_model_name: str,
+    champion_backend_name: str,
+    champion_source: str,
     sample_input: pd.DataFrame | None = None,
 ) -> None:
-    """Attach the champion retrain config, provenance, tags, PyFunc model flavor, and Model Registry entry to the open MLflow run."""
+    """Attach the champion retrain config, provenance, tags, PyFunc model flavor, and Model Registry entry to the open MLflow run.
+
+    The champion identity is passed in rather than read off `settings.business`: those fields
+    are only the fallback for a store with no registry, so tagging them made a run that
+    retrained the promoted model claim it had retrained the configured one.
+    """
     mlflow.log_params(_flat_params(settings))
     mlflow.set_tags(
         {
@@ -284,8 +310,9 @@ def log_retrain_metadata(
             "series": n_series,
             "panel_rows": panel_rows,
             "supervised_rows": supervised_rows,
-            "champion_model": settings.business.champion_model_name,
-            "champion_backend": settings.business.champion_backend_name,
+            "champion_model": champion_model_name,
+            "champion_backend": champion_backend_name,
+            "champion_source": champion_source,
             "model_path": str(model_path),
             "stage": "Production",
             "model_type": "ConformalNewsvendor",

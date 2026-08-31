@@ -1004,6 +1004,9 @@ def run_retrain(settings: Settings) -> Path:
             n_series=n_series,
             panel_rows=len(raw_panel),
             supervised_rows=len(raw_panel),
+            champion_model_name=champion_reference.model_name,
+            champion_backend_name=champion_reference.backend_name,
+            champion_source=champion_reference.source,
             sample_input=sample_input,
         )
 
@@ -1023,10 +1026,17 @@ def run_scoring(
 
     When ``panel`` or ``model_path`` are provided they override the defaults
     (train split + champion model on disk), enabling reuse from the streaming
-    simulation without duplicating the inference plumbing.
+    simulation without duplicating the inference plumbing. A supplied panel is taken as
+    already prepared, censorship included, so the reconstruction below runs only on the
+    default path: the OPS plane feeds its own panel and never reconstructs demand.
+
+    That reconstruction is the one `run_retrain` applies. Without it the champion would
+    be trained on reconstructed demand and then served lags and rolling means computed
+    over the censored signal, biasing exactly the stockout series it exists for.
     """
     rule(logger, "scoring diario de reposición")
     started = time.monotonic()
+    data_strategy = "Observed"
     if panel is None:
         panel = load_prepared_panel(
             dataset_config=settings.dataset,
@@ -1035,6 +1045,14 @@ def run_scoring(
         )
         quality_report = validate_prepared_panel(panel, settings)
         raise_on_blocking_data_quality(quality_report)
+        strategy = settings.preprocessing.imputation_strategy
+        if strategy != "none":
+            imputer = LatentDemandImputer(
+                strategy=strategy,
+                model_path=settings.models.models_dir / settings.models.imputation_params_filename,
+            )
+            panel = imputer.impute(panel)
+            data_strategy = f"Latent_{strategy}"
     else:
         quality_report = None
 
@@ -1061,6 +1079,7 @@ def run_scoring(
         feature_columns=inference_metadata.feature_columns,
         model=model,
         settings=settings,
+        data_strategy=data_strategy,
     )
 
     artifacts = RunArtifacts(
@@ -1080,6 +1099,7 @@ def run_scoring(
         logger,
         {
             "campeón": f"{model.backend_name}",
+            "estrategia": data_strategy,
             "series": f"{thousands(len(predictions))}",
             "fecha decisión": decision_date,
             "excepciones": f"{n_exceptions} avisos",
@@ -1094,6 +1114,7 @@ def _build_scoring_predictions(
     feature_columns: list[str],
     model: ConformalForecaster,
     settings: Settings,
+    data_strategy: str,
 ) -> pd.DataFrame:
     """Generate operational predictions from an inference frame without y_true."""
     frame = inference_frame.copy()
@@ -1104,7 +1125,7 @@ def _build_scoring_predictions(
     frame["model_name"] = model.model_name
     frame["backend_name"] = model.backend_name
     frame["fold_id"] = 0
-    frame["data_strategy"] = "Observed"
+    frame["data_strategy"] = data_strategy
 
     if model_mask.any():
         model_features = frame.loc[model_mask, feature_columns]

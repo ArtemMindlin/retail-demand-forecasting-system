@@ -16,8 +16,15 @@ import pandas as pd
 import pytest
 
 from retail_forecasting import tracking
-from retail_forecasting.config import ProjectConfig, ReportingConfig, Settings
+from retail_forecasting.config import (
+    BusinessConfig,
+    ModelConfig,
+    ProjectConfig,
+    ReportingConfig,
+    Settings,
+)
 from retail_forecasting.contracts.contracts_backtesting import FairCostMetadata
+from retail_forecasting.contracts.contracts_business import ChampionRecord, ChampionRegistry
 from retail_forecasting.contracts.contracts_quality import EdaRunMetadata
 from retail_forecasting.evaluation import reporting
 from retail_forecasting.evaluation.reporting import RunArtifacts
@@ -358,6 +365,51 @@ def test_the_panels_own_statistics_land_as_metrics() -> None:
     assert run.data.metrics["zero_demand_rate"] == pytest.approx(0.0446)
     assert run.data.metrics["rows"] == pytest.approx(4500000)
     assert "date_min" not in run.data.metrics, "una fecha no es una métrica"
+
+
+def test_the_daily_run_records_the_champion_it_loaded(tmp_path: Path) -> None:
+    """The registry is what `score_daily` resolves; the config is only its fallback.
+
+    Tagged from `settings.business`, a daily run named the configured model while having
+    served the promoted one, and `search_runs` had no way to tell them apart.
+    """
+    registry = ChampionRegistry(
+        updated_at="2026-08-28T08:45:47+00:00",
+        current_champion=ChampionRecord(
+            data_strategy="Latent_supervised",
+            model_name="lightgbm",
+            backend_name="conformal_lightgbm",
+            promoted_at="2026-08-28T08:45:47+00:00",
+            run_name="promotion_run",
+            git_commit="abc1234",
+            config_hash="deadbeef",
+            reason="Challenger improves total cost.",
+        ),
+    )
+    (tmp_path / "champion_registry.json").write_text(
+        registry.model_dump_json(indent=2), encoding="utf-8"
+    )
+    settings = Settings().model_copy(
+        update={
+            "project": ProjectConfig(run_mode="score_daily"),
+            "reporting": ReportingConfig(run_name="scoring_test"),
+            "models": ModelConfig(models_dir=tmp_path),
+            "business": BusinessConfig(
+                champion_model_name="catboost",
+                champion_backend_name="conformal_catboost_official",
+            ),
+        }
+    )
+    artifacts = _artifacts()
+    artifacts.metrics_summary = pd.DataFrame()
+    artifacts.cost_summary = pd.DataFrame()
+
+    written = reporting.write_run_artifacts(artifacts, settings)
+
+    run = _logged_run(written.run_directory)
+    assert run.data.tags["champion_backend"] == "conformal_lightgbm"
+    assert run.data.params["business.champion_backend_name"] == "conformal_catboost_official"
+    assert run.data.metrics["recommendation_rows"] == pytest.approx(2.0)
 
 
 def test_a_relative_store_keeps_a_relative_artifact_root() -> None:
