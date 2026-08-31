@@ -575,8 +575,8 @@ El sistema cuenta con 29 módulos de test organizados en cinco niveles, cada uno
         \midrule
         Contratos de datos & Esquemas, tipos y rangos de los DataFrames producidos por cada etapa. \\
         Anti-\textit{data leakage} & Que ninguna feature contiene información del periodo de predicción. \\
-        Contratos de configuración & Que los guardarraíles experimentales se preservan ante cambios de config; correctitud aritmética de Pinball Loss por cuantil. \\
-        Unitarios de lógica & Correctitud aritmética de lags, Winkler Score y Newsvendor. \\
+        Contratos de configuración & Que los guardarraíles experimentales se preservan ante cambios de config, y que cada modo declara solo las secciones que lee. \\
+        Unitarios de lógica & Correctitud aritmética de lags, Winkler Score y Newsvendor, y nomenclatura de las columnas de cuantiles. \\
         Integración y humo & Pipeline end-to-end sobre datos sintéticos, y vistas y \textit{endpoints} de la capa web. \\
         \bottomrule
     \end{tabular}
@@ -584,7 +584,7 @@ El sistema cuenta con 29 módulos de test organizados en cinco niveles, cada uno
     \label{tab:test_strategy}
 \end{table}
 
-El nivel más crítico es el de los \textbf{tests anti-\textit{data leakage}}, poco habitual en proyectos de ML pero imprescindible aquí: verifican que ningún lag usa el valor del propio día de predicción, que las covariables realizadas (descuento, stockout, clima) solo entran al modelo como pasado, y que el backtesting walk-forward respeta el gap de $H$ días entre el último día de entrenamiento y el primero de test.
+El nivel más crítico es el de los \textbf{tests anti-\textit{data leakage}}, poco habitual en proyectos de ML pero imprescindible aquí: verifican que ningún lag usa el valor del propio día de predicción, que las covariables realizadas (descuento, stockout, clima) solo entran al modelo como pasado, que el backtesting walk-forward respeta el gap de $H$ días entre el último día de entrenamiento y el primero de test, y que la partición de calibración embarga ese mismo horizonte, cuyo efecto mide el experimento de control de la Sección~\ref{sec:embargo_calibracion}. Un séptimo comprueba que las etiquetas de régimen se usan para agrupar y nunca llegan al modelo como \textit{features}.
 
 \subsection{Despliegue}
 
@@ -592,4 +592,4 @@ La entrega es continua y se articula en dos flujos encadenados de GitHub Actions
 
 El reinicio duro es intencionado y su alcance conviene precisarlo: descarta cualquier edición local de ficheros versionados, garantizando que lo desplegado es exactamente lo que la rama declara, mientras que la configuración específica de la máquina (variables de entorno y sobrescrituras de \textit{compose}) vive en ficheros no versionados que el reinicio no alcanza.
 
-El destino es un VPS de Hetzner bajo un dominio propio gestionado por DNS. La aplicación viaja contenerizada: \texttt{docker-compose.yml} levanta el servicio de la API, y el \textit{reverse proxy} \textbf{Caddy} que atiende el dominio y termina TLS \textbf{no forma parte de esta pila}, sino que corre a nivel de anfitrión dando servicio también a otros despliegues del mismo VPS. Esa separación es deliberada: la pila de este trabajo nunca toca los puertos 80 y 443, de modo que un despliegue fallido no puede dejar sin servicio al resto de la máquina, y Caddy redirige directamente al contenedor por la red externa que ambos comparten.
+El destino es un VPS de Hetzner bajo un dominio propio gestionado por DNS. La aplicación viaja contenerizada: \texttt{docker-compose.yml} levanta el servicio de la API, y el \textit{reverse proxy} \textbf{Caddy} que atiende el dominio y termina TLS \textbf{no forma parte de esta pila}, sino que corre a nivel de anfitrión dando servicio también a otros despliegues del mismo VPS. Esa separación es deliberada y tiene dos consecuencias. La primera es que la pila de este trabajo nunca toca los puertos 80 y 443, de modo que un despliegue fallido no puede dejar sin servicio al resto de la máquina. La segunda es que el contenedor no publica ningún puerto en el anfitrión: Caddy lo alcanza por nombre a través de la red externa que ambos comparten, así que no existe ninguna vía de entrada que no pase antes por el \textit{proxy} y por su terminación TLS.

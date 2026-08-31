@@ -3,8 +3,9 @@ services:
   api:
     build: .
     container_name: retail_forecasting_api
-    ports:
-      - "8000:8000"
+    # No `ports`: publicarlo en el anfitrion dejaba el cuadro de mandos accesible en
+    # <host>:8000 saltandose Caddy, y por tanto sin TLS. Caddy lo alcanza por nombre a
+    # traves de la red externa `caddy`, que no necesita publicacion en el anfitrion.
     command: ["uvicorn", "retail_forecasting.api.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info", "--access-log"]
     volumes:
       - ./configs:/app/configs
