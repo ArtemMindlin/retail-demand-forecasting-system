@@ -393,7 +393,7 @@ Al término de cada ejecución en modo \texttt{experiment}, el sistema evalúa a
     \item \textbf{Separación del azar}: El \textit{challenger} debe llegar marcado como concluyente en el \texttt{cost\_}\allowbreak\texttt{summary} de la ejecución (Sección~\ref{sec:promocion}), es decir, con el intervalo al 95\% de su hueco de coste frente al \textit{naive} estacional despejando el cero. El intervalo procede de un \textit{bootstrap} emparejado de $2.000$ remuestreos por conglomerados de serie, y exige un mínimo de ocho series para pronunciarse. A diferencia de los dos anteriores este guardarraíl no es configurable: un \texttt{cost\_}\allowbreak\texttt{summary} anterior a la introducción de la columna carece del campo, y en ese caso la puerta cede a los dos umbrales configurados en lugar de negarse a decidir.
 \end{enumerate}
 
-Entre todos los \textit{challengers} que superan los tres guardarraíles, se selecciona el de menor coste total (con el nivel de servicio como criterio de desempate). La decisión (los valores exactos de $\Delta_{\text{cost}}$ y $\Delta_{\text{sl}}$, los umbrales vigentes, el motivo de aceptación o rechazo y los identificadores de ambos modelos) se escribe como \texttt{promotion\_}\allowbreak\texttt{decision.json} en el directorio de la ejecución y se registra además en los metadatos de la corrida, garantizando una trazabilidad completa del historial de cambios de modelo. La Figura~\ref{fig:champion_promotion} muestra el flujo de decisión completo.
+Los tres guardarraíles se aplican a cada \textit{challenger} por separado, y entre los que los superan se promueve el de mayor puntuación ponderada $S$, con el nivel de servicio como criterio de desempate. Solo cuando $\lambda = 0$ equivale a escoger el de menor coste total; con el $\lambda = 0{,}5$ que declaran las configuraciones, el ganador puede no ser el más barato, que es precisamente lo que se compra al pagar por calidad de intervalo. Si ningún \textit{challenger} supera las tres puertas, el campeón se mantiene. La decisión (los valores exactos de $\Delta_{\text{cost}}$ y $\Delta_{\text{sl}}$, los umbrales vigentes, el motivo de aceptación o rechazo y los identificadores de ambos modelos) se escribe como \texttt{promotion\_}\allowbreak\texttt{decision.json} en el directorio de la ejecución y se registra además en los metadatos de la corrida, garantizando una trazabilidad completa del historial de cambios de modelo. La Figura~\ref{fig:champion_promotion} muestra el flujo de decisión completo.
 
 \begin{figure}[H]
 \centering
@@ -415,30 +415,32 @@ Entre todos los \textit{challengers} que superan los tres guardarraíles, se sel
                minimum width=3.8cm, minimum height=0.65cm,
                font=\sffamily\footnotesize, align=center}]
   % Nodes
-  \node[box]  (start)  {Ejecutar \texttt{experiment}\\evaluar modelos candidatos};
-  \node[dec,  below=of start]  (c1) {$\Delta_{\text{cost}} \geq \theta_{\text{cost}}$?};
+  \node[box]  (start)  {Ejecutar \texttt{experiment}\\una fila de coste por modelo};
+  \node[dec,  below=of start]  (c1) {$S \geq \theta_{\text{cost}}$?};
   \node[dec,  below=of c1]     (c2) {$\Delta_{\text{sl}} \geq -\delta_{\text{sl}}$?};
   \node[dec,  below=of c2]     (c3) {IC 95\% del hueco\\despeja el cero?};
-  \node[box,  below=of c3]     (sel){Seleccionar \textit{challenger}\\de menor coste};
+  \node[box,  below=of c3]     (sel){Seleccionar el de mayor $S$\\entre los que pasan};
   \node[ok,   below=of sel]    (promo){Promover \textit{challenger}\\como nuevo campeón};
-  \node[rej,  right=of c1]     (rj1){Mantener\\campeón actual};
-  \node[rej,  right=of c2]     (rj2){Mantener\\campeón actual};
-  \node[rej,  right=of c3]     (rj3){Mantener\\campeón actual};
+  \node[rej,  right=of c2]     (rj) {Descartar\\este \textit{challenger}};
+  \node[font=\sffamily\scriptsize, align=center, below=1.05cm of rj, text width=3.4cm]
+    (nadie) {Si los descarta a todos,\\el campeón se mantiene};
   % Arrows
-  \draw[->,thick] (start) -- (c1);
+  \draw[->,thick] (start) -- node[font=\sffamily\scriptsize, midway, right]
+    {por cada \textit{challenger}} (c1);
   \draw[->,thick] (c1)    -- node[yes]{Sí} (c2);
-  \draw[->,thick] (c1)    -- node[no]{No} (rj1);
   \draw[->,thick] (c2)    -- node[yes]{Sí} (c3);
-  \draw[->,thick] (c2)    -- node[no]{No} (rj2);
   \draw[->,thick] (c3)    -- node[yes]{Sí} (sel);
-  \draw[->,thick] (c3)    -- node[no]{No} (rj3);
+  \draw[->,thick] (c1.east) -- node[no]{No} (rj.north west);
+  \draw[->,thick] (c2)    -- node[no]{No} (rj);
+  \draw[->,thick] (c3.east) -- node[no,below]{No} (rj.south west);
   \draw[->,thick] (sel)   -- (promo);
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Flujo de decisión de la \textit{promotion logic} del campeón. Un \textit{challenger}
-solo reemplaza al modelo actual si supera simultáneamente el umbral de mejora de coste
-($\theta_{\text{cost}}$), el guardarraíl de nivel de servicio ($\delta_{\text{sl}}$) y la
-condición de que su hueco de coste sea distinguible del azar.}
+\caption{Flujo de decisión de la promoción del campeón. Una corrida deja una fila de coste
+por modelo, y cada \textit{challenger} recorre las tres puertas por su cuenta: la puntuación
+ponderada mínima ($\theta_{\text{cost}}$), el guardarraíl de nivel de servicio
+($\delta_{\text{sl}}$) y la condición de que su hueco de coste sea distinguible del azar.
+La selección llega después, entre los supervivientes.}
 \label{fig:champion_promotion}
 \end{figure}
 
