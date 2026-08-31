@@ -706,8 +706,6 @@ es decir, la mediana predicha más tres cuartas partes de la semianchura superio
 
 \paragraph{Saturación en los extremos.} La contrapartida es que la regla no puede extrapolar fuera del rango estimado: si $q^\star$ cae por encima de $\max \mathcal{Q} = 0{,}9$, la interpolación satura en $\hat{Q}(0{,}9)$. El análisis de sensibilidad recorre ratios $\{1, 2, 4, 8, 10\}$, y el último de ellos implica $q^\star = 10/11 \approx 0{,}909$, ya fuera del rango. El punto correspondiente de la curva de sensibilidad está por tanto truncado y debe leerse como una cota inferior del pedido que un fractil de $0{,}909$ prescribiría, no como su valor. Ampliar $\mathcal{Q}$ es la corrección natural si el sistema hubiera de operar de forma sostenida con ratios superiores a 9:1.
 
-\paragraph{Alcance de la decisión.} La Ecuación~\ref{eq:order_quantity} resuelve un problema de \emph{un solo periodo} por origen de predicción. No hay posición de inventario que descontar, ni arrastre de existencias entre orígenes consecutivos, ni coste fijo de pedido: cada fecha de decisión se resuelve de forma independiente. Como se argumentó en la Sección~\ref{sec:newsvendor}, esto basta para ordenar políticas por su coste y su nivel de servicio, que es el uso que este trabajo da a la magnitud, pero no reproduce la dinámica de una política $(s, S)$ real. Es la limitación de alcance más relevante del bloque y se recoge como tal en las conclusiones.
-
 \subsection{Cobertura del Catálogo: Arranque en Frío y Respaldo Jerárquico}
 \label{sec:cold_start}
 

@@ -17,7 +17,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from retail_forecasting.config import InventoryConfig
 from retail_forecasting.drift.psi import compute_psi
+from retail_forecasting.inventory.newsvendor import choose_order_quantity
+from retail_forecasting.utils.io import quantile_level_from_column
 
 logger = logging.getLogger(__name__)
 
@@ -149,9 +152,37 @@ def build_forecast_series(sku_df: pd.DataFrame, conformal_width: float) -> list[
     ]
 
 
+def newsvendor_orders(sku_df: pd.DataFrame, params: WhatIfParams) -> np.ndarray:
+    """Order quantity per row, from the pipeline's own rule, re-costed with the sliders.
+
+    Delegates to `choose_order_quantity`, so the dashboard cannot drift from the quantity
+    `score_daily` emits: it interpolates the CALIBRATED quantile grid at the critical
+    fractile. This used to be a local rule, `y_pred` plus an empirical residual quantile,
+    which disagreed with the pipeline on every row and was built on the point estimator,
+    the one output the conformal layer never corrects.
+
+    Falls back to the point forecast when the run carries no quantiles, which is what
+    `choose_order_quantity` does for the heuristic baseline and for cold-start rows.
+    """
+    columns = sorted(
+        (c for c in sku_df.columns if c.startswith("q_") and sku_df[c].notna().any()),
+        key=quantile_level_from_column,
+    )
+    orders = choose_order_quantity(
+        predictions=sku_df,
+        inventory_config=InventoryConfig(
+            overstock_cost=params.holding_cost,
+            stockout_cost=params.shortage_cost,
+        ),
+        quantile_columns=columns,
+        quantile_levels=[quantile_level_from_column(c) for c in columns],
+    )
+    return np.asarray(orders.to_numpy(dtype=float), dtype=float)
+
+
 def aggregate_inventory_cost(
     sku_df: pd.DataFrame,
-    cr_quantile: float,
+    orders: np.ndarray,
     params: WhatIfParams,
 ) -> tuple[float, float]:
     """Newsvendor vs naïve point-forecast inventory cost over the SKU's history.
@@ -161,10 +192,10 @@ def aggregate_inventory_cost(
     """
     total = 0.0
     naive_total = 0.0
-    for row in sku_df.itertuples():
+    for q, row in zip(orders, sku_df.itertuples(), strict=True):
         pred = float(row.y_pred)
         demand = float(row.y_true)
-        q = max(0.0, pred + cr_quantile)
+        q = max(0.0, float(q))
         q_naive = max(0.0, pred)
         total += (
             (demand - q) * params.shortage_cost
@@ -197,17 +228,10 @@ def compute_forecast(
     sku_df = grouped[sku].sort_values("date")
 
     conformal = empirical_conformal(sku_df, params.alpha)
-    # The slider ratio is the what-if input, but when the artifact carries the SKU's
-    # real critical fractile (per-series costs) that is the one the pipeline actually
-    # decides with, so it takes precedence — the same rule compute_sku_table follows.
-    cr = params.critical_ratio
-    series_cr = None
-    if "critical_fractile" in sku_df.columns and not sku_df["critical_fractile"].isna().all():
-        series_cr = float(sku_df["critical_fractile"].iloc[-1])
-    cr_quantile = float(np.quantile(conformal.residuals, series_cr if series_cr else cr))
+    orders = newsvendor_orders(sku_df, params)
 
-    last_pred = float(sku_df.iloc[-1]["y_pred"])
-    q_star = max(0.0, last_pred + cr_quantile)
+    cr = params.critical_ratio
+    q_star = float(orders[-1])
 
     mae = float(conformal.abs_residuals.mean())
     half = len(conformal.abs_residuals) // 2
@@ -219,7 +243,7 @@ def compute_forecast(
         else 0.0
     )
 
-    inventory_cost, inventory_delta = aggregate_inventory_cost(sku_df, cr_quantile, params)
+    inventory_cost, inventory_delta = aggregate_inventory_cost(sku_df, orders, params)
     psi = per_sku_psi(sku_df["y_true"].to_numpy(dtype=float))
     target_cr = params.service_level / 100.0
 
@@ -246,8 +270,8 @@ def compute_forecast(
         "recommendation": {
             "qStar": round(q_star),
             "z": _BASELINE_Z,
-            "criticalRatio": series_cr if series_cr else cr,
-            "criticalRatioSource": "series" if series_cr else "slider",
+            "criticalRatio": cr,
+            "criticalRatioSource": "slider",
             "targetCR": target_cr,
             "ratioDelta": (target_cr - cr) * 100.0,
             "utilization": min(100.0, round((q_star / params.capacity) * 100.0, 1)),
@@ -296,19 +320,16 @@ def compute_sku_table(
             continue
 
         conformal = empirical_conformal(sku_df, params.alpha)
-        cr_quantile = float(np.quantile(conformal.residuals, cr))
 
         last = sku_df.iloc[-1]
-        q_star = max(0.0, float(last["y_pred"]) + cr_quantile)
+        q_star = float(newsvendor_orders(sku_df, params)[-1])
         drift_psi = per_sku_psi(sku_df["y_true"].to_numpy(dtype=float))
 
-        # Cost-asymmetry proxy: the real per-SKU critical fractile when the
-        # artifact carries it, otherwise the global one.
-        margin = (
-            round(float(sku_df["critical_fractile"].iloc[-1]), 2)
-            if "critical_fractile" in sku_df.columns
-            else round(cr, 2)
-        )
+        # The fractile the quantity above was actually computed at. The artifact carries a
+        # `critical_fractile` column too, but since invariant 43 removed the per-series cost
+        # profile it is a catalogue-wide constant from the run's config: preferring it, as
+        # this did, showed the run's fractile next to a quantity the sliders had recomputed.
+        margin = round(cr, 2)
 
         rows.append(
             {
