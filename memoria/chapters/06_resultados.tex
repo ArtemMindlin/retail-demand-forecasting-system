@@ -357,6 +357,37 @@ Del análisis de esta figura se extraen las siguientes conclusiones, que validan
 \end{itemize}
 
 
+\subsection{Deriva de la Distribución de Entrada (PSI)}
+\label{sec:resultados_drift}
+
+El primero de los dos niveles de monitorización de la Sección~\ref{sec:monitorizacion} se apoya en la importancia que acaba de establecerse: el \textit{Population Stability Index} se calcula solo sobre las siete variables de mayor contribución SHAP, comparando la mitad temporalmente más antigua del \textit{frame} supervisado con la más reciente. La Tabla~\ref{tab:psi_drift} recoge la lectura de la corrida a escala.
+
+\begin{table}[h]
+\centering
+\caption{PSI por variable entre la mitad antigua y la mitad reciente del panel supervisado (500 series), sobre las siete variables de mayor importancia SHAP del campeón. Bandas convencionales del índice: estable por debajo de $0{,}10$, seguimiento entre $0{,}10$ y $0{,}20$, crítico por encima de $0{,}20$.}
+\label{tab:psi_drift}
+\begin{tabular}{@{}lccl@{}}
+\toprule
+Variable & Importancia & PSI & Estado \\
+\midrule
+\texttt{stockout\_roll\_mean\_7} & 0,033 & \textbf{1,108} & Crítico \\
+\texttt{demand\_roll\_mean\_14} & 0,173 & 0,139 & Seguimiento \\
+\texttt{demand\_roll\_sum\_14} & 0,107 & 0,139 & Seguimiento \\
+\texttt{demand\_roll\_mean\_7} & 0,155 & 0,115 & Seguimiento \\
+\texttt{demand\_roll\_sum\_7} & 0,065 & 0,115 & Seguimiento \\
+\texttt{demand\_lag\_1} & 0,042 & 0,058 & Estable \\
+\texttt{discount\_lag\_1} & 0,102 & 0,003 & Estable \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La lectura tiene dos partes. La primera es que el panel \textbf{no es temporalmente homogéneo}: las cuatro ventanas rodantes de demanda, que son las variables de las que el modelo extrae casi toda su señal, entran en la banda de seguimiento. El desplazamiento es moderado en magnitud pero afecta justo a lo que sostiene la predicción, y es una medida directa del fenómeno que la Sección~\ref{sec:resultados_escala} invoca para explicar la brecha de cobertura residual: si la distribución de entrada se mueve entre la ventana de calibración y la de test, el supuesto de intercambiabilidad que ampara la garantía conformal (Sección~\ref{sec:conformal}) se cumple solo de forma aproximada. El PSI cuantifica aquí lo que aquella sección argumentaba de forma cualitativa.
+
+La segunda es el valor extremo de \texttt{stockout\_}\allowbreak\texttt{roll\_}\allowbreak\texttt{mean\_7}, un orden de magnitud por encima del umbral crítico. Conviene interpretarlo con cuidado antes de leerlo como una alarma sobre el modelo: se trata de la variable menos influyente de las siete (un 3{,}3\,\% de la importancia), y mide la frecuencia de rotura, que es precisamente la magnitud que la reconstrucción de demanda censurada de la Sección~\ref{sec:demanda_censurada} altera aguas arriba. Un desplazamiento de esa envergadura en el régimen de rotura entre las dos mitades del periodo es un hecho del conjunto de datos antes que un defecto del sistema, y su bajo peso predictivo explica que no se traduzca en una degradación proporcional del error.
+
+Este es además el único de los dos niveles que produce lectura en este trabajo. El contraste de Page-Hinkley, por las razones de longitud de secuencia que la Sección~\ref{sec:monitorizacion} declara, no emite ninguna alerta sobre los tres \textit{folds} disponibles.
+
+
 \section{Simulación Operacional en Streaming y Política de Reentrenamiento MLOps}
 \label{sec:resultados_simulacion}
 
