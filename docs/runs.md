@@ -11,6 +11,32 @@ target-leakage fix of 16 May 2026, and nothing in the repository recorded it.
 produced it.** A run whose commit is not an ancestor of the current `HEAD` is not
 citable — re-run it before citing.
 
+## Current provenance (31 Aug 2026, commit `96c9d57`)
+
+The two blockers this file used to declare are gone: both forecasting searches landed
+(`models/forecasting_params.json`, LightGBM 29 Aug, CatBoost 30 Aug, both tuned at 500
+series on the current lags and windows). These three runs supersede everything below.
+
+| Result in chapter 6 | Run | Panel | Notes |
+| --- | --- | --- | --- |
+| `tab:metrics_predictive`, Observed arm | `tfg_observed_20260831_112611` | 500 series, 45 000 rows | 10 500 evaluation origins |
+| `tab:metrics_predictive`, Latent arm | `tfg_latent_20260831_113339` | 500 series, 45 000 rows | 10 500 evaluation origins |
+| `tab:metrics_cost` (fair cost) | `fresh_retailnet_v2_20260831_113728` | 30 sampled from 500 | 20 censoring draws, paired 95% interval |
+
+The two experiment runs are a MATCHED PAIR: same commit, same config, same seed, differing
+only in `--imputation-strategy`. That is what makes the cross-arm percentages in §6.1
+attributable to the reconstruction instead of to the run. Chapter 6 previously mixed an
+11 Aug Observed arm with a 28 Aug Latent one, 17 days and an imputer change apart, and
+quoted a MAE reduction computed across the two.
+
+Note for whoever reads the predictive table next: the point estimator is fitted at the
+critical fractile but is NOT calibrated there. Measured on these runs, the share of true
+demand falling below it is 34.6% (CatBoost) and 63.2% (LightGBM) against a nominal 80%.
+Nothing in the pipeline watches it: conformal corrects the interval bounds and never the
+point forecast, and the tuning scores cost, which is computed on the order quantity. The
+interval itself is calibrated (83.8% and 85.2% for a nominal 80%), so the decision layer is
+unaffected — but no MAE in this table should be read as the error of a central forecast.
+
 ## SUPERSEDED — every run below predates the changes of 26 Aug 2026
 
 Nothing in the table that follows is citable. Eight changes landed on 26 Aug 2026, each of
@@ -28,18 +54,20 @@ describes a configuration that no longer exists:
 | fair-cost sample: panel subset → censoring mask | `tab:metrics_cost` only. The supervised imputer's teacher goes from 684 rows to the full panel's 16 405; its reconstruction MAE improves 27%, and neither heuristic is affected (invariant 44) |
 | fair-cost ranking: 1 censoring draw → 20, with a paired 95% interval | `tab:metrics_cost` only. Its cost columns become means over draws and gain a gap column; the old single-draw ranking carried no uncertainty at all |
 
-Two more changes are pending and will invalidate again, so do not re-cite until both land:
-the LightGBM hyperparameter search (`run_mode = tune_forecasting`, in flight) and the
-CatBoost one after it. A champion trained on untuned defaults is not the champion the
-thesis will defend.
+The two searches this section listed as pending have both landed (LightGBM 29 Aug, CatBoost
+30 Aug), and the runs at the top of this file were produced after them. Their effect on the
+predictive table is large and worth stating: tuned against simulated cost, both backends
+roughly doubled their MAE on the Observed arm while improving the metric they were tuned on.
+That is the divergence chapter 6 argues for, arriving as an experimental result rather than
+as an illustration.
 
-The fair-cost figures have been rewritten for the protocol they now describe, with every one
-wrapped in `\pendiente{}` — it prints in red and in brackets so a provisional number cannot
-ship silently. There are 25 of them, and they were NOT confined to chapter 6: the same three
-numbers were asserted as fact in all three abstracts, in the conclusions, in the KPI table and
-in the SDG annex. All of them wait on one run of `make backtest-fair-cost`, which is blocked
-only by the forecasting search holding the machine. The estimates inside the markers come from a 6-draw check of the committed code,
-not from a registered run, and must be replaced rather than merely confirmed.
+The fair-cost figures were rewritten for the protocol they now describe and marked with
+`\pendiente{}` while they waited on a run. That run exists now
+(`fresh_retailnet_v2_20260831_113728`, 20 draws) and reproduces them, so the markers are gone
+from the memoria and no `\pendiente{}` survives in `memoria/chapters/`. They were NOT confined
+to chapter 6: the same three numbers are asserted in all three abstracts, in the conclusions,
+in the KPI table and in the SDG annex, so any future change to that run has to sweep all six
+places rather than chapter 6 alone.
 
 The rewrite also retired a paragraph rather than updating it. It tells a story about an "unexpected ordering" in which
 `historical_mean` is the most expensive of the four signals, dearer than the uncorrected

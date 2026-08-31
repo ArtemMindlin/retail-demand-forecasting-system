@@ -1,17 +1,18 @@
 \begin{table}[h]
 \centering
-\caption{Comparativa de errores predictivos en el backtesting walk-forward ($K=3$ folds, $H=7$ días, panel de 500 series). Cada estrategia se mide contra su propio target, por lo que los errores no son comparables entre estrategias (véase la discusión en la Sección~\ref{sec:predictivo_walkforward}).}
+\caption{Comparativa de errores predictivos en el backtesting walk-forward ($K=3$ folds, $H=7$ días, panel de 500 series). Cada estrategia se mide contra su propio target, por lo que los errores no son comparables entre estrategias (véase la discusión en la Sección~\ref{sec:predictivo_walkforward}). El sesgo es el error medio con signo como fracción de la demanda, positivo cuando el modelo sobrestima.}
 \label{tab:metrics_predictive}
-\begin{tabular}{@{}llcc@{}}
+\resizebox{\ifdim\width>\textwidth \textwidth\else\width\fi}{!}{%
+\begin{tabular}{@{}llccc@{}}
 \toprule
-Estrategia & Modelo & MAE & RMSE \\
+Estrategia & Modelo & MAE & RMSE & Sesgo (\%) \\
 \midrule
-Latent Supervised & Seasonal Naïve & 6,61 & 8,90 \\
-Latent Supervised & LightGBM & 7,88 & 10,70 \\
-Latent Supervised & CatBoost & 10,57 & 15,56 \\
-Observed & Seasonal Naïve & 8,73 & 11,82 \\
-Observed & CatBoost & 12,26 & 19,98 \\
-Observed & LightGBM & 12,48 & 19,95 \\
+Latent Supervised & Seasonal Naïve & 6,61 & 8,90 & +0,78 \\
+Latent Supervised & LightGBM & 8,06 & 10,82 & +3,49 \\
+Latent Supervised & CatBoost & 11,72 & 16,87 & -7,33 \\
+Observed & Seasonal Naïve & 8,73 & 11,82 & -3,51 \\
+Observed & LightGBM & 18,76 & 29,89 & -14,01 \\
+Observed & CatBoost & 26,49 & 42,15 & -32,22 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}

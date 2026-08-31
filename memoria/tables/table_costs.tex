@@ -1,17 +1,16 @@
-\begin{table}[htbp]
+\begin{table}[h]
 \centering
-\small
-\setlength{\tabcolsep}{2.5pt}
 \caption{Comparativa de costes operativos bajo evaluación justa: todas las estrategias se puntúan contra la misma demanda real mediante censura sintética sobre días limpios, en 30 series muestreadas del panel de 500 ($n = 293$ días censurados). La política de pedido es común a todas ellas y deliberadamente ingenua (se pide exactamente lo que dice la señal, sin término de seguridad, y se tarifa con el único par de costes del catálogo), de modo que el coste ES el error asimétrico de la señal y nada más. Cada cifra es la media de 20 sorteos de censura, y el hueco de coste es una diferencia EMPAREJADA frente al observado, con su intervalo de confianza al 95\% en unidades de coste (no en puntos porcentuales).}
 \label{tab:metrics_cost}
+\resizebox{\ifdim\width>\textwidth \textwidth\else\width\fi}{!}{%
 \begin{tabular}{@{}lcccc@{}}
 \toprule
 Estrategia & Coste Total & Fill Rate (\%) & Pedido Medio & $\Delta$ vs Observado (IC 95\%) \\
 \midrule
-Observed & 3.732,37 & 60,30 & 4,84 & --- \\
-Latent Supervised & \textbf{293,12} & \textbf{97,50} & 8,02 & -3.439,25 [-3.539,61, -3.338,90] \\
-Latent Historical Mean & 1.059,42 & 91,47 & 8,22 & -2.672,95 [-2.775,86, -2.570,03] \\
-Latent Clipped Scaling & 2.784,60 & 70,77 & 5,80 & -947,77 [-973,12, -922,43] \\
+Observed & 3.732,37 & 60,30 & 4,84 & -- \\
+Latent Supervised & 293,12 & 97,50 & 8,02 & -3.439,25 [-3.539,61; -3.338,90] \\
+Latent Historical Mean & 1.059,42 & 91,47 & 8,22 & -2.672,95 [-2.775,86; -2.570,03] \\
+Latent Clipped Scaling & 2.784,60 & 70,77 & 5,80 & -947,77 [-973,12; -922,43] \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}

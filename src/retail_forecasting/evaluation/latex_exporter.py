@@ -174,8 +174,8 @@ def _fair_cost_table(costs_df: pd.DataFrame) -> str:
         "Comparativa de costes operativos bajo evaluación justa: todas las estrategias se "
         "puntúan contra la misma demanda real mediante censura sintética sobre días limpios"
         f"{panel} ($n = {n_eval_es}$ días censurados). La política de pedido es común a todas "
-        "ellas y deliberadamente ingenua --- se pide exactamente lo que dice la señal, sin "
-        "término de seguridad, y se tarifa con el único par de costes del catálogo ---, de modo "
+        "ellas y deliberadamente ingenua (se pide exactamente lo que dice la señal, sin "
+        "término de seguridad, y se tarifa con el único par de costes del catálogo), de modo "
         f"que el coste ES el error asimétrico de la señal y nada más.{draws}"
     )
     return _tabular(
