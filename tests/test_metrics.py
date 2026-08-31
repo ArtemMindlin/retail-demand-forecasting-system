@@ -3,7 +3,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from retail_forecasting.evaluation.metrics import _build_metric_record, winkler_score
+from retail_forecasting.evaluation.metrics import (
+    _build_metric_record,
+    pinball_loss,
+    winkler_score,
+)
 
 
 def test_winkler_score_basic():
@@ -282,3 +286,32 @@ def test_the_bootstrap_is_reproducible_from_its_seed() -> None:
 
     assert first == again
     assert first != other
+
+
+def test_pinball_loss_penalises_under_and_over_prediction_asymmetrically():
+    """The asymmetry IS the metric: a symmetric check would pass on `abs(error)`."""
+    actual, deviation = 10.0, 10.0
+
+    # tau = 0.9 buys service level: falling short costs tau, overshooting costs 1 - tau.
+    under = pinball_loss(pd.Series([actual]), pd.Series([actual - deviation]), 0.9)
+    over = pinball_loss(pd.Series([actual]), pd.Series([actual + deviation]), 0.9)
+    assert under == pytest.approx(0.9 * deviation)
+    assert over == pytest.approx(0.1 * deviation)
+
+    # And the penalties swap sides with the quantile, which is what makes a low quantile
+    # a lower bound. Catches a tau/(1 - tau) inversion, invisible to a single-quantile test.
+    assert pinball_loss(pd.Series([actual]), pd.Series([actual - deviation]), 0.1) == pytest.approx(
+        0.1 * deviation
+    )
+
+
+def test_metric_record_scores_each_quantile_column_at_its_own_quantile():
+    """Guards the column-to-tau wiring, not the arithmetic."""
+    # Both quantiles fall short, so a crossed wiring changes the numbers instead of
+    # cancelling out: symmetric fixtures score the same either way and prove nothing.
+    df = pd.DataFrame({"y_true": [100.0], "y_pred": [100.0], "q_0_1": [90.0], "q_0_9": [95.0]})
+
+    record = _build_metric_record(df, "test_model", "test_backend")
+
+    assert record["pinball_q_0_1"] == pytest.approx(0.1 * 10.0)  # crossed: 9.0
+    assert record["pinball_q_0_9"] == pytest.approx(0.9 * 5.0)  # crossed: 0.5
