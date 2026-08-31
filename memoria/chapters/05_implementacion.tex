@@ -114,6 +114,7 @@ Las cinco capas son una abstracción del flujo, no un mapa del árbol de código
 \end{table}
 
 \section{Stack Tecnológico}
+\label{sec:stack}
 
 La Tabla~\ref{tab:tech_stack} resume las herramientas principales del sistema. Cada elección responde a una necesidad técnica concreta, no a preferencia arbitraria.
 
@@ -525,7 +526,7 @@ El sistema no emplea base de datos: el estado son los artefactos en disco, y la 
 
 \subsection{Superficie JSON}
 
-Durante la migración a renderizado en servidor, los \textit{endpoints} que existían únicamente para alimentar al cliente JavaScript fueron sustituidos por vistas HTML. Se conservó el subconjunto que constituye una interfaz máquina-a-máquina real, descrito en la Tabla~\ref{tab:api_endpoints} y documentado en la propia aplicación bajo la ruta \texttt{/api/}.
+El cuadro de mandos fue primero una \textit{Single Page Application} en React servida por FastAPI, y se reescribió como plantillas Django renderizadas en servidor por los motivos que recoge la Sección~\ref{sec:stack}. Aquella interfaz exponía treinta y cuatro rutas JSON, porque cada panel del cliente necesitaba la suya para pintarse; al pasar el renderizado al servidor, las que solo alimentaban a un componente se convirtieron en vistas HTML. Quedaron seis, las que constituyen una interfaz máquina-a-máquina real, descritas en la Tabla~\ref{tab:api_endpoints} y documentadas en la propia aplicación bajo la ruta \texttt{/api/}.
 
 \begin{table}[htbp]
     \centering
