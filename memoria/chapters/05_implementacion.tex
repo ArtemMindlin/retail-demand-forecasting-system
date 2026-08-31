@@ -298,6 +298,66 @@ El sistema expone ocho modos de ejecución, seleccionables mediante el parámetr
     \item \textbf{\texttt{score\_daily}}: carga ese artefacto, construye el marco de inferencia con los datos más recientes y emite \texttt{reorder\_}\allowbreak\texttt{recommendations.csv}, con una fila por par tienda--producto que lleva la cantidad de pedido para el horizonte $H$, los tres cuantiles calibrados (\texttt{q\_0\_1}, \texttt{q\_0\_5}, \texttt{q\_0\_9}) y la fecha de decisión. Ese fichero es el entregable que consumiría el sistema de compras.
 \end{itemize}
 
+Los ocho modos no son independientes: cuatro de ellos dejan en \texttt{models/} un artefacto que los demás leen, y esa dependencia es la que fija el orden en que deben ejecutarse. La Figura~\ref{fig:modos_artefactos} la recoge.
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+    every node/.style={font=\sffamily\footnotesize, align=center},
+    modo/.style={draw, rectangle, rounded corners=4pt,
+                 minimum height=0.9cm, text width=2.5cm},
+    tune/.style={modo, fill=teal!12},
+    inv/.style={modo, fill=blue!10},
+    prod/.style={modo, fill=orange!14},
+    art/.style={draw, rectangle, minimum height=0.9cm, text width=3.4cm,
+                fill=gray!8, font=\sffamily\scriptsize\ttfamily},
+    lee/.style={font=\sffamily\scriptsize, gray!60, text width=4.4cm,
+                align=left, anchor=west},
+    fam/.style={font=\sffamily\scriptsize\bfseries, gray!70, anchor=east},
+    arr/.style={->, thick},
+    orden/.style={->, thick, gray!45}
+]
+  %% ── Un artefacto por fila, con su unico productor a la izquierda ──
+  \node[tune] (ti) at (0, 0)     {\texttt{tune\_}\\\texttt{imputation}};
+  \node[art]  (a1) at (4.6, 0)   {imputation\_lgbm\_\\params.json};
+  \node[lee]  at (6.4, 0)        {leen: \texttt{experiment}, \texttt{retrain},\\\texttt{score\_daily}, \texttt{fair\_cost\_}\\\texttt{backtest}};
+
+  \node[tune] (tf) at (0,-2.1)   {\texttt{tune\_}\\\texttt{forecasting}};
+  \node[art]  (a2) at (4.6,-2.1) {forecasting\_\\params.json};
+  \node[lee]  at (6.4,-2.1)      {leen: \texttt{experiment}, \texttt{retrain},\\\texttt{simulate\_ops}};
+
+  \node[inv]  (ex) at (0,-4.2)   {\texttt{experiment}};
+  \node[art]  (a3) at (4.6,-4.2) {champion\_\\registry.json};
+  \node[lee]  at (6.4,-4.2)      {leen: \texttt{retrain}, \texttt{score\_daily},\\\texttt{simulate\_ops}};
+
+  \node[prod] (rt) at (0,-6.3)   {\texttt{retrain}};
+  \node[art]  (a4) at (4.6,-6.3) {conformal\_\\$\langle$modelo$\rangle$.pkl};
+  \node[lee]  at (6.4,-6.3)      {lee: \texttt{score\_daily}};
+
+  \node[prod] (sc) at (0,-8.3)   {\texttt{score\_daily}};
+  \node[lee]  at (6.4,-8.3)      {No persiste estado: emite\\el entregable del ciclo diario.};
+
+  \node[fam] at (-1.5,-1.05) {Sintonización};
+  \node[fam] at (-1.5,-4.2)  {Investigación};
+  \node[fam] at (-1.5,-7.3)  {Producción};
+
+  \draw[arr] (ti) -- (a1);
+  \draw[arr] (tf) -- (a2);
+  \draw[arr] (ex) -- (a3);
+  \draw[arr] (rt) -- (a4);
+
+  %% ── El orden de arriba abajo ES el orden de ejecucion ──
+  \draw[orden] (-3.5, 0.6) -- (-3.5,-8.9)
+    node[midway, rotate=90, above, font=\sffamily\scriptsize, gray!60]
+    {orden de ejecución};
+
+\end{tikzpicture}%
+\shorthandon{>}%
+\caption{Acoplamiento entre modos a través de los cuatro artefactos que persisten en \texttt{models/}. Cada artefacto tiene un único productor, y todo modo que aparece en la columna derecha de una fila debe ejecutarse después del productor de esa fila: sin \texttt{experiment} no hay registro de campeón, y sin \texttt{retrain} no hay modelo que \texttt{score\_daily} pueda cargar. Los dos modos de sintonización persisten configuración y no pesos, de modo que quien la consume reentrena; el único artefacto que transporta un modelo ajustado es el \texttt{.pkl}. Faltan \texttt{eda} y \texttt{fair\_cost\_backtest}, que no escriben nada que otro modo consuma: su salida es evidencia para esta memoria.}
+\label{fig:modos_artefactos}
+\end{figure}
+
 \section{Gobierno del Modelo}
 \label{sec:gobierno_modelo}
 
