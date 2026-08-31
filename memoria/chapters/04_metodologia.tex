@@ -4,7 +4,7 @@
 
 Este capítulo describe \textbf{cómo} se resuelve el problema planteado en el Capítulo~\ref{chap:introduccion}: dado el histórico de ventas de una cadena de distribución, \emph{\textquestiondown cuántas unidades de cada producto debe pedir mañana cada tienda?} La idea central es que predecir solo la media de la demanda no es suficiente: hay que predecir también la incertidumbre, para que la decisión de pedido tenga garantías estadísticas. A partir de ahí, el modelo se conecta directamente con la política de inventario óptima.
 
-El capítulo se organiza en tres bloques, que se corresponden con las tres fases del ciclo de vida del sistema (véase Figura~\ref{fig:bloques_metodologia}):
+El capítulo se organiza en dos bloques, que se corresponden con las dos fases del ciclo de vida del sistema (véase Figura~\ref{fig:bloques_metodologia}):
 
 \begin{figure}[H]
 \centering
@@ -17,17 +17,15 @@ El capítulo se organiza en tres bloques, que se corresponden con las tres fases
     arr/.style={->, thick}
 ]
 \node[blk] (inv) {\textbf{Bloque I}\\ Investigación\\ \footnotesize Entrenar y evaluar};
-\node[blk, right=of inv] (ops) {\textbf{Bloque II}\\ Operación\\ \footnotesize Decidir y vigilar};
-\node[blk, right=of ops] (mlo) {\textbf{Bloque III}\\ MLOps\\ \footnotesize Monitorizar y reentrenar};
+\node[blk, right=of inv] (ops) {\textbf{Bloque II}\\ Operación y gobierno\\ \footnotesize Decidir, vigilar\\ y reentrenar};
 \draw[arr] (inv) -- (ops);
-\draw[arr] (ops) -- (mlo);
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Los tres bloques metodológicos del sistema y su secuencia lógica.}
+\caption{Los dos bloques metodológicos del sistema y su secuencia lógica.}
 \label{fig:bloques_metodologia}
 \end{figure}
 
-El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: la puerta de promoción que decide qué modelo entra en producción, el reentrenamiento del modelo seleccionado, la conversión diaria de la distribución calibrada en una cantidad de pedido para todo el catálogo, y la vigilancia de un sistema cuya decisión no puede evaluarse cuando se emite. El \textbf{Bloque III} cubre la fase MLOps: simulación en streaming para determinar la cadencia óptima de reentrenamiento en producción.
+El \textbf{Bloque I} cubre la fase de investigación: preprocesado, entrenamiento del modelo y evaluación estadística y logística sobre datos históricos. El \textbf{Bloque II} cubre la fase operacional: la puerta de promoción que decide qué modelo entra en producción, el reentrenamiento del modelo seleccionado, la conversión diaria de la distribución calibrada en una cantidad de pedido para todo el catálogo, y la vigilancia de un sistema cuya decisión no puede evaluarse cuando se emite. Cierra con la pregunta que esa fase deja abierta, con qué frecuencia refrescar el modelo, que no se responde por criterio sino con una simulación en \textit{streaming} sobre datos no vistos.
 
 % ==============================================================================
 \section{Bloque I: Investigación}
@@ -823,13 +821,10 @@ Es \emph{unilateral} de forma deliberada: el contraste clásico detecta cambios 
 
 Ese mismo acoplamiento al protocolo acota lo que este nivel puede demostrar aquí, y conviene declararlo. Con $K = 3$ \textit{folds} el contraste recibe tres observaciones, y como exige un mínimo de dos antes de pronunciarse le queda una única oportunidad de disparo, en el último fold. En la corrida a escala el estadístico alcanza un máximo de $1{,}10$ frente a un umbral de $15$, un orden de magnitud por debajo, y no se emite ninguna alerta. El nivel 2 queda por tanto instrumentado y verificado, pero no ejercitado: un contraste secuencial necesita una secuencia, y la que este protocolo produce es demasiado corta para que la ausencia de alertas signifique nada sobre la estabilidad del modelo. Su lugar natural es el despliegue, donde los orígenes de decisión se suceden a diario y la serie de errores crece sin límite.
 
-\paragraph{Qué dispara qué.} Conviene ser explícito sobre el alcance real de este subsistema, porque la distancia entre detectar y actuar es donde muchos sistemas de producción fallan silenciosamente. En el estado actual, \textbf{la detección informa y marca, pero no promueve por sí sola ningún reentrenamiento en caliente}: una alerta de Page-Hinkley marca las recomendaciones del tramo afectado con la bandera \texttt{drift\_watch} de la Sección~\ref{sec:excepciones} y queda registrada en la ejecución; el PSI por variable se persiste como informe y se sirve en el cuadro de mandos. El sistema contempla además la opción de forzar el reajuste del modelo en el \textit{fold} siguiente a una alerta, pero permanece desactivada en todas las configuraciones de este trabajo: un reentrenamiento disparado por deriva alteraría la política de actualización a mitad del protocolo y haría incomparables los \textit{folds} entre sí, precisamente la comparación que el Bloque III necesita mantener limpia.
+\paragraph{Qué dispara qué.} Conviene ser explícito sobre el alcance real de este subsistema, porque la distancia entre detectar y actuar es donde muchos sistemas de producción fallan silenciosamente. En el estado actual, \textbf{la detección informa y marca, pero no promueve por sí sola ningún reentrenamiento en caliente}: una alerta de Page-Hinkley marca las recomendaciones del tramo afectado con la bandera \texttt{drift\_watch} de la Sección~\ref{sec:excepciones} y queda registrada en la ejecución; el PSI por variable se persiste como informe y se sirve en el cuadro de mandos. El sistema contempla además la opción de forzar el reajuste del modelo en el \textit{fold} siguiente a una alerta, pero permanece desactivada en todas las configuraciones de este trabajo: un reentrenamiento disparado por deriva alteraría la política de actualización a mitad del protocolo y haría incomparables los \textit{folds} entre sí, precisamente la comparación que la simulación de cadencias de la sección siguiente necesita mantener limpia.
 
-La decisión de cuándo reentrenar se toma, por tanto, por cadencia y no por alerta, y esa cadencia se elige empíricamente en el bloque siguiente.
-% ==============================================================================
-\section{Bloque III: MLOps}
-% ==============================================================================
-
+La decisión de cuándo reentrenar se toma, por tanto, por cadencia y no por alerta. Qué cadencia es la correcta no se resuelve por criterio sino midiéndola, y esa medición es el objeto de la sección siguiente.
+\subsection{Elección Empírica de la Cadencia de Reentrenamiento}
 \label{sec:simulate_ops}
 
 La validación cruzada temporal (\textit{walk-forward backtesting}) estima el rendimiento del modelo en condiciones experimentales controladas. Sin embargo, en producción surge una pregunta adicional de naturaleza MLOps: \emph{\textquestiondown con qué frecuencia debe reentrenarse el modelo a medida que llegan datos nuevos?} Reentrenar demasiado frecuentemente supone un coste computacional elevado; hacerlo demasiado esporádicamente puede degradar las predicciones conforme el modelo queda desactualizado respecto a los patrones recientes.
@@ -851,4 +846,4 @@ Para responder esta pregunta de forma empírica sobre datos genuinamente no vist
     \item Al finalizar el streaming, se dispone de curvas de \textbf{coste acumulado} por cadencia sobre el mismo periodo y los mismos datos, lo que permite una comparación directa y equitativa.
 \end{enumerate}
 
-Los artefactos generados son: \texttt{cadence\_summary.csv} (coste total, nivel de servicio, \textit{fill rate} y número de reentrenamientos por cadencia), \texttt{cumulative\_cost.png} (evolución temporal del coste acumulado), \texttt{predictions\_by\_day.parquet} (predicciones diarias por cadencia y serie), \texttt{retrain\_events.json} (registro de cada evento de reentrenamiento con fecha, duración y tamaño del histórico), y \texttt{report.md} (informe narrativo en Markdown con tabla resumen e interpretación). Esta simulación constituye la evidencia empírica para justificar la política de reentrenamiento operacional del sistema.
+Esta simulación constituye la evidencia empírica que sostiene la política de reentrenamiento operacional del sistema.
