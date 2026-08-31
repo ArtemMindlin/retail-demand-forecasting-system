@@ -449,8 +449,9 @@ La selección llega después, entre los supervivientes.}
 
 Toda ejecución, sea del modo que sea, abre una corrida de MLflow y escribe sus artefactos
 directamente en el directorio que esa corrida tiene asignado. El matiz importa: con un almacén
-local, escribir en ese directorio \emph{es} registrar, de modo que no hay etapa de subida ni
-segunda copia de nada. El almacén se compone de dos piezas, \texttt{mlflow.db} para los
+local, escribir en ese directorio \emph{es} registrar, de modo que no hay etapa de subida: la
+única duplicación son los dos resúmenes, que MLflow serializa además como JSON para poder
+renderizarlos en su interfaz. El almacén se compone de dos piezas, \texttt{mlflow.db} para los
 metadatos y \texttt{mlruns/} para los ficheros, y se explora con la interfaz web de MLflow.
 
 Sobre los ficheros, la corrida registra además lo que un directorio por sí solo no puede
@@ -459,9 +460,15 @@ responder, que es exactamente lo que permite comparar ejecuciones entre sí sin 
 \begin{itemize}
     \item \textbf{Configuración y procedencia}: los parámetros completos de la configuración
     como \textit{params} de la corrida, y como \textit{tags} el \textit{hash} de configuración
-    y el \textit{commit} de Git con el que se generó. Esos dos últimos campos son los que
-    permiten reconstruir el experimento exacto: el \textit{hash} identifica los parámetros y el
-    \textit{commit} el código. Junto a ellos, \texttt{backtest\_}\allowbreak\texttt{metadata.json}
+    y el \textit{commit} de Git con el que se generó, junto al modo de ejecución y al tamaño del
+    panel (series, filas del panel y filas del \textit{frame} supervisado). Los dos primeros son
+    los que permiten reconstruir el experimento exacto (el \textit{hash} identifica los
+    parámetros y el \textit{commit} el código) y el resto los que permiten filtrar corridas sin
+    abrirlas: el número de series es la escala a la que se midió, y el Anexo~\ref{anx:tuning_imputador}
+    documenta un caso en que la conclusión se invierte al cambiarla, de modo que comparar dos corridas
+    sin comprobar ese campo es comparar cosas distintas. Una corrida de
+    \texttt{score\_daily} añade además qué campeón resolvió, porque la configuración escrita y el
+    registro pueden nombrar modelos distintos. Junto a ellos, \texttt{backtest\_}\allowbreak\texttt{metadata.json}
     conserva en el propio directorio el dataset, las \textit{features}, la definición de los
     \textit{folds} y los modelos evaluados.
     \item \textbf{Métricas}: dos ficheros, y la separación entre ambos no es de conveniencia sino
@@ -474,15 +481,24 @@ responder, que es exactamente lo que permite comparar ejecuciones entre sí sin 
     modelo y estrategia de datos. Sus columnas numéricas se registran también como métricas de la
     corrida, de modo que una consulta sobre el almacén puede ordenar ejecuciones por cualquiera
     de ellas.
-    \item \textbf{Predicciones y decisiones}: \texttt{predictions.csv} conserva la predicción
-    puntual, los cuantiles calibrados y la cantidad de pedido para cada par serie-fecha de
-    validación, de modo que cualquier métrica publicada es recomputable a posteriori sin volver
-    a entrenar. Junto a él,
+    \item \textbf{Predicciones y decisiones}: son dos ficheros y no uno, porque los dos
+    resúmenes del punto anterior no se calculan sobre el mismo conjunto de filas.
+    \texttt{validation\_}\allowbreak\texttt{predictions.csv} conserva una fila por serie y fecha
+    de validación, y es sobre él sobre el que se computa \texttt{metrics\_summary};
+    \texttt{predictions.csv} conserva una fila por origen de decisión (con los cuantiles
+    calibrados y la cantidad de pedido), y es la base de \texttt{cost\_summary}. La diferencia
+    de tamaño es de un factor $H$, de modo que recomputar el MAE publicado a partir del segundo
+    daría un número distinto. Con ambos, cualquier métrica publicada es recomputable sin volver
+    a entrenar. Junto a ellos,
+    \texttt{fold\_}\allowbreak\texttt{metrics.csv},
     \texttt{promotion\_}\allowbreak\texttt{decision.json},
     \texttt{reorder\_}\allowbreak\texttt{recommendations.csv},
-    \texttt{exceptions.csv} y \texttt{drift\_}\allowbreak\texttt{report.json} registran,
-    respectivamente, la decisión de promoción, el plan de reposición, las excepciones marcadas
-    y la deriva medida.
+    \texttt{exceptions.csv} y \texttt{data\_}\allowbreak\texttt{quality\_}\allowbreak\texttt{report.json}
+    registran el desglose por \textit{fold}, la decisión de promoción, el plan de reposición, las
+    excepciones marcadas y las anomalías del panel de entrada. El informe de deriva
+    (\texttt{drift\_}\allowbreak\texttt{report.json}) aparece solo cuando la corrida llegó a
+    calcular valores de Shapley, que es lo que ordena las \textit{features} a vigilar; por eso la
+    interfaz avisa de su ausencia en lugar de dibujar un panel vacío.
     \item \textbf{Campeón vigente}: \texttt{champion\_}\allowbreak\texttt{registry.json} no vive
     en la corrida sino junto a los modelos persistidos, precisamente porque su función es
     sobrevivir a la ejecución que lo escribió: guarda qué modelo está operativo y bajo qué
