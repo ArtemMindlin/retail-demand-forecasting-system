@@ -195,7 +195,7 @@ puramente visual (modales, lightbox, valores en vivo de los sliders).
 Los parametros de escenario viven en la query string, no en estado de cliente:
 
 ```text
-/skus/?service_level=88&shortage_cost=25&holding_cost=4&capacity=12000&sort=q_star&dir=asc
+/skus/?service_level=88&shortage_cost=25&holding_cost=4&sort=q_star&dir=asc
 ```
 
 Consecuencia deseada: cualquier escenario es una URL compartible y recargable, y

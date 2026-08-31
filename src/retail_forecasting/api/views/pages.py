@@ -191,7 +191,6 @@ def academic_modal(request: HttpRequest, module_id: str) -> HttpResponse:
         "qStar": 0,
         "z": 0.0,
         "criticalRatio": 0.0,
-        "utilization": 0,
     }
     return render(
         request,

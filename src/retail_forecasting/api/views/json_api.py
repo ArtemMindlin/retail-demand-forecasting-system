@@ -144,7 +144,7 @@ ENDPOINTS: tuple[dict[str, str], ...] = (
         "auth": "sesión",
         "summary": (
             "Banda conformal empírica y cantidad Newsvendor para un SKU. Cuerpo JSON con "
-            "serviceLevel, shortageCost, holdingCost, capacity y selectedSkuId."
+            "serviceLevel, shortageCost, holdingCost y selectedSkuId."
         ),
     },
     {
@@ -153,7 +153,7 @@ ENDPOINTS: tuple[dict[str, str], ...] = (
         "auth": "sesión",
         "summary": (
             "Tabla operativa por SKU: cobertura empírica, PSI de deriva, margen y cantidad "
-            "recomendada. Acepta service_level, shortage_cost, holding_cost y capacity."
+            "recomendada. Acepta service_level, shortage_cost y holding_cost."
         ),
     },
     {

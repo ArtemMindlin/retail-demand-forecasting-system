@@ -33,12 +33,11 @@ PSI_DRIFT_THRESHOLD = 0.20
 
 @dataclass(frozen=True)
 class WhatIfParams:
-    """The four sliders that drive the operational plane."""
+    """The three sliders that drive the operational plane."""
 
     service_level: float = 95.0
     shortage_cost: float = 18.0
     holding_cost: float = 4.0
-    capacity: float = 12000.0
 
     @property
     def alpha(self) -> float:
@@ -71,7 +70,6 @@ class WhatIfParams:
             service_level=pick("service_level", "serviceLevel", default=95.0),
             shortage_cost=pick("shortage_cost", "shortageCost", default=18.0),
             holding_cost=pick("holding_cost", "holdingCost", default=4.0),
-            capacity=pick("capacity", default=12000.0),
         )
 
 
@@ -274,7 +272,6 @@ def compute_forecast(
             "criticalRatioSource": "slider",
             "targetCR": target_cr,
             "ratioDelta": (target_cr - cr) * 100.0,
-            "utilization": min(100.0, round((q_star / params.capacity) * 100.0, 1)),
         },
     }
 
