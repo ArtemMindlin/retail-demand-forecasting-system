@@ -201,7 +201,10 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
     s4/.style={stage, fill=teal!10},
     s5/.style={stage, fill=green!12},
     arr/.style={->, thick},
-    modfont/.style={font=\ttfamily\tiny, gray!70}
+    modfont/.style={font=\ttfamily\tiny, gray!70},
+    gate/.style={draw, rectangle, rounded corners=4pt, dashed, minimum width=2.1cm,
+                 minimum height=0.8cm, text width=1.9cm, fill=gray!8},
+    garr/.style={<->, thick, dashed, gray!60}
 ]
 \node[s1] (raw)   {Hugging Face\\FreshRetailNet-50K};
 \node[s3, right=of raw] (panel)  {Panel Preparado\\(series\_id, date)};
@@ -212,12 +215,18 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
 \draw[arr] (panel) -- (cens);
 \draw[arr] (cens)  -- (frame);
 
+% La validacion no transforma el panel: lo aprueba o detiene la ejecucion, de ahi
+% que cuelgue del panel preparado en lugar de ocupar un paso del flujo.
+\node[gate, above=0.5cm of panel] (qa) {Validación\\de calidad};
+\draw[garr] (panel) -- (qa);
+\node[modfont, right=0.1cm of qa] {quality.py};
+
 \node[modfont, below=0.15cm of raw]   {dataset.py};
 \node[modfont, below=0.15cm of cens]  {censorship.py};
 \node[modfont, below=0.15cm of frame] {engineering.py};
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Pipeline de datos: flujo de transformaciones desde la ingesta hasta el frame supervisado.}
+\caption{Pipeline de datos: flujo de transformaciones desde la ingesta hasta el frame supervisado. La validación de calidad se dibuja aparte porque no transforma el panel: lo aprueba o detiene la ejecución, distinguiendo los avisos de los fallos bloqueantes.}
 \label{fig:data_pipeline}
 \end{figure}
 
