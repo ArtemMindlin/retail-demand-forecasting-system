@@ -120,7 +120,7 @@ La Tabla~\ref{tab:tech_stack} resume las herramientas principales del sistema. C
 \begin{table}[htbp]
     \centering
     \small
-    \begin{tabular}{lll}
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.1cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{5.0cm}@{}}
         \toprule
         \textbf{Componente} & \textbf{Herramienta} & \textbf{Alternativa descartada} \\
         \midrule
@@ -185,6 +185,7 @@ El objetivo se construye aquí y solo aquí, y la Figura~\ref{fig:fila_frame} lo
 \begin{figure}[H]
 \centering
 \shorthandoff{>}%
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
     every node/.style={font=\sffamily\footnotesize, align=center},
     dia/.style={draw, minimum width=0.62cm, minimum height=0.62cm},
@@ -216,7 +217,8 @@ El objetivo se construye aquí y solo aquí, y la Figura~\ref{fig:fila_frame} lo
   \node[lbl, anchor=west] at (7.5*0.72+1.15,-1.75)
        {la meteorología, el descuento y la rotura \emph{del día $t$} no entran:\\
         esas covariables solo se conocen a posteriori, y por eso van con retardo positivo};
-\end{tikzpicture}
+\end{tikzpicture}%
+}
 \shorthandon{>}%
 \caption{Construcción de una fila del \textit{frame} supervisado. Las características se calculan mirando hacia atrás desde el origen $t$, con los retardos y ventanas que declara la configuración, y el objetivo suma la demanda de los $H$ días que empiezan en $t$, ninguno de los cuales ha ocurrido cuando hay que decidir. La celda destacada es la regla que el contrato causal protege: las covariables que no se conocen por adelantado quedan fuera para el propio día de decisión, porque cuando hay que emitir el pedido nadie las conoce.}
 \label{fig:fila_frame}
@@ -298,35 +300,47 @@ El sistema expone ocho modos de ejecución, seleccionables mediante el parámetr
     \item \textbf{\texttt{score\_daily}}: carga ese artefacto, construye el marco de inferencia con los datos más recientes y emite \texttt{reorder\_}\allowbreak\texttt{recommendations.csv}, con una fila por par tienda--producto que lleva la cantidad de pedido para el horizonte $H$, los tres cuantiles calibrados (\texttt{q\_0\_1}, \texttt{q\_0\_5}, \texttt{q\_0\_9}) y la fecha de decisión. Ese fichero es el entregable que consumiría el sistema de compras.
 \end{itemize}
 
-Los ocho modos no son independientes: cuatro de ellos dejan en \texttt{models/} un artefacto que los demás leen, y ese acoplamiento es lo que restringe el orden en que pueden ejecutarse. La Tabla~\ref{tab:modos_artefactos} lo recoge en forma de matriz.
+Los ocho modos no son independientes: cuatro de ellos dejan en \texttt{models/} un artefacto que los demás leen, y ese acoplamiento restringe el orden en que pueden ejecutarse (Figura~\ref{fig:orden_modos}).
 
-\begin{table}[H]
-    \centering
-    \small
-    \setlength{\tabcolsep}{5pt}
-    \begin{tabular}{@{}l cc cccc cc@{}}
-        \toprule
-        & \multicolumn{2}{c}{Sintonización} & \multicolumn{4}{c}{Investigación} & \multicolumn{2}{c@{}}{Producción} \\
-        \cmidrule(lr){2-3} \cmidrule(lr){4-7} \cmidrule(l){8-9}
-        \textbf{Artefacto en \texttt{models/}}
-          & \rotatebox{90}{\texttt{tune\_imputation}\;}
-          & \rotatebox{90}{\texttt{tune\_forecasting}\;}
-          & \rotatebox{90}{\texttt{experiment}\;}
-          & \rotatebox{90}{\texttt{fair\_cost\_backtest}\;}
-          & \rotatebox{90}{\texttt{simulate\_ops}\;}
-          & \rotatebox{90}{\texttt{eda}\;}
-          & \rotatebox{90}{\texttt{retrain}\;}
-          & \rotatebox{90}{\texttt{score\_daily}\;} \\
-        \midrule
-        \texttt{imputation\_lgbm\_params.json} & \textbf{E} &            & L & L &   &  & L & L \\
-        \texttt{forecasting\_params.json}      &            & \textbf{E} & L &   & L &  & L &   \\
-        \texttt{champion\_registry.json}       &            &            & \textbf{E} &   & L &  & L & L \\
-        \texttt{conformal\_$\langle$modelo$\rangle$.pkl} &  &            &   &   &   &  & \textbf{E} & L \\
-        \bottomrule
-    \end{tabular}
-    \caption{Acoplamiento entre modos a través de los cuatro artefactos que persisten en \texttt{models/}. \textbf{E} marca el modo que determina el contenido del artefacto y \textbf{L} los que lo consumen; un modo debe ejecutarse después del que produce todo lo que lee. Tres lecturas de la matriz sostienen el diseño de la Sección: la columna de \texttt{eda} está vacía, de modo que el análisis exploratorio no puede alterar nada de lo que llega a producción; cada fila tiene una única \textbf{E}, así que ningún artefacto tiene dos autores en disputa; y las \textbf{E} descienden en escalera, que es el orden de ejecución sin necesidad de imponer uno total, porque los dos modos de sintonización son independientes entre sí. La escalera también muestra que la sintonización persiste configuración y no pesos: el único artefacto que transporta un modelo ajustado es el \texttt{.pkl}, y aparece al final.}
-    \label{tab:modos_artefactos}
-\end{table}
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+    every node/.style={font=\sffamily\footnotesize, align=center},
+    modo/.style={draw, rectangle, rounded corners=4pt,
+                 minimum height=0.95cm, text width=2.5cm},
+    tune/.style={modo, fill=teal!12},
+    inv/.style={modo, fill=blue!10},
+    prod/.style={modo, fill=orange!14},
+    fuera/.style={modo, draw=gray!55, dashed, fill=gray!5},
+    arr/.style={->, thick},
+    et/.style={font=\sffamily\scriptsize, gray!65}
+]
+  \node[tune] (ti) at (0, 1.15)  {\texttt{tune\_}\\\texttt{imputation}};
+  \node[tune] (tf) at (0,-1.15)  {\texttt{tune\_}\\\texttt{forecasting}};
+  \node[inv]  (ex) at (4.0, 0)   {\texttt{experiment}};
+  \node[prod] (rt) at (7.9, 0)   {\texttt{retrain}};
+  \node[prod] (sc) at (11.8, 0)  {\texttt{score\_daily}};
+
+  \draw[arr] (ti.east) to[out=0,in=140] (ex.north west);
+  \draw[arr] (tf.east) to[out=0,in=-140] (ex.south west);
+  \draw[arr] (ex) -- (rt);
+  \draw[arr] (rt) -- (sc);
+
+  \node[et] at (5.95, 0.72) {registro de campeón};
+  \node[et] at (9.85, 0.72) {modelo \texttt{.pkl}};
+
+  \node[fuera] (fc) at (4.0,-2.6) {\texttt{fair\_cost\_}\\\texttt{backtest}};
+  \node[fuera] (ed) at (7.9,-2.6) {\texttt{eda}};
+  \node[fuera] (so) at (11.8,-2.6) {\texttt{simulate\_ops}};
+  \node[et, anchor=east] at (2.7,-2.6) {fuera de la cadena:};
+\end{tikzpicture}%
+\shorthandon{>}%
+\caption{Orden de ejecución impuesto por el consumo de artefactos: cada flecha marca un fichero de \texttt{models/} que el modo de destino necesita leer. Los tres modos discontinuos no escriben ninguno que otro modo consuma, así que pueden ejecutarse en cualquier momento posterior a lo que necesiten.}
+\label{fig:orden_modos}
+\end{figure}
+
+Detrás de cada flecha hay más de un consumidor. Los hiperparámetros del imputador (\texttt{imputation\_lgbm\_}\allowbreak\texttt{params.json}) los leen los cuatro modos que reconstruyen demanda censurada: \texttt{experiment}, \texttt{retrain}, \texttt{score\_daily} y \texttt{fair\_cost\_backtest}. Los del modelo de previsión (\texttt{forecasting\_}\allowbreak\texttt{params.json}) los leen los tres que entrenan (\texttt{experiment}, \texttt{retrain} y \texttt{simulate\_ops}), y el registro de campeón lo leen \texttt{retrain}, \texttt{score\_daily} y \texttt{simulate\_ops}.
 
 \section{Gobierno del Modelo}
 \label{sec:gobierno_modelo}
@@ -336,7 +350,7 @@ Los modos anteriores producen modelos y evidencia sobre ellos; decidir cuál lle
 \subsection{Ciclo de Vida de los Hiperparámetros: Optimización vs. Reentrenamiento}
 \label{sec:mlops_workflow}
 
-Una de las decisiones críticas de diseño ha sido la separación entre la optimización estructural de los hiperparámetros y el reentrenamiento operacional diario. Siguiendo las mejores prácticas de MLOps para entornos de inventario, el sistema opera bajo un esquema de dos niveles, visualizado en la Figura~\ref{fig:mlops_flow}:
+Una de las decisiones críticas de diseño ha sido la separación entre la optimización desacoplada de los hiperparámetros y el reentrenamiento operacional. Siguiendo las mejores prácticas de MLOps para entornos de inventario, el sistema opera bajo un esquema de dos niveles, visualizado en la Figura~\ref{fig:mlops_flow}:
 
 \begin{figure}[h]
     \centering
@@ -353,16 +367,16 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
         \draw[->, thick, dashed] (deploy) -- (retrain) node[midway, right] {Parámetros\\Fijos};
 
         % Notas
-        \node[above of=optuna, yshift=-0.5cm] {\textbf{Optimización}\\\textbf{Estructural}};
-        \node[above of=data, yshift=-0.4cm] {\textbf{Adaptación}\\\textbf{Operativa}};
+        \node[above of=optuna, yshift=-0.5cm] {\textbf{Optimización}\\\textbf{Desacoplada}};
+        \node[above of=data, yshift=-0.4cm] {\textbf{Reentrenamiento}\\\textbf{Operacional}};
     \end{tikzpicture}
-    \caption{Ciclo de vida MLOps: Optimización desacoplada vs. Reentrenamiento operativo.}
+    \caption{Ciclo de vida MLOps: optimización desacoplada frente a reentrenamiento operacional. Los dos bloques son las dos fases que enumera el texto.}
     \label{fig:mlops_flow}
 \end{figure}
 
 \begin{enumerate}
     \item \begin{sloppypar}\textbf{Fase de Optimización Desacoplada (\texttt{tune\_forecasting})}: Ejecutado en modo dedicado, este ciclo explora el espacio de hiperparámetros con \textit{Optuna} sobre el panel de 500 series, guiando el muestreo hacia las regiones prometedoras en lugar de recorrerlo, que es justamente lo que hace inviable una rejilla sobre un espacio continuo. Cada configuración candidata se evalúa tras ser ajustada por la capa de \textit{Conformal Prediction} y se contrasta contra la baseline por defecto en validación fuera de muestra. El artefacto \texttt{models/forecasting\_params.json} se actualiza solo si el candidato atraviesa \emph{dos} puertas: que gane a los valores por defecto con la diferencia emparejada y su intervalo al $95\%$ íntegramente por debajo de cero, y que además no pierda contra el titular que ya está en disco. La segunda evita que una búsqueda afortunada desplace a un ganador anterior mejor.\end{sloppypar}
-    \item \textbf{Fase de Reentrenamiento Operacional}: Ejecutado mediante el modo \texttt{retrain}, este proceso es determinista y lee los hiperparámetros guardados en \texttt{models/forecasting\_params.json}. No es diario, al contrario que la emisión de recomendaciones: su cadencia es la que la Sección~\ref{sec:simulate_ops} mide empíricamente. Su función es la integración de los datos de ventas más recientes ($48.500$ filas históricas) sobre el modelo campeón con calibración conformal y versionado automático en MLflow, manteniendo la estructura de hiperparámetros estable.\end{enumerate}
+    \item \textbf{Fase de Reentrenamiento Operacional}: Ejecutado mediante el modo \texttt{retrain}, este proceso es determinista y lee los hiperparámetros guardados en \texttt{models/}\allowbreak\texttt{forecasting\_}\allowbreak\texttt{params.json}. No es diario, al contrario que la emisión de recomendaciones: su cadencia es la que la Sección~\ref{sec:simulate_ops} mide empíricamente. Su función es la integración de los datos de ventas más recientes ($48.500$ filas históricas) sobre el modelo campeón con calibración conformal y versionado automático en MLflow, manteniendo la estructura de hiperparámetros estable.\end{enumerate}
 
 Esta separación hace que el comportamiento del sistema sea predecible y auditable: si los hiperparámetros cambian cada día resulta muy difícil diagnosticar por qué una predicción fue mala. Fijarlos y revisarlos de forma esporádica es el compromiso entre adaptarse a nuevos patrones de demanda y mantener estable el sistema en producción; con qué periodicidad conviene revisarlos es una decisión de despliegue que este trabajo no fija.
 
@@ -550,7 +564,7 @@ La entrega es continua y se articula en dos flujos de GitHub Actions. El de \tex
 \begin{itemize}
     \item \textbf{Contratos estrictos}: toda la configuración y los metadatos transitan por esquemas validados y tipados estáticamente, de modo que una configuración incoherente se rechaza al cargarse y no a mitad de una ejecución de varios minutos.
     \item \textbf{Verificación por capas}: los \textit{hooks} de \texttt{pre-commit} ejecutan \textit{linter}, formato y tipado en cada confirmación, y reservan la suite completa para el empuje, porque tres minutos son un precio razonable antes de que el código salga de la máquina pero no en cada confirmación. La contrapartida, que conviene conocer, es que una confirmación en verde no dice nada sobre si la suite pasa.
-    \item \textbf{Observabilidad}: cada recomendación atraviesa el clasificador de riesgo de \texttt{evaluation/}\allowbreak\texttt{reporting.py}, que le asigna la causa de mayor prioridad que le aplique según la precedencia que justifica la Sección~\ref{sec:excepciones}, y el sistema persiste los valores de Shapley del campeón que el Capítulo~\ref{chap:resultados} analiza.
+    \item \textbf{Observabilidad}: cada recomendación pasa por el clasificador de riesgo que implementa \texttt{evaluation/}\allowbreak\texttt{reporting.py}, que le asigna la causa de mayor prioridad de entre las que le apliquen, según la precedencia que justifica la Sección~\ref{sec:excepciones}, y el sistema persiste los valores de Shapley del campeón que el Capítulo~\ref{chap:resultados} analiza.
 \end{itemize}
 
 \subsection{Estrategia de Testing: Pirámide de Verificación}
