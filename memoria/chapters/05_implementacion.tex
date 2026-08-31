@@ -180,7 +180,47 @@ La estrategia \texttt{supervised} entrena un regresor LightGBM sobre las observa
 
 Sobre el panel ya reconstruido, \texttt{build\_supervised\_frame()} produce las 43 características y la variable objetivo. Las características se agrupan en cuatro familias: retardos y ventanas rodantes de la propia demanda, los mismos retardos aplicados a las covariables no ex ante (promoción, rotura y meteorología), variables de calendario derivadas de la fecha, e identificadores estáticos de la jerarquía tienda--producto.
 
-El objetivo se construye aquí y solo aquí: es la suma de la demanda de los $H$ días que siguen al origen, calculada desplazando la serie hacia atrás dentro de cada \texttt{series\_id} y descartando después las filas cuyo horizonte no cabe completo en el panel. Esa poda es la que explica que el \textit{frame} tenga menos filas que el panel del que sale.
+El objetivo se construye aquí y solo aquí, y la Figura~\ref{fig:fila_frame} lo sitúa en el tiempo: es la suma de la demanda de los $H$ días que arrancan en el propio origen, este incluido, calculada desplazando la serie dentro de cada \texttt{series\_id} y descartando después las filas cuyo horizonte no cabe completo en el panel. Esa poda es la que explica que el \textit{frame} tenga menos filas que el panel del que sale.
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+    every node/.style={font=\sffamily\footnotesize, align=center},
+    dia/.style={draw, minimum width=0.62cm, minimum height=0.62cm},
+    lbl/.style={font=\sffamily\scriptsize, align=center},
+    arr/.style={->, thick}
+]
+  % Dias del panel para una serie. El origen t es el ultimo dia YA observado.
+  \foreach \i in {0,...,7} { \node[dia, fill=blue!10] at (\i*0.72,0) {}; }
+  \foreach \i in {8,...,14} { \node[dia, fill=green!14] at (\i*0.72,0) {}; }
+
+  \draw[dashed, thick, gray!75] (7.5*0.72,-1.15) -- (7.5*0.72,1.5);
+  \node[font=\sffamily\footnotesize] at (7.5*0.72,1.75) {origen $t$};
+
+  % Mirada hacia atras: caracteristicas
+  \draw[<-, thick, blue!65] (0,0.62) -- (7*0.72,0.62);
+  \node[lbl, blue!65!black] at (3.4*0.72,1.05)
+       {retardos $\{1,7,14\}$ y ventanas rodantes $\{7,14\}$};
+
+  % Mirada hacia adelante: objetivo
+  \draw[->, thick, green!45!black] (8*0.72,0.62) -- (14*0.72,0.62);
+  \node[lbl, green!35!black] at (11*0.72,1.05)
+       {objetivo: $\sum$ demanda de $H=7$ días};
+
+  \node[lbl] at (3.4*0.72,-0.62) {ya observado};
+  \node[lbl] at (11*0.72,-0.62)  {aún no ocurrido};
+
+  % La regla que la figura existe para hacer visible
+  \node[dia, fill=red!14] at (7.5*0.72+0.72,-1.75) {};
+  \node[lbl, anchor=west] at (7.5*0.72+1.15,-1.75)
+       {la meteorología, el descuento y la rotura \emph{del día $t$} no entran:\\
+        esas covariables solo se conocen a posteriori, y por eso van con retardo positivo};
+\end{tikzpicture}
+\shorthandon{>}%
+\caption{Construcción de una fila del \textit{frame} supervisado. Las características se calculan mirando hacia atrás desde el origen $t$, con los retardos y ventanas que declara la configuración, y el objetivo suma la demanda de los $H$ días que empiezan en $t$, ninguno de los cuales ha ocurrido cuando hay que decidir. La celda destacada es la regla que el contrato causal protege: las covariables no ex ante del propio día de decisión quedan fuera, porque cuando hay que emitir el pedido nadie las conoce.}
+\label{fig:fila_frame}
+\end{figure}
 
 Dos reglas gobiernan este módulo y son las que sostienen el contrato causal de la Sección~\ref{sec:feature_engineering}. La primera es que toda característica temporal se calcula con información disponible en el origen de predicción. La segunda es que las covariables que no se conocen por adelantado entran únicamente con retardo positivo, porque la meteorología, el descuento o la rotura del propio día que se está prediciendo no están sobre la mesa cuando hay que decidir el pedido. Ambas se verifican con pruebas dedicadas, que la Sección~\ref{sec:testing} describe como el nivel más crítico de la pirámide.
 
