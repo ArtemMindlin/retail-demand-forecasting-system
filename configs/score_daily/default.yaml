@@ -60,8 +60,8 @@ business:
   high_uncertainty_interval_quantile: 0.95
   flag_extreme_order_quantity: true
   champion_data_strategy: Latent_supervised
-  champion_model_name: catboost
-  champion_backend_name: conformal_catboost_official
+  champion_model_name: lightgbm
+  champion_backend_name: conformal_lightgbm
   champion_min_cost_improvement_pct: 0.0
   champion_max_service_level_degradation: 0.02
   champion_winkler_weight: 0.5
