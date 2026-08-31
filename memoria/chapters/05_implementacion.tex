@@ -124,12 +124,13 @@ La Tabla~\ref{tab:tech_stack} resume las herramientas principales del sistema. C
         \toprule
         \textbf{Componente} & \textbf{Herramienta} & \textbf{Alternativa descartada} \\
         \midrule
-        Modelado probabilístico & CatBoost, LightGBM & XGBoost, scikit-learn \\
+        Modelado probabilístico & LightGBM, CatBoost & XGBoost, \textit{estimadores de} scikit-learn \\
         Búsqueda multi-objetivo & Optuna (TPE) & Hyperopt, GridSearch \\
         Búsqueda de un objetivo & Optuna (\textit{sampler} gaussiano) & TPE \\
         Trazabilidad de experimentos & MLflow & Weights \& Biases \\
         Capa web y API operacional & Django & FastAPI, Flask \\
-        Contenerización & Docker + Compose & Entornos virtuales \\
+        Entorno y dependencias & uv & pip + venv, Poetry, Conda \\
+        Contenerización (despliegue) & Docker + Compose & Despliegue sobre el intérprete del anfitrión \\
         Validación de contratos & Pydantic v2 & dataclasses, marshmallow \\
         Explicabilidad & SHAP & LIME, eli5 \\
         Dashboard interactivo & Plantillas Django + htmx & React, Streamlit, Dash \\
@@ -151,7 +152,7 @@ Las decisiones más relevantes se justifican a continuación:
 
     \item \textbf{Pydantic v2 sobre dataclasses}: Pydantic valida y convierte tipos en tiempo de ejecución, no solo en tiempo de análisis estático. Esto permite rechazar configuraciones incoherentes (ej. un horizonte negativo o una ruta de modelo inexistente) antes de que lleguen al pipeline, convirtiendo los errores tardíos en fallos rápidos y auditables.
 
-    \item \textbf{Docker sobre entornos virtuales}: Un entorno virtual resuelve las dependencias Python pero no fija el sistema operativo, las librerías del sistema ni la versión de CUDA. Docker garantiza que el entorno de entrenamiento y el de inferencia son bitwise idénticos, eliminando la clase entera de bugs ``funciona en mi máquina''.
+    \item \textbf{Docker para el despliegue, uv para el desarrollo}: no son alternativas sino dos capas. En local, \texttt{uv} resuelve y bloquea el árbol de dependencias de Python y es por donde pasan todos los comandos del proyecto. Lo que un entorno virtual no fija es el sistema operativo, las librerías del sistema ni la versión de CUDA, y por eso el despliegue va contenerizado: Docker garantiza que el entorno de entrenamiento y el de inferencia son idénticos, eliminando la clase entera de fallos de ``funciona en mi máquina''.
 
     \item \textbf{Renderizado en servidor sobre una \textit{Single Page Application}}: el argumento habitual para React (actualizaciones parciales de estado) no aplica aquí, porque el cliente no calculaba nada: cada movimiento de un \textit{slider} ya provocaba una llamada a la API y el servidor devolvía los números. El navegador era una capa de presentación sobre resultados ajenos. Sustituirlo por plantillas Django con htmx conserva esa actualización parcial (se intercambia solo la región de contenido) y elimina la transpilación en el navegador. La consecuencia de diseño más útil es que los parámetros del escenario pasan a vivir en la \textit{query string}: cualquier configuración del simulador es una URL compartible y recargable, algo imposible cuando el estado residía en componentes. Streamlit y Dash, que reconstruyen la página entera en cada interacción, siguen descartados por el mismo motivo que antes.
 \end{itemize}
