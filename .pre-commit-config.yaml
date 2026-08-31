@@ -26,6 +26,14 @@ repos:
         pass_filenames: false
         args: ["src"]
 
+      # LaTeX no lo mira nadie más: ruff y mypy nunca abren un .tex, así que un commit puede
+      # estar verde y dejar la memoria sin compilar. Ver el docstring del script.
+      - id: latex-math-spacing
+        name: latex math spacing
+        entry: uv run python scripts/check_latex_math_spacing.py
+        language: system
+        files: ^memoria/.*\.tex$
+
       # On push rather than on commit: the suite takes ~3 minutes, which is too much to pay per
       # commit but the right price before code leaves the machine. ruff and mypy above pass
       # happily on code the suite rejects, so without this a green commit says nothing about
