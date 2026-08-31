@@ -273,26 +273,35 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
 \section{Modos de Ejecución}
 \label{sec:run_modes}
 
-El sistema distingue explícitamente entre operaciones de investigación, sintonización desacoplada y operaciones de producción mediante seis modos de ejecución configurables a través del parámetro \texttt{run\_mode}:
+El sistema expone ocho modos de ejecución, seleccionables mediante el parámetro \texttt{run\_mode}, que se agrupan en tres familias según el papel que cumplen. Cada modo lee únicamente las secciones de configuración que necesita, correspondencia que un test del proyecto verifica: declarar una sección que el modo nunca lee sería un mando que no acciona nada.
 
-\begin{enumerate}
-    \item \textbf{\texttt{experiment}}: Modo de investigación completo. Ejecuta el \textit{backtesting walk-forward} con múltiples \textit{folds} temporales para una estrategia de demanda (observada o latente, según \texttt{imputation\_strategy}), selecciona el modelo \textit{champion} entre los de esa misma estrategia mediante \textit{promotion logic} y genera artefactos de análisis exhaustivos (\texttt{metrics\_summary.csv}, \texttt{cost\_summary.csv}, \texttt{champion\_registry.json}, gráficos de Pareto). Es el modo utilizado para validar el sistema antes de su despliegue.
+\paragraph{Investigación.} Producen la evidencia que sostiene el trabajo y no intervienen en producción.
 
-    \item \textbf{\texttt{retrain}}: Modo de refresco operacional. Entrena el modelo \textit{champion} sobre la totalidad de los datos disponibles ($48.500$ filas del panel consolidado) sin realizar evaluación por \textit{folds}, reconstruyendo previamente la demanda latente con el imputador supervisado y empaquetando el artefacto conformal en formato \texttt{.pkl} con trazabilidad completa registrada en MLflow. Se ejecuta periódicamente en producción para mantener el modelo actualizado con los datos más recientes.
+\begin{itemize}
+    \item \textbf{\texttt{experiment}}: ejecuta el \textit{backtesting walk-forward} sobre una estrategia de demanda (observada o latente, según \texttt{imputation\_strategy}), evalúa los modelos candidatos y resuelve la promoción del campeón. Escribe \texttt{metrics\_}\allowbreak\texttt{summary.csv}, \texttt{cost\_}\allowbreak\texttt{summary.csv} y \texttt{promotion\_}\allowbreak\texttt{decision.json}, entre otros. Es el modo que valida el sistema antes del despliegue.
+    \item \textbf{\texttt{fair\_cost\_backtest}}: puntúa las estrategias de reconstrucción de censura contra una verdad común mediante censura sintética, sin entrenar ningún modelo de previsión. Es la única comparación que las \emph{ordena}, y de ella sale la Tabla~\ref{tab:metrics_cost} del Capítulo~\ref{chap:resultados}.
+    \item \textbf{\texttt{simulate\_ops}}: ejecuta la simulación operacional en \textit{streaming} de la Sección~\ref{sec:simulate_ops}, comparando cadencias de reentrenamiento sobre el split de evaluación.
+    \item \textbf{\texttt{eda}}: genera el análisis exploratorio y las figuras del Capítulo~\ref{chap:analisis_datos}. Es un modo y no una herramienta aparte para que el análisis atraviese la misma carga de configuración y el mismo registro de ejecuciones que el resto.
+\end{itemize}
 
-    \item \begin{sloppypar}\textbf{\texttt{score\_daily}}: Modo de producción diario. Carga el modelo \textit{champion} guardado, construye el \textit{inference frame} con los datos más recientes y genera \texttt{reorder\_}\allowbreak\texttt{recommendations.csv}: una fila por par tienda-producto con la \texttt{order\_quantity} óptima para el horizonte $H$, los tres cuantiles calibrados (\texttt{q\_0.1},\allowbreak{} \texttt{q\_0.5},\allowbreak{} \texttt{q\_0.9}) y la fecha de decisión. Este fichero es el entregable que consumiría el sistema de compras o el responsable de reposición.\end{sloppypar}
+\paragraph{Sintonización desacoplada.} Buscan hiperparámetros y persisten \emph{únicamente} la configuración ganadora, nunca pesos ajustados, de modo que quien los consume siempre reentrena sobre el panel en curso.
 
-    \item \textbf{\texttt{simulate\_ops}}: Modo de investigación MLOps. Ejecuta la simulación operacional en \textit{streaming} descrita en la Sección~\ref{sec:simulate_ops}, comparando múltiples cadencias de reentrenamiento sobre el split de evaluación. Escribe \texttt{cadence\_}\allowbreak\texttt{summary.csv} (coste total, nivel de servicio, \textit{fill rate} y número de reentrenamientos por cadencia), \texttt{cumulative\_}\allowbreak\texttt{cost.png} (evolución temporal del coste acumulado), \texttt{predictions\_}\allowbreak\texttt{by\_}\allowbreak\texttt{day.parquet} (predicciones diarias por cadencia y serie), \texttt{retrain\_}\allowbreak\texttt{events.json} (registro de cada evento de reentrenamiento con fecha, duración y tamaño del histórico) y \texttt{report.md}.
+\begin{itemize}
+    \item \textbf{\texttt{tune\_imputation}}: busca los hiperparámetros del regresor auxiliar del imputador bajo censura sintética y los persiste en \texttt{models/}\allowbreak\texttt{imputation\_}\allowbreak\texttt{lgbm\_}\allowbreak\texttt{params.json}.
+    \item \textbf{\texttt{tune\_forecasting}}: busca los del modelo de previsión con Optuna en dos capas, una ventana de selección de $N=30$ sorteos y una validación fuera de muestra de $N=25$ con intervalos \textit{bootstrap} al $95\%$, evaluando a través de la capa conformal (14 días de calibración). Persiste en \texttt{models/}\allowbreak\texttt{forecasting\_}\allowbreak\texttt{params.json}.
+\end{itemize}
 
-    \item \textbf{\texttt{tune\_imputation}}: Modo de sintonización desacoplado del imputador supervisado. Entrena el regresor LightGBM auxiliar sobre días limpios del panel y busca sus hiperparámetros óptimos mediante Optuna bajo censura sintética, persistiendo el resultado en \texttt{models/imputation\_lgbm\_params.json}.
+\paragraph{Producción.} Son los dos modos que el sistema desplegado ejecuta de forma recurrente.
 
-    \item \textbf{\texttt{tune\_forecasting}}: Modo de sintonización desacoplado del modelo de previsión probabilística. Ejecuta una búsqueda de Optuna de dos capas (ventana de selección de $N=30$ sorteos y validación fuera de muestra de $N=25$ sorteos con CIs bootstrap al 95\%) evaluando directamente a través de la capa de \textit{Conformal Prediction} ($14$ días de calibración). Persiste los hiperparámetros validados en \texttt{models/forecasting\_params.json}.
-\end{enumerate}
+\begin{itemize}
+    \item \textbf{\texttt{retrain}}: entrena el campeón que declara el registro sobre la totalidad de los datos disponibles ($48.500$ filas del panel consolidado), sin evaluación por \textit{folds}, reconstruyendo antes la demanda latente y empaquetando el artefacto conformal en \texttt{.pkl}.
+    \item \textbf{\texttt{score\_daily}}: carga ese artefacto, construye el marco de inferencia con los datos más recientes y emite \texttt{reorder\_}\allowbreak\texttt{recommendations.csv}, con una fila por par tienda--producto que lleva la cantidad de pedido para el horizonte $H$, los tres cuantiles calibrados (\texttt{q\_0\_1}, \texttt{q\_0\_5}, \texttt{q\_0\_9}) y la fecha de decisión. Ese fichero es el entregable que consumiría el sistema de compras.
+\end{itemize}
 
 \section{Gobierno del Modelo}
 \label{sec:gobierno_modelo}
 
-Los tres modos anteriores producen modelos; decidir cuál de ellos llega a producción, con qué hiperparámetros y dejando qué rastro es un problema distinto, y es el que esta sección recoge. El criterio que gobierna esas decisiones se deriva en el Capítulo~\ref{chap:metodologia}; lo que sigue es cómo queda implementado.
+Los modos anteriores producen modelos y evidencia sobre ellos; decidir cuál llega a producción, con qué hiperparámetros y dejando qué rastro es un problema distinto, y es el que esta sección recoge. El criterio que gobierna esas decisiones se deriva en el Capítulo~\ref{chap:metodologia}; lo que sigue es cómo queda implementado.
 
 \subsection{Ciclo de Vida de los Hiperparámetros: Optimización vs. Reentrenamiento}
 \label{sec:mlops_workflow}
