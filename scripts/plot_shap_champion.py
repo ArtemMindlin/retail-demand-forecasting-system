@@ -3,9 +3,9 @@
 Standalone, and deliberately not part of the experiment run. Computing SHAP for the
 LightGBM champion inside the pipeline process segfaults (exit 139) after the fold loop has
 trained both backends; the same call succeeds in isolation against the persisted model, on
-the same frame and the same tuned hyperparameters. A SIGSEGV cannot be caught by the
-`try/except` in `evaluation/xai.py`, so it takes the whole run down with it, artifacts
-included. Until that crash is understood, the figure comes from here.
+the same frame and the same tuned hyperparameters. `evaluation/xai.py` now runs the computation in a child process, so that crash costs the
+figure rather than the whole run, but the figure still has to come from somewhere: this
+script produces it without paying for a backtest to redraw a plot.
 
 It reads the champion from the registry, loads its persisted `.pkl`, and rebuilds the
 supervised frame from the configured panel, so the figure is reproducible from committed
@@ -85,6 +85,11 @@ def main() -> None:
         X=frame[metadata.feature_columns],
         sample_size=args.sample_size,
     )
+    if shap_values is None:
+        raise SystemExit(
+            "SHAP no pudo calcularse; el aviso anterior dice por qué. La figura no se escribe: "
+            "sobrescribirla con una en blanco sería peor que dejar la anterior en su sitio."
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     render_shap_summary(shap_values=shap_values, output_path=args.output)
     print(f"✅ Wrote {args.output}")
