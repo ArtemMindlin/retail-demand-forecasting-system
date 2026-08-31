@@ -756,6 +756,49 @@ Esta arquitectura es la que sostiene el posicionamiento del sistema como \textbf
 
 La Sección~\ref{sec:contrato_operacional} estableció que el plano operacional no puede medir su propio error en el momento de decidir. La monitorización es la respuesta a esa limitación, y se articula en dos niveles que vigilan objetos distintos y responden a preguntas distintas.
 
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+    every node/.style={font=\sffamily\footnotesize, align=center},
+    lvl/.style={draw, rounded corners=3pt, minimum height=0.85cm, text width=4.6cm},
+    arr/.style={->, thick, gray!70},
+    disp/.style={font=\sffamily\scriptsize, text width=4.6cm}
+]
+  % Franja de la ventana ciega y eje
+  \fill[gray!12] (0,-0.3) rectangle (7,0.3);
+  \draw[->, thick] (-0.6,0) -- (9.3,0) node[right, font=\sffamily\footnotesize] {tiempo};
+  \draw[thick] (0,-0.3) -- (0,0.3);
+  \draw[thick] (7,-0.3) -- (7,0.3);
+  % Rotulo opaco para que el eje no lo atraviese
+  \node[fill=gray!12, inner sep=2pt, font=\sffamily\scriptsize\itshape] at (3.5,0)
+       {ventana ciega: la fila no tiene etiqueta};
+
+  \node[below=3pt, font=\sffamily\footnotesize] at (0,-0.3) {$t$};
+  \node[below=15pt, font=\sffamily\scriptsize] at (0,-0.3) {se emite el pedido};
+  \node[below=3pt, font=\sffamily\footnotesize] at (7,-0.3) {$t+H$};
+  \node[below=15pt, font=\sffamily\scriptsize] at (7,-0.3) {se revela la demanda};
+
+  % Nivel 1: evaluable en el acto
+  \node[lvl, fill=blue!8] at (0.4,2.2) {\textbf{Nivel 1: PSI}\\ deriva de la ENTRADA};
+  \draw[arr] (0,0.32) -- (0.4,1.72);
+  \node[disp] at (0.4,1.25) {evaluable en el acto};
+
+  % Nivel 2: solo tras el horizonte
+  \node[lvl, fill=orange!10] at (7.0,2.2) {\textbf{Nivel 2: Page-Hinkley}\\ deriva del ERROR};
+  \draw[arr] (7,0.32) -- (7.0,1.72);
+  \node[disp] at (7.0,1.25) {solo a posteriori};
+
+  % Que produce cada uno
+  \node[disp] at (0.4,-1.75) {\emph{produce:} informe por variable\\ y cuadro de mandos};
+  \node[disp] at (7.0,-1.75) {\emph{produce:} bandera \texttt{drift\_watch}\\ sobre el tramo afectado};
+\end{tikzpicture}
+\shorthandon{>}%
+\caption{Los dos niveles de monitorización, situados en el instante en que cada uno puede evaluarse. El nivel 1 compara distribuciones de entrada y no necesita esperar a nada; el nivel 2 mide el error y por tanto solo existe una vez transcurrido el horizonte. La franja sombreada es la ventana en la que el sistema ya ha decidido y todavía no puede saber si acertó, que es la limitación que la Sección~\ref{sec:contrato_operacional} enuncia como contrato. Ninguno de los dos promueve un reentrenamiento por sí solo.}
+\label{fig:monitorizacion_niveles}
+\end{figure}
+
+
 \paragraph{Nivel 1: deriva de la distribución de entrada (PSI).} Vigila si las variables que alimentan al modelo siguen pareciéndose a aquellas sobre las que se ajustó. Es observable de inmediato, sin esperar a la demanda, y por eso es el nivel que puede operar en tiempo real. Para cada variable se calcula el \textit{Population Stability Index} entre una ventana de referencia y una ventana actual:
 
 \begin{equation}
