@@ -8,7 +8,13 @@ FIRST_PARTY_PREFIX = "retail_forecasting"
 
 ALLOWED_LAYER_IMPORTS = {
     "__init__": set(),
-    "api": {"config", "drift", "forecasting", "tracking"},
+    # `inventory` and `utils` are here so the web layer can DELEGATE instead of reimplementing.
+    # CLAUDE.md already declares inventory an orchestration target for `api`, and the rule this
+    # list enforces is that the web layer holds no business logic of its own: the dashboard used
+    # to carry a local Newsvendor rule that disagreed with `score_daily` on every row, and
+    # calling `choose_order_quantity` is what removed it. `utils` comes along because pairing
+    # quantile columns with their levels goes through `quantile_level_from_column`.
+    "api": {"config", "drift", "forecasting", "inventory", "tracking", "utils"},
     "config": {"contracts"},
     "contracts": set(),
     "data": {"config", "contracts", "utils"},

@@ -41,8 +41,15 @@ def test_default_config_preserves_experimental_guardrails() -> None:
     assert 0.0 <= settings.data_quality.max_missing_fraction_warning <= 1.0
     assert 0.0 < settings.business.high_uncertainty_interval_quantile < 1.0
     assert 0.0 < settings.business.extreme_order_quantity_quantile < 1.0
+    # The fallback champion identity must be COHERENT, not a particular backend. Pinning
+    # `conformal_catboost_official` here made a legitimate promotion fail the suite: the
+    # registry promoted LightGBM on 28 Aug 2026 and the configs followed, so the guardrail
+    # was firing on the very change it exists to let through. What must not drift is that the
+    # two fields name the same model, since `resolve_champion_reference` falls back to both
+    # together when no registry exists.
     assert settings.business.champion_model_name
-    assert settings.business.champion_backend_name == "conformal_catboost_official"
+    assert settings.business.champion_backend_name
+    assert settings.business.champion_model_name in settings.business.champion_backend_name
     assert settings.business.champion_min_cost_improvement_pct >= 0.0
     assert 0.0 <= settings.business.champion_max_service_level_degradation <= 1.0
 
