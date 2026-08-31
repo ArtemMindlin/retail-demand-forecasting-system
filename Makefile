@@ -12,9 +12,15 @@ EDA_CONFIG = configs/eda/default.yaml
 # series measured 12.4% WORSE than the untuned defaults at 500. See docs/invariants.md 41.
 TUNE_CONFIG = configs/tune_imputation/default.yaml
 TUNE_FORECASTING_CONFIG = configs/tune_forecasting/default.yaml
+# The OPS split is carved at the SAME scale as every forecasting mode. Running it at 100
+# made `resolve_backend_params` reject the tuned file on its scale fingerprint and fall back
+# to the YAML defaults, so the plane measured a retraining policy for an untuned model.
+# See docs/invariants.md 41.
+OPS_SERIES = 500
+OPS_TRAIN_DAYS = 49
 OPS_SPLIT = data/processed/ops_sim/.built
 SNAPSHOT = current
-.PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf presentation
+.PHONY: help install run retrain score simulate backtest-fair-cost tune-imputation tune-forecasting mlflow-ui eda api dev collectstatic up test test-harness render-snapshots lint format clean pdf presentation
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -36,8 +42,13 @@ simulate: $(OPS_SPLIT) ## Run rolling-origin production backtest comparing retra
 
 # The OPS plane streams a dedicated train/eval split carved out of the prepared
 # panel. Built once, on demand: `simulate` depends on the file, not the script.
+#
+# The marker does NOT track the parameters below: changing OPS_SERIES or OPS_TRAIN_DAYS
+# leaves a stale split in place and `simulate` reuses it in silence. Delete the marker
+# (`rm data/processed/ops_sim/.built`) after touching either.
 $(OPS_SPLIT):
-	$(PYTHON) scripts/build_ops_sim_split.py --train-days 49 --n-series 500
+	$(PYTHON) scripts/build_ops_sim_split.py \
+		--train-days $(OPS_TRAIN_DAYS) --n-series $(OPS_SERIES)
 
 backtest-fair-cost: ## Backtest: inventory cost of each strategy vs a common ground truth (no training)
 	$(PYTHON) -m retail_forecasting.run --config $(FAIRCOST_CONFIG)
