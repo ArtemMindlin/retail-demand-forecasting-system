@@ -44,7 +44,7 @@ critical fractile but is NOT calibrated there. Measured on these runs, the share
 demand falling below it is 34.6% (CatBoost) and 63.2% (LightGBM) against a nominal 80%.
 Nothing in the pipeline watches it: conformal corrects the interval bounds and never the
 point forecast, and the tuning scores cost, which is computed on the order quantity. The
-interval itself is calibrated (83.8% and 85.2% for a nominal 80%), so the decision layer is
+interval itself is calibrated (84.6% and 85.5% for a nominal 80%), so the decision layer is
 unaffected — but no MAE in this table should be read as the error of a central forecast.
 
 ## SUPERSEDED — every run below predates the changes of 26 Aug 2026
