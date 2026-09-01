@@ -143,7 +143,7 @@ La Figura~\ref{fig:eda_weekday_profile_manual} muestra el perfil medio semanal d
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.80\textwidth]{figures/eda/weekday_demand_profile.png}
-    \caption{Perfil semanal de demanda observada con media y mediana.}
+    \caption{Perfil semanal de la demanda observada, en media y mediana sobre todo el panel. La mediana se mantiene en torno a 0{,}60 de lunes a viernes y salta un 33\% el sábado hasta un \textit{plateau} de 0{,}80; la media sigue creciendo hasta el domingo, lo que delata valores atípicos altos de fin de semana. El ciclo semanal justifica los retardos de 7 días y las variables de calendario.}
     \label{fig:eda_weekday_profile_manual}
 \end{figure}
 
@@ -154,21 +154,21 @@ Las Figuras~\ref{fig:eda_category_heatmap_high}, \ref{fig:eda_category_heatmap_m
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.90\textwidth]{figures/eda/category_seasonality_high.png}
-    \caption{Estacionalidad semanal: categorías de demanda alta.}
+    \caption{Estacionalidad semanal por categoría de producto, nivel de demanda \textbf{alta}. Cada fila es una categoría y cada columna un día de la semana; el color es la demanda normalizada por \textit{Z-score} dentro de la propia categoría, de modo que los tonos son comparables entre filas pese a operar a volúmenes distintos.}
     \label{fig:eda_category_heatmap_high}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.90\textwidth]{figures/eda/category_seasonality_medium.png}
-    \caption{Estacionalidad semanal: categorías de demanda media.}
+    \caption{Estacionalidad semanal por categoría de producto, nivel de demanda \textbf{media}. Misma normalización por \textit{Z-score} intracategoría que la Figura~\ref{fig:eda_category_heatmap_high}.}
     \label{fig:eda_category_heatmap_medium}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.90\textwidth]{figures/eda/category_seasonality_low.png}
-    \caption{Estacionalidad semanal: categorías de demanda baja.}
+    \caption{Estacionalidad semanal por categoría de producto, nivel de demanda \textbf{baja}. Misma normalización por \textit{Z-score} intracategoría que la Figura~\ref{fig:eda_category_heatmap_high}.}
     \label{fig:eda_category_heatmap_low}
 \end{figure}
 
