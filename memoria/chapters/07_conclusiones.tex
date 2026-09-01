@@ -19,82 +19,75 @@ Antes de desarrollar las conclusiones temáticas, se revisa el grado de consecuc
 De los cuatro objetivos específicos, todos se cumplen íntegramente. Las conclusiones principales se resumen en los siguientes puntos:
 
 \begin{itemize}
-    \item \textbf{Censura y Demanda Latente}: La imputación de la demanda censurada por \textit{stockouts} es el factor técnico más determinante para la rentabilidad de la cadena de suministro. Bajo una evaluación justa con un target común de demanda real, los modelos entrenados con la estrategia de Demanda Latente Supervisada reducen el coste total de inventario en un 92{,}15\% frente al baseline observado sin corregir, elevando el nivel de servicio (\textit{fill rate}) del 60{,}30\% al 97{,}50\%. Este resultado valida de forma cuantitativa y sin sesgo de evaluación el beneficio de recuperar la señal latente, con el alcance acotado al panel de 500 series del que se muestrea el protocolo (Sección~\ref{sec:resultados_gemelo}).
+    \item \textbf{Censura y Demanda Latente}: La imputación de la demanda censurada por \textit{stockouts} es el factor técnico más determinante para la rentabilidad de la cadena de suministro. Bajo una evaluación justa con un target común de demanda real, los modelos entrenados con la estrategia de Demanda Latente Supervisada reducen el coste total de inventario en un 92{,}15\% frente al baseline observado sin corregir, elevando la disponibilidad volumétrica (\textit{fill rate}) del 60{,}30\% al 97{,}50\%. Este resultado valida de forma cuantitativa y sin sesgo de evaluación el beneficio de recuperar la señal latente, con el alcance acotado al panel de 500 series del que se muestrea el protocolo (Sección~\ref{sec:resultados_gemelo}).
 
     \item \textbf{La trampa del MAE y el valor del modelo probabilístico}: El \textit{Seasonal Naïve} obtiene el mejor MAE del backtesting predictivo (\textbf{6,61} bajo estrategia Latent), y sin embargo a escala de 500 series ese menor error puntual es una trampa matemática: sufre roturas en casi la mitad de los días (nivel de servicio del $52{,}45\%$) y acumula $123.858$ u.m. en penalizaciones por rotura. En cambio, los modelos probabilísticos de \textit{Gradient Boosting} elevan el nivel de servicio al $83{,}55\%$ ($+31{,}10$ puntos) y reducen el coste logístico total a $147.646$ u.m. Este resultado reproduce el fenómeno teórico advertido en el Capítulo~\ref{chap:estado_del_arte}: optimizar el MAE no equivale a optimizar la política de inventario.
 
-    \item \textbf{Calibración Conformal a Escala}: La implementación de \textit{Mondrian Conformal Prediction} proporciona una calibración condicional por categoría sólida y estable. A escala de 500 series, CatBoost clava la cobertura nominal con un \textbf{80{,}2\%} y LightGBM alcanza un \textbf{86{,}1\%} con el mejor Winkler Score ($36{,}52$). La optimización de hiperparámetros a través de la capa conformal resuelve las desviaciones de escala observadas en conjuntos de calibración reducidos.
+    \item \textbf{Calibración Conformal a Escala}: La implementación de \textit{Mondrian Conformal Prediction} proporciona una calibración condicional por categoría sólida y estable. A escala de 500 series, CatBoost alcanza una cobertura del \textbf{84{,}6\%} y LightGBM un \textbf{85{,}5\%} (ambos por encima del $80\%$ nominal), logrando LightGBM el mejor Winkler Score del sistema ($36{,}11$). La optimización desacoplada de hiperparámetros a través de la capa conformal resuelve definitivamente las desviaciones de escala observadas en conjuntos de calibración reducidos.
 
     \item \textbf{Los dos ejes de la evaluación económica}: el coste y el nivel de servicio no ordenan igual a los modelos, y leer solo uno de los dos induce a error. A 500 series el coste separa a los tres modelos por menos de un 2\%, mientras que el nivel de servicio los separa por 15 puntos y en el orden inverso al del MAE. La validación a escala reveló además que el beneficio de la corrección de censura es sensible a la composición del catálogo: se concentra en series de stockout severo y se diluye cuando el catálogo es más heterogéneo.
 
 
-    \item \textbf{Madurez MLOps y Operativización}: El despliegue del sistema como aplicación \textbf{Django} con trazabilidad por ejecución, lógica de promoción automática del modelo campeón y cuadro de mandos \textit{What-If} renderizado en servidor demuestra la viabilidad técnica de integrar investigación académica de vanguardia en la operativa diaria de un entorno corporativo. La arquitectura resultante mantiene una separación estricta entre el cálculo de dominio y la capa de presentación, de modo que las decisiones del sistema son verificables sin instanciar la interfaz.
+    \item \textbf{Madurez MLOps y Operativización Industrial}: El despliegue del sistema como plataforma integral (\textbf{Django} y API REST operacional), respaldada por el registro de experimentos en MLflow, promoción estadística del modelo campeón mediante guardarraíles, monitorización continua de deriva (PSI y Page-Hinkley) y una suite de tests que verifica formalmente la ausencia de fuga de información temporal, demuestra la viabilidad de transformar algoritmos probabilísticos complejos en un producto de software robusto, reproducible y listo para integrarse con los sistemas transaccionales (ERP) de una organización. La arquitectura mantiene una separación estricta entre la lógica matemática de dominio y la capa de servicio, permitiendo auditar y verificar cualquier decisión logística de forma totalmente desacoplada de la interfaz.
 \end{itemize}
 
 \section{Legado del Trabajo}
 \label{sec:legado}
 
-Más allá de las conclusiones metodológicas, este TFG deja como legado un sistema completo y reproducible:
+Más allá de las conclusiones metodológicas, este TFG deja como legado un sistema completo, verificable y reproducible:
 
 \begin{itemize}
-    \item \textbf{Código y reproducibilidad}: la totalidad del código (pipeline de datos, motor de modelos, calibración conformal, decisión Newsvendor, API y \textit{dashboard}) se encuentra versionada en un repositorio Git\footnote{\url{https://github.com/ArtemMindlin/retail-demand-forecasting-system}}, con integración continua (verificación de estilo, tipos estáticos y batería de tests en cada \textit{commit}). La arquitectura completa se levanta con un único comando mediante \texttt{docker-compose}, de modo que un tercero puede reproducir los experimentos y obtener resultados equivalentes sin configuración manual. Cada experimento deja además un directorio propio bajo \texttt{reports/} con su configuración, métricas, predicciones y el \textit{commit} de Git que lo generó, lo que permite auditar cualquier cifra de esta memoria hasta la ejecución que la produjo.
-    \item \textbf{Datos}: el trabajo se apoya íntegramente en el dataset público \textit{FreshRetailNet-50K} \cite{freshretailnet2025}, disponible en abierto, por lo que la reproducción del análisis no depende de datos propietarios ni de acuerdos de cesión.
-    \item \textbf{Elemento persistente}: el sistema está desplegado como instancia de demostración en un servidor propio, con el \textit{dashboard} operativo sobre los modelos entrenados. A corto plazo su función es servir de soporte a la defensa y de demostrador para terceros; a medio plazo, la arquitectura contenerizada permite trasladarlo a la infraestructura de cualquier organización interesada; y a largo plazo, las líneas de la Sección~\ref{sec:trabajo_futuro} marcan su evolución natural hacia un entorno productivo real.
-    \item \textbf{Beneficiarios}: los responsables de aprovisionamiento de \textit{retail} de frescos disponen de una metodología cuantificada (imputación de censura, previsión probabilística, \textit{Newsvendor} con restricciones) directamente trasladable a sus datos; y la comunidad académica dispone de una implementación de referencia que conecta \textit{Conformal Prediction} con la evaluación económica de inventario, un puente poco transitado en la literatura aplicada.
+    \item \textbf{Código y reproducibilidad}: la totalidad del código (pipeline de datos, motor de modelos, calibración conformal, decisión Newsvendor, API REST y cuadro de mandos) se encuentra versionada en un repositorio Git público\footnote{\url{https://github.com/ArtemMindlin/retail-demand-forecasting-system}}, con integración continua (verificación de estilo, tipos estáticos y una suite de tests con contratos formales de no fuga de información temporal en cada \textit{commit}). La arquitectura completa se despliega con un único comando mediante \texttt{docker-compose}, permitiendo reproducir los experimentos y obtener resultados idénticos sin configuración manual. Cada ejecución persiste además su configuración YAML, métricas, predicciones y el \textit{hash} de Git asociado bajo el directorio \texttt{reports/} y en el servidor de seguimiento MLflow.
+    \item \textbf{Datos}: el trabajo se apoya íntegramente en el dataset público \textit{FreshRetailNet-50K} \cite{freshretailnet2025}, disponible en abierto bajo licencia CC BY 4.0, por lo que la reproducción del análisis no depende de datos propietarios ni de acuerdos de confidencialidad.
+    \item \textbf{Elemento persistente y demostrador}: el sistema está desplegado como instancia funcional en un servidor propio, sirviendo tanto el cuadro de mandos interactivo como la API REST operacional (documentada bajo OpenAPI/Swagger) sobre los modelos entrenados. A corto plazo sirve de soporte interactivo para la defensa; a medio plazo, la contenerización facilita su despliegue en infraestructuras corporativas; y a largo plazo, las líneas de la Sección~\ref{sec:trabajo_futuro} marcan su evolución hacia un entorno productivo industrial.
+    \item \textbf{Transferencia y beneficiarios}: los responsables de aprovisionamiento de \textit{retail} disponen de una metodología cuantitativa integral (imputación de censura, previsión probabilística y \textit{Newsvendor} con restricciones de capacidad) directamente transferible a sus datos; y la comunidad académica cuenta con una implementación de referencia abierta que conecta \textit{Conformal Prediction} con la toma de decisiones económicas bajo incertidumbre.
 \end{itemize}
 
 \section{Sostenibilidad e Impacto Ambiental}
+\label{sec:sostenibilidad}
 
-El trabajo presenta una relación directa y cuantificada con el \textbf{ODS 12} (Producción y Consumo Responsables), y una relación indirecta con el \textbf{ODS 13} (Acción por el Clima), ambas a través de la reducción del sobrestock de productos frescos perecederos. La reducción empírica del 92{,}15\% en coste de inventario que aporta la corrección de la demanda censurada, bajo evaluación justa, implica directamente menos producto caducado en estantería y menor demanda de producción agrícola en origen. El análisis detallado del grado de relación con los 17 ODS se recoge en el Anexo~\ref{anx:ods}, conforme a los requisitos de la ETSINF-UPV.
-
-\section{Análisis de Impacto Ético, Social y Privacidad}
-Más allá de los resultados logísticos, el sistema se ha estructurado atendiendo a criterios
-de ética algorítmica, responsabilidad social corporativa y cumplimiento legal:
+El trabajo presenta una contribución directa y cuantificada a la sostenibilidad a través de la optimización de la cadena de suministro de alimentos perecederos:
 
 \begin{itemize}
-    \item \textbf{Ética de la Automatización y Explicabilidad}: El sistema se propone como una
-    herramienta de soporte a la decisión, no de sustitución del criterio humano. El uso de
-    \textbf{SHAP} para desglosar la contribución de cada feature a cada predicción, junto al
-    listado de excepciones que marca cada recomendación de riesgo con su causa (ausencia de
-    modelo por \textit{cold start}, deriva detectada, incertidumbre anómala o pedido extremo),
-    fomenta una colaboración humano-máquina transparente y auditable: el sistema declara dónde
-    tiene menos base para decidir en lugar de presentar todas sus salidas como equivalentes.
-    \item \textbf{Consumo Energético}: El entrenamiento de modelos globales de \textit{Gradient Boosting}
-    sobre 4,5 millones de observaciones requiere recursos computacionales no despreciables. No
-    obstante, la arquitectura MLOps de dos niveles (optimización mensual de hiperparámetros y
-    reentrenamiento diario ligero) minimiza el ciclo de cómputo intensivo, y el coste energético
-    acumulado es marginal frente a las emisiones que podría evitar una reducción del desperdicio
-    alimentario en escala industrial.
-    \item \textbf{Privacidad y Seguridad de Datos}: El dataset utilizado está debidamente
-    anonimizado, cumpliendo con los estándares europeos de protección de datos (GDPR). El sistema
-    opera sobre patrones agregados de venta diaria por tienda-producto, sin procesar información
-    personal de consumidores.
-    \item \textbf{Propiedad Intelectual}: \textit{FreshRetailNet-50K} \cite{freshretailnet2025}
-    se distribuye bajo licencia \textbf{CC BY 4.0}, que permite su uso y redistribución citando
-    a los autores originales, condición que esta memoria cumple mediante la referencia
-    bibliográfica. El código del sistema se publica bajo licencia \textbf{MIT} en el repositorio
-    citado en la Sección~\ref{sec:legado}, sin restricciones adicionales sobre su reutilización.
-    \item \textbf{Equidad Algorítmica}: el sistema no recibe ni condiciona sus predicciones con
-    atributos personales de clientes; los únicos identificadores que utiliza son de producto y
-    de tienda (Sección~\ref{sec:feature_engineering}). Existe, no obstante, un riesgo indirecto:
-    una tienda con historial corto o intermitente --por ejemplo, una apertura reciente en una
-    zona con menor densidad comercial-- recibe una calibración conformal menos precisa
-    (Sección~\ref{sec:conformal}) y, por tanto, un nivel de servicio sistemáticamente peor no por
-    decisión del sistema sino por escasez de datos. El identificador de tienda actúa aquí como
-    un \textit{proxy} indirecto de la zona que atiende. El trabajo no corrige este efecto --
-    mitigarlo exigiría datos socioeconómicos de la zona de cada tienda, que el dataset no
-    contiene-- pero conviene declararlo como una limitación a vigilar en cualquier despliegue
-    real, no solo como una propiedad estadística del modelo.
+    \item \textbf{ODS 12 (Producción y Consumo Responsables - Vinculación Alta):} Constituye el núcleo del impacto ambiental del proyecto. El desperdicio alimentario en la distribución europea genera costes millonarios y pérdidas masivas de biomasa. La reducción empírica del \textbf{$92{,}15\%$} en el coste de inventario obtenida mediante la corrección de demanda latente supervisada y la calibración conformal se traduce directamente en una drástica disminución del sobrestock, evitando que toneladas de producto fresco caduquen en tienda o almacén.
+    \item \textbf{ODS 13 (Acción por el Clima - Vinculación Media):} Actúa como externalidad positiva indirecta: ajustar los pedidos a la demanda real reduce la sobreproducción agrícola en origen, el consumo energético en transporte refrigerado y la huella de carbono asociada a la logística inversa de destrucción de excedentes.
+    \item \textbf{ODS 2 y ODS 9 (Hambre Cero e Innovación):} La elevación de la disponibilidad de producto ($97{,}50\%$ de \textit{fill rate}) mejora el abastecimiento minorista, mientras que el desarrollo de un pipeline MLOps abierto promueve infraestructuras tecnológicas reproducibles.
+\end{itemize}
+
+El análisis detallado y la matriz oficial de vinculación con los 17 ODS de la Agenda 2030 se recogen en el Anexo~\ref{anx:ods}, conforme a la normativa de la ETSINF-UPV.
+
+\section{Análisis de Impacto Ético, Social y Privacidad}
+\label{sec:impacto_etico}
+
+Más allá de los resultados logísticos, el sistema se ha estructurado atendiendo a criterios de ética algorítmica, responsabilidad social corporativa y el marco regulatorio europeo:
+
+\begin{itemize}
+    \item \textbf{Ética de la Automatización y Supervisión Humana (\textit{Human-in-the-Loop})}: En consonancia con las directrices de IA Confiable de la Comisión Europea \cite{eucommission2019aiethics} y el Reglamento Europeo de Inteligencia Artificial (\textit{EU AI Act}) \cite{euaiact2024}, el sistema se concibe estrictamente como una herramienta de apoyo a la decisión (DSS) y no como un mecanismo de sustitución ciega del criterio humano. El uso de \textbf{SHAP} para auditar la contribución de cada variable, junto al panel de gestión por excepciones que señala anomalías (deriva temporal, \textit{cold start} o pedidos atípicos), garantiza una colaboración humano-máquina transparente, donde el operador mantiene siempre el control final.
+
+    \item \textbf{Consumo Energético y Eficiencia Computacional}: El entrenamiento de modelos globales sobre millones de registros requiere recursos computacionales no despreciables. No obstante, la arquitectura MLOps desacoplada (búsqueda aperiódica de hiperparámetros y reentrenamiento semanal ligero de apenas $5{,}5$ segundos) minimiza el ciclo de cómputo intensivo, resultando en una huella de carbono marginal frente al volumen de emisiones y desperdicio alimentario que evita en la cadena logística.
+
+    \item \textbf{Privacidad y Cumplimiento RGPD}: El dataset \textit{FreshRetailNet-50K} está completamente anonimizado, satisfaciendo el Reglamento General de Protección de Datos (RGPD / GDPR). El pipeline procesa exclusivamente series agregadas de demanda física a nivel tienda-producto, sin almacenar, inferir ni tratar ningún dato de carácter personal de consumidores.
+
+    \item \textbf{Propiedad Intelectual y Licenciamiento Abierto}: \textit{FreshRetailNet-50K} \cite{freshretailnet2025} se distribuye bajo licencia \textbf{CC BY 4.0}, cuyos términos se satisfacen mediante la debida atribución bibliográfica. El código fuente desarrollado se publica íntegramente bajo licencia permisiva \textbf{MIT} en el repositorio del proyecto, facilitando su reutilización por la comunidad.
+
+    \item \textbf{Equidad Algorítmica y Sesgo Territorial}: El sistema no incorpora variables sociodemográficas ni atributos protegidos. No obstante, se advierte un riesgo indirecto de sesgo estructural: tiendas de reciente apertura o ubicadas en zonas con menor densidad comercial presentan historiales más cortos e intermitentes, lo que genera estratos conformales con mayor dispersión residual y, potencialmente, un nivel de servicio inferior por escasez de muestra. Reconocer esta limitación permite a los gestores monitorizar activamente estos puntos de venta periféricos y aplicar amortiguadores de inventario específicos.
 \end{itemize}
 
 \section{Limitaciones Metodológicas y del Sistema}
 \label{sec:limitaciones}
 
-El diseño e implementación del sistema presentan ciertas limitaciones y simplificaciones operativas, metodológicas y tecnológicas que es necesario advertir para contextualizar el alcance de los resultados:
+El diseño e implementación del sistema presentan ciertas simplificaciones operativas, metodológicas y tecnológicas que es necesario advertir para contextualizar el alcance de los resultados:
 
 \begin{itemize}
-    \item \textbf{Generalización y Diversidad de Paneles}: Todo el análisis se apoya en el dataset \textit{FreshRetailNet-50K} bajo un marco de censura sintética controlada. Validar la robustez del imputer y la cobertura conformal en paneles externos heterogéneos (como el dataset M5 de Walmart) constituye un paso metodológico necesario para demostrar la generalización del DSS ante patrones de demanda muy distintos.
-    \item \textbf{MLOps en Entorno Local}: La arquitectura Django y el cuadro de mandos se han desarrollado como un prototipo funcional local. La trazabilidad se apoya en un almacén de corridas MLflow con base de datos local, que sí registra de forma centralizada configuración, métricas y artefactos de cada ejecución, pero cuyo respaldo es un fichero SQLite sin réplica: suficiente para un panel de esta escala y un único operador, no para una organización con varios equipos concurrentes. Un entorno productivo corporativo real exigiría una infraestructura distribuida en la nube, el despliegue mediante orquestadores (Kubernetes), el uso de bases de datos de características en tiempo real (Feature Stores) y flujos CI/CD para el reentrenamiento y promoción automática en caliente tras alertas de drift.
+    \item \textbf{Decisión Newsvendor Desacoplada sin Arrastre de Estado}: La evaluación económica Newsvendor resuelve la cantidad de reposición de forma independiente en cada origen de decisión. No modela el arrastre dinámico de existencias sobrantes entre jornadas consecutivas, los tiempos de suministro estocásticos (\textit{lead time}) ni las restricciones de capacidad volumétrica de almacén o transporte.
+
+    \item \textbf{Perfiles de Coste Sintéticos frente a Contabilidad ERP}: Dado que el dataset público no incluye márgenes comerciales ni costes reales de merma y rotura por SKU, el sistema recurre a perfiles de coste normalizados ($c_u, c_o$). Aunque preservan la estructura económica del problema, la traslación a producción real exigirá conectar el Newsvendor con los costes contables del ERP corporativo.
+
+    \item \textbf{Granularidad Diaria en la Reconstrucción de Censura}: El módulo \texttt{Latent}\allowbreak\texttt{Demand}\allowbreak\texttt{Imputer} opera a nivel diario agregado: si una jornada registra horas de rotura, imputa la demanda del día completo. No realiza la reconstrucción quirúrgica hora a hora intra-día que permitiría el registro granular del dataset original.
+
+    \item \textbf{Supuesto de Intercambiabilidad en Conformal Prediction}: La garantía teórica de cobertura de la predicción conforme descansa en la intercambiabilidad entre las muestras de calibración y evaluación. En horizontes temporales afectados por derivas pronunciadas de demanda o catálogos de extrema intermitencia, se produce una leve pérdida de calibración condicional que los métodos estáticos no corrigen dinámicamente.
+
+    \item \textbf{Infraestructura de Despliegue y Seguridad Empresarial}: El sistema se encuentra actualmente desplegado como una instancia de demostración funcional accesible públicamente (mediante Docker Compose y proxy inverso), respaldada por una base de datos SQLite y almacenamiento de artefactos en volumen local. Si bien esto resulta idóneo para la validación académica y la defensa del proyecto, un entorno corporativo real exigiría confinar el acceso a la red privada corporativa (VPC/VPN) con autenticación federada (SSO/IAM), así como escalar la persistencia hacia bases de datos transaccionales distribuidas (PostgreSQL), almacenamiento de objetos en la nube (S3/GCS), orquestación en Kubernetes y \textit{Feature Stores} en tiempo real.
 \end{itemize}
 
 \section{Análisis de Riesgos}
@@ -117,20 +110,34 @@ Las limitaciones de la sección anterior describen lo que el trabajo no cubre. E
 \section{Relación del Trabajo con los Estudios Cursados}
 \label{sec:relacion_estudios}
 
-Este trabajo integra conocimientos de prácticamente todos los bloques formativos del Grado en Ciencia de Datos, y su desarrollo ha exigido coordinarlos sobre un problema real de principio a fin:
+Este trabajo articula las bases formativas adquiridas en el \textbf{Grado en Ciencia de Datos} de la Escola Tècnica Superior d'Enginyeria Informàtica (ETSINF-UPV), complementándolas con un esfuerzo sustancial de investigación y desarrollo de ingeniería autónomo:
 
 \begin{itemize}
-    \item \textbf{Análisis y comprensión de datos}: el análisis exploratorio del Capítulo~\ref{chap:analisis_datos} (caracterización de la intermitencia, la censura por \textit{stockouts} y la estacionalidad del panel) aplica directamente las competencias de \textit{Análisis Exploratorio de Datos}, \textit{Visualización} y \textit{Proyecto I: Comprensión de Datos}.
-    \item \textbf{Preparación e integración}: la construcción del panel balanceado, la ingeniería de variables con contrato causal y la imputación de demanda latente se apoyan en \textit{Gestión de Datos}, \textit{Bases de Datos} y \textit{Proyecto II: Integración y Preparación de Datos}.
-    \item \textbf{Modelización estadística y aprendizaje automático}: el núcleo predictivo (regresión cuantílica con \textit{Gradient Boosting}, evaluación por \textit{backtesting} y métricas probabilísticas) descansa sobre \textit{Modelos Descriptivos y Predictivos I y II} y sobre la base inferencial de \textit{Modelos Estadísticos para la Toma de Decisiones I y II}, de la que deriva también el marco de decisión bajo incertidumbre que fundamenta el modelo \textit{Newsvendor}.
-    \item \textbf{Optimización y decisión bajo incertidumbre}: la formulación del Newsvendor, la traducción de la distribución predicha en una cantidad de pedido y la búsqueda multiobjetivo de hiperparámetros conectan con \textit{Algorítmica} y \textit{Modelado y Simulación Continuos}.
-    \item \textbf{Ingeniería y despliegue}: la arquitectura de la aplicación web y la API operacional (Django, contenedores, proxy inverso) y su operación aplican las competencias de \textit{Programación}, \textit{Estructuras de Datos}, \textit{Fundamentos de Computadores y Sistemas Operativos} e \textit{Infraestructura para el Procesamiento de Datos}.
-    \item \textbf{Dimensión económica y de negocio}: la traducción del error predictivo a coste de inventario, el caso de uso logístico y el presupuesto del Capítulo~\ref{chap:presupuesto} se benefician de \textit{Fundamentos de Organización de Empresas} y \textit{Economía Digital}.
+    \item \textbf{Análisis y preparación de datos}: La caracterización de la intermitencia, estacionalidad y censura del dataset (Capítulo~\ref{chap:analisis_datos}) aplica los fundamentos de \textit{Análisis Exploratorio de Datos}, \textit{Visualización}, \textit{Gestión de Datos}, \textit{Bases de Datos} y las asignaturas de \textit{Proyecto I y II}.
+
+    \item \textbf{Modelización predictiva y estadística inferencial}: El ajuste de modelos globales de \textit{Gradient Boosting}, la regresión cuantílica y el marco probabilístico de decisión bajo incertidumbre que sustenta el \textit{Newsvendor} descansan sobre \textit{Modelos Descriptivos y Predictivos I y II} y \textit{Modelos Estadísticos para la Toma de Decisiones I y II}.
+
+    \item \textbf{Metodología de validación}: El diseño del \textit{backtesting} temporal sin fuga de información y el análisis conceptual de deriva (\textit{drift}) se apoyan en \textit{Evaluación, Despliegue y Monitorización de Modelos}.
+
+    \item \textbf{Dimensión de negocio y marco legal}: La traducción de predicciones a coste logístico, el presupuesto económico (Capítulo~\ref{chap:presupuesto}) y el análisis de impacto ético y RGPD (Sección~\ref{sec:impacto_etico}) aplican competencias de \textit{Fundamentos de Organización de Empresas}, \textit{Economía Digital} y \textit{Marco Profesional, Legal y Deontológico}.
 \end{itemize}
 
-No obstante, una parte sustancial del trabajo exigió aprendizaje autónomo más allá del plan de estudios: la \textit{Conformal Prediction} (y en particular su variante Mondrian), la literatura de imputación de demanda censurada, el ecosistema MLOps (promoción automática de modelos, detección de \textit{drift}) y el desarrollo del cuadro de mandos web. Este proceso evidencia la capacidad de aprendizaje permanente que el grado persigue como competencia de salida.
+\textbf{Aprendizaje autónomo e ingeniería de software}: Dado que el plan de estudios se orienta prioritariamente al modelado analítico, una parte determinante del proyecto exigió un aprendizaje autónomo avanzado más allá de las aulas:
+\begin{enumerate}
+    \item \textit{Conformal Prediction}: El estudio e implementación de la calibración conformal (y en particular su variante estratificada \textit{Mondrian}) para obtener intervalos con cobertura garantizada.
+    \item \textit{Tratamiento de la demanda censurada}: La asimilación de la literatura de imputación de demanda latente en retail para revertir el sesgo de rotura de stock.
+    \item \textit{Arquitectura web, APIs y servidores}: El desarrollo de la plataforma completa en \textbf{Django} con componentes dinámicos en \textbf{HTMX}, la especificación y documentación de la \textbf{API REST con OpenAPI/Swagger}, el empaquetado en contenedores \textbf{Docker Compose}, la configuración del servidor de producción (Nginx/Gunicorn), la suite de tests automatizados con contratos temporales en \textbf{pytest} y la integración del servidor de trazabilidad \textbf{MLflow}.
+\end{enumerate}
 
-En cuanto a las \textbf{competencias transversales} UPV, el trabajo pone en práctica de forma directa la \textit{comprensión e integración} de conocimientos de múltiples disciplinas sobre un mismo sistema; el \textit{análisis y resolución de problemas} mediante descomposición incremental (predicción $\rightarrow$ calibración $\rightarrow$ decisión $\rightarrow$ simulación) con decisiones justificadas y validadas; el \textit{pensamiento crítico}, reflejado en la verificación honesta de objetivos de la Sección~\ref{sec:resultados_kpis}, donde se reconocen explícitamente los KPIs no alcanzados y se diagnostica su causa; la \textit{planificación y gestión del tiempo}, con un desarrollo por fases dentro de las 300 horas de dedicación estimadas en el presupuesto; y la \textit{responsabilidad ética, medioambiental y profesional}, tratada en las secciones anteriores de este capítulo y en el Anexo~\ref{anx:ods}.
+En cuanto a las \textbf{competencias transversales institucionales de la UPV}, el trabajo pone en práctica:
+\begin{itemize}
+    \item \textbf{CT-01 (Comprensión e integración):} Coordinación de estadística matemática, algoritmos de aprendizaje, ingeniería web y logística en un único DSS.
+    \item \textbf{CT-03 (Análisis y resolución de problemas):} Descomposición modular y justificada del problema (imputación $\rightarrow$ predicción $\rightarrow$ calibración $\rightarrow$ decisión Newsvendor $\rightarrow$ simulación).
+    \item \textbf{CT-07 (Responsabilidad ética, medioambiental y profesional):} Análisis de sostenibilidad (ODS 12 y 13), estricto cumplimiento del RGPD, directrices del \textit{EU AI Act} y código abierto bajo licencia MIT.
+    \item \textbf{CT-09 (Pensamiento crítico):} Verificación empírica honesta, demostración de la insuficiencia del MAE frente al coste económico, diagnóstico del colapso conformal a escala reducida (Sección~\ref{sec:resultados_escala}) y declaración deliberada de no-conclusión en políticas de reentrenamiento por muestra insuficiente (Sección~\ref{sec:resultados_simulacion}).
+    \item \textbf{CT-10 (Aprendizaje permanente):} Capacidad para investigar e integrar tecnologías de frontera no impartidas en el grado.
+    \item \textbf{CT-11 (Planificación y gestión del tiempo):} Ejecución metódica del proyecto dentro de las 300 horas estimadas en el presupuesto.
+\end{itemize}
 
 \section{Líneas de Trabajo Futuro}
 \label{sec:trabajo_futuro}
@@ -180,7 +187,7 @@ La arquitectura modular desarrollada deja el camino preparado para futuras expan
     datos es suficiente.
 
     \item \textbf{Recuperación de Demanda Latente a Granularidad Horaria}: El módulo
-    \texttt{LatentDemandImputer} opera a nivel diario: si un día presenta \texttt{stockout\_hours} $>
+    \texttt{Latent}\allowbreak\texttt{Demand}\allowbreak\texttt{Imputer} opera a nivel diario: si un día presenta \texttt{stockout\_hours} $>
     0$, la imputación se aplica sobre la demanda agregada de ese día completo, independientemente de
     si el stockout duró 2 horas o 22. El dataset FreshRetailNet-50K contiene registros de ventas y
     estado de stock hora a hora, granularidad que el paper de referencia del dataset

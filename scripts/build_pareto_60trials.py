@@ -114,13 +114,16 @@ def main() -> None:
     ax2.legend(frameon=True, fontsize=9)
 
     fig.tight_layout()
-    fig.savefig(output_dir / "pareto_front_60trials.png")
-    fig.savefig(memoria_fig_dir / "pareto_front_60trials.png")
+    for path in [
+        output_dir / "pareto_front_60trials.pdf",
+        output_dir / "pareto_front_60trials.png",
+        memoria_fig_dir / "pareto_front_60trials.pdf",
+        memoria_fig_dir / "pareto_front_60trials.png",
+    ]:
+        fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
 
-    print(
-        f"Generated {output_dir / 'pareto_front_60trials.png'} and copied to memoria/figures successfully!"
-    )
+    print("Generated pareto_front_60trials.pdf and PNG successfully!")
 
 
 if __name__ == "__main__":

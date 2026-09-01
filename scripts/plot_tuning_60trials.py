@@ -78,100 +78,109 @@ def main() -> None:
     lgb_df.to_csv(output_dir / "tuning_lightgbm_60trials.csv", index=False)
     cat_df.to_csv(output_dir / "tuning_catboost_60trials.csv", index=False)
 
-    # Figure 1: Convergence and Trial Distribution (60 trials per backend)
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5), dpi=150)
-
-    # Subplot 1: Convergence Curve (Best Cost So Far)
-    ax1.plot(
-        lgb_df["trial"],
-        lgb_df["best_so_far"],
-        color="#3b82f6",
-        linewidth=2.5,
-        label="LightGBM (Mejor: 22.07)",
+    # Configure publication styling
+    plt.rcParams.update(
+        {
+            "font.size": 9.5,
+            "axes.labelsize": 10,
+            "axes.titlesize": 10.5,
+            "xtick.labelsize": 9,
+            "ytick.labelsize": 9,
+            "legend.fontsize": 8.8,
+            "figure.autolayout": True,
+        }
     )
+
+    # Figure: 2-Panel Tuning Analysis (Convergence + Out-of-Sample Stability)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.8, 2.85), dpi=300)
+
+    # Panel A: Convergence Curve in Selection (N=30 draws)
     ax1.scatter(
         lgb_df["trial"],
         lgb_df["cost"],
         color="#3b82f6",
         alpha=0.35,
-        s=25,
-        label="LightGBM (trials)",
-    )
-
-    ax1.plot(
-        cat_df["trial"],
-        cat_df["best_so_far"],
-        color="#f97316",
-        linewidth=2.5,
-        label="CatBoost (Mejor: 23.77)",
+        s=20,
+        edgecolors="none",
     )
     ax1.scatter(
         cat_df["trial"],
         cat_df["cost"],
         color="#f97316",
         alpha=0.35,
-        s=25,
-        label="CatBoost (trials)",
+        s=20,
+        edgecolors="none",
+    )
+    ax1.plot(
+        lgb_df["trial"],
+        lgb_df["best_so_far"],
+        color="#2563eb",
+        linewidth=2.2,
+        label=r"LightGBM (mín: $22{,}07$)",
+    )
+    ax1.plot(
+        cat_df["trial"],
+        cat_df["best_so_far"],
+        color="#ea580c",
+        linewidth=2.2,
+        label=r"CatBoost (mín: $23{,}77$)",
     )
 
-    ax1.set_xlabel("Número de Ensayo (Trial 1 a 60)", fontsize=11, fontweight="bold")
-    ax1.set_ylabel("Coste de Selección (In-Sample)", fontsize=11, fontweight="bold")
-    ax1.set_title("Convergencia del Tuning (60 Trials por Backend)", fontsize=12, fontweight="bold")
-    ax1.grid(True, linestyle=":", alpha=0.6)
-    ax1.legend(frameon=True)
+    ax1.set_xlabel("Número de ensayo (Optuna)", fontweight="semibold")
+    ax1.set_ylabel("Coste en selección (u.m.)", fontweight="semibold")
+    ax1.set_title("A. Convergencia en Selección ($N=30$)", fontweight="bold")
+    ax1.set_xlim(0, 61)
+    ax1.set_ylim(21.5, 32.5)
+    ax1.set_xticks([1, 15, 30, 45, 60])
+    ax1.grid(True, linestyle=":", alpha=0.55)
+    ax1.legend(loc="upper right", framealpha=0.92, edgecolor="#cbd5e1")
 
-    # Subplot 2: Out-of-Sample Validation Verdict vs. Defaults
-    backends = ["LightGBM", "CatBoost"]
-    defaults = [44.00, 33.26]
-    winners = [34.03, 29.93]
-    gains = [-22.66, -10.01]
+    # Panel B: In-Sample vs Out-of-Sample vs Defaults (N=25 draws)
+    stages = ["Selección\n(In-Sample)", "Validación\n(Out-Sample)", "Por Defecto\n(Baseline)"]
+    import numpy as np
 
-    x = [0, 1]
-    width = 0.32
-    ax2.bar(
-        [p - width / 2 for p in x],
-        defaults,
-        width,
-        label="Configuración por defecto",
-        color="#94a3b8",
-    )
-    ax2.bar(
-        [p + width / 2 for p in x],
-        winners,
-        width,
-        label="Ganador del Tuning (60 trials)",
-        color="#10b981",
-    )
+    x = np.arange(len(stages))
+    width = 0.35
 
-    ax2.set_ylabel(
-        "Coste de Inventario en Validación (Out-of-Sample)", fontsize=11, fontweight="bold"
-    )
-    ax2.set_title("Veredicto Final en Validación (25 Extracciones)", fontsize=12, fontweight="bold")
+    lgb_vals = [22.07, 34.03, 44.00]
+    cat_vals = [23.77, 29.93, 33.26]
+
+    rects1 = ax2.bar(x - width / 2, lgb_vals, width, label="LightGBM", color="#2563eb", alpha=0.88)
+    rects2 = ax2.bar(x + width / 2, cat_vals, width, label="CatBoost", color="#ea580c", alpha=0.88)
+
+    ax2.set_ylabel("Coste logístico de inventario (u.m.)", fontweight="semibold")
+    ax2.set_title("B. Estabilidad Fuera de Muestra ($N=25$)", fontweight="bold")
     ax2.set_xticks(x)
-    ax2.set_xticklabels(backends, fontsize=11, fontweight="bold")
-    ax2.grid(axis="y", linestyle=":", alpha=0.6)
-    ax2.legend(frameon=True)
+    ax2.set_xticklabels(stages, fontweight="semibold")
+    ax2.set_ylim(0, 52)
+    ax2.grid(axis="y", linestyle=":", alpha=0.55)
+    ax2.legend(loc="upper left", framealpha=0.92, edgecolor="#cbd5e1")
 
-    # Annotate bars
-    for i in range(2):
-        ax2.annotate(
-            f"{gains[i]:.1f}%\n(IC95)",
-            (x[i] + width / 2, winners[i] / 2),
-            ha="center",
-            va="center",
-            color="white",
-            fontweight="bold",
-            fontsize=10,
-        )
+    for rects in [rects1, rects2]:
+        for rect in rects:
+            height = rect.get_height()
+            ax2.annotate(
+                f"{height:.1f}",
+                xy=(rect.get_x() + rect.get_width() / 2, height),
+                xytext=(0, 2),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=8.5,
+                fontweight="bold",
+            )
 
-    fig.tight_layout()
-    fig.savefig(output_dir / "tuning_comparison_60trials.png")
-    fig.savefig(memoria_fig_dir / "tuning_comparison_60trials.png")
+    # Save vector PDF and PNG
+    for path in [
+        output_dir / "tuning_comparison_60trials.pdf",
+        output_dir / "tuning_comparison_60trials.png",
+        memoria_fig_dir / "tuning_comparison_60trials.pdf",
+        memoria_fig_dir / "tuning_comparison_60trials.png",
+    ]:
+        fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
 
-    print(
-        f"Generated {output_dir / 'tuning_comparison_60trials.png'} and copied to memoria/figures successfully!"
-    )
+    print("Generated tuning_comparison_60trials.pdf and PNG successfully!")
 
 
 if __name__ == "__main__":

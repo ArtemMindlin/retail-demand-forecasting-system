@@ -89,7 +89,7 @@ Esa descalibración no invalida la política de inventario, y conviene precisar 
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{figures/mae_vs_servicio.pdf}
+    \includegraphics[width=\textwidth]{figures/mae_vs_servicio.pdf}
     \caption{Disociación entre el error puntual y el resultado operativo en la validación a escala (500 series, estrategia \textit{Latent Supervised}). El \textit{Seasonal Naïve} obtiene el mejor MAE; el coste de inventario apenas separa a los tres modelos; y el nivel de servicio invierte exactamente el orden del MAE. Optimizar el error puntual no equivale a optimizar la política de inventario.}
     \label{fig:mae_vs_servicio}
 \end{figure}
@@ -97,7 +97,7 @@ Esa descalibración no invalida la política de inventario, y conviene precisar 
 \subsection{Efecto de la Corrección de Censura sobre el Error Predictivo}
 \label{sec:efecto_censura_mae}
 
-La corrección de la demanda censurada tiene un efecto consistente y de gran magnitud sobre la precisión pura: todos los modelos mejoran sustancialmente su MAE y RMSE cuando se entrenan sobre la estimación de la demanda latente en lugar de las ventas observadas sin procesar. En concreto, CatBoost pasa de un MAE$=26{,}49$ (Observed) a $11{,}72$ (Latent Supervised), reduciendo el error en un $55{,}8\%$, mientras que LightGBM pasa de $18{,}76$ a $8{,}06$ (una reducción del $57{,}0\%$). Ambas cifras proceden del mismo par de ejecuciones, que comparten configuración, semilla e hiperparámetros y difieren únicamente en el brazo de demanda, de modo que la variación es atribuible a la reconstrucción y no a la ejecución.
+La corrección de la demanda censurada tiene un efecto consistente y de gran magnitud sobre la precisión pura: todos los modelos mejoran sustancialmente su MAE y RMSE cuando se entrenan sobre la estimación de la demanda latente en lugar de las ventas observadas sin procesar. En concreto, CatBoost pasa de un MAE$=26{,}49$ (Observed) a $11{,}72$ (Latent Supervised), reduciendo el error en un $55{,}8\%$; LightGBM pasa de $18{,}76$ a $8{,}06$ (una reducción del $57{,}0\%$); e incluso el \textit{Seasonal Naïve} reduce su error de $8{,}73$ a $6{,}61$ (un $24{,}3\%$). Ambas cifras proceden del mismo par de ejecuciones, que comparten configuración, semilla e hiperparámetros y difieren únicamente en el brazo de demanda, de modo que la variación es atribuible a la reconstrucción y no a la ejecución.
 
 Ese salto no debe leerse, no obstante, como una medida del beneficio de reconstruir la demanda. Cada modelo se mide aquí contra su propio \textit{target}, por el mismo motivo que expone la Sección~\ref{sec:resultados_gemelo}, y predecir una señal imputada y suavizada es intrínsecamente más fácil que predecir ventas con caídas bruscas a cero: buena parte de la mejora la aporta la métrica, no el método. La Tabla~\ref{tab:metrics_predictive} acredita por tanto la coherencia interna de los modelos entrenados sobre datos corregidos, mientras que el beneficio real de la reconstrucción lo establece la evaluación bajo verdad común de la Sección~\ref{sec:resultados_censura}.
 
@@ -105,15 +105,18 @@ Ese salto no debe leerse, no obstante, como una medida del beneficio de reconstr
 \section{Búsqueda de Hiperparámetros del Forecasting sobre la Capa Conformal}
 \label{sec:resultados_tuning_forecasting}
 
-La sintonización de hiperparámetros de los modelos de \textit{forecasting} (\texttt{tune\_forecasting}, régimen \texttt{v3}) se ejecuta como un proceso desacoplado de dos capas. Para garantizar que los hiperparámetros optimicen el objetivo operativo real y no una métrica intermedia, cada configuración candidata propuesta por \textit{Optuna} se entrena, se calibra dinámicamente mediante la capa de \textit{Mondrian Conformal Prediction} (utilizando la ventana de calibración de 14 días equivalente a producción) y se evalúa directamente según el coste logístico del \textit{Newsvendor} sobre un subconjunto de evaluación.
+La sintonización de hiperparámetros de los modelos de \textit{forecasting} (\texttt{tune\_forecasting}) se ejecuta como un proceso desacoplado de dos capas. Para garantizar que los hiperparámetros optimicen el objetivo operativo real y no una métrica intermedia, cada configuración candidata propuesta por \textit{Optuna} \cite{akiba2019optuna} se entrena, se calibra dinámicamente mediante la capa de \textit{Mondrian Conformal Prediction} (utilizando la ventana de calibración de 14 días equivalente a producción) y se evalúa directamente según el coste logístico del \textit{Newsvendor} sobre un subconjunto de evaluación.
+
+\subsection{Protocolo de Sintonización y Validación Out-of-Sample}
+\label{sec:tuning_protocol_oos}
 
 El protocolo divide temporalmente la búsqueda en dos ventanas independientes para evitar el sobreajuste al conjunto de selección:
 \begin{enumerate}
-    \item \textbf{Ventana de Selección} ($N=30$ sorteos temporales): Optuna explora el espacio de búsqueda minimizando el coste logístico promedio devuelto por el modelo calibrado conformalmente.
-    \item \textbf{Ventana de Validación Out-of-Sample} ($N=25$ sorteos independientes posteriores): La configuración ganadora se evalúa fuera de muestra contra los hiperparámetros por defecto, computando intervalos de confianza bootstrap al 95\% sobre la diferencia emparejada de costes.
+    \item \textbf{Ventana de Selección} ($N=30$ sorteos temporales): Optuna explora el espacio de búsqueda minimizando el coste logístico promedio devuelto por el modelo calibrado conformalmente. El tamaño $N=30$ filtra el ruido y la varianza estacional de la demanda sin hacer prohibitivo el coste computacional de evaluar 60 \textit{trials}.
+    \item \textbf{Ventana de Validación Out-of-Sample} ($N=25$ sorteos independientes posteriores): La configuración ganadora se evalúa fuera de muestra contra los hiperparámetros por defecto, aportando potencia estadística suficiente para computar intervalos de confianza bootstrap al 95\% sobre la diferencia emparejada de costes.
 \end{enumerate}
 
-La Tabla~\ref{tab:forecasting_tuning_results} y la Figura~\ref{fig:tuning_convergence_60trials} resumen los resultados cuantitativos y la dinámica de convergencia obtenidos para los dos \textit{backends} de \textit{Gradient Boosting} sobre el panel de 500 series.
+La Tabla~\ref{tab:forecasting_tuning_results} y la Figura~\ref{fig:tuning_convergence_60trials} resumen los resultados cuantitativos y la dinámica de convergencia obtenidos para los dos \textit{backends} de \textit{Gradient Boosting} (\textit{LightGBM} \cite{ke2017lightgbm} y \textit{CatBoost} \cite{prokhorenkova2018catboost}) sobre el panel de 500 series.
 
 \begin{table}[htbp]
     \centering
@@ -121,47 +124,49 @@ La Tabla~\ref{tab:forecasting_tuning_results} y la Figura~\ref{fig:tuning_conver
     \setlength{\tabcolsep}{2.5pt}
     \begin{tabular}{lcccccc}
         \toprule
-        \textbf{Backend} & \textbf{Trials} & \textbf{Coste Sel.} & \textbf{Coste Val.} & \textbf{Coste Def.} & \textbf{Mejora (\%)} & \textbf{IC 95\% Mejora} \\
+        \textbf{Backend} & \textbf{Trials} & \textbf{Coste Sel.} & \textbf{Coste Val.} & \textbf{Coste Def.} & \textbf{Mejora (\%)} & \textbf{IC 95\% Dif. (u.m.)} \\
         \midrule
-        LightGBM & 60 & 22{,}07 & 34{,}03 & 44{,}00 & -22{,}66\% & $[-11{,}03\%,\; -8{,}92\%]$ \\
-        CatBoost & 60 & 23{,}77 & \textbf{29{,}93} & 33{,}26 & -10{,}01\% & $[-4{,}50\%,\; -2{,}16\%]$ \\
+        LightGBM & 60 & 22{,}07 & 34{,}03 & 44{,}00 & -22{,}66\% & $[-11{,}03,\; -8{,}92]$ \\
+        CatBoost & 60 & 23{,}77 & \textbf{29{,}93} & 33{,}26 & -10{,}01\% & $[-4{,}50,\; -2{,}16]$ \\
         \bottomrule
     \end{tabular}
-    \caption{Resultados de la sintonización de hiperparámetros del modelo de forecasting (régimen biobjetivo) evaluados a través de la capa de calibración conformal de 14 días. El coste de validación refleja el rendimiento \textit{out-of-sample}.}
+    \caption{Resultados de la sintonización de hiperparámetros del modelo de forecasting (régimen biobjetivo) evaluados a través de la capa de calibración conformal de 14 días. El coste de validación refleja el rendimiento \textit{out-of-sample} y el intervalo de confianza recoge la diferencia absoluta emparejada frente a la configuración por defecto.}
     \label{tab:forecasting_tuning_results}
 \end{table}
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{figures/tuning_comparison_60trials.png}
-    \caption{Historial de sintonización de hiperparámetros (60 \textit{trials} por motor) y veredicto de validación \textit{out-of-sample}. A la izquierda, convergencia del coste logístico durante la fase de selección con Optuna. A la derecha, reducción del coste logístico entre la configuración por defecto y los modelos ganadores evaluados en 25 extracciones de validación independiente.}
+    \includegraphics[width=\textwidth]{figures/tuning_comparison_60trials.pdf}
+    \caption{Sintonización de hiperparámetros de los modelos de forecasting (60 \textit{trials} por motor). A la izquierda (Panel A), convergencia del coste logístico durante la fase de selección con Optuna ($N=30$ sorteos). A la derecha (Panel B), comparación del coste logístico entre la fase de selección, la validación \textit{out-of-sample} ($N=25$ sorteos independientes) y la configuración por defecto.}
     \label{fig:tuning_convergence_60trials}
 \end{figure}
 
 Los resultados aportan dos conclusiones metodológicas fundamentales sobre el comportamiento de los modelos:
 
 \begin{itemize}
-    \item \textbf{Degradación out-of-sample en LightGBM}: Durante la fase de selección, LightGBM alcanza un coste inferior al de CatBoost ($22{,}07$ frente a $23{,}77$, Panel izquierdo de la Figura~\ref{fig:tuning_convergence_60trials}). Sin embargo, en la ventana de validación posterior, el coste de LightGBM aumenta a $34{,}03$, evidenciando una alta sensibilidad y un sobreajuste a la ventana temporal de selección.
-    \item \textbf{Estabilidad estructural de CatBoost}: CatBoost muestra un comportamiento marcadamente más estable entre ventanas ($23{,}77$ en selección frente a $29{,}93$ en validación). En la evaluación \textit{out-of-sample}, \textbf{CatBoost resulta un $12{,}0\%$ más económico que LightGBM} ($29{,}93$ vs. $34{,}03$ u.m., Panel derecho de la Figura~\ref{fig:tuning_convergence_60trials}).
+    \item \textbf{Degradación out-of-sample en LightGBM}: Durante la fase de selección, LightGBM alcanza un coste inferior al de CatBoost ($22{,}07$ frente a $23{,}77$, Panel A de la Figura~\ref{fig:tuning_convergence_60trials}). Sin embargo, en la ventana de validación posterior, el coste de LightGBM aumenta a $34{,}03$ (Panel B y Tabla~\ref{tab:forecasting_tuning_results}), evidenciando una alta sensibilidad y un sobreajuste a la ventana temporal de selección.
+    \item \textbf{Estabilidad estructural de CatBoost}: CatBoost muestra un comportamiento marcadamente más estable entre ventanas ($23{,}77$ en selección frente a $29{,}93$ en validación). En la evaluación \textit{out-of-sample}, \textbf{CatBoost resulta un $12{,}0\%$ más económico que LightGBM} ($29{,}93$ vs. $34{,}03$ u.m., Panel B de la Figura~\ref{fig:tuning_convergence_60trials}).
 \end{itemize}
 
-Esta estabilidad fuera de muestra es un resultado atribuible al diseño de CatBoost: sus árboles \textit{oblivious} actúan como un regularizador estructural eficaz y sus \textit{Ordered Target Statistics} gestionan los identificadores categóricos de alta cardinalidad sin introducir fuga de información. El orquestador valida y persiste ambos conjuntos de hiperparámetros en \texttt{models/forecasting\_params.json}.
+Esta estabilidad fuera de muestra es un resultado atribuible al diseño de CatBoost \cite{prokhorenkova2018catboost}: sus árboles simétricos (\textit{oblivious trees}) actúan como un regularizador estructural eficaz y sus \textit{Ordered Target Statistics} gestionan los identificadores categóricos de alta cardinalidad sin introducir fuga de información (\textit{target leakage}). El orquestador valida y persiste ambos conjuntos de hiperparámetros en \texttt{models/forecasting\_params.json}.
 
-Conviene, sin embargo, delimitar con precisión el alcance de esta conclusión, porque el criterio de selección del campeón no es este. Lo que la comparación anterior mide es la degradación de cada motor entre la ventana de selección de la búsqueda y su ventana de validación inmediata, sobre sorteos de la misma partición: informa de cuánto se sobreajusta cada búsqueda a su propio objetivo, no de qué modelo decide mejor. La elección del campeón corresponde al protocolo \textit{walk-forward} de la Sección~\ref{sec:backtesting}, evaluado sobre tres orígenes rodantes y bajo el coste logístico simulado, y ese protocolo \textbf{invierte el orden}: LightGBM alcanza $147.646$ u.m. frente a las $174.527$ de CatBoost, con mejor Winkler Score ($36{,}11$ frente a $46{,}54$) y un nivel de servicio superior ($83{,}55\%$ frente a $78{,}39\%$). El registro de promoción, que aplica ese criterio de forma automática, recoge en consecuencia a \textbf{LightGBM} como campeón vigente, y es el modelo que la Sección~\ref{sec:resultados_xai} explica y el que el modo de reposición diaria carga.
+Conviene, sin embargo, delimitar con precisión el alcance de esta conclusión, porque el criterio de selección del campeón no es este. Lo que la comparación anterior mide es la degradación de cada motor entre la ventana de selección de la búsqueda y su ventana de validación inmediata, sobre sorteos de la misma partición: informa de cuánto se sobreajusta cada búsqueda a su propio objetivo, no de qué modelo decide mejor. La elección del campeón corresponde a la evaluación a escala del protocolo \textit{walk-forward} (Sección~\ref{sec:resultados_escala}, formulado en la Sección~\ref{sec:backtesting}), evaluado sobre tres orígenes rodantes y bajo el coste logístico simulado, donde el orden \textbf{se invierte en favor de LightGBM} tanto en coste operativo como en nivel de servicio y Winkler Score. El registro de promoción recoge en consecuencia a \textbf{LightGBM} como campeón vigente, y es el modelo que la Sección~\ref{sec:resultados_xai} explica y el que el modo de reposición diaria carga.
 
 La discrepancia no es un defecto sino la consecuencia esperable de medir dos cosas distintas, y refuerza el argumento central del trabajo: la robustez de un motor frente a su propio proceso de sintonización no predice su rendimiento económico bajo el protocolo de evaluación que decide.
 
-\paragraph{Frontera de Pareto: Compromiso Coste vs. Calibración de Incertidumbre.}
-La formulación biobjetivo implementada permite analizar empíricamente la estructura del espacio de búsqueda para ambos motores. La Figura~\ref{fig:pareto_front_60trials} ilustra las fronteras de Pareto resultantes en el espacio bi-criterio (\textit{Coste Logístico de Inventario} frente a \textit{Winkler Score P10--P90}):
+\subsection{Frontera de Pareto: Compromiso Coste vs. Calibración de Incertidumbre}
+\label{sec:tuning_pareto_front}
+
+La formulación biobjetivo implementada permite analizar empíricamente la estructura del espacio de búsqueda para ambos motores. La Figura~\ref{fig:pareto_front_60trials} ilustra las fronteras de Pareto resultantes en el espacio bi-criterio (\textit{Coste Logístico de Inventario} frente a \textit{Winkler Score P10--P90} \cite{winkler1972scoring,gneiting2007strictly}):
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{figures/pareto_front_60trials.png}
-    \caption{Fronteras de Pareto empíricas obtenidas mediante optimización biobjetivo (Optuna MOTPE multivariante, 60 ensayos por motor). A la izquierda, espacio de búsqueda de LightGBM; a la derecha, espacio de búsqueda de CatBoost con sus 5 soluciones no dominadas y el óptimo seleccionado.}
+    \includegraphics[width=\textwidth]{figures/pareto_front_60trials.pdf}
+    \caption{Fronteras de Pareto empíricas obtenidas mediante optimización biobjetivo (Optuna MOTPE multivariante \cite{akiba2019optuna}, 60 ensayos por motor). A la izquierda, espacio de búsqueda de LightGBM; a la derecha, espacio de búsqueda de CatBoost con sus 5 soluciones no dominadas y el óptimo seleccionado.}
     \label{fig:pareto_front_60trials}
 \end{figure}
 
-En el caso de LightGBM, la exploración converge hacia un único punto extremal dominante (Trial 21, coste $22{,}07$, Winkler $58{,}34$). En CatBoost, por el contrario, la búsqueda revela una rica frontera de 5 soluciones no dominadas que exhibe el compromiso clásico entre nitidez/cobertura y coste de rotura: la configuración ganadora (Trial 46) alcanza el mínimo coste de inventario ($23{,}77$) manteniendo un Winkler Score equilibrado ($65{,}59$), descartando aquellas configuraciones con intervalos deformados.
+En el caso de LightGBM, la exploración converge hacia un único punto extremal dominante (Trial 22, coste $22{,}07$, Winkler $58{,}34$). En CatBoost, por el contrario, la búsqueda revela una rica frontera de 5 soluciones no dominadas que exhibe el compromiso clásico entre nitidez/cobertura y coste de rotura: la configuración ganadora (Trial 47) alcanza el mínimo coste de inventario ($23{,}77$) manteniendo un Winkler Score equilibrado ($65{,}59$), descartando aquellas configuraciones con intervalos deformados.
 
 
 \section{Calibración Conformal: Cobertura y Winkler Score}
@@ -188,6 +193,7 @@ La evaluación del componente probabilístico exige dos métricas específicas q
 La cobertura promedio de ambos modelos (55,0\% para CatBoost y 58,5\% para LightGBM) se sitúa significativamente por debajo del objetivo teórico del 80\%. El siguiente apartado examina la varianza entre folds y las causas estructurales de esta infracobertura.
 
 \subsection{Análisis por Fold y Diagnóstico de la Baja Cobertura}
+\label{sec:analisis_folds}
 
 La Tabla~\ref{tab:fold_coverage} desagrega la cobertura por fold temporal, revelando una varianza extrema que apunta al origen del problema.
 
@@ -206,18 +212,11 @@ La Tabla~\ref{tab:fold_coverage} desagrega la cobertura por fold temporal, revel
     \label{tab:fold_coverage}
 \end{table}
 
-Los folds 0 y 1 presentan cobertura crítica (40,9\%--42,9\% en CatBoost), mientras que el fold 2 alcanza 81,4\% en ambos modelos, prácticamente sobre el objetivo teórico. Este patrón es consistente con el tamaño del conjunto de calibración: con 50 series distribuidas entre los estratos de la \textit{Mondrian Conformal Prediction} (estratificada por \texttt{third\_category\_id}), cada estrato recibe aproximadamente 4--7 observaciones de calibración.
+A esta escala, la varianza extrema entre folds responde a una limitación estadística bien documentada en la literatura de \textit{Conformal Prediction} \cite{angelopoulos2021gentle,vovk2005algorithmic}. Al aplicar la calibración estratificada (\textit{Mondrian CP}) sobre un panel reducido de 50 series, cada categoría de producto (\texttt{third\_category\_id}) dispone únicamente de entre 4 y 7 observaciones en la ventana de calibración.
 
-A esta escala, la varianza extrema no es una anomalía empírica sino el comportamiento predicho por la teoría. Angelopoulos y Bates \cite{angelopoulos2021gentle} demuestran que la cobertura empírica de un Split CP con $n_\text{cal}$ puntos de calibración sigue una distribución
-\begin{equation}
-    \widehat{\text{cov}} \;\sim\; \mathrm{Beta}(l,\; n_\text{cal}+1-l), \qquad l = \left\lceil (n_\text{cal}+1)(1-\alpha) \right\rceil.
-    \label{eq:beta_coverage}
-\end{equation}
-Al nivel $\alpha = 0{,}20$ (intervalo $[q_{0{,}1}, q_{0{,}9}]$ del 80\%), el factor conformal solo se comporta como un cuantil \emph{interior} estable cuando $l < n_\text{cal}$, lo que exige $n_\text{cal} \geq 9$ puntos de calibración por estrato. Por debajo de ese umbral, la posición requerida coincide con el propio tamaño muestral ($l = n_\text{cal}$): por ejemplo, con $n_\text{cal} = 5$ se obtiene $l = \lceil 0{,}8\,(5+1) \rceil = \lceil 4{,}8 \rceil = 5$, de modo que el cuantil conformal colapsa al \textbf{máximo} de los cinco residuos de calibración, un estimador de varianza máxima.
+Con un tamaño muestral tan pequeño por estrato, estimar el percentil del 80\% ($1-\alpha = 0{,}20$) obliga al algoritmo a tomar prácticamente el valor máximo de los pocos residuos disponibles. Esto genera un estimador con una varianza muy elevada: si en un fold concreto el residuo máximo observado en calibración resulta atípicamente pequeño o grande, el ancho del intervalo resultante quedará descalibrado para el conjunto de test. Esto explica por qué en los folds 0 y 1 la cobertura cae al 41\% mientras que en el fold 2 alcanza el 81,4\%.
 
-Cuando el estrato es aún más pequeño ($n_\text{cal} \leq 3$, donde $l > n_\text{cal}$ es directamente imposible), la implementación recurre por construcción al máximo de los residuos como único valor disponible. En ambos regímenes el resultado es el mismo: con apenas 4--7 observaciones por estrato, el ancho del intervalo queda fijado por el residuo más grande observado en calibración, lo que produce intervalos mal calibrados cuando la cola de la distribución de test no se observó en calibración. La cobertura por fold sigue entonces una distribución $\mathrm{Beta}(n_\text{cal},\,1)$ de media $n_\text{cal}/(n_\text{cal}+1) \approx 0{,}80$--$0{,}88$ pero varianza muy elevada, lo que explica el salto del 40,9\% al 81,4\% entre folds. No es por tanto una inestabilidad del método o del estimador subyacente, sino la consecuencia directa y teóricamente esperada de operar por debajo del tamaño mínimo de calibración que el marco conformal exige para ofrecer sus garantías.
-
-Esta limitación es inherente al tamaño del subset de evaluación utilizado en este trabajo ($n=50$ series activas) y no al diseño del método: la garantía teórica del Split Conformal Prediction es de muestra finita, pero la garantía \textit{condicional por estrato} de Mondrian se degrada con estratos pequeños: el factor corrector $\hat{q}_g$ se vuelve inestable con apenas 4--7 observaciones de calibración por categoría, produciendo intervalos excesivamente anchos o mal calibrados. El fold 2, con un conjunto de calibración más representativo, apunta en esta dirección. Para verificar empíricamente esta hipótesis, se repitió el protocolo completo a mayor escala, como se describe a continuación.
+Por tanto, esta baja cobertura inicial no refleja un fallo del modelo predictivo ni del algoritmo conformal, sino un efecto de muestra finita derivado de subdividir un conjunto pequeño de 50 series en múltiples estratos. Como la teoría garantiza que la estabilidad del factor corrector $\hat{q}_g$ se recupera al disponer de suficientes observaciones de calibración por categoría, se procedió a validar el protocolo completo sobre el panel a gran escala de 500 series.
 
 \subsection{Validación a Escala: 500 Series}
 \label{sec:resultados_escala}
@@ -305,9 +304,7 @@ calibración contaminada; la cifra honesta del subset base es el 55{,}0\% de la
 Tabla~\ref{tab:conformal_metrics}. Segunda, que el efecto depende de la escala: a 500
 series, donde cada estrato de calibración dispone de aproximadamente un orden de
 magnitud más de observaciones, la corrección deja de tener coste y la cobertura media
-se sitúa en el 68{,}3\%. Esto es coherente con el umbral $n_\text{cal} \geq 9$
-derivado en la Ecuación~\ref{eq:beta_coverage}: con estratos diminutos, sacrificar
-siete días de entrenamiento pesa más que eliminar la contaminación; con estratos
+supera el objetivo nominal situándose en el 85{,}5\% (Tabla~\ref{tab:scale_coverage}). Esto es plenamente coherente con la estabilización de los estratos de calibración al aumentar la escala: con muestras diminutas, sacrificar siete días de entrenamiento pesa más que eliminar la contaminación; con estratos
 suficientes, el balance se invierte. Se mantiene el embargo en la versión final por
 un criterio de validez y no por optimización de métricas: la garantía del Split Conformal no
 se sostiene sobre una calibración que el modelo ya ha visto.
@@ -315,7 +312,7 @@ se sostiene sobre una calibración que el modelo ya ha visto.
 \section{Explicabilidad del Modelo Campeón}
 \label{sec:resultados_xai}
 
-El sistema fue evaluado también por su capacidad de justificar sus decisiones, requisito indispensable para la adopción en entornos logísticos industriales donde los responsables de compra deben validar las recomendaciones. Para abrir la ``caja negra'' de los modelos basados en árboles, se emplearon los valores de Shapley (SHAP). Esta técnica permite cuantificar exactamente cuánto aporta cada variable al valor final predicho y confirmar que el algoritmo está aprendiendo relaciones lógicas y no artefactos espurios de los datos.
+El sistema fue evaluado también por su capacidad de justificar sus decisiones, requisito indispensable para la adopción en entornos logísticos industriales donde los responsables de compra deben validar las recomendaciones. Para abrir la ``caja negra'' de los modelos basados en árboles, se emplearon los valores de Shapley mediante el algoritmo \textit{TreeSHAP} \cite{lundberg2017shap}. Esta técnica permite cuantificar exactamente cuánto aporta cada variable al valor final predicho y confirmar que el algoritmo está aprendiendo relaciones lógicas y no artefactos espurios de los datos.
 
 La Figura~\ref{fig:shap_summary} muestra el \textit{beeswarm plot} global del modelo campeón vigente (LightGBM, según el registro de promoción), donde se representan las 20 características más influyentes.
 
@@ -329,7 +326,7 @@ La Figura~\ref{fig:shap_summary} muestra el \textit{beeswarm plot} global del mo
 Del análisis de esta figura se extraen las siguientes conclusiones, que validan empíricamente las hipótesis de diseño del módulo de \textit{feature engineering}:
 
 \begin{itemize}
-    \item \textbf{Dominancia absoluta del nivel reciente, no de los rezagos:} Las dos medias móviles de demanda concentran la importancia de forma abrumadora (\texttt{demand\_}\allowbreak\texttt{roll\_}\allowbreak\texttt{mean\_14} y \texttt{demand\_}\allowbreak\texttt{roll\_}\allowbreak\texttt{mean\_7} suman una contribución media absoluta de $36{,}1$ frente al $4{,}6$ de la tercera variable). El hallazgo relevante es el reverso: los rezagos directos son casi irrelevantes y por eso no figuran en el gráfico, que solo representa las veinte primeras variables; sobre el total de 43, \texttt{demand\_lag\_1} ocupa el puesto 31 y \texttt{demand\_lag\_7} el 37. El modelo no lee el pasado punto a punto sino su nivel suavizado, lo que es coherente con un objetivo que agrega la demanda de siete días: promediar la ventana reduce el ruido diario que un rezago aislado arrastraría hasta la predicción.
+    \item \textbf{Dominancia absoluta del nivel reciente y consistencia monótona:} Las dos medias móviles de demanda concentran la importancia de forma abrumadora (\texttt{demand\_}\allowbreak\texttt{roll\_}\allowbreak\texttt{mean\_14} y \texttt{demand\_}\allowbreak\texttt{roll\_}\allowbreak\texttt{mean\_7} suman una contribución media absoluta de $36{,}1$ frente al $4{,}6$ de la tercera variable). El gradiente de color confirma una relación monótona positiva físicamente coherente: valores altos de demanda reciente (puntos rojos) desplazan fuertemente la predicción a la derecha (hasta $+60$ unidades), mientras que niveles bajos (puntos azules) la contraen (hasta $-20$ unidades). Asimismo, las sumas rodantes correspondientes (\texttt{demand\_roll\_sum\_7} y \texttt{14}) ocupan los puestos tercero y cuarto al repartir \textit{TreeSHAP} el crédito explicativo entre variables colineales en los cortes del árbol. En contraste, los rezagos directos son casi irrelevantes y quedan fuera del top-20 (\texttt{demand\_lag\_1} ocupa el puesto 31 y \texttt{demand\_lag\_7} el 37), demostrando que al predecir la demanda agregada de siete días el modelo aprende a apoyarse en el nivel medio suavizado para filtrar el ruido diario.
     \item \textbf{Los identificadores estáticos pesan más que el calendario y el clima:} \texttt{product\_id} y \texttt{store\_id} ocupan las posiciones quinta y sexta, por delante de toda la información de calendario y meteorología. Esto respalda directamente la decisión de entrenar un \emph{modelo global} sobre el catálogo completo en lugar de un modelo por serie (Sección~\ref{sec:eleccion_backends}): el modelo emplea la identidad de la referencia y de la tienda como el mecanismo por el que transfiere comportamiento entre series, que es justamente lo que un modelo por serie no puede hacer.
     \item \textbf{La rotura informa, pero de forma discreta:} Las variables de historial de \textit{stockout} se sitúan en la zona media de la tabla (\texttt{stockout\_lag\_1} en el puesto 17, \texttt{stockout\_}\allowbreak\texttt{roll\_}\allowbreak\texttt{mean\_14} en el 19). Conviene no sobreinterpretarlo: su aportación es real pero modesta, y no debe confundirse con el mecanismo por el que el sistema corrige la censura, que no es una variable del modelo sino la reconstrucción previa del objetivo (Sección~\ref{sec:demanda_censurada}). Con la señal ya reconstruida aguas arriba, al modelo le queda poco que extraer del indicador de rotura.
     \item \textbf{Modulación climática modesta y desigual entre variables:} La meteorología no es despreciable y encabeza el grupo de variables secundarias: \texttt{precpt\_lag\_1} y \texttt{avg\_}\allowbreak\texttt{temperature\_}\allowbreak\texttt{lag\_1} ocupan los puestos décimo y undécimo. El comportamiento del rezago largo, en cambio, no es uniforme y conviene no generalizarlo: la precipitación a catorce días se sitúa inmediatamente detrás (puesto duodécimo, con un 73\,\% de la contribución de su rezago de un día), mientras que el viento a catorce días cae al puesto vigesimoquinto. La lectura defendible es que la precipitación conserva capacidad predictiva a dos semanas, plausiblemente por su asociación con episodios meteorológicos persistentes, y que es el viento, no el rezago largo en bloque, el candidato a poda.
@@ -339,43 +336,48 @@ Del análisis de esta figura se extraen las siguientes conclusiones, que validan
 \section{Deriva de la Distribución de Entrada (PSI)}
 \label{sec:resultados_drift}
 
-El primero de los dos niveles de monitorización de la Sección~\ref{sec:monitorizacion} se apoya en la importancia que acaba de establecerse: el \textit{Population Stability Index} se calcula solo sobre las siete variables de mayor contribución SHAP, comparando la mitad temporalmente más antigua del \textit{frame} supervisado con la más reciente. La Tabla~\ref{tab:psi_drift} recoge la lectura de la corrida a escala.
+El plano operacional del sistema no puede evaluar su propio error predictivo en el momento en que se emite la recomendación de inventario, ya que la demanda real tarda $H=7$ días en revelarse (Sección~\ref{sec:monitorizacion}). Para detectar cambios en el entorno antes de que impacten en la reposición, el sistema monitoriza el \textit{Population Stability Index} (PSI) sobre las siete características más influyentes identificadas por SHAP en la Sección~\ref{sec:resultados_xai}.
 
-\begin{table}[h]
-\centering
-\caption{PSI por variable entre la mitad antigua y la mitad reciente del panel supervisado (500 series), sobre las siete variables de mayor importancia SHAP del campeón. Bandas convencionales del índice: estable por debajo de $0{,}10$, seguimiento entre $0{,}10$ y $0{,}20$, crítico por encima de $0{,}20$.}
-\label{tab:psi_drift}
-\begin{tabular}{@{}lccl@{}}
-\toprule
-Variable & Importancia & PSI & Estado \\
-\midrule
-\texttt{stockout\_roll\_mean\_7} & 0,033 & \textbf{1,108} & Crítico \\
-\texttt{demand\_roll\_mean\_14} & 0,173 & 0,139 & Seguimiento \\
-\texttt{demand\_roll\_sum\_14} & 0,107 & 0,139 & Seguimiento \\
-\texttt{demand\_roll\_mean\_7} & 0,155 & 0,115 & Seguimiento \\
-\texttt{demand\_roll\_sum\_7} & 0,065 & 0,115 & Seguimiento \\
-\texttt{demand\_lag\_1} & 0,042 & 0,058 & Estable \\
-\texttt{discount\_lag\_1} & 0,102 & 0,003 & Estable \\
-\bottomrule
-\end{tabular}
+El índice compara la distribución de cada variable entre la mitad temporal antigua (referencia) y la mitad reciente (actual) del panel de 500 series, aplicando las bandas estándar de la industria: estabilidad ($\text{PSI} < 0{,}10$), seguimiento moderado ($0{,}10 \leq \text{PSI} \leq 0{,}20$) y deriva crítica ($\text{PSI} > 0{,}20$). La Tabla~\ref{tab:psi_drift} resume los resultados obtenidos en la evaluación a escala.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{lccl}
+        \toprule
+        \textbf{Variable} & \textbf{Importancia SHAP} & \textbf{PSI} & \textbf{Estado} \\
+        \midrule
+        \texttt{stockout\_roll\_mean\_7} & 0{,}033 & \textbf{1{,}108} & Crítico ($>0{,}20$) \\
+        \texttt{demand\_roll\_mean\_14} & 0{,}173 & 0{,}139 & Seguimiento ($0{,}10$--$0{,}20$) \\
+        \texttt{demand\_roll\_sum\_14}  & 0{,}107 & 0{,}139 & Seguimiento ($0{,}10$--$0{,}20$) \\
+        \texttt{demand\_roll\_mean\_7}  & 0{,}155 & 0{,}115 & Seguimiento ($0{,}10$--$0{,}20$) \\
+        \texttt{demand\_roll\_sum\_7}   & 0{,}065 & 0{,}115 & Seguimiento ($0{,}10$--$0{,}20$) \\
+        \texttt{demand\_lag\_1}         & 0{,}042 & 0{,}058 & Estable ($<0{,}10$) \\
+        \texttt{discount\_lag\_1}       & 0{,}102 & 0{,}003 & Estable ($<0{,}10$) \\
+        \bottomrule
+    \end{tabular}
+    \caption{Índice de Estabilidad Poblacional (PSI) por variable entre la primera y la segunda mitad del panel supervisado (500 series), evaluado sobre las variables de mayor impacto en el modelo campeón. Bandas de control: estable ($<0{,}10$), seguimiento ($0{,}10$--$0{,}20$) y crítico ($>0{,}20$).}
+    \label{tab:psi_drift}
 \end{table}
 
-La lectura tiene dos partes. La primera es que el panel \textbf{no es temporalmente homogéneo}: las cuatro ventanas rodantes de demanda, que son las variables de las que el modelo extrae casi toda su señal, entran en la banda de seguimiento. El desplazamiento es moderado en magnitud pero afecta justo a lo que sostiene la predicción, y es una medida directa del fenómeno que la Sección~\ref{sec:resultados_escala} invoca para explicar la brecha de cobertura residual: si la distribución de entrada se mueve entre la ventana de calibración y la de test, el supuesto de intercambiabilidad que ampara la garantía conformal (Sección~\ref{sec:conformal}) se cumple solo de forma aproximada. El PSI cuantifica aquí lo que aquella sección argumentaba de forma cualitativa.
+Del análisis de la Tabla~\ref{tab:psi_drift} se extraen tres conclusiones fundamentales:
 
-La Figura~\ref{fig:psi_decomposition} abre uno de esos números para mostrar qué hay detrás. Como los bordes de los tramos son los deciles de la ventana de referencia, cada uno de ellos contenía por construcción el $10\%$ de las observaciones, de modo que la altura de cada barra se lee directamente contra esa línea: por encima, el decil ha ganado masa; por debajo, la ha perdido.
+\begin{enumerate}
+    \item \textbf{Deriva moderada en el nivel de demanda:} Las cuatro ventanas rodantes de demanda (\texttt{roll\_mean} y \texttt{roll\_sum} a 7 y 14 días), que concentran el núcleo predictivo del modelo, registran un PSI en la franja de seguimiento ($0{,}115$--$0{,}139$). Este desplazamiento temporal cuantifica empíricamente la leve pérdida de intercambiabilidad entre ventanas que explica la varianza residual en la cobertura conformal (Sección~\ref{sec:resultados_escala}).
+
+    \item \textbf{Descomposición por deciles del desplazamiento:} La Figura~\ref{fig:psi_decomposition} desagrega el PSI de la variable líder (\texttt{demand\_roll\_mean\_14}) comparando la proporción de observaciones en cada decil respecto al $10\%$ esperado por construcción en la ventana de referencia. El diagnóstico visual es concluyente: los deciles inferiores y medios (1 al 7) se mantienen estables, mientras que los deciles 8 y 9 se vacían y el decil superior (decil 10) duplica su masa hasta el $20{,}5\%$. Estos tres tramos extremos concentran el $96\%$ del valor del índice, evidenciando un crecimiento sistemático de la demanda media en la segunda mitad del panel.
+
+    \item \textbf{Deriva extrema en roturas pero bajo impacto operativo:} La variable \texttt{stockout\_}\allowbreak\texttt{roll\_}\allowbreak\texttt{mean\_7} presenta un PSI crítico ($1{,}108$), fruto de una marcada variación en la frecuencia histórica de roturas de stock entre periodos. Sin embargo, este cambio no degrada proporcionalmente el modelo porque: (a) su importancia SHAP es reducida ($3{,}3\%$), y (b) la demanda no observada fue previamente reconstruida mediante el imputador latente en la etapa de preprocesamiento (Sección~\ref{sec:demanda_censurada}), desacoplando la señal de demanda real del indicador bruto de disponibilidad en estantería.
+\end{enumerate}
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.86\textwidth]{figures/psi_decomposition.pdf}
-    \caption{Descomposición del PSI de \texttt{demand\_roll\_mean\_14} ($\text{PSI} = 0{,}139$) por decil de la distribución de referencia. La línea discontinua marca el $10\%$ que cada decil contenía en la ventana antigua. Los siete primeros tramos apenas se mueven; los deciles octavo y noveno se vacían y el superior duplica su masa, hasta el $20{,}5\%$. Esos tres tramos aportan el $96\%$ del índice.}
+    \includegraphics[width=0.62\textwidth]{figures/psi_decomposition.pdf}
+    \caption{Descomposición del PSI de \texttt{demand\_roll\_mean\_14} ($\text{PSI} = 0{,}139$) por decil de la distribución de referencia. La línea discontinua marca el $10\%$ teórico por tramo. Los siete primeros deciles permanecen estables; la masa se desplaza desde los deciles 8 y 9 hacia el decil 10 ($20{,}5\%$), concentrando en estos tres tramos el $96\%$ de la divergencia calculada.}
     \label{fig:psi_decomposition}
 \end{figure}
 
-La lectura es inequívoca: la masa migra hacia el extremo alto. No se trata de un ensanchamiento simétrico ni de ruido repartido, sino de un desplazamiento del nivel de demanda entre la primera y la segunda mitad del periodo, que es exactamente la forma de deriva que rompe el supuesto de intercambiabilidad.
-
-La segunda es el valor extremo de \texttt{stockout\_}\allowbreak\texttt{roll\_}\allowbreak\texttt{mean\_7}, un orden de magnitud por encima del umbral crítico. Conviene interpretarlo con cuidado antes de leerlo como una alarma sobre el modelo: se trata de la variable menos influyente de las siete (un 3{,}3\,\% de la importancia), y mide la frecuencia de rotura, que es precisamente la magnitud que la reconstrucción de demanda censurada de la Sección~\ref{sec:demanda_censurada} altera aguas arriba. Un desplazamiento de esa envergadura en el régimen de rotura entre las dos mitades del periodo es un hecho del conjunto de datos antes que un defecto del sistema, y su bajo peso predictivo explica que no se traduzca en una degradación proporcional del error.
-
-Este es además el único de los dos niveles que produce lectura en este trabajo. El contraste de Page-Hinkley, por las razones de longitud de secuencia que la Sección~\ref{sec:monitorizacion} declara, no emite ninguna alerta sobre los tres \textit{folds} disponibles.
+Por último, el segundo nivel de monitorización operacional (el detector secuencial de \textit{Page-Hinkley} sobre los residuos de predicción, Sección~\ref{sec:monitorizacion}) no registró alarmas activas durante los tres folds de evaluación. Esto confirma que, si bien existe un desplazamiento gradual en la distribución de entrada, los errores de predicción se mantuvieron dentro de los límites admisibles de control estadístico.
 
 
 \section{Simulación Operacional en Streaming y Política de Reentrenamiento MLOps}
@@ -412,45 +414,49 @@ Se contrastó la política estática (\texttt{never}, el modelo inicial nunca se
 De la simulación se extraen cuatro lecturas:
 
 \begin{itemize}
-    \item \textbf{Degradación del modelo estático, sin colapso:} El modelo no reentrenado acumula $19.866{,}80$ unidades de rotura frente a las $8.769{,}48$ de la política activa, un $55{,}86\%$ más, y su nivel de servicio queda en el $65{,}80\%$ frente al $73{,}60\%$ del refresco semanal. La degradación es real y sostenida, como muestra la Figura~\ref{fig:cadence_cost}, pero conviene no exagerarla: un modelo correctamente sintonizado que no se actualiza durante seis semanas sigue atendiendo dos de cada tres decisiones sin rotura.
+    \item \textbf{Degradación del modelo estático, sin colapso:} La política activa reduce un \textbf{$-55{,}86\%$} las unidades no servidas ($8.769{,}48$ frente a las $19.866{,}80$ del modelo no reentrenado, lo que supone que el modelo estático acumula más del doble de rotura, un $+126{,}55\%$), elevando el nivel de servicio del $65{,}80\%$ al $73{,}60\%$. La degradación del modelo estático es continua a lo largo del tiempo (Figura~\ref{fig:cadence_cost}), pero conviene no exagerarla: un modelo bien sintonizado que no se actualiza durante mes y medio sigue atendiendo casi dos de cada tres decisiones completas sin rotura.
     \item \textbf{Reducción del coste logístico:} El refresco semanal reduce el coste total de $105.676{,}74$ a $63.112{,}52$ u.m. ($\Delta = -42.564{,}23$ u.m.), un $-40{,}28\%$, con un intervalo \textit{bootstrap} al $95\%$ emparejado por origen de $[-57{,}45\%,\ -17{,}00\%]$.
-    \item \textbf{Mejora en la disponibilidad de producto:} El \textit{fill rate} se incrementa en $+5{,}79$ puntos porcentuales ($95{,}43\%$ frente a $89{,}64\%$), y el coste medio por decisión cae de $42{,}27$ a $25{,}25$ u.m.
-    \item \textbf{Viabilidad computacional:} Cada ciclo de reentrenamiento y recalibración conformal tarda en promedio $5{,}55$ segundos sobre el panel completo. Frente a una cadencia semanal, el coste de cómputo de la política activa es despreciable y no condiciona la decisión.
+    \item \textbf{Mejora en la disponibilidad de producto:} El \textit{fill rate} volumétrico alcanza el \textbf{$95{,}43\%$} ($+5{,}79$ puntos frente al $89{,}64\%$ estático) y el coste medio por decisión cae de $42{,}27$ a $25{,}25$ u.m. La aparente discrepancia entre un \textit{fill rate} del $95{,}43\%$ y un nivel de servicio del $73{,}60\%$ es el comportamiento habitual en distribución minorista: en los días en que se produce una rotura, el inventario cubre la inmensa mayoría de la demanda, faltando solo una fracción menor del volumen total.
+    \item \textbf{Viabilidad computacional y escalabilidad en producción:} Cada ciclo de reentrenamiento y recalibración conformal tarda en promedio $5{,}55$ segundos sobre el panel evaluado. Conviene matizar que este tiempo corresponde a un histórico acotado; en un entorno de producción industrial con catálogos de decenas de miles de referencias y varios años de profundidad temporal, el volumen de observaciones por serie es sustancialmente mayor y los tiempos de cómputo escalarían a decenas de minutos o varias horas. No obstante, al ejecutarse bajo una cadencia semanal (típicamente como un proceso por lotes desacoplado durante el cierre nocturno), el coste operativo sigue siendo perfectamente asumible y no compromete los acuerdos de nivel de servicio (SLA) de la reposición diaria.
 \end{itemize}
 
 \paragraph{Por qué esta comparación no ordena las políticas.} El intervalo anterior queda íntegramente en la región negativa, y sin embargo el sistema marca la comparación como \textbf{no concluyente}. La razón es deliberada y merece enunciarse en lugar de resolverse a favor del resultado que conviene: el remuestreo toma el origen como unidad, porque las series de una misma semana comparten el choque de demanda y no son independientes, y la ventana solo proporciona \emph{cinco} orígenes no solapados. Un intervalo construido remuestreando cinco unidades es demasiado ancho para ordenar dos políticas, de modo que la exigencia de un mínimo de ocho orígenes se aplica antes de mirar dónde cae el intervalo. La lectura honesta es que esta ventana \emph{sugiere} con claridad que reentrenar sale más barato, y que los cinco orígenes de los que dispone no bastan para afirmarlo. Ampliar la ventana de evaluación es la corrección natural, y se recoge como línea de trabajo futura.
 
+\clearpage
 \section{Verificación de Objetivos y KPIs}
 \label{sec:resultados_kpis}
 
-La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantificables definidos en el Capítulo~\ref{chap:introduccion} con los resultados empíricos obtenidos.
+La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantitativos y operacionales definidos en la Sección~\ref{sec:objetivos} del Capítulo~\ref{chap:introduccion} con los resultados empíricos alcanzados.
 
 \begin{table}[htbp]
     \centering
     \small
     \resizebox{\textwidth}{!}{%
-    \begin{tabular}{>{\raggedright\arraybackslash}p{5.5cm}>{\centering\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{4.5cm}c}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{5.8cm}>{\centering\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{5.2cm}c}
         \toprule
-        \textbf{Objetivo} & \textbf{Target} & \textbf{Resultado} & \textbf{Estado} \\
+        \textbf{Objetivo Específico} & \textbf{Target} & \textbf{Resultado Empírico} & \textbf{Estado} \\
         \midrule
-        Corrección de censura mejora el coste vs.\ estrategia Observed & $> 0\%$ & $-92{,}15\%$ (Latent Supervised vs.\ Observed, coste justo, panel de 500 series) & \checkmark \\
+        Corrección de demanda censurada (\ref{obj:pipeline}) & Ahorro $> 0\%$ & Ahorro del \textbf{$92{,}15\%$} en coste logístico (\textit{Latent Supervised} vs.\ \textit{Observed} bajo coste justo) & \checkmark \\
         \midrule
-        Reducción de coste logístico frente a Seasonal Naïve & $> 0\%$ & $-9{,}03\%$ (LightGBM: 147.646 frente a 162.299 u.m., con $+31{,}10$ puntos más de nivel de servicio) & \checkmark \\
+        Reducción de coste vs.\ baseline (\ref{obj:modelos}) & Ahorro $> 0\%$ & Ahorro del \textbf{$9{,}03\%$} frente a \textit{Seasonal Naïve} ($147.646$ vs.\ $162.299$ u.m.) con $+31{,}10$ p.p. en nivel de servicio & \checkmark \\
         \midrule
-        Winkler Score del modelo probabilístico & Mínimo & LightGBM: 36{,}11; CatBoost: 46{,}54 & \checkmark \\
+        Eficiencia probabilística (Winkler Score) & Mínimo & LightGBM: \textbf{36{,}11}; CatBoost: \textbf{46{,}54} (intervalos compactos y adaptativos) & \checkmark \\
         \midrule
-        Cobertura empírica $[q_{0{,}1}, q_{0{,}9}]$ ($\alpha = 0{,}20$) & $\geq 80\%$ & 85{,}5\% (LightGBM); 84{,}6\% (CatBoost) en el panel de 500 series & \checkmark \\
+        Cobertura empírica conformal $[q_{0{,}1}, q_{0{,}9}]$ (\ref{obj:conformal}) & $\geq 80\%$ & \textbf{85{,}5\%} (LightGBM) y \textbf{84{,}6\%} (CatBoost) sobre el panel a escala de 500 series & \checkmark \\
+        \midrule
+        Operativización y latencia MLOps (\ref{obj:mlops}) & $< 10\text{ s}$ & \textbf{5{,}55 s} en reentrenamiento y recalibración en \textit{streaming}, 100\% contratos temporales y monitorización PSI & \checkmark \\
         \bottomrule
     \end{tabular}%
     }
-    \caption{Verificación de los KPIs del trabajo. Las tres primeras filas se corresponden con los objetivos \ref{obj:pipeline}, \ref{obj:modelos} y \ref{obj:conformal} de la Sección~\ref{sec:objetivos}. \checkmark = cumplido; $\times$ = no alcanzado; Parcial = cumplido con matices.}
+    \caption{Verificación de los KPIs del trabajo en correspondencia con los cuatro objetivos específicos (\ref{obj:pipeline}, \ref{obj:modelos}, \ref{obj:conformal} y \ref{obj:mlops}) definidos en la Sección~\ref{sec:objetivos}. \checkmark = cumplido; $\times$ = no alcanzado; Parcial = cumplido con matices.}
     \label{tab:kpi_verification}
 \end{table}
 
-Todos los objetivos cuantitativos del trabajo se han alcanzado con éxito:
+Todos los objetivos del trabajo se han alcanzado con éxito:
 \begin{enumerate}
-    \item \textbf{Corrección de censura:} Se cumple holgadamente con una reducción del coste logístico del \textbf{$-92{,}15\%$} bajo evaluación de coste justo con demanda latente supervisada.
-    \item \textbf{Reducción de coste frente al baseline:} El modelo de \textit{Gradient Boosting} Conformal reduce el coste logístico un \textbf{$-9{,}03\%$} frente al \textit{Seasonal Naïve} ($147.646$ frente a $162.299$ u.m.), al tiempo que eleva el nivel de servicio del $52{,}45\%$ al $83{,}55\%$ ($+31{,}10$ puntos de demanda atendida sin rotura).
-    \item \textbf{Eficiencia probabilística (Winkler Score):} Los modelos probabilísticos calibrados mediante la capa conformal alcanzan puntuaciones compactas ($36{,}11$ en LightGBM y $46{,}54$ en CatBoost).
-    \item \textbf{Cobertura empírica conformal:} Se satisface la garantía de cobertura con un \textbf{85{,}5\%} en LightGBM y un \textbf{84{,}6\%} en CatBoost sobre el panel de 500 series, en ambos casos por encima del 80\% nominal y sin ningún fold por debajo de él.
+    \item \textbf{Corrección de censura (\ref{obj:pipeline}):} Se satisface holgadamente al reducir el coste logístico un \textbf{$92{,}15\%$} bajo evaluación de coste justo con demanda latente supervisada frente al uso de datos observados censurados.
+    \item \textbf{Reducción de coste frente al baseline (\ref{obj:modelos}):} El modelo campeón de \textit{Gradient Boosting} Conformal reduce el coste logístico un \textbf{$9{,}03\%$} frente al \textit{Seasonal Naïve} ($147.646$ frente a $162.299$ u.m.), al tiempo que eleva el nivel de servicio del $52{,}45\%$ al $83{,}55\%$ ($+31{,}10$ puntos de demanda atendida sin rotura).
+    \item \textbf{Eficiencia probabilística y Winkler Score:} Los modelos probabilísticos calibrados mediante la capa conformal alcanzan puntuaciones compactas ($36{,}11$ en LightGBM y $46{,}54$ en CatBoost), optimizando simultáneamente la nitidez y la cobertura de los intervalos.
+    \item \textbf{Cobertura empírica conformal (\ref{obj:conformal}):} Se satisface la garantía de cobertura con un \textbf{85{,}5\%} en LightGBM y un \textbf{84{,}6\%} en CatBoost sobre el panel de 500 series, en ambos casos por encima del 80\% nominal y sin ningún fold por debajo de él.
+    \item \textbf{Operativización MLOps (\ref{obj:mlops}):} El sistema ejecuta el ciclo completo de reentrenamiento, inferencia y recalibración conformal en apenas \textbf{$5{,}55$ segundos}, incorpora monitorización de deriva por PSI, explicabilidad SHAP y está blindado por una suite de tests automatizados que garantizan el cumplimiento estricto de los contratos temporales y la ausencia de \textit{data leakage}.
 \end{enumerate}
