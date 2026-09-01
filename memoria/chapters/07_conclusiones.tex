@@ -97,6 +97,23 @@ El diseño e implementación del sistema presentan ciertas limitaciones y simpli
     \item \textbf{MLOps en Entorno Local}: La arquitectura Django y el cuadro de mandos se han desarrollado como un prototipo funcional local. La trazabilidad se apoya en un almacén de corridas MLflow con base de datos local, que sí registra de forma centralizada configuración, métricas y artefactos de cada ejecución, pero cuyo respaldo es un fichero SQLite sin réplica: suficiente para un panel de esta escala y un único operador, no para una organización con varios equipos concurrentes. Un entorno productivo corporativo real exigiría una infraestructura distribuida en la nube, el despliegue mediante orquestadores (Kubernetes), el uso de bases de datos de características en tiempo real (Feature Stores) y flujos CI/CD para el reentrenamiento y promoción automática en caliente tras alertas de drift.
 \end{itemize}
 
+\section{Análisis de Riesgos}
+\label{sec:analisis_riesgos}
+
+Las limitaciones de la sección anterior describen lo que el trabajo no cubre. Esta recoge lo distinto: qué puede salir mal si el sistema se lleva a explotación, con qué impacto y qué medida lo contiene. Se ordenan por criticidad, y en todos los casos la medida citada está implementada, no es una intención.
+
+\begin{itemize}
+    \item \textbf{Riesgo tecnológico: descalibración del imputador al cambiar de escala.} El fichero de hiperparámetros del imputador supervisado solo es válido cerca del tamaño de ajuste con el que se obtuvo, y el efecto llega a invertirse de signo (Anexo~\ref{anx:tuning_imputador}). Un despliegue sobre un catálogo de tamaño distinto degradaría la reconstrucción sin emitir error alguno, y como toda la cadena se alimenta de esa señal, el deterioro llegaría hasta la cantidad de pedido. \emph{Medida}: los metadatos de cada búsqueda registran las filas limpias de ajuste, y la resolución de parámetros rechaza un fichero cuya huella de escala no corresponda, recurriendo entonces a los valores por defecto de la configuración.
+
+    \item \textbf{Riesgo tecnológico: pérdida de cobertura conformal por deriva.} La garantía de la predicción conforme descansa en la intercambiabilidad entre la ventana de calibración y la de test, supuesto que la deriva temporal rompe. Una infracobertura sostenida se traduce en roturas de stock por debajo del nivel de servicio comprometido. \emph{Medida}: el índice PSI sobre las variables más influyentes y el detector Page-Hinkley sobre el error vigilan las dos derivas por separado (Sección~\ref{sec:monitorizacion}), y la cobertura empírica se reporta por fold en cada ejecución en lugar de asumirse.
+
+    \item \textbf{Riesgo de integración: modelo campeón obsoleto.} Un campeón promovido y no revisado se degrada a medida que el régimen de demanda se desplaza. \emph{Medida}: la promoción está sujeta a un criterio automático de coste sobre el registro de campeones, y la cadencia de reentrenamiento se eligió empíricamente (Sección~\ref{sec:resultados_simulacion}) en lugar de fijarse por convención.
+
+    \item \textbf{Riesgo de aceptación: desconfianza del planificador ante una recomendación opaca.} Un sistema de apoyo a la decisión que no se explica se termina ignorando, y el beneficio medido no se materializa por mucho que el modelo acierte. \emph{Medida}: el cuadro de mandos publica la atribución SHAP del campeón y la gestión por excepciones prioriza los casos que requieren criterio humano, de modo que la herramienta actúa como copiloto y no como caja negra. Como indicador de aceptación medible tras una implantación real, la fracción de recomendaciones aceptadas sin modificación sería la métrica natural a instrumentar.
+
+    \item \textbf{Riesgo operativo: pérdida de la trazabilidad de las corridas.} El almacén de corridas se respalda en un fichero SQLite sin réplica, de modo que su pérdida dejaría los artefactos sin la información que los identifica. \emph{Medida parcial}: cada directorio de artefactos incluye un fichero \texttt{mlflow\_run.json} con el nombre y el identificador de su corrida, lo que permite reconstruir la correspondencia; la réplica del almacén queda como requisito de un entorno productivo, según lo indicado en la Sección~\ref{sec:limitaciones}.
+\end{itemize}
+
 \section{Relación del Trabajo con los Estudios Cursados}
 \label{sec:relacion_estudios}
 
