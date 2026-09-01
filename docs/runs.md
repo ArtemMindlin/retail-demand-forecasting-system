@@ -167,6 +167,13 @@ Observed fill rate where the current protocol gives 60.3% — and does not descr
 protocol. The artifact records `source_panel_series`, so always read a magnitude together
 with it.
 
+**Which 30 series get sampled barely moves the magnitude.** Six independent draws on the
+500-series panel (seeds 42, 7, 123, 2024, 999, 555 — `fair_cost_panel500_seed{7,123,2024,
+999,555}_20260901_*`) put the Supervised-vs-Observed gap between -91.78% and -93.52%, mean
+-92.68%, a range under 2 points around the headline -92.15%. The other source of variance
+this backtest leaves open, the censoring draw within a run, is already the paired 95% CI
+in `cost_ci95_low`/`cost_ci95_high`; this closes the series-sample one.
+
 **Subsets answer different questions.** The 50-series base subset isolates the economics
 on high-rotation SKUs; the 500-series run tests conformal stability at scale; the 30-series
 fair-cost backtest isolates the imputation signal under a common ground truth. Do not

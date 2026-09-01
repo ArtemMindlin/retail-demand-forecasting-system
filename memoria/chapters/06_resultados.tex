@@ -37,17 +37,20 @@ El protocolo con el que se produce esta tabla, incluidas las decisiones que aís
 
 \begin{quote}
 \small
-\textbf{Sensibilidad al panel.} Repitiendo el protocolo íntegro sobre el subset base de 50
-series de alta rotación, \textbf{el orden se mantiene}: la estrategia Supervisada vuelve a ser
-la más barata, con un $-96{,}14\%$ frente a la señal sin corregir e intervalo emparejado
-íntegramente por debajo de cero, y las cuatro estrategias conservan sus posiciones relativas. Lo
-que sí cambia con el panel es la \emph{magnitud}: la ventaja pasa del $92{,}15\%$ al
-$96{,}14\%$ y los costes absolutos se multiplican por tres, porque un subset de alta rotación
-concentra series con más volumen y regímenes de rotura más severos. Las cifras de esta sección
-deben leerse por tanto acotadas al panel que las produce, aunque el veredicto cualitativo no
-dependa de él. Queda abierta la otra fuente de variación dentro de un mismo panel: repetir el
-muestreo de las 30 series para acotar cuánto se mueve la magnitud frente a qué series entran, y
-no solo frente a qué censura les toca.
+\textbf{Sensibilidad al panel y al muestreo.} Repitiendo el protocolo íntegro sobre el subset
+base de 50 series de alta rotación, \textbf{el orden se mantiene}: la estrategia Supervisada
+vuelve a ser la más barata, con un $-96{,}14\%$ frente a la señal sin corregir e intervalo
+emparejado íntegramente por debajo de cero, y las cuatro estrategias conservan sus posiciones
+relativas. Lo que sí cambia con el panel es la \emph{magnitud}: la ventaja pasa del $92{,}15\%$
+al $96{,}14\%$ y los costes absolutos se multiplican por tres, porque un subset de alta
+rotación concentra series con más volumen y regímenes de rotura más severos.
+
+Queda además la otra fuente de variación, dentro de un mismo panel: qué 30 series concretas
+entran en la muestra. Repitiendo el sorteo de series seis veces sobre el panel de 500, la
+ventaja de la Supervisada se mueve entre el $91{,}78\%$ y el $93{,}52\%$ (media $-92{,}68\%$),
+un rango de menos de dos puntos porcentuales alrededor de la cifra citada, y el signo no cambia
+en ninguna repetición. Las cifras de esta sección deben leerse por tanto acotadas al panel que
+las produce, pero la composición concreta de la muestra de 30 series apenas mueve el resultado.
 \end{quote}
 
 \paragraph{Alcance de estas cifras.} El coste se puntúa sobre los días censurados sintéticamente, y esa censura se construye reduciendo la venta de forma proporcional a la fracción de jornada sin producto. La estrategia Supervisada usa precisamente esa fracción para dimensionar su corrección, de modo que sobre estos días su supuesto es cierto por construcción. La ventaja que la tabla mide es por tanto una \textbf{cota superior} del beneficio de corregir la censura, no una estimación imparcial: en roturas reales, donde la demanda no se reparte uniformemente a lo largo del día y parte de los clientes vuelve o sustituye, la corrección tiene menos margen del que aquí aparece. Lo que la tabla sostiene sin reservas es la comparación entre las tres reconstrucciones y la señal sin corregir bajo un mismo criterio económico; lo que no sostiene es trasladar el porcentaje a una operación real como si fuera una previsión de ahorro.
