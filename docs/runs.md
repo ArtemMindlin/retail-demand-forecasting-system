@@ -156,10 +156,16 @@ the cache key was the split name alone, so all five configs shared one
 fingerprints `top_n_series`, `min_history_days`, `max_rows` and `horizon`, so a config
 change rebuilds the panel — the first run after switching configs is slower by design.
 
-**The fair-cost backtest is sensitive to the panel it samples from.** It draws 30 series;
-from the 500-series panel `Latent_supervised` is cheapest (1 774.82 vs 1 843.41 u.m.),
-from the 50-series top-rotation subset the order inverts (927.80 vs 844.01). The
-artifact records `source_panel_series`, so always read the ranking together with it.
+**The fair-cost backtest's magnitude depends on the panel it samples from, its ranking
+does not.** It draws 30 series; from the 500-series panel `Latent_supervised` is cheapest
+(293.12 vs 3 732.37 u.m., -92.15%), from the 50-series top-rotation subset it is cheapest
+too (413.87 vs 10 721.38, -96.14%, `fair_cost_panel50_20260901_105912`) — the absolute
+costs triple and the gap widens, but no position changes. An older pair of numbers had the
+order inverting on the 50-series subset (927.80 vs 844.01); that measurement predates the
+naive ordering policy — it carries a `signal_mae` column, no paired interval, and a 90.4%
+Observed fill rate where the current protocol gives 60.3% — and does not describe this
+protocol. The artifact records `source_panel_series`, so always read a magnitude together
+with it.
 
 **Subsets answer different questions.** The 50-series base subset isolates the economics
 on high-rotation SKUs; the 500-series run tests conformal stability at scale; the 30-series
