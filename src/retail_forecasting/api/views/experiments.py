@@ -49,7 +49,8 @@ def pareto(request: HttpRequest) -> HttpResponse:
             detail=str(exc),
         )
 
-    front = service.pareto_front(run_path)
+    pareto = service.pareto_front(store.runs_with)
+    front = pareto["rows"]
     sensitivity_rows = service.sensitivity(run_path)
     fair = service.fair_cost(store.runs_with)
 
@@ -68,6 +69,7 @@ def pareto(request: HttpRequest) -> HttpResponse:
             "run": run_name,
             "front": front,
             "front_count": len(front),
+            "pareto_run": pareto["run"],
             "best": best,
             "best_items": sorted(best.items()) if best else [],
             "pareto_chart": eda_charts.pareto_chart(front),

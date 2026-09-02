@@ -13,6 +13,8 @@ from typing import Any
 
 import pandas as pd
 
+from retail_forecasting.tracking import EXPERIMENT_FORECASTING_TUNING
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,9 +54,18 @@ def _optional_csv(run_path: Path, filename: str) -> list[dict[str, Any]]:
         return []
 
 
-def pareto_front(run_path: Path) -> list[dict[str, Any]]:
-    """``tuning_pareto.csv`` — the Pinball vs Winkler trade-off front."""
-    return _optional_csv(run_path, "tuning_pareto.csv")
+def pareto_front(runs_with: Any) -> dict[str, Any]:
+    """Latest tuning run's ``tuning_pareto.csv`` — the Pinball vs Winkler front.
+
+    Read from the tuning experiment rather than from the selected experiment run: the search
+    is its own run mode, so its front never lived inside a walk-forward run and looking for
+    it there found nothing.
+    """
+    candidates = runs_with("tuning_pareto.csv", experiment=EXPERIMENT_FORECASTING_TUNING)
+    if not candidates:
+        return {"rows": [], "run": None}
+    name, latest = next(iter(candidates.items()))
+    return {"rows": records(pd.read_csv(latest / "tuning_pareto.csv")), "run": name}
 
 
 def sensitivity(run_path: Path) -> list[dict[str, Any]]:

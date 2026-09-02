@@ -19,10 +19,12 @@
   <div class="glass chart-card">
     <div class="card-title">Frente · {{ front_count }} configuraciones</div>
     {% if front %}
+      <div class="card-subtitle">Búsqueda: <code>{{ pareto_run }}</code></div>
       {{ pareto_chart }}
     {% else %}
       <div class="card-empty">
-        Este run no contiene <code>tuning_pareto.csv</code>.
+        Ninguna búsqueda registrada contiene <code>tuning_pareto.csv</code>.
+        Genérala con: <code>make tune-forecasting</code>.
       </div>
     {% endif %}
   </div>
