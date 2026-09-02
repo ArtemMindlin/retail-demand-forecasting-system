@@ -26,22 +26,23 @@
 \definecolor{CrimsonError}{RGB}{239, 68, 68}
 
 % --- Configuración del Tema Beamer ---
-\usetheme{Madrid}
-\usecolortheme{whale}
+\usetheme[progressbar=frametitle, block=fill]{metropolis}
 
-\setbeamercolor{palette primary}{bg=UPVNavy, fg=white}
-\setbeamercolor{palette secondary}{bg=DarkSlate, fg=white}
-\setbeamercolor{palette tertiary}{bg=UPVRed, fg=white}
-\setbeamercolor{titlelike}{parent=palette primary, fg=UPVNavy}
-\setbeamercolor{structure}{fg=UPVNavy}
+% Personalización corporativa UPV sobre Metropolis
+\setbeamercolor{normal text}{fg=DarkSlate, bg=white}
+\setbeamercolor{alerted text}{fg=UPVRed}
+\setbeamercolor{example text}{fg=EmeraldGreen}
+\setbeamercolor{progress bar}{fg=UPVRed, bg=LightSlate}
+\setbeamercolor{frametitle}{fg=white, bg=UPVNavy}
+\setbeamercolor{title separator}{fg=UPVRed}
+
+% Bloques con fondo suave
 \setbeamercolor{block title}{bg=UPVNavy, fg=white}
 \setbeamercolor{block body}{bg=LightSlate, fg=DarkSlate}
 \setbeamercolor{block title example}{bg=EmeraldGreen, fg=white}
-\setbeamercolor{block body example}{bg=LightSlate, fg=DarkSlate}
+\setbeamercolor{block body example}{bg=EmeraldGreen!10, fg=DarkSlate}
 \setbeamercolor{block title alert}{bg=UPVRed, fg=white}
-\setbeamercolor{block body alert}{bg=LightSlate, fg=DarkSlate}
-
-\setbeamertemplate{navigation symbols}{}
+\setbeamercolor{block body alert}{bg=UPVRed!10, fg=DarkSlate}
 
 % --- Símbolos ---
 \newcommand{\cmark}{\textcolor{EmeraldGreen}{\textbf{\checkmark}}}
@@ -63,7 +64,7 @@
 % ==============================================================================
 % 1. PORTADA
 % ==============================================================================
-\begin{frame}[plain]
+\begin{frame}[plain]\transfade
   \titlepage
 \end{frame}
 
@@ -429,7 +430,7 @@
 % ==============================================================================
 % DIAPOSITIVA FINAL
 % ==============================================================================
-\begin{frame}[plain]
+\begin{frame}[plain]\transfade
   \centering
   \vspace{1.5cm}
   {\Huge \textbf{\textcolor{UPVNavy}{¡Muchas Gracias!}}}\\[0.8cm]
