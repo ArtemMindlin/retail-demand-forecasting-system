@@ -28,21 +28,18 @@
 % --- Configuración del Tema Beamer ---
 \usetheme[progressbar=frametitle, block=fill]{metropolis}
 
-% Personalización corporativa UPV sobre Metropolis
+% Solo cambiamos el color primario para que respete el estilo UPV, dejando que Metropolis diseñe el resto
 \setbeamercolor{normal text}{fg=DarkSlate, bg=white}
+\setbeamercolor{palette primary}{bg=UPVNavy, fg=white}
+\setbeamercolor{progress bar}{fg=UPVRed, bg=UPVNavy!50}
 \setbeamercolor{alerted text}{fg=UPVRed}
 \setbeamercolor{example text}{fg=EmeraldGreen}
-\setbeamercolor{progress bar}{fg=UPVRed, bg=LightSlate}
-\setbeamercolor{frametitle}{fg=white, bg=UPVNavy}
-\setbeamercolor{title separator}{fg=UPVRed}
 
-% Bloques con fondo suave
-\setbeamercolor{block title}{bg=UPVNavy, fg=white}
-\setbeamercolor{block body}{bg=LightSlate, fg=DarkSlate}
-\setbeamercolor{block title example}{bg=EmeraldGreen, fg=white}
-\setbeamercolor{block body example}{bg=EmeraldGreen!10, fg=DarkSlate}
-\setbeamercolor{block title alert}{bg=UPVRed, fg=white}
-\setbeamercolor{block body alert}{bg=UPVRed!10, fg=DarkSlate}
+% Evitamos forzar el fondo azul oscuro en las cajas para que respiren con el estilo flat de Metropolis
+
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamercovered{transparent}
 
 % --- Símbolos ---
 \newcommand{\cmark}{\textcolor{EmeraldGreen}{\textbf{\checkmark}}}
