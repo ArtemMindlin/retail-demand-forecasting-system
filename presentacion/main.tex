@@ -112,11 +112,11 @@
       \toprule
       \textbf{KPI} & \textbf{Métrica / Descripción} & \textbf{Objetivo} & \textbf{Resultado} & \textbf{Estado} \\
       \midrule
-      \textbf{KPI-1} & Cobertura empírica conformal & $\ge 75{,}0\%$ a $\alpha=0{,}2$ & \textbf{80,2\%} & \cmark \\
-      \textbf{KPI-2} & Reducción de coste Newsvendor & $\ge 5{,}0\%$ vs Naïve & \textbf{-7,57\%} & \cmark \\
+      \textbf{KPI-1} & Cobertura empírica conformal & $\ge 75{,}0\%$ a $\alpha=0{,}2$ & \textbf{85,5\%} & \cmark \\
+      \textbf{KPI-2} & Reducción de coste Newsvendor & $\ge 5{,}0\%$ vs Naïve & \textbf{-9,03\%} & \cmark \\
       \textbf{KPI-3} & Imputación demanda latente & Reducción error MAE & \textbf{-92,15\%} coste & \cmark \\
-      \textbf{KPI-4} & Retención de servicio en drift & $\ge 70{,}0\%$ fill rate & \textbf{92,68\%} & \cmark \\
-      \textbf{KPI-5} & Rendimiento y reproducibilidad & Tests pasados / MLflow & \textbf{305 / 305} & \cmark \\
+      \textbf{KPI-4} & Retención de servicio en drift & $\ge 70{,}0\%$ fill rate & \textbf{95,43\%} & \cmark \\
+      \textbf{KPI-5} & Rendimiento y reproducibilidad & Tests pasados / MLflow & \textbf{309 / 309} & \cmark \\
       \textbf{KPI-6} & Latencia de inferencia & $< 500$ ms / serie & \textbf{4,9 ms} & \cmark \\
       \bottomrule
     \end{tabular}
@@ -291,17 +291,17 @@
       \toprule
       \textbf{Modelo} & \textbf{MAE} & \textbf{RMSE} & \textbf{Winkler (80\%)} & \textbf{Coste (u.m.)} & \textbf{Fill Rate} & \textbf{Cobertura} \\
       \midrule
-      \textbf{Seasonal Naïve} & 10,57 & 15,56 & 78,42 & 41.520 & 76,4\% & 74,1\% \\
-      \textbf{LightGBM} & 7,88 & 10,70 & 42,15 & 39.210 & 91,2\% & \textbf{86,1\%} \\
-      \textbf{CatBoost (Campeón)} & \textbf{6,61} & \textbf{8,90} & \textbf{36,80} & \textbf{38.378} & \textbf{93,4\%} & \textbf{80,2\%} \\
+      \textbf{Seasonal Naïve} & \textbf{6,61} & \textbf{8,90} & n/a & 162.299 & 81,2\% & n/a \\
+      \textbf{CatBoost} & 11,72 & 16,87 & 46,54 & 171.450 & 97,9\% & 84,6\% \\
+      \textbf{LightGBM (Campeón)} & 8,06 & 10,82 & \textbf{36,11} & \textbf{147.646} & \textbf{98,9\%} & \textbf{85,5\%} \\
       \bottomrule
     \end{tabular}
   \end{table}
 
   \begin{block}{\textbf{Conclusiones Predictivas}}
     \begin{itemize}
-      \item CatBoost reduce el MAE en un \textbf{-37,46\%} y el Winkler Score en un \textbf{-53,07\%} frente a Naïve.
-      \item Ahorro directo en coste logístico de inventario: \textbf{-7,57\%} ($\Delta = -3.142$ u.m.).
+      \item LightGBM domina el Winkler Score (\textbf{36,11}) con intervalos un 19\% más estrechos que CatBoost.
+      \item Ahorro directo en coste logístico de inventario: \textbf{-9,03\%} frente a Naïve.
     \end{itemize}
   \end{block}
 \end{frame}
@@ -313,8 +313,8 @@
       \begin{exampleblock}{\textbf{Garantía Nominal vs Empírica}}
         \begin{itemize}
           \item \textbf{Objetivo nominal:} $1 - \alpha = 80{,}0\%$.
-          \item \textbf{CatBoost:} \textbf{80,2\%} cobertura real.
-          \item \textbf{LightGBM:} \textbf{86,1\%} cobertura real.
+          \item \textbf{CatBoost:} \textbf{84,6\%} cobertura real.
+          \item \textbf{LightGBM:} \textbf{85,5\%} cobertura real.
           \item \textbf{Seasonal Naïve:} $74{,}1\%$ (sub-cobertura).
         \end{itemize}
       \end{exampleblock}
@@ -361,11 +361,11 @@
     \begin{column}{0.48\textwidth}
       \begin{exampleblock}{\textbf{Simulación Prequencial (41 días, 5 folds)}}
         \begin{itemize}
-          \item \textbf{Política `never` (estático):} Coste $59.302{,}35$ u.m. | Fill Rate $82{,}08\%$ | Nivel de Servicio $10{,}00\%$.
-          \item \textbf{Política `every\_7d` (semanal):} Coste \textbf{26.229,08 u.m.} | Fill Rate \textbf{92,68\%} | Nivel de Servicio \textbf{35,40\%}.
-          \item \textbf{Reducción del Coste:} \textbf{-55,77\%} ($\Delta = -33.073$ u.m.).
-          \item Bootstrap 95\% CI: $[-75{,}23\%, -27{,}05\%]$.
-          \item Tiempo medio de reentreno: \textbf{2,45 segundos}.
+          \item \textbf{Política `never` (estático):} Coste $105.676{,}74$ u.m. | Fill Rate $89{,}64\%$ | Nivel de Servicio $65{,}80\%$.
+          \item \textbf{Política `every\_7d` (semanal):} Coste \textbf{63.112,52 u.m.} | Fill Rate \textbf{95,43\%} | Nivel de Servicio \textbf{73,60\%}.
+          \item \textbf{Reducción del Coste:} \textbf{-40,28\%} ($\Delta = -42.564$ u.m.).
+          \item Bootstrap 95\% CI: $[-57{,}45\%, -17{,}00\%]$.
+          \item Tiempo medio de reentreno: \textbf{5,55 segundos}.
         \end{itemize}
       \end{exampleblock}
     \end{column}
@@ -411,7 +411,7 @@
           \item \textbf{Corrección de Censura:} Eliminación del sesgo de rotura con LightGBM (-92\% coste).
           \item \textbf{Conformal Prediction:} Cobertura empírica rigurosa del 80\% en 500 series reales.
           \item \textbf{Newsvendor Asimétrico:} Pedidos optimizados según la función de pérdida real del negocio.
-          \item \textbf{MLOps Streaming:} Reentrenamiento semanal que ahorra un -55,77\% de coste.
+          \item \textbf{MLOps Streaming:} Reentrenamiento semanal que ahorra un -40,28\% de coste.
         \end{enumerate}
       \end{block}
     \end{column}
