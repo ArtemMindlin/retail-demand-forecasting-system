@@ -270,7 +270,8 @@ El invariante del proyecto ya exige ese margen entre entrenamiento y validación
 ($\text{train\_end} = \text{val\_start} - h$, Sección~\ref{sec:backtesting}); la
 auditoría del código reveló que no se aplicaba al corte entre entrenamiento y
 calibración. Corregido este punto, se reejecutó el subset base alternando
-únicamente el embargo, con el resto del panel y del código fijos:
+únicamente el embargo, con el resto del panel y del código fijos, con el resultado que
+recoge la Tabla~\ref{tab:embargo_control}.
 
 \begin{table}[htbp]
     \centering
@@ -385,7 +386,7 @@ Por último, el segundo nivel de monitorización operacional (el detector secuen
 
 Para responder a la pregunta de con qué frecuencia debe actualizarse el modelo en producción se ejecutó la simulación en \textit{streaming} prequencial sobre una ventana continua de 41 días no vistos ($500$ series, $20.500$ observaciones de evaluación) siguiendo el protocolo de la Sección~\ref{sec:simulate_ops}. La simulación entrena el campeón que declara el registro, LightGBM, con los hiperparámetros que la búsqueda de la Sección~\ref{sec:resultados_tuning_forecasting} persistió, y lo hace a la misma escala que el resto de los modos, de modo que lo que se mide es la política de actualización del modelo que efectivamente se despliega.
 
-Se contrastó la política estática (\texttt{never}, el modelo inicial nunca se reentrena tras el despliegue) frente al refresco semanal (\texttt{every\_7d}). La agregación se realiza sobre $5$ orígenes semanales independientes no solapados ($2.500$ decisiones Newsvendor completas).
+Se contrastó la política estática (\texttt{never}, el modelo inicial nunca se reentrena tras el despliegue) frente al refresco semanal (\texttt{every\_7d}). La agregación se realiza sobre $5$ orígenes semanales independientes no solapados ($2.500$ decisiones Newsvendor completas), y la Tabla~\ref{tab:cadence_summary} recoge la comparación.
 
 \begin{table}[htbp]
     \centering

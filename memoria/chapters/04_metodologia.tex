@@ -297,7 +297,7 @@ En la formulación general, el modelo minimiza la pérdida esperada de forma con
 
 donde $q_s^*$ representa el fractil crítico específico de la serie $s$ en función de sus márgenes comerciales y costes de merma individuales. En un entorno productivo con contabilidad analítica por referencia, este fractil variará por producto; no obstante, al no disponer en el conjunto de datos de partida de los costes desglosados por SKU, el sistema evalúa de manera homogénea una política de catálogo canónica (como se detalla y justifica en la Sección~\ref{sec:cost_profiles}).
 
-Al entrenar con RMSE o MAE se minimiza el error estadístico pero no el coste logístico, lo que es inconsistente con el objetivo operativo del sistema. Por eso el entrenamiento orientado a cuantiles de coste es el pilar central de la arquitectura. Para resolver eficientemente este problema de optimización no diferenciable por tramos, la siguiente subsección examina las implementaciones de \textit{Gradient Boosting} seleccionadas.
+Al entrenar con RMSE o MAE se minimiza el error estadístico pero no el coste logístico, lo que es inconsistente con el objetivo operativo del sistema. Por eso el objetivo de la Ecuación~\ref{eq:training_objective}, orientado al cuantil que dicta el coste, es el pilar central de la arquitectura. Para resolver eficientemente este problema de optimización no diferenciable por tramos, la siguiente subsección examina las implementaciones de \textit{Gradient Boosting} seleccionadas.
 
 \subsection{Selección de las Implementaciones de Boosting}
 \label{sec:eleccion_backends}
@@ -768,7 +768,7 @@ Esta arquitectura es la que sostiene el posicionamiento del sistema como \textbf
 \subsection{Monitorización: Deriva de la Entrada y Deriva del Error}
 \label{sec:monitorizacion}
 
-La Sección~\ref{sec:contrato_operacional} estableció que el plano operacional no puede medir su propio error en el momento de decidir. La monitorización es la respuesta a esa limitación, y se articula en dos niveles que vigilan objetos distintos y responden a preguntas distintas.
+La Sección~\ref{sec:contrato_operacional} estableció que el plano operacional no puede medir su propio error en el momento de decidir. La monitorización es la respuesta a esa limitación, y se articula en dos niveles que vigilan objetos distintos y responden a preguntas distintas, resumidos en la Figura~\ref{fig:monitorizacion_niveles}.
 
 \begin{figure}[H]
 \centering
