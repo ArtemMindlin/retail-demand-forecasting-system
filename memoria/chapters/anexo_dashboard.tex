@@ -2,7 +2,7 @@
 \chapter{Capturas de la Interfaz Web}
 \label{anexo:dashboard}
 
-Este apéndice recoge capturas de las seis vistas del cuadro de mandos, organizadas por los dos planos funcionales de la interfaz: el \textbf{plano de Operación} y el \textbf{plano de Análisis}. Se han tomado sobre una instancia local que ejecuta los mismos artefactos que la desplegada, cuya topología describe la Sección~\ref{sec:calidad_despliegue}.
+Este apéndice recoge capturas de las seis vistas del cuadro de mandos, organizadas por los dos planos funcionales de la interfaz: el \textbf{plano de Operación} y el \textbf{plano de Análisis}. Se han tomado sobre una instancia local que ejecuta los mismos artefactos que la desplegada, cuya topología describe la Sección~\ref{sec:calidad_despliegue}, leyendo la corrida \texttt{tfg\_latent\_20260831\_113339} del almacén. El selector de la cabecera, presente en todas las vistas, es el que fija esa corrida.
 
 % ─────────────────────────────────────────────
 \section*{Plano de Operación}
@@ -18,7 +18,7 @@ Este apéndice recoge capturas de las seis vistas del cuadro de mandos, organiza
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{figures/dashboard/ui_simulacion_ops.png}
-    \caption{Vista \textit{Simulación OPS} del plano de Operación. Presenta el backtest walk-forward semana a semana: cobertura realizada, coste de inventario semanal y ahorro respecto a la política base. El slider permite navegar por las semanas del horizonte evaluado.}
+    \caption{Vista \textit{Backtest OPS} del plano de Operación. Presenta el backtest de origen rodante semana a semana: cobertura realizada, coste de inventario semanal, MAE de la demanda a \textit{lead time} y ahorro frente a no reentrenar, este último acompañado del número de orígenes que lo sostienen. El conmutador elige entre la política con reentreno semanal y la que mantiene el modelo fijo, y el deslizador recorre las semanas del horizonte evaluado.}
     \label{fig:ui_simulacion_ops}
 \end{figure}
 
@@ -51,6 +51,6 @@ Este apéndice recoge capturas de las seis vistas del cuadro de mandos, organiza
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{figures/dashboard/ui_pareto_tuning.png}
-    \caption{Vista \textit{Pareto Tuning} del plano de Análisis. Frente de Pareto multiobjeto (Pinball Loss vs. Winkler Score) generado por Optuna con muestreador TPE multiobjetivo, tabla comparativa de los modelos en la frontera y curva de sensibilidad al ratio de costes $c_u/c_o$.}
+    \caption{Vista \textit{Pareto Tuning} del plano de Análisis, con los tres bloques que la componen. Arriba, el frente de la búsqueda multiobjetivo que nombra la propia tarjeta (\texttt{forecasting\_catboost\_v4}, 60 \textit{trials}): cada punto es una configuración situada por su \textit{pinball loss} y su \textit{Winkler score}, en verde las no dominadas y en violeta las dominadas, y a su derecha los hiperparámetros de la que minimiza el \textit{pinball} sobre el frente. En el centro, la sensibilidad al ratio $c_u/c_o$, con cada serie normalizada a su propio rango para que quepan en un eje común. Abajo, el \textit{backtest} de coste justo, que es la comparación que sí ordena las estrategias de reconstrucción (Sección~\ref{sec:resultados_gemelo}).}
     \label{fig:ui_pareto_tuning}
 \end{figure}
