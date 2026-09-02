@@ -187,13 +187,17 @@ recuperación de demanda censurada, y lo hace sobre un \textit{benchmark} public
     medida para la corrección de censura se declare como cota superior
     (Sección~\ref{sec:imputacion_censura_sintetica}).
 
-    \item \textbf{Los hiperparámetros del imputador no transfieren entre tamaños de ajuste, y el
-    efecto cambia de signo.} La búsqueda mejora al ajuste por defecto con pocos cientos de filas
-    limpias y lo empeora con decenas de miles, que es la escala a la que el sistema opera. La
-    tendencia es monótona en el tamaño de ajuste y se confirma sobre dos periodos de puntuación
-    distintos, de modo que es un efecto de escala y no de calendario. Un fichero de
-    hiperparámetros solo es válido cerca del tamaño con el que se obtuvo, condición que el
-    artefacto registra explícitamente (Anexo~\ref{anx:tuning_imputador}).
+    \item \textbf{Una partición de validación puede decidir la respuesta de una búsqueda de
+    hiperparámetros, y hacerlo en silencio.} El imputador reajusta sobre el panel que recibe, de
+    modo que partir ese panel para obtener un conjunto de validación disjunto encoge también el
+    conjunto de entrenamiento del maestro. Medida sobre un maestro así empobrecido, la
+    sintonización parecía mejorar un 5{,}33\%; los mismos hiperparámetros resultaban un 12{,}44\%
+    \emph{peores} que no sintonizar a la escala real de operación, de modo que el fichero
+    persistido era activamente perjudicial allí donde se consumía. Separar por tiempo y aplicar la
+    partición como una máscara sobre el panel completo, en lugar de como un recorte de él,
+    invierte el veredicto: a escala de despliegue la sintonización mejora un 5{,}98\%, con el
+    intervalo al 95\% íntegramente por debajo de cero y replicado sobre seis búsquedas
+    independientes (Anexo~\ref{anx:tuning_imputador}).
 
     \item \textbf{En una evaluación por coste, el término de seguridad de la política decide el
     resultado.} Con un término común a todo el catálogo, conocer la demanda real sale más caro

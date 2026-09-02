@@ -5,43 +5,85 @@
 La estrategia de imputación supervisada descrita en la Sección~\ref{sec:demanda_censurada} se
 apoya en un regresor LightGBM auxiliar. Este anexo documenta la búsqueda de hiperparámetros de
 ese modelo, que constituye un procedimiento independiente del ajuste del modelo de
-\textit{forecasting} y que se ejecuta como un modo de ejecución propio del sistema
-(\texttt{run\_mode = tune\_imputation}). Se recoge aquí, y no en el cuerpo de la memoria, porque
-su resultado no modifica la configuración del sistema final: lo que aporta es una lección
-metodológica sobre la validez de una búsqueda de hiperparámetros, y el material que la sostiene.
+\textit{forecasting} y se ejecuta como un modo propio del sistema
+(\texttt{run\_mode = tune\_imputation}).
+
+Se recoge en un anexo, y no en el cuerpo de la memoria, porque su resultado numérico no es la
+parte interesante. Lo que aporta es una lección metodológica sobre cómo se valida una búsqueda
+de hiperparámetros, y esa lección se aprendió de la peor manera posible: con dos protocolos
+sucesivos que parecían razonables y que producían respuestas falsas, cada uno por un motivo
+distinto. La primera sección describe el protocolo vigente, la segunda su resultado, y la
+tercera los dos que hubo que descartar antes de llegar a él.
 
 \section{Protocolo}
+\label{sec:tuning_protocolo}
 
 La búsqueda opera sobre el mismo protocolo de censura sintética de la
 Sección~\ref{sec:imputacion_censura_sintetica}: se censura artificialmente una fracción de los
-días limpios, se reconstruyen y se compara la estimación con la demanda conocida. Es el uso para
-el que aquel apartado declara el protocolo válido, por tratarse de una comparación entre
+días limpios, se reconstruyen y se compara la estimación con la demanda conocida. Es el uso
+para el que aquel apartado declara el protocolo válido, por tratarse de una comparación entre
 hiperparámetros de una misma regla de reconciliación.
 
-El espacio de búsqueda comprende \textbf{trece hiperparámetros}, con cotas acotadas en la
+El espacio de búsqueda comprende \textbf{trece hiperparámetros}, acotados en la
 Tabla~\ref{tab:tuning_espacio}, recorridos por 300 \textit{trials} del muestreador gaussiano de
-Optuna. Dos decisiones de diseño gobiernan el procedimiento:
+Optuna. Tres decisiones de diseño gobiernan el procedimiento.
+
+\subsection*{Promediar sobre múltiples extracciones}
+
+En una sola extracción de censura sintética, la dispersión del error entre \textit{trials} es un
+orden de magnitud mayor que las diferencias reales entre conjuntos de hiperparámetros. Una
+búsqueda de extracción única selecciona por tanto el \textit{trial} afortunado, y su propio valor
+objetivo no es evidencia de mejora alguna: una ejecución que reportó un $-1{,}4\%$ en su muestra
+de selección midió $-0{,}32\%$, con intervalo cruzando el cero, sobre extracciones nuevas. El
+objetivo promedia en consecuencia sobre \textbf{30 extracciones de selección}, y el veredicto
+final se emite sobre \textbf{25 de validación} con semillas disjuntas.
+
+\subsection*{Separar selección y validación por tiempo, no por series}
+
+Los dos conjuntos deben ser disjuntos, y la forma de separarlos no es indiferente. Semillas de
+censura distintas no bastan: cada extracción censura el 30\% del mismo conjunto de días limpios,
+de modo que tras $n$ extracciones el solapamiento esperado es $1 - 0{,}7^n$ y ambos conjuntos
+convergen sobre las mismas filas (se midió un 82{,}4\% de solapamiento con 5 y 10 extracciones).
+
+La separación se hace por tanto sobre el \textbf{calendario}: el último tercio del panel se
+reserva para validar, dejando la selección hasta el 2024-05-26 y la validación desde el
+2024-05-27. Y, decisivamente, se aplica como una \emph{máscara} sobre el panel completo y no como
+una partición de él: el imputador reajusta sobre el panel que recibe, así que recortarlo para
+elegir filas de test recortaría también el conjunto de entrenamiento del maestro. La
+Sección~\ref{sec:tuning_descartados} documenta lo que ocurrió cuando no era así.
+
+La máscara restringe \textbf{dos} poblaciones, no una: las filas que pueden censurarse y también
+los stockouts reales de los que se muestrea la severidad. Restringir solo la primera filtraba
+severidad a través de la frontera temporal: las roturas reales de la ventana temprana ocultan un
+43{,}4\% de la jornada frente al 30{,}5\% de la tardía, y un 76\% de las filas con rotura caen en
+la primera mitad, de modo que las filas de la ventana tardía acababan censuradas alrededor de un
+32\% más duro de lo que lo están nunca. Eso borraba sobre el eje de la severidad justo el cambio
+de régimen que un holdout temporal existe para medir, y premiaba por igual en ambas ventanas a
+la candidata que mejor tolerase censura severa. Un test con severidades disjuntas por ventana lo
+fija, y falla sobre la versión sin restringir en 5 de 6 semillas.
+
+\subsection*{Dos puertas, sobre estadísticos distintos}
+
+El ganador solo se persiste si supera dos comprobaciones, y cada una mira una magnitud diferente
+a propósito:
 
 \begin{itemize}
-    \item \textbf{Promediado sobre múltiples extracciones.} En una sola extracción de censura
-    sintética, la dispersión del error entre \textit{trials} (entre el 12\% y el 40\% según la
-    medición) es un orden de magnitud mayor que las diferencias reales entre conjuntos de
-    hiperparámetros (en torno al 1\%). Una búsqueda de extracción única selecciona por tanto el
-    \textit{trial} afortunado, y su propio valor objetivo no es evidencia de mejora alguna: una
-    ejecución que reportó un $-1{,}4\%$ en la muestra de selección midió $-0{,}32\%$, con
-    intervalo de confianza cruzando el cero, sobre extracciones nuevas. El objetivo promedia
-    en consecuencia sobre 15 extracciones.
-    \item \textbf{Series disjuntas entre selección y validación.} Las semillas de censura
-    disjuntas no bastan: cada extracción censura el 30\% del mismo conjunto de días limpios, de
-    modo que tras $n$ extracciones el solapamiento es de $1 - 0{,}7^n$ y los dos conjuntos
-    convergen sobre las mismas filas (se midió un 82{,}4\% de solapamiento con 5 y 10
-    extracciones). La separación se hace por tanto sobre series: 35 series para seleccionar y
-    15 reservadas para validar, con 25 extracciones sobre estas últimas.
+    \item \textbf{Frente a los hiperparámetros por defecto}, decide el \textbf{intervalo}: el IC
+    al 95\% de la diferencia pareada debe quedar íntegramente por debajo de cero. Esta puerta
+    guarda una \emph{afirmación} (que sintonizar sirve), y una mejora cuyo intervalo cruza el
+    cero no la sostiene.
+    \item \textbf{Frente al campeón que ya estuviera en disco}, decide la \textbf{media}. Esta
+    puerta no guarda ninguna afirmación: solo elige cuál de dos ficheros se queda, y ante esa
+    disyuntiva exigir un intervalo sería pedir más evidencia de la que la decisión necesita.
 \end{itemize}
 
-El ganador solo se persiste si el intervalo de confianza al 95\% de la mejora media sobre las
-extracciones de validación queda \textbf{íntegramente por debajo de cero}, y además solo si bate
-tanto a los hiperparámetros por defecto como al campeón que ya estuviera en disco.
+El intervalo es de Student-t, no bootstrap. Medidos, ambos coinciden hasta 0{,}0004 sobre datos
+simétricos y sesgados y dan idéntico veredicto en todos los casos de puerta; donde divergen (una
+extracción atípica, 0{,}0057 de separación) el de Student-t es el \emph{más ancho}, de modo que
+la puerta yerra por estricta y no puede admitir a un ganador que el bootstrap habría rechazado.
+Se usa $t(0{,}975,\, n-1)$ y no $1{,}96$ porque con 25 extracciones este último anuncia como 95\%
+un intervalo que en realidad es del 93\%, permisivo justo en la dirección en la que una puerta no
+debe serlo.
 
 \begin{table}[htbp]
     \centering
@@ -50,78 +92,140 @@ tanto a los hiperparámetros por defecto como al campeón que ya estuviera en di
         \toprule
         \textbf{Hiperparámetro} & \textbf{Cotas} & \textbf{Hiperparámetro} & \textbf{Cotas} \\
         \midrule
-        \texttt{n\_estimators} & 50 -- 3.000 & \texttt{subsample} & 0,4 -- 1,0 \\
-        \texttt{max\_depth} & 2 -- 12 & \texttt{learning\_rate} & 0,005 -- 0,3 (log) \\
-        \texttt{num\_leaves} & 2 -- 1.024 & \texttt{colsample\_bytree} & 0,3 -- 1,0 \\
-        \texttt{min\_child\_samples} & 2 -- 100 & \texttt{reg\_alpha} & $10^{-8}$ -- 100 (log) \\
-        \texttt{min\_data\_per\_group} & 1 -- 100 & \texttt{reg\_lambda} & $10^{-8}$ -- 100 (log) \\
+        \texttt{n\_estimators} & 50 -- 3.000 & \texttt{subsample} & 0,85 -- 1,0 \\
+        \texttt{max\_depth} & 6 -- 12 & \texttt{learning\_rate} & 0,005 -- 0,3 (log) \\
+        \texttt{num\_leaves} & 2 -- 1.024 (log) & \texttt{colsample\_bytree} & 0,1 -- 1,0 \\
+        \texttt{min\_child\_samples} & 1 -- 100 & \texttt{reg\_alpha} & $10^{-8}$ -- 100 (log) \\
+        \texttt{min\_data\_per\_group} & 1 -- 500 & \texttt{reg\_lambda} & $10^{-8}$ -- 100 (log) \\
         \texttt{max\_bin} & 8 -- 255 & \texttt{cat\_smooth} & 0 -- 50 \\
         \texttt{subsample\_freq} & 0 -- 1 & & \\
         \bottomrule
     \end{tabular}
     \caption{Espacio de búsqueda de la sintonización del imputador supervisado. La cota superior
     de \texttt{n\_estimators} responde a una restricción de cómputo y está justificada por
-    medición: a 500 series un ajuste de 8.000 árboles cuesta unos 34 segundos, lo que situaría
-    una búsqueda de 300 \textit{trials} en torno a las 43 horas. Lo que se sacrifica al recortar
-    a 3.000 son 0{,}0037 de MAE, cifra inferior a los 0{,}0059 de anchura del intervalo de
-    validación que decide la persistencia, de modo que el recorte no puede alterar el veredicto.}
+    medición: a 500 series un ajuste de 8.000 árboles cuesta unos 34 segundos, lo que situaría la
+    búsqueda cerca de las 43 horas frente a las 1{,}8 del recorte. Lo que se sacrifica al recortar
+    a 3.000 son 0{,}0037 de MAE, cifra inferior a la anchura del intervalo que decide las puertas
+    (unos 0{,}0059), de modo que el recorte no puede alterar ningún veredicto; pasados los 6.000
+    árboles los retornos se agotan por completo.}
     \label{tab:tuning_espacio}
 \end{table}
 
-\section{Resultado: la ganancia se invierte con la escala}
+\section{Resultado}
+\label{sec:tuning_resultado}
 
-Sobre el protocolo descrito, la búsqueda encuentra una configuración que mejora el error de
-reconstrucción un \textbf{5{,}33\%} frente a los hiperparámetros por defecto, con un intervalo
-de confianza al 95\% de $[-0{,}0199,\ -0{,}0120]$, enteramente por debajo de cero.
+Sobre el protocolo descrito, y a la escala a la que el sistema opera (500 series, 14.144 filas
+limpias de ajuste del maestro), la búsqueda encuentra una configuración que mejora el error de
+reconstrucción un \textbf{5{,}98\%} frente a los hiperparámetros por defecto, con un intervalo de
+confianza al 95\% de $[-0{,}0238,\ -0{,}0191]$ sobre la diferencia pareada, enteramente por
+debajo de cero. Las tres cifras que deciden, medidas sobre las mismas 25 extracciones de
+validación, son las de la Tabla~\ref{tab:tuning_resultado}.
 
-Ese resultado, sin embargo, no es transferible. Al repetir la medición variando únicamente el
-número de días limpios con los que se ajusta el imputador, y manteniendo todo lo demás
-constante, la ganancia se reduce de forma monótona y termina cambiando de signo
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Configuración} & \textbf{MAE de validación} & \textbf{Mejora sobre los defectos} \\
+        \midrule
+        Hiperparámetros por defecto & 0,3585 & -- \\
+        Campeón anterior, remedido   & 0,3439 & $-4{,}06\%$ \\
+        \textbf{Ganador de esta búsqueda} & \textbf{0,3370} & $\mathbf{-5{,}98\%}$ \\
+        \bottomrule
+    \end{tabular}
+    \caption{Las tres configuraciones puntuadas sobre las mismas 25 extracciones de validación
+    (semillas 10042--10066, ventana desde el 2024-05-27, 2.455 filas evaluables por extracción).
+    La fila central es una \emph{réplica}: el campeón anterior se remide aquí y devuelve un
+    $-4{,}06\%$ que reproduce el $-4{,}07\%$ con el que se había persistido, lo que acredita que
+    la comparación entre aspirante y campeón es homogénea.}
+    \label{tab:tuning_resultado}
+\end{table}
+
+Que el campeón anterior reproduzca su cifra al remedirlo es lo que da valor al resto de la tabla:
+sin esa réplica, una mejora del aspirante podría deberse a cualquier diferencia entre las dos
+mediciones y no al aspirante. El ganador se persiste en consecuencia, y es el que el modo de
+experimento y el \textit{backtest} de coste justo leen para producir las cifras del
+Capítulo~\ref{chap:resultados}.
+
+Ninguno de los trece parámetros del ganador queda pegado a una cota de la búsqueda. Los dos que
+valen 1, \texttt{min\_child\_samples} y \texttt{min\_data\_per\_group}, están en el mínimo
+definicional de LightGBM y no en una pared impuesta aquí. Esa comprobación no es cosmética: en
+una versión anterior del espacio de búsqueda cinco de los trece ganaban pegados a su cota, lo que
+significa que la búsqueda quería salir del recinto y la respuesta la fijaba el recinto y no los
+datos. Ensanchar las cotas resolvió el síntoma de forma verificable, con
+\texttt{colsample\_bytree} pasando de 0{,}966, contra el suelo de entonces, a 0{,}594, holgado
+dentro del actual.
+
+\section{Los dos protocolos descartados}
+\label{sec:tuning_descartados}
+
+Las decisiones de la Sección~\ref{sec:tuning_protocolo} no son evidentes a priori, y el camino
+hasta ellas es la aportación metodológica de este anexo. Ambos protocolos descartados producían
+un número creíble, con su intervalo de confianza y su veredicto, y ambos eran falsos.
+
+\subsection*{Solapamiento entre selección y validación}
+
+El primer protocolo separaba los dos conjuntos únicamente por la semilla de censura. Como cada
+extracción censura el 30\% de los mismos días limpios, el solapamiento crece con el número de
+extracciones hasta hacer que ambos conjuntos midan sobre las mismas filas: se midió un 82{,}4\%
+con 5 y 10 extracciones. La validación no era entonces independiente de la selección, y su
+veredicto no acotaba el sobreajuste que existía para detectar.
+
+\subsection*{Partición por series: la reversión de escala que no existía}
+
+La corrección obvia al problema anterior fue partir el panel por series, reservando 15 de las 50
+para validar. Eso resolvía el solapamiento y creaba uno peor. El imputador \textbf{reajusta sobre
+el panel que recibe}, de modo que partir el panel para elegir filas de test partía también el
+conjunto de entrenamiento del maestro: la validación medía un imputador ajustado con 467 filas
+limpias, mientras que en producción se ajusta con más de catorce mil.
+
+Ese detalle no añade ruido a la respuesta, la \emph{decide}. Manteniendo fijo todo lo demás y
+variando únicamente el número de filas limpias con las que se ajusta el maestro, la ganancia de
+un mismo conjunto de hiperparámetros se degrada de forma monótona y termina cambiando de signo
 (Tabla~\ref{tab:tuning_reversion}).
 
 \begin{table}[htbp]
     \centering
     \small
-    \begin{tabular}{rlr}
+    \begin{tabular}{rr}
         \toprule
-        \textbf{Filas limpias de ajuste} & \textbf{Periodo de evaluación} & \textbf{Ganancia} \\
+        \textbf{Filas limpias de ajuste del maestro} & \textbf{Ganancia frente a los defectos} \\
         \midrule
-        467 (15 series reservadas) & series disjuntas & $-5{,}33\%$ \\
-        595 (últimos 30 días de 50 series) & tiempo disjunto & $-4{,}34\%$ \\
-        1.930 (50 series completas) & tiempo disjunto & $-1{,}72\%$ \\
-        14.243 (500 series) & tiempo disjunto & $\mathbf{+12{,}44\%}$ \\
-        18.310 (500 series más holdout) & semana de holdout & $\mathbf{+13{,}20\%}$ \\
+        467 (15 series reservadas) & $-5{,}33\%$ \\
+        595 (últimos 30 días de 50 series) & $-4{,}34\%$ \\
+        1.930 (50 series completas) & $-1{,}72\%$ \\
+        14.243 (500 series, escala de producción) & $\mathbf{+12{,}44\%}$ \\
         \bottomrule
     \end{tabular}
-    \caption{Efecto del tamaño del conjunto de ajuste del imputador sobre la ganancia de la
-    sintonización. Signo negativo indica mejora. Las dos últimas filas coinciden sobre periodos
-    de evaluación distintos, lo que descarta el calendario como explicación y señala a la escala.}
+    \caption{Diagnóstico del protocolo de partición por series. Signo negativo indica mejora. Los
+    mismos hiperparámetros que mejoraban un 5{,}33\% medidos sobre el maestro empobrecido de 467
+    filas resultan un 12{,}44\% \emph{peores} que no sintonizar a la escala a la que el sistema
+    opera. La tabla no describe una propiedad del problema, sino el efecto de un defecto del
+    montaje experimental.}
     \label{tab:tuning_reversion}
 \end{table}
 
-La lectura es que \textbf{el tamaño del conjunto con el que se ajusta el imputador no es un
-detalle del montaje experimental, sino la variable que decide la respuesta}. Los mismos
-hiperparámetros que mejoran un 5\% con 467 filas de ajuste resultan un 12\% \emph{peores} que no
-sintonizar a la escala de 500 series, que es precisamente la escala a la que el sistema ejecuta
-la comparación de estrategias del Capítulo~\ref{chap:resultados}. La causa es reconocible: un
-conjunto de ajuste pequeño premia configuraciones fuertemente regularizadas que dejan de ser
-ventajosas cuando hay datos suficientes.
+La consecuencia práctica era grave y silenciosa: el fichero de hiperparámetros que aquel
+protocolo persistía resultaba \textbf{activamente perjudicial} en el modo que lo consume, y nada
+en el sistema lo señalaba. Un fichero de trece números no puede declarar por sí solo el tamaño de
+ajuste en el que es válido.
 
-De ahí se derivan dos consecuencias prácticas. La primera es que un fichero de hiperparámetros
-sintonizados solo es válido en el entorno del tamaño de ajuste con el que se obtuvo, y esa
-condición no puede expresarse en el propio fichero, por lo que se registra explícitamente en los
-metadatos de la búsqueda. La segunda, y es la que justifica la decisión del sistema final, es
-que \textbf{las cifras de reconstrucción del Capítulo~\ref{chap:resultados} se obtienen con los
-hiperparámetros por defecto}, no con los sintonizados: a la escala a la que se publican, los
-defectos son la mejor opción disponible.
+De ahí las dos correcciones que incorpora el protocolo vigente. La primera es la máscara: la
+ventana de validación restringe qué filas se puntúan sin recortar el panel, así que el maestro
+conserva el tamaño que tiene en producción y la medición deja de depender de una escala que no
+es la real. La segunda es de trazabilidad: los metadatos de cada búsqueda registran
+\texttt{teacher\_fit\_rows} junto al resto de la configuración, de modo que la condición de
+validez viaja con el artefacto. Sigue siendo una condición documentada para quien lo lea, no una
+comprobación que el sistema haga al cargarlo.
 
 \section{Validación del buscador}
 
-Un resultado como el anterior invita a una objeción legítima: que la reversión sea un artefacto
-del muestreador empleado y no una propiedad del problema. Para acotarla se repitió la búsqueda
-completa con los dos muestreadores disponibles, el basado en procesos gaussianos y el
-\textit{Tree-structured Parzen Estimator}, sobre tres semillas comunes y 300 \textit{trials}
-cada uno, en un total de unas 14 horas de cómputo (Tabla~\ref{tab:tuning_samplers}).
+Un resultado obtenido con un muestreador bayesiano invita a una objeción legítima: que dependa
+del muestreador y no del problema. Para acotarla se repitió la búsqueda completa, bajo el
+protocolo de la Sección~\ref{sec:tuning_protocolo}, con los dos muestreadores disponibles (el
+basado en procesos gaussianos y el \textit{Tree-structured Parzen Estimator}) sobre tres semillas
+comunes y 300 \textit{trials} cada uno, en unas 14 horas de cómputo
+(Tabla~\ref{tab:tuning_samplers}).
 
 \begin{table}[htbp]
     \centering
@@ -137,23 +241,34 @@ cada uno, en un total de unas 14 horas de cómputo (Tabla~\ref{tab:tuning_sample
         \textbf{Media} & $\mathbf{-6{,}74\%}$ & $\mathbf{-6{,}24\%}$ & $\mathbf{-0{,}50}$ \textbf{pp} & \textbf{110} & \textbf{165} \\
         \bottomrule
     \end{tabular}
-    \caption{Comparación pareada de muestreadores sobre semillas comunes. La diferencia media
-    entre ambos (0{,}50 puntos porcentuales) es cuatro veces menor que su desviación entre
-    semillas (2{,}26 puntos), y el signo se invierte según la semilla.}
+    \caption{Comparación pareada de muestreadores sobre semillas comunes, a 500 series. La
+    diferencia media entre ambos (0{,}50 puntos porcentuales) es cuatro veces menor que la
+    desviación de esa diferencia entre semillas (2{,}26 puntos), y su signo se invierte según la
+    semilla.}
     \label{tab:tuning_samplers}
 \end{table}
 
-La conclusión es un \textbf{resultado nulo}: con tres semillas, el ruido entre extracciones
-domina por completo la elección de muestreador, de modo que ambos conducen al mismo sitio y la
-reversión de la sección anterior no es atribuible a ninguno de los dos. Lo que sí resulta
-concluyente, y es la razón por la que el sistema emplea el muestreador gaussiano, es que este
-resulta un 34\% más rápido y gana en las tres semillas sin excepción.
+La conclusión es un \textbf{resultado nulo}: con tres semillas, el ruido entre extracciones domina
+por completo la elección de muestreador. Lo que sí resulta concluyente, y es la razón por la que
+el sistema emplea el gaussiano, es que este resulta un 33\% más rápido y gana en las tres semillas
+sin excepción.
 
-Dos observaciones adicionales del mismo experimento. Las seis búsquedas baten a los
-hiperparámetros por defecto con el intervalo de confianza íntegramente por debajo de cero, entre
-el $-4{,}56\%$ y el $-7{,}62\%$, lo que confirma que a esa escala de ajuste la ganancia es real
-con independencia del muestreador. Y las configuraciones ganadoras \emph{no se parecen entre sí}:
-\texttt{num\_leaves} recorre de 40 a 219, \texttt{n\_estimators} de 687 a 3.000 y
-\texttt{learning\_rate} de 0{,}015 a 0{,}052, produciendo mejoras casi idénticas. La superficie
-de respuesta es plana en la región buena, que es la misma observación con la que se justificó
-promediar sobre múltiples extracciones.
+El experimento deja además dos observaciones que refuerzan el resultado de la
+Sección~\ref{sec:tuning_resultado}. Las seis búsquedas baten a los hiperparámetros por defecto
+con el intervalo íntegramente por debajo de cero, entre el $-4{,}56\%$ y el $-7{,}62\%$, lo que
+confirma que a la escala de despliegue la ganancia es real con independencia del muestreador y de
+la semilla. Y las configuraciones ganadoras \emph{no se parecen entre sí}: \texttt{num\_leaves}
+recorre de 40 a 219, \texttt{n\_estimators} de 687 a 3.000 y \texttt{learning\_rate} de 0{,}015 a
+0{,}052, produciendo mejoras casi idénticas. La superficie de respuesta es plana en la región
+buena, que es la misma observación con la que se justificó promediar sobre múltiples
+extracciones.
+
+\section{Trazabilidad}
+
+Las cifras de este anexo proceden de la corrida \texttt{imputation\_lgbm\_seed42\_500series} del
+23 de agosto de 2026, registrada en el almacén de MLflow bajo el experimento
+\texttt{imputation\_lgbm\_tuning}, y de la comparación de muestreadores que recoge
+\texttt{docs/sampler\_ab.md}. Conviene una advertencia sobre la procedencia: el metadato de la
+búsqueda estampa el \textit{commit} en el momento de \emph{escribirlo}, no al arrancar, de modo
+que el campo \texttt{git\_commit} del artefacto no identifica al código que produjo el número. El
+que lo produjo es \texttt{30128fa}.
