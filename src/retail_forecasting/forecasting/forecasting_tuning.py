@@ -59,7 +59,7 @@ from retail_forecasting.forecasting.tuned_params import (
 from retail_forecasting.inventory.newsvendor import attach_inventory_costs, choose_order_quantity
 from retail_forecasting.models.boosting import LightGBMModel
 from retail_forecasting.models.catboosting import CatBoostingModel
-from retail_forecasting.tracking import MLFLOW_TRACKING_URI
+from retail_forecasting.tracking import EXPERIMENT_FORECASTING_TUNING, MLFLOW_TRACKING_URI
 from retail_forecasting.utils.io import winkler_score
 from retail_forecasting.utils.logging import Table, fields, rule, thousands
 from retail_forecasting.utils.provenance import get_git_commit, utc_timestamp
@@ -102,7 +102,7 @@ _FINISHED_STATES = (optuna.trial.TrialState.COMPLETE,)
 # deploys.
 _OBJECTIVE_VERSION = 4
 
-_MLFLOW_EXPERIMENT = "forecasting_tuning"
+_MLFLOW_EXPERIMENT = EXPERIMENT_FORECASTING_TUNING
 
 # Searched under the DATACLASS's names, not the backend's, so the space and the persisted JSON
 # are the same shape for both. CatBoost calls these `iterations` and `depth`; the dataclass
@@ -665,6 +665,31 @@ def judge(
     )
 
 
+PARETO_ARTIFACT = "tuning_pareto.csv"
+
+
+def build_pareto_frame(study: optuna.Study, selected_trial: int) -> pd.DataFrame:
+    """One row per scored trial, named as the dashboard reads it.
+
+    `pinball_loss`/`winkler_score` are the column names the web layer consumes; the search
+    itself calls them cost and winkler. Renaming here rather than at the reader keeps the
+    artifact self-describing for anyone who opens the CSV without the view.
+    """
+    records = [
+        {
+            "trial_number": trial.number,
+            "pinball_loss": float(trial.values[0]),
+            "winkler_score": float(trial.values[1]),
+            "is_on_front": trial in study.best_trials,
+            "is_selected": trial.number == selected_trial,
+            **trial.params,
+        }
+        for trial in study.trials
+        if trial.values and len(trial.values) >= 2
+    ]
+    return pd.DataFrame(records)
+
+
 def _build_metadata(
     verdict: Verdict,
     study: optuna.Study,
@@ -853,6 +878,19 @@ def _log_study_to_mlflow(
         if metadata.persisted and params_path.exists():
             mlflow.log_artifact(str(params_path))
 
+        # The front goes into the RUN, not a path relative to the cwd: it is what the
+        # dashboard's Pareto view reads, and a run store is the only place it can find it.
+        pareto_df = build_pareto_frame(study, best_cost_trial.number)
+        if not pareto_df.empty:
+            pareto_path = metadata_path.parent / PARETO_ARTIFACT
+            front_png = metadata_path.parent / f"pareto_front_{metadata.backend}.png"
+            pareto_df.to_csv(pareto_path, index=False)
+            render_pareto_front(pareto_df, front_png)
+            mlflow.log_artifact(str(pareto_path))
+            mlflow.log_artifact(str(front_png))
+            pareto_path.unlink()
+            front_png.unlink()
+
 
 def _track(
     study: optuna.Study,
@@ -976,31 +1014,6 @@ def tune_forecasting_models(
             "parámetros": ", ".join(f"{k}={v}" for k, v in sorted(winner_params.items())),
         },
     )
-
-    # Export Pareto front artifacts to reports/figures
-    pareto_records = []
-    for trial in study.trials:
-        if not trial.values or len(trial.values) < 2:
-            continue
-        is_front = trial in study.best_trials
-        is_selected = trial.number == winner_trial.number
-        pareto_records.append(
-            {
-                "trial_number": trial.number,
-                "cost": float(trial.values[0]),
-                "winkler": float(trial.values[1]),
-                "pinball": float(trial.values[0]),
-                "is_on_front": is_front,
-                "is_selected": is_selected,
-                **trial.params,
-            }
-        )
-    if pareto_records:
-        pareto_df = pd.DataFrame(pareto_records)
-        reports_fig_dir = Path("reports/figures")
-        reports_fig_dir.mkdir(parents=True, exist_ok=True)
-        pareto_df.to_csv(reports_fig_dir / f"pareto_{backend}.csv", index=False)
-        render_pareto_front(pareto_df, reports_fig_dir / f"pareto_front_{backend}.png")
 
     models_dir = settings.models.models_dir
     params_path = models_dir / settings.models.forecasting_params_filename

@@ -68,6 +68,8 @@ EXPERIMENT_OPS = "retail_forecasting_ops"
 # in front of the 5 that back chapter 6.
 EXPERIMENT_IMPUTATION = "retail_forecasting_imputation"
 EXPERIMENT_SENSITIVITY = "retail_forecasting_sensitivity"
+# Owned by `forecasting_tuning.py`, which set it before this module had a constant for it.
+EXPERIMENT_FORECASTING_TUNING = "forecasting_tuning"
 
 _IDENTITY_COLUMNS = ("model_name", "backend_name", "data_strategy", "observations")
 
