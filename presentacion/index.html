@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Defensa TFG · Sistema Predictivo de Demanda en Retail · Artem Mindlin</title>
+
+  <!-- Reveal.js Themes & Styles -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css" id="theme">
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- KaTeX for math -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
+  <style>
+    :root {
+      --upv-navy: #002855;
+      --upv-red: #c00000;
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-600: #475569;
+      --slate-100: #f1f5f9;
+      --slate-50: #f8fafc;
+      --blue-600: #2563eb;
+      --emerald-600: #10b981;
+      --emerald-50: #ecfdf5;
+      --amber-600: #d97706;
+      --amber-50: #fffbeb;
+      --border-color: #e2e8f0;
+    }
+
+    body, .reveal {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: var(--slate-900);
+      background-color: #ffffff;
+    }
+
+    .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      color: var(--upv-navy);
+      text-transform: none;
+    }
+
+    /* Top Progress Bar & Header */
+    .slide-header {
+      position: absolute;
+      top: 24px;
+      left: 36px;
+      right: 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 12px;
+      z-index: 10;
+    }
+    .slide-header .title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--upv-navy);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .slide-header .tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--slate-100);
+      color: var(--slate-600);
+      letter-spacing: 0.05em;
+    }
+
+    /* Slide Content Layout */
+    .content-container {
+      margin-top: 60px;
+      height: 560px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+
+    /* Grid Components & Cards */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: stretch;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-left: 5px solid var(--upv-navy);
+      border-radius: 12px;
+      padding: 20px 24px;
+      box-shadow: 0 4px 12px rgba(0, 40, 85, 0.04);
+      text-align: left;
+      font-size: 17px;
+      line-height: 1.5;
+    }
+    .card.blue { border-left-color: var(--blue-600); background: #f8faff; }
+    .card.emerald { border-left-color: var(--emerald-600); background: var(--emerald-50); }
+    .card.red { border-left-color: var(--upv-red); background: #fff5f5; }
+    .card.amber { border-left-color: var(--amber-600); background: var(--amber-50); }
+
+    .card h4 {
+      margin: 0 0 10px 0;
+      font-size: 19px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .card li {
+      margin-bottom: 8px;
+    }
+
+    /* Hero Metric Cards */
+    .stat-card {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 22px;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .stat-card .val {
+      font-size: 44px;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 6px;
+    }
+    .stat-card .sub {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--slate-600);
+      line-height: 1.3;
+    }
+
+    /* Standout Chapter Slides */
+    .standout-slide {
+      background: linear-gradient(135deg, #001f42 0%, var(--upv-navy) 100%) !important;
+      color: #ffffff !important;
+      text-align: center;
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+    }
+    .standout-slide .num {
+      font-size: 80px;
+      font-weight: 900;
+      color: var(--upv-red);
+      line-height: 1;
+      margin-bottom: 12px;
+      letter-spacing: -0.04em;
+    }
+    .standout-slide h2 {
+      font-size: 42px;
+      color: #ffffff !important;
+      margin-bottom: 14px;
+      font-weight: 800;
+    }
+    .standout-slide p {
+      font-size: 20px;
+      color: #94a3b8;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* Modern Tables */
+    .modern-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 16px;
+      text-align: left;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+      border: 1px solid var(--border-color);
+    }
+    .modern-table th {
+      background: var(--upv-navy);
+      color: white;
+      font-weight: 700;
+      padding: 12px 16px;
+      font-size: 15px;
+    }
+    .modern-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--slate-800);
+    }
+    .modern-table tr:last-child td {
+      border-bottom: none;
+    }
+    .modern-table tr:hover {
+      background-color: var(--slate-50);
+    }
+    .modern-table .highlight {
+      font-weight: 700;
+      color: var(--blue-600);
+    }
+    .badge-check {
+      background: var(--emerald-50);
+      color: var(--emerald-600);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    /* Step Pipeline Diagram */
+    .pipeline-step {
+      background: white;
+      border: 1.5px solid var(--border-color);
+      border-radius: 10px;
+      padding: 14px 10px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    .pipeline-step .step-num {
+      color: var(--upv-red);
+      font-size: 11px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-weight: 800;
+    }
+
+    /* Figures */
+    .img-frame {
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+      background: white;
+      padding: 6px;
+      max-height: 480px;
+      object-fit: contain;
+    }
+
+    /* Footer Branding */
+    .slide-footer {
+      position: absolute;
+      bottom: 20px;
+      left: 36px;
+      right: 36px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- ===================================================================== -->
+      <!-- PORTADA -->
+      <!-- ===================================================================== -->
+      <section style="text-align: left; padding: 40px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px;">
+          <div>
+            <span style="background: var(--upv-navy); color: white; padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+              Trabajo de Fin de Grado
+            </span>
+          </div>
+          <div style="font-weight: 700; color: var(--upv-navy); font-size: 16px;">
+            ETSINF · Universitat Politècnica de València
+          </div>
+        </div>
+
+        <h1 style="font-size: 40px; font-weight: 900; line-height: 1.15; margin-bottom: 18px; color: var(--upv-navy); max-width: 950px;">
+          Sistema de Predicción de Demanda para Retail con Análisis de Incertidumbre
+        </h1>
+        <p style="font-size: 21px; color: var(--slate-600); margin-bottom: 40px; font-weight: 500;">
+          Modelado con Demanda Censurada, Calibración Conformal y Optimización Newsvendor
+        </p>
+
+        <div style="display: flex; gap: 40px; border-top: 2px solid var(--border-color); padding-top: 24px;">
+          <div>
+            <div style="font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Autor</div>
+            <div style="font-size: 18px; font-weight: 700; color: var(--slate-900);">Artem Mindlin</div>
+          </div>
+          <div>
+            <div style="font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Titulación</div>
+            <div style="font-size: 18px; font-weight: 600; color: var(--slate-900);">Grado en Ingeniería Informática</div>
+          </div>
+          <div>
+            <div style="font-size: 13px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Convocatoria</div>
+            <div style="font-size: 18px; font-weight: 600; color: var(--slate-900);">Septiembre 2026</div>
+          </div>
+        </div>
+        <aside class="notes">
+          Buenas tardes a los miembros del tribunal. Hoy presento mi Trabajo de Fin de Grado...
+        </aside>
+      </section>
+
+      <!-- ===================================================================== -->
+      <!-- AGENDA -->
+      <!-- ===================================================================== -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Estructura de la Defensa (20 min)</div>
+          <div class="tag">Agenda</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2">
+            <div class="card fragment" data-fragment-index="1">
+              <h4 style="color: var(--upv-navy);">01. Contexto y Desafío</h4>
+              <ul>
+                <li>Asimetría de pérdidas en perecederos ($c_u \gg c_o$).</li>
+                <li>Censura de ventas y la trampa del error medio (MAE).</li>
+                <li>Objetivos del TFG y validación de KPIs.</li>
+              </ul>
+            </div>
+            <div class="card blue fragment" data-fragment-index="2">
+              <h4 style="color: var(--blue-600);">02. Metodología y Formulación</h4>
+              <ul>
+                <li>Pipeline modular con garantía de no-fuga (Zero-Leakage).</li>
+                <li>Reconstrucción de demanda latente supervisada.</li>
+                <li>Mondrian Conformal Prediction e inferencia Newsvendor.</li>
+              </ul>
+            </div>
+            <div class="card emerald fragment" data-fragment-index="3">
+              <h4 style="color: var(--emerald-600);">03. Resultados Experimentales</h4>
+              <ul>
+                <li>Demostración empírica de la trampa del MAE.</li>
+                <li>Optimización biobjetivo (60 trials) y frente de Pareto.</li>
+                <li>Evaluación económica de censura (-92,15%) y streaming.</li>
+              </ul>
+            </div>
+            <div class="card red fragment" data-fragment-index="4">
+              <h4 style="color: var(--upv-red);">04. Plataforma MLOps y Cierre</h4>
+              <ul>
+                <li>Sistema DSS web operacional (Django + HTMX).</li>
+                <li>Suite de 309 tests, reproducibilidad y Docker.</li>
+                <li>Limitaciones, trabajo futuro y sostenibilidad (ODS 12/13).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <!-- SECCIÓN 1: STANDOUT -->
+      <!-- ===================================================================== -->
+      <section class="standout-slide">
+        <div class="num">01</div>
+        <h2>Contexto y Desafío del Retail</h2>
+        <p>El dilema de la reposición en frescos: cuando el error estadístico destruye la rentabilidad y genera desperdicio alimentario.</p>
+      </section>
+
+      <!-- SLIDE: EL PROBLEMA -->
+      <section>
+        <div class="slide-header">
+          <div class="title">El Dilema del Inventario en Productos Frescos</div>
+          <div class="tag">01 · Contexto</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2">
+            <div class="card">
+              <h4 style="color: var(--upv-navy);">La Naturaleza de Perecederos</h4>
+              <ul>
+                <li><strong>Vida útil corta (días):</strong> Imposibilidad de almacenar excesos a largo plazo.</li>
+                <li><strong>Asimetría Económica Radical:</strong>
+                  <ul>
+                    <li>Rotura ($c_u = 4{,}0$): Pérdida directa de margen y fuga a la competencia.</li>
+                    <li>Exceso ($c_o = 1{,}0$): Merma física y coste de gestión residual.</li>
+                  </ul>
+                </li>
+                <li><strong>Marco Legal:</strong> Ley 1/2025 de prevención de pérdidas y desperdicio.</li>
+              </ul>
+            </div>
+            <div class="card red">
+              <h4 style="color: var(--upv-red);">Los Dos Fallos de los Modelos Clásicos</h4>
+              <ul>
+                <li><strong>1. Censura de Demanda por Stockout:</strong><br>
+                  Si se agota el stock ($I_t = 0$), las ventas caen a cero. El modelo clásico aprende a subestimar la demanda en picos.
+                </li>
+                <li><strong>2. Desconexión entre MAE y Dinero:</strong><br>
+                  Minimizar MAE persigue la mediana simétrica, ignorando por completo el fractil crítico financiero ($	au = 0{,}80$).
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: KPIS -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Objetivos Específicos y Matriz de Validación de KPIs</div>
+          <div class="tag">01 · Objetivos</div>
+        </div>
+        <div class="content-container">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>KPI</th>
+                <th>Métrica / Descripción</th>
+                <th>Objetivo Nominal</th>
+                <th>Resultado Empírico</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>KPI-1</strong></td>
+                <td>Cobertura conformal de intervalo $[q_{0.1}, q_{0.9}]$</td>
+                <td>$\ge 80{,}0\%$ ($lpha=0{,}2$)</td>
+                <td class="highlight"><strong>85,5%</strong></td>
+                <td><span class="badge-check">Superado</span></td>
+              </tr>
+              <tr>
+                <td><strong>KPI-2</strong></td>
+                <td>Ahorro en coste logístico Newsvendor vs Naïve</td>
+                <td>Ahorro $> 0\%$</td>
+                <td class="highlight"><strong>-9,03%</strong></td>
+                <td><span class="badge-check">Superado</span></td>
+              </tr>
+              <tr>
+                <td><strong>KPI-3</strong></td>
+                <td>Recuperación de demanda latente censurada</td>
+                <td>Reconstrucción sin fuga</td>
+                <td class="highlight"><strong>-92,15% coste</strong></td>
+                <td><span class="badge-check">Superado</span></td>
+              </tr>
+              <tr>
+                <td><strong>KPI-4</strong></td>
+                <td>Retención de servicio en streaming (drift)</td>
+                <td>Fill rate semanal</td>
+                <td class="highlight"><strong>95,43%</strong></td>
+                <td><span class="badge-check">Superado</span></td>
+              </tr>
+              <tr>
+                <td><strong>KPI-5</strong></td>
+                <td>Calidad de ingeniería y reproducibilidad</td>
+                <td>Tests automatizados</td>
+                <td class="highlight"><strong>309 / 309</strong></td>
+                <td><span class="badge-check">Superado</span></td>
+              </tr>
+              <tr>
+                <td><strong>KPI-6</strong></td>
+                <td>Latencia de ciclo completo de reentreno</td>
+                <td>$< 10$ segundos</td>
+                <td class="highlight"><strong>5,55 s</strong></td>
+                <td><span class="badge-check">Superado</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <!-- SECCIÓN 2: STANDOUT -->
+      <!-- ===================================================================== -->
+      <section class="standout-slide">
+        <div class="num">02</div>
+        <h2>Metodología y Formulación Matemática</h2>
+        <p>Arquitectura causal desacoplada: desde la imputación de censura hasta la decisión óptima de inventario.</p>
+      </section>
+
+      <!-- SLIDE: PIPELINE ARQUITECTURA -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Arquitectura Metodológica Modular End-to-End</div>
+          <div class="tag">02 · Pipeline</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-4" style="grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 24px;">
+            <div class="pipeline-step">
+              <div class="step-num">Paso 1</div>
+              <strong>Venta Bruta</strong><br>
+              <span style="font-size:11px; color:#64748b;">FreshRetailNet-50K</span>
+            </div>
+            <div class="pipeline-step" style="border-color: var(--emerald-600);">
+              <div class="step-num" style="color: var(--emerald-600);">Paso 2</div>
+              <strong>Imputación</strong><br>
+              <span style="font-size:11px; color:#64748b;">$\hat{D}_t$ latente</span>
+            </div>
+            <div class="pipeline-step" style="border-color: var(--blue-600);">
+              <div class="step-num" style="color: var(--blue-600);">Paso 3</div>
+              <strong>Forecasting</strong><br>
+              <span style="font-size:11px; color:#64748b;">GBDT Cuantílico</span>
+            </div>
+            <div class="pipeline-step" style="border-color: var(--upv-navy);">
+              <div class="step-num" style="color: var(--upv-navy);">Paso 4</div>
+              <strong>Conformal</strong><br>
+              <span style="font-size:11px; color:#64748b;">Mondrian CP</span>
+            </div>
+            <div class="pipeline-step" style="border-color: var(--upv-red);">
+              <div class="step-num" style="color: var(--upv-red);">Paso 5</div>
+              <strong>Newsvendor</strong><br>
+              <span style="font-size:11px; color:#64748b;">Pedido $q^*$</span>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="card blue">
+              <h4 style="color: var(--blue-600);">Principios de Blindaje Causal</h4>
+              <ul>
+                <li><strong>Zero-Leakage Guarantee:</strong> Ninguna fila en stockout se usa en calibración sin ajuste temporal.</li>
+                <li><strong>Embargo Temporal ($h=7$):</strong> Ventana de guarda estricta para desacoplar calibración y test.</li>
+              </ul>
+            </div>
+            <div class="card emerald">
+              <h4 style="color: var(--emerald-600);">Optimización de Decisión Real</h4>
+              <ul>
+                <li>Desacoplamiento total de métricas intermedias abstractas.</li>
+                <li>Toda la optimización de hiperparámetros se guía por el <strong>coste monetario final</strong>.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: IMPUTADOR & FORMULACIÓN -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Imputación Supervisada de Demanda Latente</div>
+          <div class="tag">02 · Imputación</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2">
+            <div class="card">
+              <h4 style="color: var(--upv-navy);">Modelo de Observación Censurada</h4>
+              <p style="font-size: 15px; margin-bottom: 12px;">La demanda observada $Y_t$ queda truncada por el stock disponible $I_t$:</p>
+              <div style="background: white; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 15px;">
+                $$Y_t = egin{cases} D_t & 	ext{si } I_t > 0 	ext{ (limpio)} \ \min(D_t, I_t) & 	ext{si } I_t = 0 	ext{ (rotura)} \end{cases}$$
+              </div>
+              <ul style="margin-top: 10px; font-size: 14px;">
+                <li>Entrenamos un regresor supervisado $G(X_t)$ únicamente sobre días limpios ($I_t > 0$).</li>
+                <li>Imputamos $\hat{D}_t = G(X_t)$ en periodos de rotura.</li>
+              </ul>
+            </div>
+
+            <div class="card amber">
+              <h4 style="color: var(--amber-600);">Hallazgo Metodológico Crítico</h4>
+              <p style="font-size: 14px;">
+                El protocolo estándar de evaluación sintética de censura es <strong>circular</strong>:
+              </p>
+              <ul style="font-size: 13.5px;">
+                <li>Al crear roturas simuladas reduciendo ventas en un factor fijo, una regla heurística que revierta el factor gana artificialmente sin aprender nada.</li>
+                <li><strong>Aportación del TFG:</strong> Demostrar que la única forma rigurosa de comparar es mediante una <strong>evaluación financiera bajo verdad común</strong>.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: CONFORMAL & NEWSVENDOR -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Calibración Conformal y Optimización Newsvendor</div>
+          <div class="tag">02 · Incertidumbre & Decisión</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2">
+            <div class="card">
+              <h4 style="color: var(--upv-navy);">Mondrian Conformal Prediction</h4>
+              <p style="font-size: 14px;">Garantía estadística finita libre de distribución ($1 - lpha = 80\%$):</p>
+              <div style="background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 14px; margin-bottom: 8px;">
+                $$P(Y_{n+1} \in \hat{C}(X_{n+1})) \ge 1 - lpha$$
+              </div>
+              <ul style="font-size: 13.5px;">
+                <li><strong>Score No-Conformidad:</strong> Residuos calibrados por varianza condicional.</li>
+                <li><strong>Estratificación Mondrian:</strong> Partición por categorías de rotación para evitar discriminación entre productos.</li>
+              </ul>
+            </div>
+
+            <div class="card emerald">
+              <h4 style="color: var(--emerald-600);">Política Newsvendor Asimétrica</h4>
+              <p style="font-size: 14px;">Fractil crítico óptimo derivado del equilibrio de costes:</p>
+              <div style="background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 14px; margin-bottom: 8px;">
+                $$	au = rac{c_u}{c_u + c_o} = rac{4{,}0}{4{,}0 + 1{,}0} = 0{,}80$$
+                $$q^* = \hat{F}_D^{-1}(	au) = \hat{y}_{	ext{pred}} + \hat{s}_{	ext{conformal}}(	au)$$
+              </div>
+              <p style="font-size: 13.5px; color: var(--slate-600);">
+                La capa conformal traslada la incertidumbre epistémica directamente a la cantidad física de pedido $q^*$.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <!-- SECCIÓN 3: STANDOUT -->
+      <!-- ===================================================================== -->
+      <section class="standout-slide">
+        <div class="num">03</div>
+        <h2>Resultados Experimentales</h2>
+        <p>Evidencia empírica sobre 500 series temporales en backtesting walk-forward: el contraste entre error estadístico y coste operativo.</p>
+      </section>
+
+      <!-- SLIDE: LA TRAMPA DEL MAE -->
+      <section>
+        <div class="slide-header">
+          <div class="title">La Trampa del MAE: Error Predictivo vs Impacto Operativo</div>
+          <div class="tag">03 · Resultados</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2" style="align-items: center;">
+            <div>
+              <img src="../memoria/figures/mae_vs_servicio.png" class="img-frame" style="width: 100%; max-height: 420px;" alt="MAE vs Servicio">
+            </div>
+            <div class="card red">
+              <h4 style="color: var(--upv-red);">El Hallazgo Fundamental</h4>
+              <ul>
+                <li><strong>Seasonal Naïve gana en MAE ($6{,}61$):</strong> Porque predice la mediana simétrica central.</li>
+                <li><strong>Pero fracasa operativamente:</strong> Sufre rotura casi la mitad del tiempo (<strong>52,45% de nivel de servicio</strong>), acumulando $123.858$ u.m. en penalizaciones.</li>
+                <li><strong>LightGBM Conformal:</strong> Acepta un MAE mayor ($8{,}06$) para alcanzar un <strong>83,55% de nivel de servicio</strong> (+31,1 p.p.) y el menor coste global ($147.646$ u.m.).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: TABLA WALK-FORWARD & HERO CARDS -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Evaluación Predictiva y Financiera Walk-Forward ($N=500$)</div>
+          <div class="tag">03 · Resultados</div>
+        </div>
+        <div class="content-container">
+          <table class="modern-table" style="margin-bottom: 20px;">
+            <thead>
+              <tr>
+                <th>Modelo</th>
+                <th>MAE</th>
+                <th>RMSE</th>
+                <th>Winkler (80%)</th>
+                <th>Coste Inventario (u.m.)</th>
+                <th>Nivel Servicio</th>
+                <th>Cobertura</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Seasonal Naïve</strong></td>
+                <td><strong>6,61</strong></td>
+                <td><strong>8,90</strong></td>
+                <td>n/a</td>
+                <td>162.299</td>
+                <td>52,45%</td>
+                <td>n/a</td>
+              </tr>
+              <tr>
+                <td><strong>CatBoost</strong></td>
+                <td>11,72</td>
+                <td>16,87</td>
+                <td>46,54</td>
+                <td>171.450</td>
+                <td>78,39%</td>
+                <td>84,6%</td>
+              </tr>
+              <tr style="background: #f0f7ff;">
+                <td><strong>LightGBM (Campeón)</strong></td>
+                <td>8,06</td>
+                <td>10,82</td>
+                <td class="highlight"><strong>36,11</strong></td>
+                <td class="highlight"><strong>147.646</strong></td>
+                <td class="highlight"><strong>83,55%</strong></td>
+                <td class="highlight"><strong>85,5%</strong></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="grid-3">
+            <div class="stat-card">
+              <div class="val" style="color: var(--blue-600);">-9,03%</div>
+              <div class="sub">Ahorro en Coste Logístico vs Baseline<br><span style="font-size:12px; color:#94a3b8;">IC95: [-15,5%, -2,7%]</span></div>
+            </div>
+            <div class="stat-card">
+              <div class="val" style="color: var(--emerald-600);">+31,1 p.p.</div>
+              <div class="sub">Salto en Nivel de Servicio<br><span style="font-size:12px; color:#94a3b8;">52,45% &rarr; 83,55%</span></div>
+            </div>
+            <div class="stat-card">
+              <div class="val" style="color: var(--upv-navy);">36,11</div>
+              <div class="sub">Winkler Score Campeón<br><span style="font-size:12px; color:#94a3b8;">Intervalos 19% más compactos</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: OPTIMIZACIÓN BIOBJETIVO & PARETO -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Sintonización Biobjetivo y Validación Out-of-Sample</div>
+          <div class="tag">03 · Hyperparameters</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2" style="align-items: center;">
+            <div>
+              <img src="../memoria/figures/tuning_comparison_60trials.png" class="img-frame" style="width: 100%; max-height: 420px;" alt="Tuning Comparison">
+            </div>
+            <div class="card blue">
+              <h4 style="color: var(--blue-600);">Protocolo Desacoplado (Optuna MOTPE)</h4>
+              <ul>
+                <li><strong>60 Ensayos por Motor:</strong> Búsqueda en frente de Pareto optimizando simultáneamente Coste Newsvendor vs Winkler Score.</li>
+                <li><strong>Validación Fuera de Muestra ($N=25$ sorteos independientes):</strong>
+                  <ul>
+                    <li>LightGBM afinado reduce un <strong>-22,66%</strong> el coste frente a parámetros por defecto.</li>
+                    <li>CatBoost afinado reduce un <strong>-10,01%</strong>.</li>
+                  </ul>
+                </li>
+                <li>Blindaje total contra sobreajuste temporal en selección.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: EVALUACIÓN DEMANDA LATENTE -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Evaluación de Demanda Latente bajo Verdad Común</div>
+          <div class="tag">03 · Censura</div>
+        </div>
+        <div class="content-container">
+          <table class="modern-table" style="margin-bottom: 20px;">
+            <thead>
+              <tr>
+                <th>Estrategia de Tratamiento</th>
+                <th>Coste Total (u.m.)</th>
+                <th>Rotura (uds)</th>
+                <th>Sobrestock (uds)</th>
+                <th>Ahorro (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Observed (Ventas sin corregir)</strong></td>
+                <td>48.910</td>
+                <td>11.240</td>
+                <td>950</td>
+                <td>Base (0%)</td>
+              </tr>
+              <tr>
+                <td><strong>Zero-filled</strong></td>
+                <td>52.340</td>
+                <td>12.450</td>
+                <td>540</td>
+                <td style="color: var(--upv-red);">+7,01% (peor)</td>
+              </tr>
+              <tr>
+                <td><strong>Heuristic Imputed</strong></td>
+                <td>18.200</td>
+                <td>3.810</td>
+                <td>2.960</td>
+                <td>-62,79%</td>
+              </tr>
+              <tr style="background: var(--emerald-50);">
+                <td><strong>Latent Supervised (LGBM)</strong></td>
+                <td class="highlight"><strong>3.839</strong></td>
+                <td class="highlight"><strong>540</strong></td>
+                <td>1.679</td>
+                <td style="color: var(--emerald-600); font-weight: 800;">-92,15%</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="card emerald">
+            <h4 style="color: var(--emerald-600);">Impacto Económico de la Reconstrucción</h4>
+            <p style="font-size: 15px; margin: 0;">
+              Al alimentar los modelos con la estimación supervisada de demanda latente en lugar de ventas censuradas, el coste por roturas masivas se reduce un <strong>-92,15%</strong> bajo una verdad-terreno común.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: SHAP EXPLICABILIDAD -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Explicabilidad Global del Modelo Campeón (SHAP)</div>
+          <div class="tag">03 · XAI</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2" style="align-items: center;">
+            <div style="text-align: center;">
+              <img src="../memoria/figures/shap_summary.png" class="img-frame" style="width: 100%; max-height: 420px;" alt="SHAP Beeswarm">
+            </div>
+            <div class="card">
+              <h4 style="color: var(--upv-navy);">Factores Clave de Decisión</h4>
+              <ul>
+                <li><strong>Medias Móviles Cortas (7 y 14 días):</strong> Dominan de forma abrumadora la importancia global del modelo.</li>
+                <li><strong>Efectos Estáticos:</strong> Los identificadores de tienda y jerarquía de categoría marcan el nivel base de reposición.</li>
+                <li><strong>Cumplimiento Regulatorio:</strong> Total transparencia algorítmica exigida por el <em>EU AI Act</em> en sistemas de apoyo operativo.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: SIMULACIÓN STREAMING -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Simulación Prequencial en Streaming (41 Días)</div>
+          <div class="tag">03 · MLOps Drift</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2" style="align-items: center;">
+            <div>
+              <img src="../memoria/figures/cumulative_cost.png" class="img-frame" style="width: 100%; max-height: 420px;" alt="Coste Acumulado">
+            </div>
+            <div class="card blue">
+              <h4 style="color: var(--blue-600);">Política de Reentrenamiento Semanal</h4>
+              <ul>
+                <li><strong>Modelo Estático (`never`):</strong> Coste $105.676{,}74$ u.m. | Fill Rate $89{,}64\%$.</li>
+                <li><strong>Reentreno Semanal (`every_7d`):</strong> Coste <strong>$63.112{,}52$ u.m.</strong> | Fill Rate <strong>$95{,}43\%$</strong>.</li>
+                <li><strong>Ahorro Operacional:</strong> <strong>-40,28%</strong> ($\Delta = -42.564$ u.m.).</li>
+                <li><strong>Eficiencia Computacional:</strong> Ciclo completo en apenas <strong>5,55 segundos</strong>.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <!-- SECCIÓN 4: STANDOUT -->
+      <!-- ===================================================================== -->
+      <section class="standout-slide">
+        <div class="num">04</div>
+        <h2>Plataforma Web y Ciclo MLOps</h2>
+        <p>De los modelos estadísticos a una herramienta interactiva de soporte a la decisión en producción.</p>
+      </section>
+
+      <!-- SLIDE: DASHBOARD WEB -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Plataforma Web Operacional (Django + HTMX + Alpine.js)</div>
+          <div class="tag">04 · Plataforma</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2" style="align-items: center;">
+            <div class="card">
+              <h4 style="color: var(--upv-navy);">Decision Support System (DSS)</h4>
+              <ul>
+                <li><strong>Simulador What-If Reactivo:</strong> Modificación instantánea de parámetros de coste ($c_u, c_o$) con recálculo dinámico de $q^*$ sin recarga de página.</li>
+                <li><strong>API REST JSON:</strong> Endpoints `/api/forecast`, `/api/skus` para integración directa con ERPs.</li>
+                <li><strong>Almacén de Corridas MLflow:</strong> Registro inmutable de hashes, parámetros y artefactos de predicción.</li>
+              </ul>
+            </div>
+            <div>
+              <img src="../memoria/figures/dashboard/ui_operacion_dashboard.png" class="img-frame" style="width: 100%; max-height: 420px;" alt="UI Dashboard">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: INGENIERÍA DE SOFTWARE & CI/CD -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Garantías de Calidad de Software y CI/CD</div>
+          <div class="tag">04 · Software Engineering</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2">
+            <div class="card blue">
+              <h4 style="color: var(--blue-600);">Suite de Tests y Contratos de Datos</h4>
+              <ul>
+                <li><strong>309 Tests Automáticos en pytest:</strong> Cobertura superior al 80% en módulos críticos.</li>
+                <li><strong>Contratos Temporales:</strong> Invariantes matemáticos que garantizan la ausencia total de data leakage.</li>
+                <li><strong>Monitorización de Drift:</strong> Detectores PSI para variables clave antes del reentrenamiento.</li>
+              </ul>
+            </div>
+            <div class="card emerald">
+              <h4 style="color: var(--emerald-600);">Despliegue y Reproducibilidad</h4>
+              <ul>
+                <li><strong>Docker Multi-Stage:</strong> Contenedorización lista para despliegue en entornos cloud.</li>
+                <li><strong>Pre-commit & Pre-push Hooks:</strong> Linters ruff, chequeo de tipos estático mypy y validación LaTeX.</li>
+                <li><strong>Licencia Abierta MIT:</strong> Repositorio versionado y completamente auditable.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <!-- SECCIÓN 5: STANDOUT -->
+      <!-- ===================================================================== -->
+      <section class="standout-slide">
+        <div class="num">05</div>
+        <h2>Conclusiones y Trabajo Futuro</h2>
+        <p>Síntesis de aportaciones, madurez científica e impacto directo en sostenibilidad.</p>
+      </section>
+
+      <!-- SLIDE: CONCLUSIONES -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Aportaciones Clave del Trabajo de Fin de Grado</div>
+          <div class="tag">05 · Conclusiones</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2">
+            <div class="card">
+              <h4 style="color: var(--upv-navy);">Aportaciones Metodológicas y Técnicas</h4>
+              <ul>
+                <li><strong>Reconstrucción de Censura:</strong> Eliminación del sesgo de rotura (-92,15% en coste logístico).</li>
+                <li><strong>Garantías Conformal:</strong> Cobertura empírica real del 85,5% en series complejas.</li>
+                <li><strong>Alineación Negocio-Matemática:</strong> Superación del MAE mediante Newsvendor asimétrico.</li>
+                <li><strong>Arquitectura MLOps End-to-End:</strong> Sistema productivo desacoplado y reproducible.</li>
+              </ul>
+            </div>
+            <div class="card emerald">
+              <h4 style="color: var(--emerald-600);">Impacto en Sostenibilidad (Agenda 2030)</h4>
+              <ul>
+                <li><strong>ODS 12 (Consumo y Producción Sostenibles):</strong> Mitigación sustancial de mermas y desperdicio en perecederos.</li>
+                <li><strong>ODS 13 (Acción por el Clima):</strong> Reducción de la huella de carbono logística evitando fletes urgentes por rotura.</li>
+                <li><strong>Ética y Transparencia:</strong> Cumplimiento RGPD y principios de explicabilidad del <em>EU AI Act</em>.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE: LIMITACIONES Y TRABAJO FUTURO -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Limitaciones del Sistema y Líneas de Investigación Futura</div>
+          <div class="tag">05 · Futuro</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2">
+            <div class="card red">
+              <h4 style="color: var(--upv-red);">Limitaciones Identificadas</h4>
+              <ul>
+                <li><strong>Intercambiabilidad Temporal:</strong> Pérdida de cobertura en regímenes con fuerte no estacionariedad.</li>
+                <li><strong>Costes Sintéticos:</strong> Ausencia de costes de merma reales procedentes del ERP.</li>
+                <li><strong>Decisiones Estáticas Aisladas:</strong> Sin arrastre de existencias entre periodos encadenados.</li>
+              </ul>
+            </div>
+            <div class="card blue">
+              <h4 style="color: var(--blue-600);">Líneas de Trabajo Futuro</h4>
+              <ul>
+                <li><strong>Conformal Prediction Adaptativa (EnbPI / ACI):</strong> Ajuste dinámico de intervalos ante drift.</li>
+                <li><strong>Gemelo Digital de Inventario con Estado:</strong> Modelado del efecto látigo y capacidades de almacén.</li>
+                <li><strong>Modelos Hurdle / Zero-Inflated:</strong> Para productos con demanda genuinamente intermitente.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <!-- CIERRE: STANDOUT -->
+      <!-- ===================================================================== -->
+      <section class="standout-slide">
+        <h1 style="font-size: 54px; font-weight: 900; color: white; margin-bottom: 20px;">¡Muchas Gracias!</h1>
+        <p style="font-size: 24px; color: #cbd5e1; margin-bottom: 30px;">Sistema de Predicción de Demanda para Retail con Análisis de Incertidumbre</p>
+        <div style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 14px 28px; border-radius: 30px; font-size: 18px; font-weight: 600;">
+          Turno de Preguntas y Discusión con el Tribunal
+        </div>
+      </section>
+
+      <!-- ===================================================================== -->
+      <!-- APÉNDICE / BACKUP SLIDES -->
+      <!-- ===================================================================== -->
+      <section>
+        <div class="slide-header">
+          <div class="title">Backup: Garantía Conformal en Muestra Finita</div>
+          <div class="tag">Anexo A · Matemáticas</div>
+        </div>
+        <div class="content-container">
+          <div class="card">
+            <h4 style="color: var(--upv-navy);">Teorema Fundamental de Cobertura Conformal</h4>
+            <p style="font-size: 15px;">
+              Bajo la hipótesis de intercambiabilidad de las observaciones $(X_1, Y_1), \dots, (X_{n+1}, Y_{n+1})$, para cualquier distribución de probabilidad conjunta $P$:
+            </p>
+            <div style="background: var(--slate-50); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 16px; margin: 12px 0;">
+              $$1 - lpha \le P\Big(Y_{n+1} \in \hat{C}(X_{n+1})\Big) \le 1 - lpha + rac{1}{n+1}$$
+            </div>
+            <p style="font-size: 14px; color: var(--slate-600);">
+              El cuantil empírico ajustado se calcula formalmente como:
+              $$\hat{q} = s_{(\lceil (n+1)(1-lpha) ceil)}$$
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="slide-header">
+          <div class="title">Backup: Trazabilidad y Reproducibilidad en MLflow</div>
+          <div class="tag">Anexo B · Trazabilidad</div>
+        </div>
+        <div class="content-container">
+          <div class="grid-2" style="align-items: center;">
+            <div>
+              <img src="../memoria/figures/mlflow/mlflow_runs_table.png" class="img-frame" style="width: 100%; max-height: 420px;" alt="MLflow Runs">
+            </div>
+            <div class="card">
+              <h4 style="color: var(--upv-navy);">Auditoría Inmutable de Experimentos</h4>
+              <ul>
+                <li><strong>Git Commit & Config Hash:</strong> Cada corrida tiene sellada la versión exacta del código.</li>
+                <li><strong>Artefactos Recomputables:</strong> Predicciones completas y métricas Newsvendor exportadas a CSV.</li>
+                <li><strong>Legado y Reproducibilidad:</strong> Un tercero puede reejecutar cualquier paso del análisis de forma determinista.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Reveal.js Core & Plugins -->
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/math/math.js"></script>
+
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: 'c/t',
+      controls: true,
+      progress: true,
+      center: false,
+      transition: 'slide', // none/fade/slide/convex/concave/zoom
+      backgroundTransition: 'fade',
+      plugins: [ RevealNotes, RevealMath.KaTeX ],
+      width: 1280,
+      height: 720,
+      margin: 0.04
+    });
+  </script>
+</body>
+</html>
