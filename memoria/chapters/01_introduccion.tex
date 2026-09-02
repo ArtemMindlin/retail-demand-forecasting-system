@@ -97,7 +97,7 @@ Para alcanzar este objetivo general, se plantean los siguientes objetivos espec�
 \begin{enumerate}[label=\textbf{O\arabic*.}, ref=O\arabic*]
     \item \label{obj:pipeline} Desarrollar un \textit{pipeline} de datos reproducible que incluya la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}, verificando que ninguna observación censurada por stockout introduce fuga de información hacia la etiqueta objetivo.
     \item \label{obj:modelos} Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos, obteniendo un coste de inventario simulado en el conjunto de test inferior al de un \textit{baseline} estacional ingenuo (\textit{seasonal naïve}).
-    \item \label{obj:conformal} \begin{sloppypar}Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con hiper-optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$) sobre el conjunto de test.\end{sloppypar}
+    \item \label{obj:conformal} Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$) sobre el conjunto de test.
     \item \label{obj:mlops} Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software,
     incluyendo trazabilidad de experimentos en un almacén de corridas, explicabilidad (SHAP),
     una API operacional y un cuadro de mandos interactivo \textit{What-If} renderizado en servidor
@@ -293,13 +293,14 @@ La presente memoria se organiza en siete capítulos adicionales:
     \item El \textbf{Capítulo 8: Presupuesto} detalla el coste económico del desarrollo del proyecto.
 \end{itemize}
 
-La memoria se completa con tres anexos. El \textbf{Anexo~\ref{anx:ods}} analiza la
+La memoria se completa con cuatro anexos. El \textbf{Anexo~\ref{anx:ods}} analiza la
 vinculación del trabajo con los Objetivos de Desarrollo Sostenible de la Agenda 2030; el
 \textbf{Anexo~\ref{anexo:dashboard}} recoge las capturas del cuadro de mandos web, que
-documentan visualmente las vistas descritas en el Capítulo~\ref{chap:implementacion}; y el
+documentan visualmente las vistas descritas en el Capítulo~\ref{chap:implementacion}; el
 \textbf{Anexo~\ref{anx:tuning_imputador}} documenta la búsqueda de hiperparámetros del
 imputador supervisado, cuyo resultado no modifica el sistema final pero deja una lección
-metodológica sobre la validez de este tipo de búsquedas.
+metodológica sobre la validez de este tipo de búsquedas; y el \textbf{Anexo~\ref{anexo:mlflow}}
+presenta la trazabilidad de corridas y artefactos en el almacén de experimentos de MLflow.
 
 Por último, dado que el texto emplea terminología específica de la previsión probabilística y de la
 gestión de inventarios, se ha incluido al inicio del documento, antes del índice, una
