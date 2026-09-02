@@ -434,3 +434,30 @@ def test_the_mondrian_radius_survives_a_categorical_grouping_column() -> None:
     assert list(forecaster._resolve_q_hat_vector(np.zeros(2), covered)) == [1.0, 2.0]
     assert list(forecaster._resolve_q_hat_vector(np.zeros(2), partial)) == [1.0, 29.5]
     assert list(forecaster._resolve_q_hat_vector(np.zeros(2), absent)) == [29.5, 29.5]
+
+
+def test_pareto_frame_carries_the_columns_the_dashboard_reads() -> None:
+    """The search and the web layer must agree on the front's column names.
+
+    They did not: the tuner wrote `pinball`/`winkler` to a path relative to the working
+    directory, while the Pareto view read `pinball_loss`/`winkler_score` out of a run's
+    artifacts. Neither the name nor the location matched, so the panel had never once
+    rendered a front. This pins both halves of that contract in one place.
+    """
+    from retail_forecasting.api.eda_charts import pareto_chart
+    from retail_forecasting.forecasting.forecasting_tuning import build_pareto_frame
+
+    def objective(trial: optuna.trial.Trial) -> tuple[float, float]:
+        x = trial.suggest_float("x", 0.0, 1.0)
+        return x, 1.0 - x
+
+    study = optuna.create_study(directions=["minimize", "minimize"])
+    study.optimize(objective, n_trials=6)
+
+    frame = build_pareto_frame(study, selected_trial=study.best_trials[0].number)
+
+    assert {"pinball_loss", "winkler_score", "is_on_front", "is_selected"} <= set(frame.columns)
+    assert len(frame) == 6
+    assert frame["is_selected"].sum() == 1
+    # The chart is the actual consumer: it indexes the two columns without a default.
+    assert pareto_chart(frame.to_dict(orient="records"))
