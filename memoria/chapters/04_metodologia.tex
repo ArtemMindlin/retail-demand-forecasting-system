@@ -814,8 +814,60 @@ Ese umbral es medible, y el sistema ya lo mide. El \textit{bootstrap} del tercer
 \begin{equation}
     \lambda \;\leq\; \frac{\text{semiancho del ruido de coste}}{\text{brecha de Winkler}} \;=\; \frac{8{,}3}{14{,}8} \;\approx\; 0{,}56 ,
 \end{equation}
-y el sistema adopta $\lambda = 0{,}5$. La lectura operativa del valor es directa: un \textit{challenger} un $2\%$ más caro necesita un $4\%$ mejor de Winkler para promocionar, magnitudes ambas dentro del ruido; uno un $10\%$ más caro necesitaría un $20\%$, y uno un $20\%$ más caro un $40\%$, exigencia que en la práctica ningún modelo satisface. El coste real, en suma, no se vende barato, y la calibración solo arbitra donde el coste ya no informa.
+y el sistema adopta $\lambda = 0{,}5$. La lectura operativa del valor es directa: un \textit{challenger} un $2\%$ más caro necesita un $4\%$ mejor de Winkler para promocionar, magnitudes ambas dentro del ruido; uno un $10\%$ más caro necesitaría un $20\%$, y uno un $20\%$ más caro un $40\%$, exigencia que en la práctica ningún modelo satisface. El coste real, en suma, no se vende barato, y la calibración solo arbitra donde el coste ya no informa. La Figura~\ref{fig:region_promocion} representa esa frontera y la banda de ruido que la acota.
 
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[x=0.155cm, y=0.062cm]
+  % Region que supera el primer guardarrail (S > 0)
+  \fill[blue!8] (-22,44) -- (11,-22) -- (22,-22) -- (22,46) -- (-22,46) -- cycle;
+  % Banda de ruido del coste
+  \fill[gray!35, opacity=0.33] (-8.3,-22) rectangle (8.3,46);
+  \draw[gray!70, dashed] (-8.3,-22) -- (-8.3,46);
+  \draw[gray!70, dashed] (8.3,-22) -- (8.3,46);
+  % Ejes
+  \draw[->,thick] (-23,0) -- (23.5,0) node[right,font=\sffamily\scriptsize] {$\Delta_{\text{cost}}$};
+  \draw[->,thick] (0,-23) -- (0,48) node[above,font=\sffamily\scriptsize] {$\Delta_{\text{wink}}$};
+  \foreach \x in {-20,-10,10,20} {
+    \draw[gray!60] (\x,0) -- (\x,-1.6);
+    \node[below,font=\sffamily\scriptsize,gray] at (\x,-1.6) {\x};
+  }
+  \foreach \yv in {20,40} {
+    \draw[gray!60] (0,\yv) -- (-0.7,\yv);
+    \node[left,font=\sffamily\scriptsize,gray] at (-0.9,\yv) {\yv};
+  }
+  % Frontera S = 0
+  \draw[blue!75,very thick] (-22,44) -- (11,-22);
+  % Brecha de Winkler observada
+  \draw[orange!85,thick,dashed] (-23,14.8) -- (23,14.8);
+  \node[right,font=\sffamily\scriptsize,orange!85] at (0.8,17.6)
+    {brecha de Winkler observada (14,8)};
+  % Puntos de ejemplo sobre la frontera
+  \foreach \px/\py in {-2/4, -10/20, -20/40} {
+    \node[circle,fill=blue!80,draw=blue!90,inner sep=1.3pt] at (\px,\py) {};
+  }
+  \draw[gray!60,thin] (0.7,6.5) -- (-1.5,4.4);
+  \node[right,font=\sffamily\scriptsize] at (0.8,6.5) {$2\% \rightarrow 4\%$};
+  \node[left=2pt,font=\sffamily\scriptsize] at (-10.6,20) {$10\% \rightarrow 20\%$};
+  \node[right=1pt,font=\sffamily\scriptsize] at (-19,43) {$20\% \rightarrow 40\%$};
+  % Corte de la frontera con la brecha observada
+  \node[circle,fill=orange!90,draw=orange!95,inner sep=1.3pt] at (-7.4,14.8) {};
+  % Etiquetas de region
+  \node[font=\sffamily\scriptsize,blue!70,align=center] at (14,34) {promociona\\ $S > 0$};
+  \node[font=\sffamily\scriptsize,gray!75,align=center] at (-16,-13) {no promociona\\ $S < 0$};
+  \node[font=\sffamily\scriptsize,gray!85] at (-1.5,-19) {banda de ruido};
+\end{tikzpicture}
+\shorthandon{>}%
+\caption[Región de promoción en el plano coste--Winkler]{Primer guardarraíl de promoción en el plano de mejoras relativas, con $\lambda = 0{,}5$.
+La frontera $S = \Delta_{\text{cost}} + \lambda\,\Delta_{\text{wink}} = 0$ tiene pendiente $-2$: cada punto
+de coste sacrificado exige dos de Winkler. La banda gris es el semiancho del ruido del \textit{bootstrap}
+($\pm 8{,}3$ pp), dentro del cual el experimento no distingue dos modelos por coste. El corte de la
+frontera con la mayor brecha de Winkler observada entre \textit{backends} (línea naranja, $14{,}8$ pp)
+cae \emph{dentro} de esa banda: con este $\lambda$, la calibración solo puede decidir donde el coste ya
+no informa, nunca revertir una diferencia de coste real.}
+\label{fig:region_promocion}
+\end{figure}
 
 \paragraph{Alcance exacto del tercer guardarraíl.} Conviene precisar qué certifica y qué no. El intervalo se calcula sobre el hueco frente al \textit{naive} estacional, no frente al campeón vigente: lo que el guardarraíl garantiza es que el \textit{challenger} bate de forma no atribuible al azar a la referencia trivial del dominio, condición necesaria pero no suficiente para afirmar que bate al campeón. El remuestreo se hace por series, y no por fechas, porque la comparación está \emph{emparejada} sobre filas idénticas: el choque de demanda de un día alcanza por igual a ambos modelos y se cancela en la diferencia, de modo que lo que queda es el desajuste idiosincrásico de cada serie; además, este diseño dispone de $500$ series frente a $21$ fechas de validación, con lo que la serie es también la unidad con más potencia estadística. Cerrar el hueco restante (un intervalo emparejado \textit{challenger} contra campeón) se recoge como línea de trabajo futuro en el Capítulo~\ref{chap:conclusiones}.
 
@@ -866,8 +918,54 @@ con $\tau_k, \tau_{k+1} \in \mathcal{Q}$ consecutivos. Con la configuración del
 \begin{equation}
     O_{s,t} = \max\!\left(0,\ \hat{Q}_{s,t}(0{,}5) + 0{,}75 \cdot \big[\hat{Q}_{s,t}(0{,}9) - \hat{Q}_{s,t}(0{,}5)\big]\right),
 \end{equation}
-es decir, la mediana predicha más tres cuartas partes de la semianchura superior del intervalo conformal. Este es el mecanismo concreto por el que el ensanchamiento por categoría de la calibración Mondrian (Sección~\ref{sec:conformal}) se traduce en un colchón de seguridad adaptativo: una categoría con mayor dispersión empírica recibe un $\hat{Q}(0{,}9)$ más alto y, con ello, un pedido proporcionalmente mayor, sin que ninguna regla adicional lo estipule.
+es decir, la mediana predicha más tres cuartas partes de la semianchura superior del intervalo conformal. La Figura~\ref{fig:fractil_interpolacion} representa la lectura geométrica de esta regla. Este es el mecanismo concreto por el que el ensanchamiento por categoría de la calibración Mondrian (Sección~\ref{sec:conformal}) se traduce en un colchón de seguridad adaptativo: una categoría con mayor dispersión empírica recibe un $\hat{Q}(0{,}9)$ más alto y, con ello, un pedido proporcionalmente mayor, sin que ninguna regla adicional lo estipule.
 
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[x=7.4cm, y=0.155cm]
+  % Zona de saturacion
+  \fill[gray!18] (0.9,0) rectangle (1.03,27);
+  % Ejes
+  \draw[->,thick] (0,0) -- (1.07,0) node[right,font=\sffamily\scriptsize] {$\tau$};
+  \draw[->,thick] (0,0) -- (0,28.5) node[above,font=\sffamily\scriptsize] {unidades};
+  \foreach \t/\lab in {0.1/0{,}1, 0.5/0{,}5, 0.9/0{,}9} {
+    \draw[gray!55,dashed] (\t,0) -- (\t,26);
+    \node[below,font=\sffamily\scriptsize,gray] at (\t,-0.4) {$\lab$};
+  }
+  \foreach \v in {6,12,22} {
+    \draw[gray!45,dotted] (0,\v) -- (0.92,\v);
+    \node[left,font=\sffamily\scriptsize,gray] at (-0.006,\v) {\v};
+  }
+  % Funcion cuantil calibrada
+  \draw[blue!75,very thick] (0.1,6) -- (0.5,12) -- (0.9,22);
+  \draw[blue!60,thick,dashed] (0.9,22) -- (1.03,22);
+  \foreach \t/\v in {0.1/6, 0.5/12, 0.9/22} {
+    \node[circle,fill=blue!80,draw=blue!90,inner sep=1.5pt] at (\t,\v) {};
+  }
+  \node[above,font=\sffamily\scriptsize,blue!75] at (0.3,13.5) {$\hat{Q}_{s,t}(\tau)$ calibrada};
+  % Fractil critico y pedido resultante
+  \draw[orange!85,thick,dashed] (0.8,0) -- (0.8,19.5) -- (0,19.5);
+  \node[circle,fill=orange!90,draw=orange!95,inner sep=1.5pt] at (0.8,19.5) {};
+  \node[below,font=\sffamily\scriptsize,orange!85] at (0.8,-3.6) {$q^\star = 0{,}80$};
+  \node[left,font=\sffamily\scriptsize,orange!85] at (-0.006,19.5) {$19{,}5$};
+  \node[right,font=\sffamily\scriptsize,orange!85] at (0.07,25.8)
+    {\mbox{$O_{s,t} = \hat{Q}(0{,}5) + 0{,}75\cdot[\hat{Q}(0{,}9) - \hat{Q}(0{,}5)]$}};
+  % Saturacion
+  \draw[gray!75,thin,dotted] (0.909,0) -- (0.909,22);
+  \node[font=\sffamily\scriptsize,gray!80,align=center,rotate=90] at (0.968,13)
+    {satura: no extrapola};
+
+\end{tikzpicture}
+\shorthandon{>}%
+\caption[Interpolación de la función cuantil en el fractil crítico]{Traducción de la distribución calibrada en cantidad de pedido. La rejilla estimada
+$\mathcal{Q} = \{0{,}1;\ 0{,}5;\ 0{,}9\}$ no contiene el fractil crítico $q^\star = 0{,}80$, de modo que
+el pedido se lee interpolando linealmente entre los dos niveles que lo rodean, a tres cuartas partes del
+tramo. Como la interpolación se hace sobre la función cuantil \emph{calibrada}, el pedido hereda la
+garantía conformal. A la derecha de $0{,}9$ (zona gris) la regla no puede extrapolar: un ratio $10{:}1$
+implicaría $q^\star \approx 0{,}909$ y el valor satura en $\hat{Q}(0{,}9)$.}
+\label{fig:fractil_interpolacion}
+\end{figure}
 
 \paragraph{Por qué se interpola en lugar de decidir con el modelo puntual.} El sistema entrena un modelo puntual con pérdida \textit{pinball} en el propio fractil crítico ($\tau = 0{,}80$), de modo que la interpolación no obedece a que ese cuantil falte. La razón es que la decisión debe tomarse sobre la distribución \emph{calibrada}, y la corrección conformal recae sobre los extremos del intervalo, no sobre la predicción puntual: decidir con esta última entregaría un pedido sin garantía de cobertura. La interpolación entre $\hat{Q}(0{,}5)$ y $\hat{Q}(0{,}9)$ sí la hereda, y desarrollar la Ecuación~\ref{eq:order_quantity} muestra su efecto neto, que es sumar $0{,}75 \cdot \hat{q}_g$ al pedido que prescribirían los cuantiles sin calibrar: el colchón adaptativo por categoría anticipado en la Sección~\ref{sec:conformal}. Con la interpolación, además, \textbf{un cambio en la asimetría de costes no exige reentrenar}: basta reevaluar la Ecuación~\ref{eq:order_quantity} con otro $q^\star$ sobre las mismas predicciones. Es esta propiedad la que hace posible el análisis de sensibilidad al ratio $c_u/c_o$ que reporta el Capítulo~\ref{chap:resultados}, en el que las predicciones permanecen fijas y solo cambia la regla de decisión.
 
@@ -898,8 +996,51 @@ El sistema resuelve esta tensión enrutando cada fila del marco de inferencia po
     \end{equation}
 \end{enumerate}
 
-La cascada recorre de lo específico a lo general y se detiene en el primer nivel con dato, de modo que un producto nuevo en una tienda hereda el comportamiento de ese mismo producto en el resto de la red antes de recurrir a su categoría. Las medias se calculan exclusivamente sobre la historia disponible en el origen de predicción (el panel de entrenamiento, o las filas estrictamente anteriores a la fecha de decisión cuando la llamada procede de la simulación en \textit{streaming}), de modo que la vía de respaldo respeta el mismo contrato causal que la vía del modelo.
+La cascada recorre de lo específico a lo general y se detiene en el primer nivel con dato, de modo que un producto nuevo en una tienda hereda el comportamiento de ese mismo producto en el resto de la red antes de recurrir a su categoría. Las medias se calculan exclusivamente sobre la historia disponible en el origen de predicción (el panel de entrenamiento, o las filas estrictamente anteriores a la fecha de decisión cuando la llamada procede de la simulación en \textit{streaming}), de modo que la vía de respaldo respeta el mismo contrato causal que la vía del modelo. La Figura~\ref{fig:cascada_respaldo} resume el enrutado completo.
 
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+  every node/.style={font=\sffamily\scriptsize, align=center},
+  box/.style={draw=blue!60, rounded corners=3pt, fill=blue!8, inner sep=5pt},
+  lvl/.style={draw=purple!70, rounded corners=3pt, fill=purple!10, text width=1.85cm,
+              minimum height=0.95cm, inner sep=3pt},
+  arr/.style={->, thick, gray!65},
+  tag/.style={font=\sffamily\scriptsize, gray!75, inner sep=1.5pt}
+]
+  \node[box, text width=5.0cm] (fila) at (0,4.4) {Fila del marco de inferencia};
+  \node[box, draw=purple!70, fill=purple!8, text width=3.1cm] (resp) at (-3.3,2.7)
+    {Vía de respaldo\\ \footnotesize sin modelo ni intervalo};
+  \node[box, text width=3.5cm] (mod) at (3.3,2.7)
+    {Vía del modelo\\ \footnotesize campeón conformal, con intervalo};
+
+  \node[lvl] (l1) at (-4.05,0.85) {serie};
+  \node[lvl] (l2) at (-1.65,0.85) {producto};
+  \node[lvl] (l3) at ( 0.75,0.85) {categoría};
+  \node[lvl] (l4) at ( 3.15,0.85) {global};
+
+  \node[box, draw=purple!70, fill=purple!8, text width=8.2cm] (out) at (-0.45,-1.2)
+    {\mbox{$\hat{Y}^{\text{resp}}_{s,t} = H \cdot \overline{y}_{\ell(s)}$}\\
+     \footnotesize media del primer nivel con historia, escalada al horizonte};
+
+  \draw[arr] (fila) -- (resp) node[tag, midway, above left=-1pt] {algún nulo};
+  \draw[arr] (fila) -- (mod)  node[tag, midway, above right=-1pt] {sin nulos};
+  \draw[arr] (resp) -- (l1);
+  \draw[arr] (l1) -- (l2);
+  \draw[arr] (l2) -- (l3);
+  \draw[arr] (l3) -- (l4);
+  \node[tag] at (-0.45,1.75) {si el nivel no tiene historia, se pasa al siguiente};
+  \foreach \n in {l1,l2,l3,l4} { \draw[arr] (\n.south) -- (\n.south |- out.north); }
+\end{tikzpicture}
+\shorthandon{>}%
+\caption[Enrutado de cobertura y cascada de respaldo jerárquico]{Enrutado de cada fila del marco de inferencia. Una sola característica nula basta para
+desviar la fila a la vía de respaldo, porque un retardo nulo imputado a cero es indistinguible, para un
+modelo de \textit{boosting}, de una serie que no vendió. La vía de respaldo recorre la jerarquía de lo
+específico a lo general y se detiene en el primer nivel con historia, de modo que un producto nuevo en
+una tienda hereda su propio comportamiento en el resto de la red antes de recurrir a la categoría.}
+\label{fig:cascada_respaldo}
+\end{figure}
 
 \subsection{Gestión por Excepciones: el Sistema como Copiloto}
 \label{sec:excepciones}
