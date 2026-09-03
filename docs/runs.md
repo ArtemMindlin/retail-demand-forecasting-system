@@ -21,8 +21,16 @@ series on the current lags and windows). These three runs supersede everything b
 | --- | --- | --- | --- |
 | `tab:metrics_predictive`, Observed arm | `tfg_observed_20260831_112611` | 500 series, 45 000 rows | 10 500 evaluation origins |
 | `tab:metrics_predictive`, Latent arm | `tfg_latent_20260831_113339` | 500 series, 45 000 rows | 10 500 evaluation origins |
+| `tab:scale_coverage`, simulated costs of §6.4, `fig:mae_vs_servicio` | `tfg_latent_20260831_113339` | 500 series, 45 000 rows | Same run as the Latent arm above: coverage, cost and service level are three readings of one execution |
 | `tab:metrics_cost` (fair cost) | `fresh_retailnet_v2_20260831_113728` | 30 sampled from 500 | 20 censoring draws, paired 95% interval |
 | `tab:cadence_summary`, `fig:cadence_cost` | `ops_sim_20260831_165703` | 500 series, 41-day eval window | 5 independent origins — the comparison is descriptive, not conclusive |
+
+Verified against the store on 3 Sep 2026: every figure chapter 6 quotes from these runs
+matches to the printed precision (cost, saving, service level, interval coverage, Winkler
+and MAE for all three models, plus the fair-cost deltas and the OPS interval). Note that
+`conclusive.every_7d` is 0.0 in the OPS run, which is what §6.7 reports as non-conclusive.
+The chapter never quotes CatBoost's absolute cost; the store puts it at 174 527 u.m., so any
+document that prints 171 450 for it is wrong.
 
 The two experiment runs are a MATCHED PAIR: same commit, same config, same seed, differing
 only in `--imputation-strategy`. That is what makes the cross-arm percentages in §6.1

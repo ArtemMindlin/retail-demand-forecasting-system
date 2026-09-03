@@ -414,7 +414,7 @@
                   Si se agota el stock ($I_t = 0$), las ventas caen a cero. El modelo clásico aprende a subestimar la demanda en picos.
                 </li>
                 <li><strong>2. Desconexión entre MAE y Dinero:</strong><br>
-                  Minimizar MAE persigue la mediana simétrica, ignorando por completo el fractil crítico financiero ($	au = 0{,}80$).
+                  Minimizar MAE persigue la mediana simétrica, ignorando por completo el fractil crítico financiero ($\tau = 0{,}80$).
                 </li>
               </ul>
             </div>
@@ -443,7 +443,7 @@
               <tr>
                 <td><strong>KPI-1</strong></td>
                 <td>Cobertura conformal de intervalo $[q_{0.1}, q_{0.9}]$</td>
-                <td>$\ge 80{,}0\%$ ($lpha=0{,}2$)</td>
+                <td>$\ge 80{,}0\%$ ($\alpha=0{,}2$)</td>
                 <td class="highlight"><strong>85,5%</strong></td>
                 <td><span class="badge-check">Superado</span></td>
               </tr>
@@ -562,7 +562,7 @@
               <h4 style="color: var(--upv-navy);">Modelo de Observación Censurada</h4>
               <p style="font-size: 15px; margin-bottom: 12px;">La demanda observada $Y_t$ queda truncada por el stock disponible $I_t$:</p>
               <div style="background: white; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 15px;">
-                $$Y_t = egin{cases} D_t & 	ext{si } I_t > 0 	ext{ (limpio)} \ \min(D_t, I_t) & 	ext{si } I_t = 0 	ext{ (rotura)} \end{cases}$$
+                $$Y_t = \begin{cases} D_t & \text{si } I_t > 0 \text{ (limpio)} \\ \min(D_t, I_t) & \text{si } I_t = 0 \text{ (rotura)} \end{cases}$$
               </div>
               <ul style="margin-top: 10px; font-size: 14px;">
                 <li>Entrenamos un regresor supervisado $G(X_t)$ únicamente sobre días limpios ($I_t > 0$).</li>
@@ -594,9 +594,9 @@
           <div class="grid-2">
             <div class="card">
               <h4 style="color: var(--upv-navy);">Mondrian Conformal Prediction</h4>
-              <p style="font-size: 14px;">Garantía estadística finita libre de distribución ($1 - lpha = 80\%$):</p>
+              <p style="font-size: 14px;">Garantía estadística finita libre de distribución ($1 - \alpha = 80\%$):</p>
               <div style="background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 14px; margin-bottom: 8px;">
-                $$P(Y_{n+1} \in \hat{C}(X_{n+1})) \ge 1 - lpha$$
+                $$P(Y_{n+1} \in \hat{C}(X_{n+1})) \ge 1 - \alpha$$
               </div>
               <ul style="font-size: 13.5px;">
                 <li><strong>Score No-Conformidad:</strong> Residuos calibrados por varianza condicional.</li>
@@ -608,8 +608,8 @@
               <h4 style="color: var(--emerald-600);">Política Newsvendor Asimétrica</h4>
               <p style="font-size: 14px;">Fractil crítico óptimo derivado del equilibrio de costes:</p>
               <div style="background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 14px; margin-bottom: 8px;">
-                $$	au = rac{c_u}{c_u + c_o} = rac{4{,}0}{4{,}0 + 1{,}0} = 0{,}80$$
-                $$q^* = \hat{F}_D^{-1}(	au) = \hat{y}_{	ext{pred}} + \hat{s}_{	ext{conformal}}(	au)$$
+                $$\tau = \frac{c_u}{c_u + c_o} = \frac{4{,}0}{4{,}0 + 1{,}0} = 0{,}80$$
+                $$q^* = \hat{F}_D^{-1}(\tau) = \hat{y}_{\text{pred}} + \hat{s}_{\text{conformal}}(\tau)$$
               </div>
               <p style="font-size: 13.5px; color: var(--slate-600);">
                 La capa conformal traslada la incertidumbre epistémica directamente a la cantidad física de pedido $q^*$.
@@ -685,7 +685,7 @@
                 <td>11,72</td>
                 <td>16,87</td>
                 <td>46,54</td>
-                <td>171.450</td>
+                <td>174.527</td>
                 <td>78,39%</td>
                 <td>84,6%</td>
               </tr>
@@ -727,20 +727,25 @@
         <div class="content-container">
           <div class="grid-2" style="align-items: center;">
             <div>
-              <img src="../memoria/figures/tuning_comparison_60trials.png" class="img-frame" style="width: 100%; max-height: 420px;" alt="Tuning Comparison">
+              <img src="../memoria/figures/tuning_comparison_60trials.png" class="img-frame" style="width: 100%; max-height: 400px;" alt="Tuning Comparison">
             </div>
-            <div class="card blue">
-              <h4 style="color: var(--blue-600);">Protocolo Desacoplado (Optuna MOTPE)</h4>
-              <ul>
-                <li><strong>60 Ensayos por Motor:</strong> Búsqueda en frente de Pareto optimizando simultáneamente Coste Newsvendor vs Winkler Score.</li>
-                <li><strong>Validación Fuera de Muestra ($N=25$ sorteos independientes):</strong>
-                  <ul>
-                    <li>LightGBM afinado reduce un <strong>-22,66%</strong> el coste frente a parámetros por defecto.</li>
-                    <li>CatBoost afinado reduce un <strong>-10,01%</strong>.</li>
-                  </ul>
-                </li>
-                <li>Blindaje total contra sobreajuste temporal en selección.</li>
-              </ul>
+            <div>
+              <div class="card blue" style="font-size: 15px; padding: 16px 20px; margin-bottom: 14px;">
+                <h4 style="color: var(--blue-600); font-size: 17px;">Protocolo Desacoplado (Optuna MOTPE)</h4>
+                <ul style="margin-bottom: 0;">
+                  <li><strong>60 ensayos por motor</strong> sobre el frente de Pareto: Coste Newsvendor vs Winkler Score.</li>
+                  <li>Selección con $N=30$ sorteos; validación <em>out-of-sample</em> con $N=25$ sorteos independientes posteriores.</li>
+                  <li>Afinar mejora a ambos motores frente a los parámetros por defecto: <strong>-22,66%</strong> (LightGBM) y <strong>-10,01%</strong> (CatBoost).</li>
+                </ul>
+              </div>
+              <div class="card amber" style="font-size: 14.5px; padding: 16px 20px;">
+                <h4 style="color: var(--amber-600); font-size: 17px;">Matiz: aquí gana CatBoost, no el campeón</h4>
+                <ul style="margin-bottom: 0;">
+                  <li>LightGBM baja a $22{,}07$ en selección pero <strong>se degrada a $34{,}03$</strong> fuera de muestra: sobreajusta su propia ventana.</li>
+                  <li>CatBoost es estable ($23{,}77 \rightarrow 29{,}93$) y resulta un <strong>12,0% más económico</strong> out-of-sample.</li>
+                  <li>Esta prueba mide el <strong>sobreajuste de cada búsqueda</strong>, no qué modelo decide mejor. El campeón lo decide el <em>walk-forward</em> a 500 series, donde el orden <strong>se invierte a favor de LightGBM</strong>.</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -753,52 +758,57 @@
           <div class="tag">03 · Censura</div>
         </div>
         <div class="content-container">
-          <table class="modern-table" style="margin-bottom: 20px;">
+          <table class="modern-table" style="margin-bottom: 16px; font-size: 15px;">
             <thead>
               <tr>
                 <th>Estrategia de Tratamiento</th>
                 <th>Coste Total (u.m.)</th>
-                <th>Rotura (uds)</th>
-                <th>Sobrestock (uds)</th>
+                <th>Fill Rate</th>
+                <th>Pedido Medio</th>
+                <th>$\Delta$ vs Observado (IC 95%)</th>
                 <th>Ahorro (%)</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>Observed (Ventas sin corregir)</strong></td>
-                <td>48.910</td>
-                <td>11.240</td>
-                <td>950</td>
-                <td>Base (0%)</td>
+                <td><strong>Observed</strong> <span style="color:#94a3b8;">(ventas sin corregir)</span></td>
+                <td>3.732,37</td>
+                <td>60,30%</td>
+                <td>4,84</td>
+                <td style="color:#94a3b8;">Referencia</td>
+                <td style="color:#94a3b8;">Base (0%)</td>
               </tr>
               <tr>
-                <td><strong>Zero-filled</strong></td>
-                <td>52.340</td>
-                <td>12.450</td>
-                <td>540</td>
-                <td style="color: var(--upv-red);">+7,01% (peor)</td>
+                <td><strong>Latent Clipped Scaling</strong></td>
+                <td>2.784,60</td>
+                <td>70,77%</td>
+                <td>5,80</td>
+                <td>-947,77 [-973,12; -922,43]</td>
+                <td>-25,39%</td>
               </tr>
               <tr>
-                <td><strong>Heuristic Imputed</strong></td>
-                <td>18.200</td>
-                <td>3.810</td>
-                <td>2.960</td>
-                <td>-62,79%</td>
+                <td><strong>Latent Historical Mean</strong></td>
+                <td>1.059,42</td>
+                <td>91,47%</td>
+                <td>8,22</td>
+                <td>-2.672,95 [-2.775,86; -2.570,03]</td>
+                <td>-71,62%</td>
               </tr>
               <tr style="background: var(--emerald-50);">
                 <td><strong>Latent Supervised (LGBM)</strong></td>
-                <td class="highlight"><strong>3.839</strong></td>
-                <td class="highlight"><strong>540</strong></td>
-                <td>1.679</td>
+                <td class="highlight"><strong>293,12</strong></td>
+                <td class="highlight"><strong>97,50%</strong></td>
+                <td>8,02</td>
+                <td class="highlight"><strong>-3.439,25 [-3.539,61; -3.338,90]</strong></td>
                 <td style="color: var(--emerald-600); font-weight: 800;">-92,15%</td>
               </tr>
             </tbody>
           </table>
 
-          <div class="card emerald">
-            <h4 style="color: var(--emerald-600);">Impacto Económico de la Reconstrucción</h4>
-            <p style="font-size: 15px; margin: 0;">
-              Al alimentar los modelos con la estimación supervisada de demanda latente en lugar de ventas censuradas, el coste por roturas masivas se reduce un <strong>-92,15%</strong> bajo una verdad-terreno común.
+          <div class="card emerald" style="font-size: 14px; padding: 14px 20px;">
+            <h4 style="color: var(--emerald-600); font-size: 17px;">Impacto Económico de la Reconstrucción</h4>
+            <p style="margin: 0;">
+              Las cuatro estrategias se puntúan contra <strong>la misma demanda real</strong>: 30 series muestreadas del panel de 500, $n = 293$ días censurados, media de <strong>20 sorteos</strong> de censura sintética. El $\Delta$ es una diferencia <strong>emparejada</strong>, no una resta de agregados, y su intervalo al 95% no cruza el cero en ninguna de las tres reconstrucciones. La corrección supervisada reduce el coste un <strong>-92,15%</strong> y eleva el <em>fill rate</em> del 60,30% al 97,50%.
             </p>
           </div>
         </div>
@@ -1003,11 +1013,11 @@
               Bajo la hipótesis de intercambiabilidad de las observaciones $(X_1, Y_1), \dots, (X_{n+1}, Y_{n+1})$, para cualquier distribución de probabilidad conjunta $P$:
             </p>
             <div style="background: var(--slate-50); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 16px; margin: 12px 0;">
-              $$1 - lpha \le P\Big(Y_{n+1} \in \hat{C}(X_{n+1})\Big) \le 1 - lpha + rac{1}{n+1}$$
+              $$1 - \alpha \le P\Big(Y_{n+1} \in \hat{C}(X_{n+1})\Big) \le 1 - \alpha + \frac{1}{n+1}$$
             </div>
             <p style="font-size: 14px; color: var(--slate-600);">
               El cuantil empírico ajustado se calcula formalmente como:
-              $$\hat{q} = s_{(\lceil (n+1)(1-lpha) ceil)}$$
+              $$\hat{q} = s_{(\lceil (n+1)(1-\alpha) \rceil)}$$
             </p>
           </div>
         </div>
