@@ -101,7 +101,7 @@ debe serlo.
         \texttt{subsample\_freq} & 0 -- 1 & & \\
         \bottomrule
     \end{tabular}
-    \caption{Espacio de búsqueda de la sintonización del imputador supervisado. La cota superior
+    \caption[Espacio de búsqueda del imputador supervisado]{Espacio de búsqueda de la sintonización del imputador supervisado. La cota superior
     de \texttt{n\_estimators} responde a una restricción de cómputo y está justificada por
     medición: a 500 series un ajuste de 8.000 árboles cuesta unos 34 segundos, lo que situaría la
     búsqueda cerca de las 43 horas frente a las 1{,}8 del recorte. Lo que se sacrifica al recortar
@@ -133,7 +133,7 @@ validación, son las de la Tabla~\ref{tab:tuning_resultado}.
         \textbf{Ganador de esta búsqueda} & \textbf{0,3370} & $\mathbf{-5{,}98\%}$ \\
         \bottomrule
     \end{tabular}
-    \caption{Las tres configuraciones puntuadas sobre las mismas 25 extracciones de validación
+    \caption[Las tres configuraciones sobre la validación común]{Las tres configuraciones puntuadas sobre las mismas 25 extracciones de validación
     (semillas 10042--10066, ventana desde el 2024-05-27, 2.455 filas evaluables por extracción).
     La fila central es una \emph{réplica}: el campeón anterior se remide aquí y devuelve un
     $-4{,}06\%$ que reproduce el $-4{,}07\%$ con el que se había persistido, lo que acredita que
@@ -197,7 +197,7 @@ un mismo conjunto de hiperparámetros se degrada de forma monótona y termina ca
         14.243 (500 series, escala de producción) & $\mathbf{+12{,}44\%}$ \\
         \bottomrule
     \end{tabular}
-    \caption{Diagnóstico del protocolo de partición por series. Signo negativo indica mejora. Los
+    \caption[Diagnóstico de la partición por series]{Diagnóstico del protocolo de partición por series. Signo negativo indica mejora. Los
     mismos hiperparámetros que mejoraban un 5{,}33\% medidos sobre el maestro empobrecido de 467
     filas resultan un 12{,}44\% \emph{peores} que no sintonizar a la escala a la que el sistema
     opera. La tabla no describe una propiedad del problema, sino el efecto de un defecto del
@@ -241,7 +241,7 @@ comunes y 300 \textit{trials} cada uno, en unas 14 horas de cómputo
         \textbf{Media} & $\mathbf{-6{,}74\%}$ & $\mathbf{-6{,}24\%}$ & $\mathbf{-0{,}50}$ \textbf{pp} & \textbf{110} & \textbf{165} \\
         \bottomrule
     \end{tabular}
-    \caption{Comparación pareada de muestreadores sobre semillas comunes, a 500 series. La
+    \caption[Comparación pareada de muestreadores]{Comparación pareada de muestreadores sobre semillas comunes, a 500 series. La
     diferencia media entre ambos (0{,}50 puntos porcentuales) es cuatro veces menor que la
     desviación de esa diferencia entre semillas (2{,}26 puntos), y su signo se invierte según la
     semilla.}

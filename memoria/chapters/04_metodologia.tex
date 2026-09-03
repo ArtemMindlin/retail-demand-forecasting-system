@@ -130,7 +130,7 @@ Entrenar directamente sobre $y_{s,t}$ en esos días introduciría un sesgo negat
   \node[right,font=\sffamily\scriptsize] at (4.65,9.85) {Demanda latente estimada $\tilde{y}_{s,t}$};
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Efecto de la censura por stockout: en los días con rotura (fondo gris), las ventas
+\caption[Efecto de la censura por stockout]{Efecto de la censura por stockout: en los días con rotura (fondo gris), las ventas
 registradas (azul) son inferiores a la demanda real. La estimación de la demanda latente
 (naranja) corrige el sesgo antes del entrenamiento.}
 \label{fig:censored_demand}
@@ -261,7 +261,7 @@ Por ejemplo, para $q = 0{,}9$ y una demanda real $y = 10$ kg: si el modelo predi
   \node[right,font=\sffamily\scriptsize] at (1.1,3.70) {$q=0{,}1$ (percentil bajo)};
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Asimetría de la función de pérdida \textit{pinball} para dos cuantiles extremos.
+\caption[Asimetría de la pérdida \textit{pinball}]{Asimetría de la función de pérdida \textit{pinball} para dos cuantiles extremos.
 Para $q=0{,}9$ (azul), subestimar la demanda se penaliza nueve veces más que sobreestimarla,
 empujando las predicciones hacia valores altos. Para $q=0{,}1$ (naranja), el efecto es inverso.}
 \label{fig:pinball_asymmetry}
@@ -568,7 +568,7 @@ El sistema utiliza una estrategia de \textbf{ventana de entrenamiento expansiva}
   \node[right,font=\sffamily\scriptsize] at (3.9,3.65) {Test ($H=7$d)};
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Esquema del \textit{backtesting walk-forward} con $K=3$ folds temporales. El conjunto
+\caption[Esquema del \textit{backtesting walk-forward}]{Esquema del \textit{backtesting walk-forward} con $K=3$ folds temporales. El conjunto
 de entrenamiento (azul) se expande progresivamente con cada fold; los últimos 14 días de cada ventana
 de entrenamiento se reservan como calibración conformal (violeta); un intervalo de guarda de $H$ días
 (gris) separa el entrenamiento del test para impedir que la etiqueta acumulada del último origen de
@@ -808,7 +808,7 @@ La Sección~\ref{sec:contrato_operacional} estableció que el plano operacional 
   \node[disp] at (7.0,-1.75) {\emph{produce:} bandera \texttt{drift\_watch}\\ sobre el tramo afectado};
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Los dos niveles de monitorización, situados en el instante en que cada uno puede evaluarse. El nivel 1 compara distribuciones de entrada y no necesita esperar a nada; el nivel 2 mide el error y por tanto solo existe una vez transcurrido el horizonte. La franja sombreada es la ventana en la que el sistema ya ha decidido y todavía no puede saber si acertó, que es la limitación que la Sección~\ref{sec:contrato_operacional} enuncia como contrato. Ninguno de los dos promueve un reentrenamiento por sí solo.}
+\caption[Los dos niveles de monitorización]{Los dos niveles de monitorización, situados en el instante en que cada uno puede evaluarse. El nivel 1 compara distribuciones de entrada y no necesita esperar a nada; el nivel 2 mide el error y por tanto solo existe una vez transcurrido el horizonte. La franja sombreada es la ventana en la que el sistema ya ha decidido y todavía no puede saber si acertó, que es la limitación que la Sección~\ref{sec:contrato_operacional} enuncia como contrato. Ninguno de los dos promueve un reentrenamiento por sí solo.}
 \label{fig:monitorizacion_niveles}
 \end{figure}
 
@@ -899,7 +899,7 @@ Para responder esta pregunta de forma empírica sobre datos genuinamente no vist
        {la historia se corta aquí:\\ nada posterior a $t$ entra};
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Un paso del bucle prequential para una cadencia $k$. En cada fecha de decisión $t$ el modelo solo ve la historia estrictamente anterior, predice hacia adelante el horizonte completo y se puntúa cuando esos días se revelan; el reentrenamiento se dispara cada $k$ días sobre la historia disponible en ese momento. El corte en $t$ es lo que hace que la comparación entre cadencias mida la política de actualización y no una fuga de información.}
+\caption[Un paso del bucle prequencial]{Un paso del bucle prequential para una cadencia $k$. En cada fecha de decisión $t$ el modelo solo ve la historia estrictamente anterior, predice hacia adelante el horizonte completo y se puntúa cuando esos días se revelan; el reentrenamiento se dispara cada $k$ días sobre la historia disponible en ese momento. El corte en $t$ es lo que hace que la comparación entre cadencias mida la política de actualización y no una fuga de información.}
 \label{fig:prequential_loop}
 \end{figure}
 

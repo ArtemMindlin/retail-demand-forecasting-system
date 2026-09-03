@@ -77,7 +77,7 @@ El sistema se organiza en cinco capas funcionales que transforman los datos brut
 \end{tikzpicture}%
 }
 \shorthandon{>}%
-\caption{Arquitectura del sistema: flujo de datos y decisiones entre las cinco capas funcionales, de la ingesta a la entrega. Los dos bloques discontinuos son transversales: el almacén de MLflow, que persiste cada ejecución para trazabilidad, y el lazo de monitorización, que vigila la distribución de entrada antes de decidir y el error una vez revelado (Sección~\ref{sec:monitorizacion}).}
+\caption[Arquitectura del sistema en cinco capas]{Arquitectura del sistema: flujo de datos y decisiones entre las cinco capas funcionales, de la ingesta a la entrega. Los dos bloques discontinuos son transversales: el almacén de MLflow, que persiste cada ejecución para trazabilidad, y el lazo de monitorización, que vigila la distribución de entrada antes de decidir y el error una vez revelado (Sección~\ref{sec:monitorizacion}).}
 \label{fig:arquitectura_sistema}
 \end{figure}
 
@@ -109,7 +109,7 @@ Las cinco capas son una abstracción del flujo, no un mapa del árbol de código
         Transversales & \texttt{tracking/}, \texttt{evaluation/}, \texttt{contracts/}, \texttt{utils/}, \texttt{eda/} \\
         \bottomrule
     \end{tabular}
-    \caption{Correspondencia entre las capas funcionales de la Figura~\ref{fig:arquitectura_sistema} y los paquetes del código. Las transversales no pertenecen a una capa porque las atraviesan: \texttt{contracts/} valida las fronteras entre todas ellas y \texttt{tracking/} registra lo que cada modo ejecuta.}
+    \caption[Correspondencia entre capas funcionales y paquetes]{Correspondencia entre las capas funcionales de la Figura~\ref{fig:arquitectura_sistema} y los paquetes del código. Las transversales no pertenecen a una capa porque las atraviesan: \texttt{contracts/} valida las fronteras entre todas ellas y \texttt{tracking/} registra lo que cada modo ejecuta.}
     \label{tab:capas_paquetes}
 \end{table}
 
@@ -221,7 +221,7 @@ El objetivo se construye aquí y solo aquí, y la Figura~\ref{fig:fila_frame} lo
 \end{tikzpicture}%
 }
 \shorthandon{>}%
-\caption{Construcción de una fila del \textit{frame} supervisado. Las características se calculan mirando hacia atrás desde el origen $t$, con los retardos y ventanas que declara la configuración, y el objetivo suma la demanda de los $H$ días que empiezan en $t$, ninguno de los cuales ha ocurrido cuando hay que decidir. La celda destacada es la regla que el contrato causal protege: las covariables que no se conocen por adelantado quedan fuera para el propio día de decisión, porque cuando hay que emitir el pedido nadie las conoce.}
+\caption[Construcción de una fila del \textit{frame} supervisado]{Construcción de una fila del \textit{frame} supervisado. Las características se calculan mirando hacia atrás desde el origen $t$, con los retardos y ventanas que declara la configuración, y el objetivo suma la demanda de los $H$ días que empiezan en $t$, ninguno de los cuales ha ocurrido cuando hay que decidir. La celda destacada es la regla que el contrato causal protege: las covariables que no se conocen por adelantado quedan fuera para el propio día de decisión, porque cuando hay que emitir el pedido nadie las conoce.}
 \label{fig:fila_frame}
 \end{figure}
 
@@ -269,7 +269,7 @@ La Figura~\ref{fig:data_pipeline} ilustra el orden de transformaciones desde la 
 \node[modfont, below=0.15cm of frame] {engineering.py};
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Pipeline de datos: flujo de transformaciones desde la ingesta hasta el frame supervisado. La validación de calidad se dibuja aparte porque no transforma el panel: lo aprueba o detiene la ejecución, distinguiendo los avisos de los fallos bloqueantes.}
+\caption[Pipeline de datos, de la ingesta al \textit{frame}]{Pipeline de datos: flujo de transformaciones desde la ingesta hasta el frame supervisado. La validación de calidad se dibuja aparte porque no transforma el panel: lo aprueba o detiene la ejecución, distinguiendo los avisos de los fallos bloqueantes.}
 \label{fig:data_pipeline}
 \end{figure}
 
@@ -337,7 +337,7 @@ Los ocho modos no son independientes: cuatro de ellos dejan en \texttt{models/} 
   \node[et, anchor=east] at (2.7,-2.6) {fuera de la cadena:};
 \end{tikzpicture}%
 \shorthandon{>}%
-\caption{Orden de ejecución impuesto por el consumo de artefactos: cada flecha marca un fichero de \texttt{models/} que el modo de destino necesita leer. Los tres modos discontinuos no escriben ninguno que otro modo consuma, así que pueden ejecutarse en cualquier momento posterior a lo que necesiten.}
+\caption[Orden de ejecución de los modos]{Orden de ejecución impuesto por el consumo de artefactos: cada flecha marca un fichero de \texttt{models/} que el modo de destino necesita leer. Los tres modos discontinuos no escriben ninguno que otro modo consuma, así que pueden ejecutarse en cualquier momento posterior a lo que necesiten.}
 \label{fig:orden_modos}
 \end{figure}
 
@@ -371,7 +371,7 @@ Una de las decisiones críticas de diseño ha sido la separación entre la optim
         \node[above of=optuna, yshift=-0.5cm] {\textbf{Optimización}\\\textbf{Desacoplada}};
         \node[above of=data, yshift=-0.4cm] {\textbf{Reentrenamiento}\\\textbf{Operacional}};
     \end{tikzpicture}
-    \caption{Ciclo de vida MLOps: optimización desacoplada frente a reentrenamiento operacional. Los dos bloques son las dos fases que enumera el texto.}
+    \caption[Ciclo de vida MLOps]{Ciclo de vida MLOps: optimización desacoplada frente a reentrenamiento operacional. Los dos bloques son las dos fases que enumera el texto.}
     \label{fig:mlops_flow}
 \end{figure}
 
@@ -437,7 +437,7 @@ Los tres guardarraíles se aplican a cada \textit{challenger} por separado, y en
   \draw[->,thick] (sel)   -- (promo);
 \end{tikzpicture}
 \shorthandon{>}%
-\caption{Flujo de decisión de la promoción del campeón. Una corrida deja una fila de coste
+\caption[Flujo de promoción del campeón]{Flujo de decisión de la promoción del campeón. Una corrida deja una fila de coste
 por modelo, y cada \textit{challenger} recorre las tres puertas por su cuenta: la puntuación
 ponderada mínima ($\theta_{\text{cost}}$), el guardarraíl de nivel de servicio
 ($\delta_{\text{sl}}$) y la condición de que su hueco de coste sea distinguible del azar.
@@ -635,7 +635,7 @@ El destino es un VPS de Hetzner bajo un dominio propio gestionado por DNS, cuya 
 
 \end{tikzpicture}%
 \shorthandon{>}%
-\caption{Topología del despliegue. Los puertos 80 y 443 los publica únicamente el contenedor de Caddy, que es el que termina TLS; el de la aplicación no publica ninguno y solo es alcanzable por su nombre dentro de la red Docker compartida, de modo que toda entrada pasa antes por el \textit{proxy}. Caddy queda fuera de esta pila porque otros seis servicios del mismo VPS dependen de él. El estado que debe sobrevivir a un despliegue se monta desde el anfitrión: reconstruir la imagen no alcanza al almacén de corridas ni al registro de campeón.}
+\caption[Topología del despliegue]{Topología del despliegue. Los puertos 80 y 443 los publica únicamente el contenedor de Caddy, que es el que termina TLS; el de la aplicación no publica ninguno y solo es alcanzable por su nombre dentro de la red Docker compartida, de modo que toda entrada pasa antes por el \textit{proxy}. Caddy queda fuera de esta pila porque otros seis servicios del mismo VPS dependen de él. El estado que debe sobrevivir a un despliegue se monta desde el anfitrión: reconstruir la imagen no alcanza al almacén de corridas ni al registro de campeón.}
 \label{fig:topologia_vps}
 \end{figure}
 

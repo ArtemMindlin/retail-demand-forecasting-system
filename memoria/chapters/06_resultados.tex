@@ -90,7 +90,7 @@ Esa descalibración no invalida la política de inventario, y conviene precisar 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/mae_vs_servicio.pdf}
-    \caption{Disociación entre el error puntual y el resultado operativo en la validación a escala (500 series, estrategia \textit{Latent Supervised}). El \textit{Seasonal Naïve} obtiene el mejor MAE; el coste de inventario apenas separa a los tres modelos; y el nivel de servicio invierte exactamente el orden del MAE. Optimizar el error puntual no equivale a optimizar la política de inventario.}
+    \caption[Error puntual frente a resultado operativo]{Disociación entre el error puntual y el resultado operativo en la validación a escala (500 series, estrategia \textit{Latent Supervised}). El \textit{Seasonal Naïve} obtiene el mejor MAE; el coste de inventario apenas separa a los tres modelos; y el nivel de servicio invierte exactamente el orden del MAE. Optimizar el error puntual no equivale a optimizar la política de inventario.}
     \label{fig:mae_vs_servicio}
 \end{figure}
 
@@ -130,14 +130,14 @@ La Tabla~\ref{tab:forecasting_tuning_results} y la Figura~\ref{fig:tuning_conver
         CatBoost & 60 & 23{,}77 & \textbf{29{,}93} & 33{,}26 & -10{,}01\% & $[-4{,}50,\; -2{,}16]$ \\
         \bottomrule
     \end{tabular}
-    \caption{Resultados de la sintonización de hiperparámetros del modelo de forecasting (régimen biobjetivo) evaluados a través de la capa de calibración conformal de 14 días. El coste de validación refleja el rendimiento \textit{out-of-sample} y el intervalo de confianza recoge la diferencia absoluta emparejada frente a la configuración por defecto.}
+    \caption[Sintonización de hiperparámetros del \textit{forecasting}]{Resultados de la sintonización de hiperparámetros del modelo de forecasting (régimen biobjetivo) evaluados a través de la capa de calibración conformal de 14 días. El coste de validación refleja el rendimiento \textit{out-of-sample} y el intervalo de confianza recoge la diferencia absoluta emparejada frente a la configuración por defecto.}
     \label{tab:forecasting_tuning_results}
 \end{table}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/tuning_comparison_60trials.pdf}
-    \caption{Sintonización de hiperparámetros de los modelos de forecasting (60 \textit{trials} por motor). A la izquierda (Panel A), convergencia del coste logístico durante la fase de selección con Optuna ($N=30$ sorteos). A la derecha (Panel B), comparación del coste logístico entre la fase de selección, la validación \textit{out-of-sample} ($N=25$ sorteos independientes) y la configuración por defecto.}
+    \caption[Convergencia y validación de la sintonización]{Sintonización de hiperparámetros de los modelos de forecasting (60 \textit{trials} por motor). A la izquierda (Panel A), convergencia del coste logístico durante la fase de selección con Optuna ($N=30$ sorteos). A la derecha (Panel B), comparación del coste logístico entre la fase de selección, la validación \textit{out-of-sample} ($N=25$ sorteos independientes) y la configuración por defecto.}
     \label{fig:tuning_convergence_60trials}
 \end{figure}
 
@@ -162,7 +162,7 @@ La formulación biobjetivo implementada permite analizar empíricamente la estru
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/pareto_front_60trials.pdf}
-    \caption{Fronteras de Pareto empíricas obtenidas mediante optimización biobjetivo (Optuna MOTPE multivariante \cite{akiba2019optuna}, 60 ensayos por motor). A la izquierda, espacio de búsqueda de LightGBM; a la derecha, espacio de búsqueda de CatBoost con sus 5 soluciones no dominadas y el óptimo seleccionado.}
+    \caption[Fronteras de Pareto de la búsqueda biobjetivo]{Fronteras de Pareto empíricas obtenidas mediante optimización biobjetivo (Optuna MOTPE multivariante \cite{akiba2019optuna}, 60 ensayos por motor). A la izquierda, espacio de búsqueda de LightGBM; a la derecha, espacio de búsqueda de CatBoost con sus 5 soluciones no dominadas y el óptimo seleccionado.}
     \label{fig:pareto_front_60trials}
 \end{figure}
 
@@ -186,7 +186,7 @@ La evaluación del componente probabilístico exige dos métricas específicas q
         \textit{Seasonal Naïve} & \textit{Latent Supervised} & \multicolumn{3}{c}{\textit{n/a: no genera intervalos de predicción}} \\
         \bottomrule
     \end{tabular}
-    \caption{Métricas de calibración conformal. Cobertura objetivo: $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$). El Seasonal Naïve es un modelo puntual y no produce intervalos cuantílicos.}
+    \caption[Métricas de calibración conformal]{Métricas de calibración conformal. Cobertura objetivo: $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$). El Seasonal Naïve es un modelo puntual y no produce intervalos cuantílicos.}
     \label{tab:conformal_metrics}
 \end{table}
 
@@ -208,7 +208,7 @@ La Tabla~\ref{tab:fold_coverage} desagrega la cobertura por fold temporal, revel
         LightGBM     & 41,1\% & 52,9\% & 81,4\% & 58,5\% \\
         \bottomrule
     \end{tabular}
-    \caption{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold de backtesting. La cobertura nominal del intervalo es del 80\% ($\alpha = 0{,}20$).}
+    \caption[Cobertura conformal por fold, subset base]{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold de backtesting. La cobertura nominal del intervalo es del 80\% ($\alpha = 0{,}20$).}
     \label{tab:fold_coverage}
 \end{table}
 
@@ -234,14 +234,14 @@ Se reejecutó el protocolo de backtesting íntegro ampliando el subset de evalua
         CatBoost  & 89{,}1\% & 81{,}5\% & 83{,}2\% & \textbf{84{,}6\%} \\
         \bottomrule
     \end{tabular}
-    \caption{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold con 500 series (10.500 observaciones por modelo). Cobertura objetivo: $\geq 80\%$ ($\alpha = 0{,}20$).}
+    \caption[Cobertura conformal por fold a 500 series]{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold con 500 series (10.500 observaciones por modelo). Cobertura objetivo: $\geq 80\%$ ($\alpha = 0{,}20$).}
     \label{tab:scale_coverage}
 \end{table}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{figures/cobertura_folds.pdf}
-    \caption{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold para LightGBM (estrategia \textit{Latent Supervised}): subset base de 50 series frente a la validación a escala con 500 series. La línea discontinua marca la cobertura nominal del 80\% ($\alpha=0{,}20$) y las líneas punteadas la media de cada experimento. El subset base infracubre gravemente (58{,}5\% de media, con dos folds por debajo del 53\%), mientras que a escala la cobertura media sube al 85{,}5\% y ningún fold baja del objetivo nominal.}
+    \caption[Cobertura por fold: subset base frente a escala]{Cobertura empírica del intervalo $[q_{0{,}1}, q_{0{,}9}]$ por fold para LightGBM (estrategia \textit{Latent Supervised}): subset base de 50 series frente a la validación a escala con 500 series. La línea discontinua marca la cobertura nominal del 80\% ($\alpha=0{,}20$) y las líneas punteadas la media de cada experimento. El subset base infracubre gravemente (58{,}5\% de media, con dos folds por debajo del 53\%), mientras que a escala la cobertura media sube al 85{,}5\% y ningún fold baja del objetivo nominal.}
     \label{fig:cobertura_folds}
 \end{figure}
 
@@ -284,7 +284,7 @@ recoge la Tabla~\ref{tab:embargo_control}.
         Con embargo ($h=7$) & \textbf{4{,}066} & \textbf{9{,}162} & 55{,}0\% & 24{,}40 \\
         \bottomrule
     \end{tabular}
-    \caption{Efecto del embargo temporal en el corte entrenamiento/calibración (CatBoost, \textit{Latent Supervised}, subset base de 50 series). La caída de cobertura es consistente en las cuatro combinaciones modelo-estrategia evaluadas (entre $-8{,}5$ y $-11{,}3$ puntos).}
+    \caption[Efecto del embargo temporal en la calibración]{Efecto del embargo temporal en el corte entrenamiento/calibración (CatBoost, \textit{Latent Supervised}, subset base de 50 series). La caída de cobertura es consistente en las cuatro combinaciones modelo-estrategia evaluadas (entre $-8{,}5$ y $-11{,}3$ puntos).}
     \label{tab:embargo_control}
 \end{table}
 
@@ -320,7 +320,7 @@ La Figura~\ref{fig:shap_summary} muestra el \textit{beeswarm plot} global del mo
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.82\textwidth]{figures/shap_summary.png}
-    \caption{SHAP \textit{beeswarm plot} del modelo campeón LightGBM (top-20 features por importancia global). El eje horizontal mide el impacto en la predicción; el color indica el valor de la feature (rojo = alto, azul = bajo). Las dos medias móviles de demanda dominan la importancia por un margen amplio, seguidas de las sumas rodantes y de los identificadores estáticos de producto y tienda. Los rezagos directos no aparecen en el gráfico: quedan fuera del top-20 que se representa.}
+    \caption[SHAP \textit{beeswarm} del modelo campeón]{SHAP \textit{beeswarm plot} del modelo campeón LightGBM (top-20 features por importancia global). El eje horizontal mide el impacto en la predicción; el color indica el valor de la feature (rojo = alto, azul = bajo). Las dos medias móviles de demanda dominan la importancia por un margen amplio, seguidas de las sumas rodantes y de los identificadores estáticos de producto y tienda. Los rezagos directos no aparecen en el gráfico: quedan fuera del top-20 que se representa.}
     \label{fig:shap_summary}
 \end{figure}
 
@@ -357,7 +357,7 @@ El índice compara la distribución de cada variable entre la mitad temporal ant
         \texttt{discount\_lag\_1}       & 0{,}102 & 0{,}003 & Estable ($<0{,}10$) \\
         \bottomrule
     \end{tabular}
-    \caption{Índice de Estabilidad Poblacional (PSI) por variable entre la primera y la segunda mitad del panel supervisado (500 series), evaluado sobre las variables de mayor impacto en el modelo campeón. Bandas de control: estable ($<0{,}10$), seguimiento ($0{,}10$--$0{,}20$) y crítico ($>0{,}20$).}
+    \caption[PSI por variable entre mitades del panel]{Índice de Estabilidad Poblacional (PSI) por variable entre la primera y la segunda mitad del panel supervisado (500 series), evaluado sobre las variables de mayor impacto en el modelo campeón. Bandas de control: estable ($<0{,}10$), seguimiento ($0{,}10$--$0{,}20$) y crítico ($>0{,}20$).}
     \label{tab:psi_drift}
 \end{table}
 
@@ -374,7 +374,7 @@ Del análisis de la Tabla~\ref{tab:psi_drift} se extraen tres conclusiones funda
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.62\textwidth]{figures/psi_decomposition.pdf}
-    \caption{Descomposición del PSI de \texttt{demand\_roll\_mean\_14} ($\text{PSI} = 0{,}139$) por decil de la distribución de referencia. La línea discontinua marca el $10\%$ teórico por tramo. Los siete primeros deciles permanecen estables; la masa se desplaza desde los deciles 8 y 9 hacia el decil 10 ($20{,}5\%$), concentrando en estos tres tramos el $96\%$ de la divergencia calculada.}
+    \caption[Descomposición del PSI por decil]{Descomposición del PSI de \texttt{demand\_roll\_mean\_14} ($\text{PSI} = 0{,}139$) por decil de la distribución de referencia. La línea discontinua marca el $10\%$ teórico por tramo. Los siete primeros deciles permanecen estables; la masa se desplaza desde los deciles 8 y 9 hacia el decil 10 ($20{,}5\%$), concentrando en estos tres tramos el $96\%$ de la divergencia calculada.}
     \label{fig:psi_decomposition}
 \end{figure}
 
@@ -401,14 +401,14 @@ Se contrastó la política estática (\texttt{never}, el modelo inicial nunca se
         \bottomrule
     \end{tabular}%
     }
-    \caption{Simulación operacional en \textit{streaming} (ventana de 41 días, 500 series, 5 orígenes independientes, campeón LightGBM afinado). El refresco semanal reduce el coste de inventario un $40{,}28\%$ frente al modelo estático, con un intervalo al $95\%$ de $[-57{,}45\%,\ -17{,}00\%]$ que la Sección declara no concluyente por el número de orígenes disponibles.}
+    \caption[Simulación en \textit{streaming} por cadencia]{Simulación operacional en \textit{streaming} (ventana de 41 días, 500 series, 5 orígenes independientes, campeón LightGBM afinado). El refresco semanal reduce el coste de inventario un $40{,}28\%$ frente al modelo estático, con un intervalo al $95\%$ de $[-57{,}45\%,\ -17{,}00\%]$ que la Sección declara no concluyente por el número de orígenes disponibles.}
     \label{tab:cadence_summary}
 \end{table}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.86\textwidth]{figures/cadence_cost.pdf}
-    \caption{Coste de inventario acumulado por política a lo largo de los cinco orígenes independientes de la ventana de evaluación. Cada marcador es una de las decisiones semanales sobre las que se calcula la comparación, de modo que la curva no sugiere más evidencia de la que respalda el intervalo. La separación se abre de forma sostenida y no procede de una única semana adversa.}
+    \caption[Coste acumulado por política de reentrenamiento]{Coste de inventario acumulado por política a lo largo de los cinco orígenes independientes de la ventana de evaluación. Cada marcador es una de las decisiones semanales sobre las que se calcula la comparación, de modo que la curva no sugiere más evidencia de la que respalda el intervalo. La separación se abre de forma sostenida y no procede de una única semana adversa.}
     \label{fig:cadence_cost}
 \end{figure}
 
@@ -449,7 +449,7 @@ La Tabla~\ref{tab:kpi_verification} compara los objetivos cuantitativos y operac
         \bottomrule
     \end{tabular}%
     }
-    \caption{Verificación de los KPIs del trabajo en correspondencia con los cuatro objetivos específicos (\ref{obj:pipeline}, \ref{obj:modelos}, \ref{obj:conformal} y \ref{obj:mlops}) definidos en la Sección~\ref{sec:objetivos}. \checkmark = cumplido; $\times$ = no alcanzado; Parcial = cumplido con matices.}
+    \caption[Verificación de los KPIs frente a los objetivos]{Verificación de los KPIs del trabajo en correspondencia con los cuatro objetivos específicos (\ref{obj:pipeline}, \ref{obj:modelos}, \ref{obj:conformal} y \ref{obj:mlops}) definidos en la Sección~\ref{sec:objetivos}. \checkmark = cumplido; $\times$ = no alcanzado; Parcial = cumplido con matices.}
     \label{tab:kpi_verification}
 \end{table}
 
