@@ -336,7 +336,59 @@ Esta operación garantiza formalmente la monotonicidad de la rejilla estimada:
     \hat{y}_{s,t}^{(1)} \le \hat{y}_{s,t}^{(2)} \le \dots \le \hat{y}_{s,t}^{(M)}
 \end{equation}
 
-Este procedimiento es computacionalmente ligero ($\mathcal{O}(M \log M)$, equivalente a ordenar con \texttt{np.sort} sobre el eje de cuantiles) y posee una propiedad teórica fundamental \cite{chernozhukov2010quantile}: el \textit{rearrangement} reduce (o mantiene) la pérdida cuantílica integrada sobre todos los niveles de cuantil respecto a las estimaciones originales.
+Este procedimiento es computacionalmente ligero ($\mathcal{O}(M \log M)$, equivalente a ordenar con \texttt{np.sort} sobre el eje de cuantiles) y posee una propiedad teórica fundamental \cite{chernozhukov2010quantile}: el \textit{rearrangement} reduce (o mantiene) la pérdida cuantílica integrada sobre todos los niveles de cuantil respecto a las estimaciones originales. La Figura~\ref{fig:quantile_crossing} contrasta la rejilla cruda con la reordenada.
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[xscale=1.0, yscale=0.78,
+    pt/.style={circle, fill=blue!70, draw=blue!85, inner sep=1.4pt}]
+  % Panel (a): rejilla cruda
+  \draw[->,thick] (-0.1,0) -- (5.1,0) node[right,font=\sffamily\scriptsize] {$q$};
+  \draw[->,thick] (0,-0.15) -- (0,5.3) node[above,font=\sffamily\scriptsize] {$\hat{y}_q$};
+  \foreach \x/\q in {0.7/0{,}1, 1.6/0{,}3, 2.5/0{,}5, 3.4/0{,}7, 4.3/0{,}9} {
+    \node[below,font=\sffamily\scriptsize] at (\x,-0.15) {$\q$};
+    \draw[gray!30] (\x,0) -- (\x,4.9);
+  }
+  \draw[blue!70,thick] (0.7,1.2) -- (1.6,2.1) -- (2.5,2.9) -- (3.4,4.3);
+  \draw[red!75,very thick] (3.4,4.3) -- (4.3,3.5);
+  \foreach \x/\y in {0.7/1.2, 1.6/2.1, 2.5/2.9} { \node[pt] at (\x,\y) {}; }
+  \node[circle, fill=red!70, draw=red!85, inner sep=1.4pt] at (3.4,4.3) {};
+  \node[circle, fill=red!70, draw=red!85, inner sep=1.4pt] at (4.3,3.5) {};
+  \node[font=\sffamily\scriptsize, red!80] at (3.85,5.05) {cruce};
+  \draw[red!70,thin] (3.85,4.85) -- (3.9,4.0);
+  \node[font=\sffamily\scriptsize] at (2.5,-1.0) {(a) rejilla cruda};
+
+  % Flecha de reordenacion
+  \draw[->,very thick,gray!70] (5.45,2.4) -- (6.55,2.4);
+  \node[above,font=\sffamily\scriptsize,gray] at (6.0,2.5) {\texttt{sort}};
+
+  % Panel (b): tras el rearrangement
+  \begin{scope}[xshift=7cm]
+  \draw[->,thick] (-0.1,0) -- (5.1,0) node[right,font=\sffamily\scriptsize] {$q$};
+  \draw[->,thick] (0,-0.15) -- (0,5.3) node[above,font=\sffamily\scriptsize] {$\hat{y}_q$};
+  \foreach \x/\q in {0.7/0{,}1, 1.6/0{,}3, 2.5/0{,}5, 3.4/0{,}7, 4.3/0{,}9} {
+    \node[below,font=\sffamily\scriptsize] at (\x,-0.15) {$\q$};
+    \draw[gray!30] (\x,0) -- (\x,4.9);
+  }
+  \draw[blue!70,thick] (0.7,1.2) -- (1.6,2.1) -- (2.5,2.9) -- (3.4,3.5) -- (4.3,4.3);
+  \foreach \x/\y in {0.7/1.2, 1.6/2.1, 2.5/2.9} { \node[pt] at (\x,\y) {}; }
+  \node[circle, fill=orange!80, draw=orange!90, inner sep=1.4pt] at (3.4,3.5) {};
+  \node[circle, fill=orange!80, draw=orange!90, inner sep=1.4pt] at (4.3,4.3) {};
+  \draw[orange!85,thin,dashed] (3.4,4.3) -- (4.3,4.3);
+  \draw[orange!85,thin,dashed] (3.4,3.5) -- (4.3,3.5);
+  \node[font=\sffamily\scriptsize, orange!85] at (3.85,5.05) {intercambiados};
+  \node[font=\sffamily\scriptsize] at (2.5,-1.0) {(b) tras el \textit{rearrangement}};
+  \end{scope}
+\end{tikzpicture}
+\shorthandon{>}%
+\caption[Cruzamiento de cuantiles y su corrección]{Cruzamiento de cuantiles y su corrección. En (a) los estimadores se entrenan de forma
+independiente y el del cuantil $0{,}7$ predice por encima del de $0{,}9$ (segmento rojo), lo que hace
+que la rejilla deje de ser una distribución acumulada válida. En (b) el \textit{rearrangement} devuelve
+la monotonicidad limitándose a intercambiar las posiciones de los dos valores en conflicto (naranja):
+ningún valor predicho se modifica, solo su asignación a un nivel de cuantil.}
+\label{fig:quantile_crossing}
+\end{figure}
 
 \paragraph{Descarte de la Regresión Isotónica (PAVA).}
 Frente al \textit{rearrangement}, la alternativa clásica para forzar monotonicidad es la regresión isotónica mediante el algoritmo \textbf{PAVA} (\textit{Pool Adjacent Violators Algorithm}) \cite{barlow1972isotonic}. PAVA recorre el vector y promedia sucesivamente los pares adyacentes que violan el orden para encontrar la proyección más cercana en norma $L_2$. Sin embargo, PAVA no ofrece garantías de mejora sobre la función de pérdida \textit{Pinball} y modifica activamente los valores predichos al promediarlos, mientras que el \textit{rearrangement} preserva exactamente los cuantiles aprendidos por el modelo reorganizando únicamente sus posiciones.
@@ -383,13 +435,62 @@ Para un intervalo central $[L_{s,t},\, U_{s,t}]$ con nivel de significancia nomi
 El primer término representa el \emph{pago base} correspondiente a la amplitud del intervalo $(U - L)$, incentivando bandas estrechas. Cuando la demanda real $y_{s,t}$ cae fuera del intervalo, se añade una penalización lineal a la distancia al borde multiplicada por el factor $2/\alpha$ (en este caso, un factor amplificador de $\times 10$). La métrica se promedia sobre todas las series y horizontes evaluados (\textbf{valores más bajos indican mejor calibración}).
 
 \medskip
-\noindent\textbf{Ejemplo numérico.} Supóngase que el modelo predice el intervalo $[10, 20]$ unidades para la demanda acumulada (amplitud $= 10$, $\alpha = 0{,}2$):
+\noindent\textbf{Ejemplo numérico.} Supóngase que el modelo predice el intervalo $[10, 20]$ unidades para la demanda acumulada (amplitud $= 10$, $\alpha = 0{,}2$). La Figura~\ref{fig:winkler_score} representa la función completa y sitúa sobre ella los tres casos:
 
 \begin{itemize}
     \item \textbf{Caso 1 (acierto):} si la demanda real es $y = 15$ (dentro del intervalo), $W = 20 - 10 = \mathbf{10}$. Solo se penaliza la amplitud.
     \item \textbf{Caso 2 (fallo por defecto):} si la demanda real es $y = 5$ ($y < L$), $W = 10 + \frac{2}{0{,}2}(10 - 5) = 10 + 50 = \mathbf{60}$. El fallo de cobertura multiplica por seis la penalización.
     \item \textbf{Caso 3 (fallo por exceso):} si la demanda real es $y = 25$ ($y > U$), $W = 10 + \frac{2}{0{,}2}(25 - 20) = 10 + 50 = \mathbf{60}$.
 \end{itemize}
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[x=0.26cm, y=0.032cm]
+  % Banda del intervalo predicho
+  \fill[blue!8] (10,0) rectangle (20,122);
+  % Rejilla horizontal
+  \foreach \v in {10,60,110} {
+    \draw[gray!35,dashed] (0,\v) -- (32,\v);
+    \node[left,font=\sffamily\scriptsize,gray] at (-0.6,\v) {\v};
+  }
+  % Ejes
+  \draw[->,thick] (-0.5,0) -- (33.5,0) node[right,font=\sffamily\scriptsize] {$y$ real};
+  \draw[->,thick] (0,-4) -- (0,132) node[above,font=\sffamily\scriptsize] {$W$};
+  % Curva de la funcion a trozos
+  \draw[blue!70,very thick] (0,110) -- (10,10) -- (20,10) -- (30,110);
+  % Marcas del eje x
+  \foreach \x in {5,15,25} {
+    \draw[gray!60] (\x,0) -- (\x,-3);
+    \node[below,font=\sffamily\scriptsize] at (\x,-3) {\x};
+  }
+  \draw[gray!60] (10,0) -- (10,-3);
+  \node[below,font=\sffamily\scriptsize] at (10,-3) {$L=10$};
+  \draw[gray!60] (20,0) -- (20,-3);
+  \node[below,font=\sffamily\scriptsize] at (20,-3) {$U=20$};
+  % Los tres casos del ejemplo
+  \node[circle,fill=orange!85,draw=orange!95,inner sep=1.4pt] at (15,10) {};
+  \node[circle,fill=orange!85,draw=orange!95,inner sep=1.4pt] at (5,60) {};
+  \node[circle,fill=orange!85,draw=orange!95,inner sep=1.4pt] at (25,60) {};
+  \node[above=2pt,font=\sffamily\scriptsize] at (15,10) {Caso 1};
+  \node[above=2pt,font=\sffamily\scriptsize] at (5,60) {Caso 2};
+  \node[above=2pt,font=\sffamily\scriptsize] at (25,60) {Caso 3};
+  % Anotaciones
+  \node[font=\sffamily\scriptsize,gray!80,align=center] at (15,52)
+    {pago base\\ $U-L$};
+  \draw[gray!60,thin] (15,41) -- (15,26);
+  \node[font=\sffamily\scriptsize,gray!80,rotate=-51] at (7.5,78) {pendiente $2/\alpha=10$};
+  \node[font=\sffamily\scriptsize,gray!80,rotate=51] at (22.5,78) {pendiente $2/\alpha=10$};
+  \node[font=\sffamily\scriptsize,blue!70] at (15,128) {intervalo predicho};
+\end{tikzpicture}
+\shorthandon{>}%
+\caption[Winkler Score como función de la demanda observada]{Winkler Score en función de la demanda observada, para el intervalo predicho $[10, 20]$
+con $\alpha = 0{,}2$. Dentro del intervalo la puntuación es constante e igual a la amplitud, de modo que
+la única forma de mejorarla es estrechar la banda; fuera de él crece con pendiente $2/\alpha = 10$, lo que
+penaliza el fallo de cobertura muy por encima de lo que cuesta ensanchar. Los tres puntos naranjas son
+los casos del ejemplo numérico.}
+\label{fig:winkler_score}
+\end{figure}
 
 Si en cambio el modelo produjera un intervalo trivial e hiper-conservador $[0, 100]$ unidades, cubriría siempre la demanda real pero incurriría en un pago constante de $W = 100$, muy superior al del intervalo ajustado. Por estas propiedades, el \textbf{Winkler Score se integra directamente como el segundo objetivo en la búsqueda biobjetivo}: actúa penalizando activamente aquellas configuraciones de hiperparámetros que logren reducir el coste logístico a expensas de deformar, ensanchar o descalibrar los intervalos de incertidumbre predichos.
 
@@ -420,8 +521,8 @@ con la estrategia \textbf{Mondrian} \cite{vovk2005algorithmic}: en lugar de un �
 $\hat{q}$ global, se calcula un $\hat{q}_g$ independiente para cada grupo taxonómico $g$,
 garantizando que la cobertura se cumpla dentro de cada familia de producto por separado.
 El $\hat{q}$ global se conserva como valor de seguridad (\textit{fallback}) para SKUs cuya
-categoría no haya aparecido en el set de calibración. El procedimiento completo es el
-siguiente:
+categoría no haya aparecido en el set de calibración. El procedimiento completo, resumido en la
+Figura~\ref{fig:mondrian_conformal}, es el siguiente:
 
 \begin{enumerate}
     \item \textbf{Partición Taxonómica}: Las series temporales se agrupan en categorías homogéneas
@@ -464,6 +565,56 @@ siguiente:
     \end{equation}
     Este ensanchamiento produce bandas con cobertura condicional garantizada dentro de cada grupo y, simultáneamente, traslada una ventaja directa a la operativa de compras: al calcular la cantidad de pedido $O_{s,t}$ interpolando en el fractil crítico ($q^\star = 0{,}80$) entre la mediana y el cuantil superior $P90$ calibrado (Sección~\ref{sec:newsvendor_operativo}), la orden se incrementa proporcionalmente en $+0{,}75 \cdot \hat{q}_g$. Esto genera automáticamente un \textbf{colchón de stock de seguridad adaptativo por categoría} que protege al almacén contra el coste asimétrico de rotura ($c_u = 4{,}0$ frente a $c_o = 1{,}0$) en función de la verdadera dispersión empírica de cada familia de productos.
 \end{enumerate}
+
+\begin{figure}[H]
+\centering
+\shorthandoff{>}%
+\begin{tikzpicture}[
+  every node/.style={font=\sffamily\scriptsize, align=center},
+  box/.style={draw=blue!60, rounded corners=3pt, fill=blue!8, inner sep=5pt},
+  grp/.style={draw=purple!70, rounded corners=3pt, fill=purple!10, text width=2.3cm,
+              minimum height=1.5cm, inner sep=4pt},
+  fb/.style={draw=gray!70, dashed, rounded corners=3pt, fill=gray!10, text width=2.3cm,
+             minimum height=1.5cm, inner sep=4pt},
+  arr/.style={->, thick, gray!65}
+]
+  \node[box, text width=6.6cm] (cal) at (0,5.9)
+    {Conjunto de calibración\\ \footnotesize últimos 14 días del \textit{train}, no usados en el ajuste};
+  \node[box, text width=8.0cm] (score) at (0,4.2)
+    {Score de no conformidad CQR por observación\\[2pt]
+     \mbox{$s_i = \max\!\left(\hat{y}_{P10}(x_i) - y_i,\ y_i - \hat{y}_{P90}(x_i)\right)$}};
+  \node[gray!75] (part) at (0,2.95) {partición por \texttt{third\_category\_id}};
+
+  \node[grp] (g1) at (-4.3,1.6) {Categoría $g_1$\\[2pt] $\hat{q}_{g_1}$ bajo\\[1pt] \footnotesize estable};
+  \node[grp] (g2) at (-1.45,1.6) {Categoría $g_2$\\[2pt] $\hat{q}_{g_2}$ medio\\[1pt] \footnotesize regular};
+  \node[grp] (g3) at ( 1.4,1.6) {Categoría $g_3$\\[2pt] $\hat{q}_{g_3}$ alto\\[1pt] \footnotesize intermitente};
+  \node[fb]  (fb) at ( 4.25,1.6) {$\hat{q}_{\text{global}}$\\[2pt] \footnotesize respaldo si $n_g = 0$ o la categoría es nueva};
+
+  \node[box, text width=9.0cm] (out) at (0,-0.9)
+    {Intervalo ajustado, un ensanchamiento propio por familia\\[2pt]
+     \mbox{$\left[\max(\hat{y}_{P10} - \hat{q}_g,\ 0),\ \hat{y}_{P90} + \hat{q}_g\right]$}\\[2pt]
+     \footnotesize cobertura del 80\% \emph{dentro} de cada categoría, no solo en media};
+
+  \draw[arr] (cal) -- (score);
+  \draw[arr] (score) -- (part);
+  \draw[arr] (part) -- (g1.north);
+  \draw[arr] (part) -- (g2.north);
+  \draw[arr] (part) -- (g3.north);
+  \draw[arr, dashed] (part) -- (fb.north);
+  \draw[arr] (g1.south) -- (g1.south |- out.north);
+  \draw[arr] (g2.south) -- (g2.south |- out.north);
+  \draw[arr] (g3.south) -- (g3.south |- out.north);
+  \draw[arr, dashed] (fb.south) -- (fb.south |- out.north);
+\end{tikzpicture}
+\shorthandon{>}%
+\caption[Calibración Mondrian Conformal por categoría]{Calibración \textit{Mondrian Conformal}. Los scores de no conformidad calculados sobre la
+ventana de calibración se agrupan por categoría de producto, y cada grupo obtiene su propio factor
+corrector $\hat{q}_g$ en lugar de compartir uno global. Así, las familias con demanda dispersa reciben
+bandas más anchas y las estables no pagan por ellas, que es lo que un $\hat{q}$ único enmascara. El
+factor global se conserva únicamente como respaldo (trazo discontinuo) para categorías ausentes de la
+ventana de calibración.}
+\label{fig:mondrian_conformal}
+\end{figure}
 
 \paragraph{Limitación: intercambiabilidad en series temporales.}
 La garantía de cobertura de Split CP y CQR asume que las observaciones de calibración y test son
@@ -665,6 +816,7 @@ Ese umbral es medible, y el sistema ya lo mide. El \textit{bootstrap} del tercer
 \end{equation}
 y el sistema adopta $\lambda = 0{,}5$. La lectura operativa del valor es directa: un \textit{challenger} un $2\%$ más caro necesita un $4\%$ mejor de Winkler para promocionar, magnitudes ambas dentro del ruido; uno un $10\%$ más caro necesitaría un $20\%$, y uno un $20\%$ más caro un $40\%$, exigencia que en la práctica ningún modelo satisface. El coste real, en suma, no se vende barato, y la calibración solo arbitra donde el coste ya no informa.
 
+
 \paragraph{Alcance exacto del tercer guardarraíl.} Conviene precisar qué certifica y qué no. El intervalo se calcula sobre el hueco frente al \textit{naive} estacional, no frente al campeón vigente: lo que el guardarraíl garantiza es que el \textit{challenger} bate de forma no atribuible al azar a la referencia trivial del dominio, condición necesaria pero no suficiente para afirmar que bate al campeón. El remuestreo se hace por series, y no por fechas, porque la comparación está \emph{emparejada} sobre filas idénticas: el choque de demanda de un día alcanza por igual a ambos modelos y se cancela en la diferencia, de modo que lo que queda es el desajuste idiosincrásico de cada serie; además, este diseño dispone de $500$ series frente a $21$ fechas de validación, con lo que la serie es también la unidad con más potencia estadística. Cerrar el hueco restante (un intervalo emparejado \textit{challenger} contra campeón) se recoge como línea de trabajo futuro en el Capítulo~\ref{chap:conclusiones}.
 
 Entre todos los \textit{challengers} que superan los tres guardarraíles se promociona el de mayor puntuación $S$, con el nivel de servicio como criterio de desempate. La decisión completa (ambos identificadores de modelo, $\Delta_{\text{cost}}$, $\Delta_{\text{sl}}$ y el motivo de aceptación o rechazo) se persiste junto a la ejecución, de modo que el historial de cambios de modelo es auditable a posteriori. Este diseño prioriza la estabilidad operacional frente a la optimización agresiva: un modelo que recorte costes a costa de roturas frecuentes nunca alcanzará producción, y uno que las recorte por una diferencia indistinguible del azar tampoco. El flujo de decisión y los parámetros de configuración se detallan en la Sección~\ref{sec:champion_promotion}.
@@ -716,6 +868,7 @@ con $\tau_k, \tau_{k+1} \in \mathcal{Q}$ consecutivos. Con la configuración del
 \end{equation}
 es decir, la mediana predicha más tres cuartas partes de la semianchura superior del intervalo conformal. Este es el mecanismo concreto por el que el ensanchamiento por categoría de la calibración Mondrian (Sección~\ref{sec:conformal}) se traduce en un colchón de seguridad adaptativo: una categoría con mayor dispersión empírica recibe un $\hat{Q}(0{,}9)$ más alto y, con ello, un pedido proporcionalmente mayor, sin que ninguna regla adicional lo estipule.
 
+
 \paragraph{Por qué se interpola en lugar de decidir con el modelo puntual.} El sistema entrena un modelo puntual con pérdida \textit{pinball} en el propio fractil crítico ($\tau = 0{,}80$), de modo que la interpolación no obedece a que ese cuantil falte. La razón es que la decisión debe tomarse sobre la distribución \emph{calibrada}, y la corrección conformal recae sobre los extremos del intervalo, no sobre la predicción puntual: decidir con esta última entregaría un pedido sin garantía de cobertura. La interpolación entre $\hat{Q}(0{,}5)$ y $\hat{Q}(0{,}9)$ sí la hereda, y desarrollar la Ecuación~\ref{eq:order_quantity} muestra su efecto neto, que es sumar $0{,}75 \cdot \hat{q}_g$ al pedido que prescribirían los cuantiles sin calibrar: el colchón adaptativo por categoría anticipado en la Sección~\ref{sec:conformal}. Con la interpolación, además, \textbf{un cambio en la asimetría de costes no exige reentrenar}: basta reevaluar la Ecuación~\ref{eq:order_quantity} con otro $q^\star$ sobre las mismas predicciones. Es esta propiedad la que hace posible el análisis de sensibilidad al ratio $c_u/c_o$ que reporta el Capítulo~\ref{chap:resultados}, en el que las predicciones permanecen fijas y solo cambia la regla de decisión.
 
 \paragraph{Saturación en los extremos.} La contrapartida es que la regla no puede extrapolar fuera del rango estimado: si $q^\star$ cae por encima de $\max \mathcal{Q} = 0{,}9$, la interpolación satura en $\hat{Q}(0{,}9)$. El análisis de sensibilidad recorre ratios $\{1, 2, 4, 8, 10\}$, y el último de ellos implica $q^\star = 10/11 \approx 0{,}909$, ya fuera del rango. El punto correspondiente de la curva de sensibilidad está por tanto truncado y debe leerse como una cota inferior del pedido que un fractil de $0{,}909$ prescribiría, no como su valor. Ampliar $\mathcal{Q}$ es la corrección natural si el sistema hubiera de operar de forma sostenida con ratios superiores a 9:1.
@@ -746,6 +899,7 @@ El sistema resuelve esta tensión enrutando cada fila del marco de inferencia po
 \end{enumerate}
 
 La cascada recorre de lo específico a lo general y se detiene en el primer nivel con dato, de modo que un producto nuevo en una tienda hereda el comportamiento de ese mismo producto en el resto de la red antes de recurrir a su categoría. Las medias se calculan exclusivamente sobre la historia disponible en el origen de predicción (el panel de entrenamiento, o las filas estrictamente anteriores a la fecha de decisión cuando la llamada procede de la simulación en \textit{streaming}), de modo que la vía de respaldo respeta el mismo contrato causal que la vía del modelo.
+
 
 \subsection{Gestión por Excepciones: el Sistema como Copiloto}
 \label{sec:excepciones}
