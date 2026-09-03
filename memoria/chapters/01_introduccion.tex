@@ -96,7 +96,9 @@ El objetivo general de este proyecto es diseñar, evaluar y desplegar un sistema
 Para alcanzar este objetivo general, se plantean los siguientes objetivos específicos:
 \begin{enumerate}[label=\textbf{O\arabic*.}, ref=O\arabic*]
     \item \label{obj:pipeline} Desarrollar un \textit{pipeline} de datos reproducible que incluya la imputación de demanda censurada a partir del dataset \textit{Fresh RetailNet}, verificando que ninguna observación censurada por stockout introduce fuga de información hacia la etiqueta objetivo.
-    \item \label{obj:modelos} Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos, obteniendo un coste de inventario simulado en el conjunto de test inferior al de un \textit{baseline} estacional ingenuo (\textit{seasonal naïve}).
+    \begin{sloppypar}
+\item \label{obj:modelos} Implementar modelos globales de \textit{Machine Learning} probabilístico (CatBoost, LightGBM) capaces de compartir información entre productos, obteniendo un coste de inventario simulado en el conjunto de test inferior al de un \textit{baseline} estacional ingenuo (\textit{seasonal naïve}).
+    \end{sloppypar}
     \item \label{obj:conformal} Garantizar la calibración estadística de las predicciones mediante \textit{Mondrian Conformal Prediction} con optimización multi-objetivo (\textit{Pareto Frontier}), alcanzando una cobertura empírica $\geq 80\%$ para el intervalo $[q_{0{,}1}, q_{0{,}9}]$ (nivel $\alpha = 0{,}20$) sobre el conjunto de test.
     \item \label{obj:mlops} Operativizar el sistema mediante estándares \textit{MLOps} e Ingeniería de Software,
     incluyendo trazabilidad de experimentos en un almacén de corridas, explicabilidad (SHAP),

@@ -94,8 +94,6 @@ def _tabular(
     return (
         "\\begin{table}[h]\n"
         "\\centering\n"
-        f"\\caption{{{caption}}}\n"
-        f"\\label{{{label}}}\n"
         f"{fit}\n"
         f"\\begin{{tabular}}{{{column_format}}}\n"
         "\\toprule\n"
@@ -104,6 +102,8 @@ def _tabular(
         f"{body}\n"
         "\\bottomrule\n"
         "\\end{tabular}}\n"
+        f"\\caption{{{caption}}}\n"
+        f"\\label{{{label}}}\n"
         "\\end{table}\n"
     )
 
