@@ -823,9 +823,10 @@ y el sistema adopta $\lambda = 0{,}5$. La lectura operativa del valor es directa
   % Region que supera el primer guardarrail (S > 0)
   \fill[blue!8] (-22,44) -- (11,-22) -- (22,-22) -- (22,46) -- (-22,46) -- cycle;
   % Banda de ruido del coste
-  \fill[gray!35, opacity=0.33] (-8.3,-22) rectangle (8.3,46);
-  \draw[gray!70, dashed] (-8.3,-22) -- (-8.3,46);
-  \draw[gray!70, dashed] (8.3,-22) -- (8.3,46);
+  \draw[gray!70, dashed] (-8.3,-15) -- (-8.3,46);
+  \draw[gray!70, dashed] (8.3,-15) -- (8.3,46);
+  \draw[<->, gray!75] (-8.3,-17) -- (8.3,-17);
+  \node[below,font=\sffamily\scriptsize,gray!85] at (0,-17.5) {ruido del coste ($\pm 8{,}3$)};
   % Ejes
   \draw[->,thick] (-23,0) -- (23.5,0) node[right,font=\sffamily\scriptsize] {$\Delta_{\text{cost}}$};
   \draw[->,thick] (0,-23) -- (0,48) node[above,font=\sffamily\scriptsize] {$\Delta_{\text{wink}}$};
@@ -848,24 +849,30 @@ y el sistema adopta $\lambda = 0{,}5$. La lectura operativa del valor es directa
     \node[circle,fill=blue!80,draw=blue!90,inner sep=1.3pt] at (\px,\py) {};
   }
   \draw[gray!60,thin] (0.7,6.5) -- (-1.5,4.4);
-  \node[right,font=\sffamily\scriptsize] at (0.8,6.5) {$2\% \rightarrow 4\%$};
-  \node[left=2pt,font=\sffamily\scriptsize] at (-10.6,20) {$10\% \rightarrow 20\%$};
-  \node[right=1pt,font=\sffamily\scriptsize] at (-19,43) {$20\% \rightarrow 40\%$};
+  \node[right,font=\sffamily\scriptsize] at (0.8,6.5) {$(-2,\ +4)$};
+  \node[left=2pt,font=\sffamily\scriptsize] at (-10.6,20) {$(-10,\ +20)$};
+  \node[right=1pt,font=\sffamily\scriptsize] at (-18.5,43) {$(-20,\ +40)$};
   % Corte de la frontera con la brecha observada
   \node[circle,fill=orange!90,draw=orange!95,inner sep=1.3pt] at (-7.4,14.8) {};
+  \draw[gray!65,thin] (-7.6,14.2) -- (-9.2,11);
+  \node[left,font=\sffamily\scriptsize] at (-9.3,11) {$-7{,}4$};
   % Etiquetas de region
   \node[font=\sffamily\scriptsize,blue!70,align=center] at (14,34) {promociona\\ $S > 0$};
   \node[font=\sffamily\scriptsize,gray!75,align=center] at (-16,-13) {no promociona\\ $S < 0$};
-  \node[font=\sffamily\scriptsize,gray!85] at (-1.5,-19) {banda de ruido};
 \end{tikzpicture}
 \shorthandon{>}%
 \caption[Región de promoción en el plano coste--Winkler]{Primer guardarraíl de promoción en el plano de mejoras relativas, con $\lambda = 0{,}5$.
 La frontera $S = \Delta_{\text{cost}} + \lambda\,\Delta_{\text{wink}} = 0$ tiene pendiente $-2$: cada punto
-de coste sacrificado exige dos de Winkler. La banda gris es el semiancho del ruido del \textit{bootstrap}
-($\pm 8{,}3$ pp), dentro del cual el experimento no distingue dos modelos por coste. El corte de la
-frontera con la mayor brecha de Winkler observada entre \textit{backends} (línea naranja, $14{,}8$ pp)
-cae \emph{dentro} de esa banda: con este $\lambda$, la calibración solo puede decidir donde el coste ya
-no informa, nunca revertir una diferencia de coste real.}
+de coste sacrificado exige dos de Winkler. Las verticales discontinuas acotan el semiancho del ruido
+del \textit{bootstrap} ($\pm 8{,}3$ pp), dentro del cual el experimento no distingue dos modelos por coste. El corte de la
+frontera con la brecha de Winkler observada entre \textit{backends} (línea naranja, $14{,}8$ pp) cae
+\emph{dentro} de esa banda: el mayor desplazamiento de coste que la calibración puede compensar es
+$\lambda \cdot 14{,}8 = 7{,}4$ pp, menor que el ruido, de modo que con este $\lambda$ el Winkler Score
+solo decide donde el coste ya no informa y nunca revierte una diferencia de coste real. Los tres puntos
+azules sobre la frontera son los ejemplos del texto, en coordenadas
+$(\Delta_{\text{cost}}, \Delta_{\text{wink}})$: un \textit{challenger} un $2\%$ más caro es
+$\Delta_{\text{cost}} = -2$ y necesita $+4$ de Winkler para compensarlo. La frontera dibujada es la de
+$\theta_{\text{cost}} = 0$; un umbral positivo la desplaza en paralelo hacia la región de promoción.}
 \label{fig:region_promocion}
 \end{figure}
 
