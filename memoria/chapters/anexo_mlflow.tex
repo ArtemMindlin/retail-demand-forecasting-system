@@ -33,7 +33,7 @@ que es el otro uso que el sistema hace del almacén.
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,height=0.80\textheight,keepaspectratio]{figures/mlflow/mlflow_run_overview.png}
-    \caption{Ficha de la corrida \texttt{tfg\_latent\_20260831\_113339}, la rama de demanda
+    \caption[Ficha de la corrida del brazo de demanda reconstruida]{Ficha de la corrida \texttt{tfg\_latent\_20260831\_113339}, la rama de demanda
     reconstruida del experimento a 500 series. Lo decisivo para la reproducibilidad son las
     \textbf{etiquetas} de la derecha: \texttt{git\_commit} fija el código que produjo el
     resultado, \texttt{config\_hash} la configuración resuelta con la que se ejecutó, y
@@ -50,7 +50,7 @@ que es el otro uso que el sistema hace del almacén.
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,height=0.80\textheight,keepaspectratio]{figures/mlflow/mlflow_run_artifacts.png}
-    \caption{Artefactos de esa misma corrida, con \texttt{predictions.csv} abierto en el panel de
+    \caption[Artefactos de la corrida en el almacén]{Artefactos de esa misma corrida, con \texttt{predictions.csv} abierto en el panel de
     previsualización. La ruta que encabeza el panel muestra que el fichero vive dentro del
     directorio de la corrida, sin copia intermedia. En la lista conviven los dos resúmenes que el
     Capítulo~\ref{chap:resultados} explota por separado (\texttt{metrics\_summary.csv} para la
