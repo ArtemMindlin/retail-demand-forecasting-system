@@ -5,17 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Defensa TFG · Sistema Predictivo de Demanda en Retail · Artem Mindlin</title>
 
-  <!-- Reveal.js Themes & Styles -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <!-- Todo el runtime va empotrado en vendor/: la defensa no depende de la red del aula -->
+  <link rel="stylesheet" href="vendor/reveal/reset.css">
+  <link rel="stylesheet" href="vendor/reveal/reveal.css">
 
-  <!-- Google Fonts: Outfit (display), Inter (body), JetBrains Mono (cifras) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Outfit (display), Inter (cuerpo), JetBrains Mono (cifras) -->
+  <link rel="stylesheet" href="vendor/fonts/fonts.css">
 
   <!-- KaTeX for math -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <link rel="stylesheet" href="vendor/katex/dist/katex.min.css">
 
   <style>
     /* ---------------------------------------------------------------
@@ -1205,9 +1203,9 @@
   </div>
 
   <!-- Reveal.js Core & Plugins -->
-  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/math/math.js"></script>
+  <script src="vendor/reveal/reveal.js"></script>
+  <script src="vendor/reveal/plugin/notes/notes.js"></script>
+  <script src="vendor/reveal/plugin/math/math.js"></script>
 
   <script>
     Reveal.initialize({
@@ -1220,6 +1218,9 @@
       transitionSpeed: 'fast',
       backgroundTransition: 'fade',
       plugins: [ RevealNotes, RevealMath.KaTeX ],
+      // Sin `local` el plugin se trae KaTeX de jsdelivr y las formulas se quedan en
+      // crudo si el aula no tiene red. Espera el layout de paquete npm: <local>/dist/
+      katex: { local: 'vendor/katex' },
       width: 1280,
       height: 720,
       margin: 0.045

@@ -96,3 +96,13 @@ staticfiles/
 # Scratch and ad-hoc output directories
 tmp/*
 output/*
+
+# El mazo de la defensa lleva sus dependencias fijadas dentro (reveal, katex y
+# las fuentes): tienen que viajar en el repo o un clon nuevo abre la
+# presentacion sin tema y con las formulas en crudo. Hay que renegarlas porque
+# el .gitignore global de la maquina ignora dist/, que se comia
+# vendor/katex/dist/ entero, 23 ficheros, sin avisar. La primera negacion es
+# para el directorio: git no puede reincluir un fichero si su directorio padre
+# sigue excluido.
+!presentacion/vendor/**/dist/
+!presentacion/vendor/**

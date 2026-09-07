@@ -2,8 +2,14 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      # presentacion/vendor/ son dependencias de terceros fijadas a una version.
+      # end-of-file-fixer reescribia cuatro de ellas (reveal.css, reset.css y los
+      # dos minificados de katex vienen sin salto final), y una dependencia que
+      # deja de ser identica a upstream ya no se puede verificar contra el.
       - id: trailing-whitespace
+        exclude: ^presentacion/vendor/
       - id: end-of-file-fixer
+        exclude: ^presentacion/vendor/
       - id: check-yaml
       - id: check-added-large-files
         args: ['--maxkb=500']
