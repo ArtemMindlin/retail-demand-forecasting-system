@@ -285,6 +285,24 @@
     .step .step-title { font-family: var(--font-display); font-weight: 600; font-size: 13.5px; color: var(--text-1); }
     .step .step-sub { font-size: 12px; color: var(--text-mute); margin-top: 3px; }
 
+    /* ---------------------------------------------------------------
+       DIAGRAMAS: dibujados en SVG inline, no exportados. Heredan los
+       tokens, asi que un cambio de canal semantico los sigue, y no
+       anaden ninguna dependencia al mazo empotrado. Los trazos van a
+       2px o mas y los rotulos a 12px o mas porque la compresion de
+       video se come lo fino.
+       --------------------------------------------------------------- */
+    .dg { width: 100%; height: auto; display: block; overflow: visible; }
+    .dg-ax { stroke: var(--border-2); stroke-width: 1.5; }
+    .dg-t { font-family: var(--font-body); font-size: 13px; font-weight: 500; }
+    .dg-k {
+      font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+      letter-spacing: 0.1em;
+    }
+    /* Cabecera de tarjeta con la etiqueta de esquema a la derecha */
+    .row-head { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
+    .row-head h4 { margin-bottom: 6px; }
+
     /* --- Ecuaciones: tarjeta clara, como una hoja de referencia sobre el panel oscuro --- */
     .eqn {
       background: #f8fafc; color: #0f172a;
@@ -362,41 +380,23 @@
         <div class="grid-2">
           <div class="glass rail fragment" data-fragment-index="1" style="--accent: var(--c-inv);">
             <h4>01 · Contexto y desafío</h4>
-            <ul>
-              <li>Asimetría de pérdidas en perecederos ($c_u \gg c_o$).</li>
-              <li>Censura de ventas y la trampa del error medio (MAE).</li>
-              <li>Objetivos del TFG y validación de KPIs.</li>
-            </ul>
+            <p style="margin-top: 6px; color: var(--text-2);">La asimetría del inventario en frescos y la trampa del MAE.</p>
           </div>
           <div class="glass rail fragment" data-fragment-index="2" style="--accent: var(--c-ai);">
             <h4>02 · Metodología y formulación</h4>
-            <ul>
-              <li>Pipeline modular con garantía de no fuga (zero-leakage).</li>
-              <li>Reconstrucción de demanda latente supervisada.</li>
-              <li>Mondrian Conformal Prediction e inferencia Newsvendor.</li>
-            </ul>
+            <p style="margin-top: 6px; color: var(--text-2);">Del dato censurado a la decisión: imputación, conformal y Newsvendor.</p>
           </div>
           <div class="glass rail fragment" data-fragment-index="3" style="--accent: var(--c-conf);">
             <h4>03 · Resultados experimentales</h4>
-            <ul>
-              <li>Demostración empírica de la trampa del MAE.</li>
-              <li>Optimización biobjetivo (60 trials) y frente de Pareto.</li>
-              <li>Evaluación económica de censura (-92,15%) y streaming.</li>
-            </ul>
+            <p style="margin-top: 6px; color: var(--text-2);">500 series en backtesting: error puntual vs coste real de la decisión.</p>
           </div>
           <div class="glass rail fragment" data-fragment-index="4" style="--accent: var(--c-drift);">
             <h4>04 · Plataforma web y ciclo MLOps</h4>
-            <ul>
-              <li>Sistema DSS web operacional (Django + HTMX).</li>
-              <li>Suite de 309 tests, reproducibilidad y Docker.</li>
-            </ul>
+            <p style="margin-top: 6px; color: var(--text-2);">El sistema en producción: DSS, tests y reproducibilidad.</p>
           </div>
           <div class="glass rail fragment" data-fragment-index="5" style="--accent: var(--c-crit); grid-column: 1 / -1;">
             <h4>05 · Conclusiones y trabajo futuro</h4>
-            <ul>
-              <li>Aportaciones metodológicas, limitaciones y líneas futuras.</li>
-              <li>Impacto en sostenibilidad (ODS 12/13) y cierre.</li>
-            </ul>
+            <p style="margin-top: 6px; color: var(--text-2);">Aportaciones, límites e impacto en sostenibilidad.</p>
           </div>
         </div>
       </section>
@@ -437,15 +437,43 @@
             </ul>
           </div>
           <div class="glass rail" style="--accent: var(--c-crit);">
-            <h4>Los dos fallos de los modelos clásicos</h4>
-            <ul>
-              <li><strong>1. Censura de demanda por stockout:</strong>
-                si se agota el stock ($I_t = 0$), las ventas caen a cero. El modelo clásico aprende a subestimar la demanda en picos.
-              </li>
-              <li><strong>2. Desconexión entre MAE y dinero:</strong>
-                minimizar MAE persigue la mediana simétrica, ignorando por completo el fractil crítico financiero ($\tau = 0{,}80$).
-              </li>
-            </ul>
+            <div class="row-head">
+              <h4>El fallo de origen: la censura por rotura</h4>
+              <span class="chip" style="--accent: var(--c-crit);"><span class="dot"></span>ESQUEMA</span>
+            </div>
+            <svg class="dg" viewBox="0 0 600 300" role="img"
+                 aria-label="La demanda latente supera el stock disponible durante la rotura y las ventas observadas se quedan planas en el techo de stock: la diferencia nunca se registra.">
+              <!-- banda de rotura -->
+              <rect x="205.1" y="40" width="183.1" height="210" fill="var(--c-crit)" opacity="0.07"/>
+              <!-- demanda que nunca se observa -->
+              <polygon points="219.1,100.8 257.8,67.6 296.6,62.1 335.4,84.2 374.2,128.4 374.2,133.9 335.4,133.9 296.6,133.9 257.8,133.9 219.1,133.9"
+                       fill="var(--c-crit)" opacity="0.28"/>
+              <!-- ejes -->
+              <line class="dg-ax" x1="64" y1="250" x2="576" y2="250"/>
+              <line class="dg-ax" x1="64" y1="34" x2="64" y2="250"/>
+              <!-- techo de stock -->
+              <line x1="64" y1="133.9" x2="576" y2="133.9" stroke="var(--c-inv)" stroke-width="2" stroke-dasharray="7 5"/>
+              <!-- demanda latente -->
+              <polyline points="64.0,194.7 102.8,183.7 141.5,167.1 180.3,139.5 219.1,100.8 257.8,67.6 296.6,62.1 335.4,84.2 374.2,128.4 412.9,161.6 451.7,178.2 490.5,189.2 529.2,183.7 568.0,172.6"
+                        fill="none" stroke="var(--text-3)" stroke-width="2" stroke-dasharray="5 4"/>
+              <!-- ventas observadas -->
+              <polyline points="64.0,194.7 102.8,183.7 141.5,167.1 180.3,139.5 219.1,133.9 257.8,133.9 296.6,133.9 335.4,133.9 374.2,133.9 412.9,161.6 451.7,178.2 490.5,189.2 529.2,183.7 568.0,172.6"
+                        fill="none" stroke="var(--c-conf)" stroke-width="3"/>
+              <!-- Rotulos apilados dentro de la ventana de rotura, que es el unico
+                   tramo donde las dos series difieren: fuera de ella coinciden y la
+                   observada tapa a la latente, asi que rotularlas ahi enganaria. -->
+              <text class="dg-t" x="296.6" y="50" text-anchor="middle" fill="var(--text-3)">demanda latente</text>
+              <text class="dg-t" x="296.6" y="107" text-anchor="middle" fill="var(--text-1)">nunca se registra</text>
+              <text class="dg-t" x="296.6" y="153" text-anchor="middle" fill="var(--c-conf)">ventas observadas</text>
+              <text class="dg-t" x="70" y="126" fill="var(--c-inv)">stock disponible</text>
+              <text class="dg-k" x="296.6" y="268" text-anchor="middle" fill="var(--c-crit)">ROTURA</text>
+              <text class="dg-k" x="64" y="268" fill="var(--text-mute)">tiempo</text>
+            </svg>
+            <p style="margin: 10px 0 0; font-size: 13px; color: var(--text-3);">
+              La venta se trunca en el techo de stock, así que el histórico no dice
+              <em>cuánta</em> demanda hubo: dice cuánta cupo. Entrenar sobre esa serie
+              enseña al modelo a subestimar precisamente los picos.
+            </p>
           </div>
         </div>
       </section>
@@ -633,29 +661,75 @@
           </div>
           <div class="band"></div>
         </div>
-        <div class="grid-2">
+        <div class="grid-2" style="align-items: start;">
           <div class="glass rail" style="--accent: var(--c-ai);">
-            <h4>Mondrian Conformal Prediction</h4>
-            <p style="font-size: 13.5px;">Garantía estadística finita libre de distribución ($1 - \alpha = 80\%$):</p>
-            <div class="eqn" style="margin-bottom: 10px;">
-              $$P(Y_{n+1} \in \hat{C}(X_{n+1})) \ge 1 - \alpha$$
+            <div class="row-head">
+              <h4>Del intervalo a la cantidad de pedido</h4>
+              <span class="chip" style="--accent: var(--c-ai);"><span class="dot"></span>ESQUEMA</span>
             </div>
-            <ul style="font-size: 13px;">
-              <li><strong>Score de no-conformidad:</strong> residuos calibrados por varianza condicional.</li>
-              <li><strong>Estratificación Mondrian:</strong> partición por categorías de rotación para evitar discriminación entre productos.</li>
-            </ul>
+            <svg class="dg" viewBox="0 0 600 292" role="img"
+                 aria-label="El intervalo conformal se abre con el horizonte. La cantidad de pedido no sigue a la mediana sino al fractil 0,80, y el colchon entre ambos crece con el horizonte.">
+              <defs>
+                <marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                  <path d="M0,1 L9,5 L0,9 z" fill="var(--c-conf)"/>
+                </marker>
+              </defs>
+              <!-- Intervalo conformal 80%. La mediana va PLANA a proposito: si el centro
+                   subiera a la vez que se abre la banda, el dibujo se leeria como una
+                   tendencia y no como lo que dice, que la incertidumbre crece. -->
+              <polygon points="92.0,111.6 163.3,105.2 234.7,99.9 306.0,95.2 377.3,91.1 448.7,87.5 520.0,84.0 520.0,168.7 448.7,165.2 377.3,161.6 306.0,157.5 234.7,152.8 163.3,147.5 92.0,141.1"
+                       fill="var(--c-ai)" opacity="0.26"/>
+              <!-- ejes -->
+              <line class="dg-ax" x1="80" y1="244" x2="576" y2="244"/>
+              <line class="dg-ax" x1="80" y1="40" x2="80" y2="244"/>
+              <!-- mediana -->
+              <line x1="92" y1="126.4" x2="520" y2="126.4"
+                    stroke="var(--text-3)" stroke-width="2" stroke-dasharray="5 4"/>
+              <!-- fractil 0,80 -->
+              <polyline points="92.0,116.6 163.3,112.4 234.7,108.9 306.0,105.8 377.3,103.1 448.7,100.7 520.0,98.4"
+                        fill="none" stroke="var(--c-conf)" stroke-width="3"/>
+              <!-- el colchon, medido al principio y al final del horizonte -->
+              <line x1="98" y1="116.6" x2="98" y2="126.4" stroke="var(--c-conf)" stroke-width="2"/>
+              <line x1="520" y1="98.4" x2="520" y2="126.4" stroke="var(--c-conf)" stroke-width="2"/>
+              <line x1="514" y1="98.4" x2="526" y2="98.4" stroke="var(--c-conf)" stroke-width="2"/>
+              <line x1="514" y1="126.4" x2="526" y2="126.4" stroke="var(--c-conf)" stroke-width="2"/>
+              <line x1="528" y1="98.4" x2="558" y2="98.4" stroke="var(--c-conf)" stroke-width="2" marker-end="url(#fl)"/>
+              <!-- rotulos -->
+              <text class="dg-t" x="330" y="99" text-anchor="middle" fill="var(--c-conf)">fractil 0,80</text>
+              <text class="dg-t" x="300" y="139" text-anchor="middle" fill="var(--text-3)">mediana (minimiza el MAE)</text>
+              <text class="dg-t" x="306" y="188" text-anchor="middle" fill="var(--text-2)">intervalo conformal 80%</text>
+              <text class="dg-k" x="576" y="94" text-anchor="end" fill="var(--c-conf)">q*</text>
+              <text class="dg-k" x="576" y="122" text-anchor="end" fill="var(--c-conf)">colchon</text>
+              <text class="dg-k" x="520" y="266" text-anchor="middle" fill="var(--text-mute)">+7</text>
+              <text class="dg-k" x="92" y="266" text-anchor="middle" fill="var(--text-mute)">+1</text>
+              <text class="dg-k" x="306" y="266" text-anchor="middle" fill="var(--text-mute)">HORIZONTE (DIAS)</text>
+            </svg>
+            <p style="margin: 10px 0 0; font-size: 13px; color: var(--text-3);">
+              Minimizar el MAE apunta a la línea discontinua. La decisión vive en la
+              continua, y el colchón entre ambas <strong>crece con el horizonte</strong>:
+              es la incertidumbre convertida en unidades físicas.
+            </p>
           </div>
 
-          <div class="glass rail" style="--accent: var(--c-crit);">
-            <h4>Política Newsvendor asimétrica</h4>
-            <p style="font-size: 13.5px;">Fractil crítico óptimo derivado del equilibrio de costes:</p>
-            <div class="eqn" style="margin-bottom: 10px;">
-              $$\tau = \frac{c_u}{c_u + c_o} = \frac{4{,}0}{4{,}0 + 1{,}0} = 0{,}80$$
-              $$q^* = \hat{F}_D^{-1}(\tau) = \hat{y}_{\text{pred}} + \hat{s}_{\text{conformal}}(\tau)$$
+          <div>
+            <div class="glass rail tight" style="--accent: var(--c-ai); margin-bottom: 14px;">
+              <h4 style="font-size: 15.5px;">Mondrian Conformal Prediction</h4>
+              <p style="font-size: 13px;">Garantía finita y libre de distribución ($1 - \alpha = 80\%$):</p>
+              <div class="eqn">
+                $$P(Y_{n+1} \in \hat{C}(X_{n+1})) \ge 1 - \alpha$$
+              </div>
+              <ul style="font-size: 12.5px; margin-top: 10px;">
+                <li><strong>Score de no-conformidad:</strong> residuos calibrados por varianza condicional.</li>
+                <li><strong>Estratificación Mondrian:</strong> partición por categorías de rotación, para que la cobertura no se sostenga de media discriminando entre productos.</li>
+              </ul>
             </div>
-            <p style="font-size: 13px; color: var(--text-3); margin-bottom: 0;">
-              La capa conformal traslada la incertidumbre epistémica directamente a la cantidad física de pedido $q^*$.
-            </p>
+            <div class="glass rail tight" style="--accent: var(--c-crit);">
+              <h4 style="font-size: 15.5px;">Política Newsvendor asimétrica</h4>
+              <div class="eqn">
+                $$\tau = \frac{c_u}{c_u + c_o} = \frac{4{,}0}{4{,}0 + 1{,}0} = 0{,}80$$
+                $$q^* = \hat{F}_D^{-1}(\tau) = \hat{y}_{\text{pred}} + \hat{s}_{\text{conformal}}(\tau)$$
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -668,6 +742,69 @@
         <h2>Resultados experimentales</h2>
         <div class="band" style="max-width: 660px;"></div>
         <p>500 series en backtesting walk-forward. El contraste entre el error estadístico y el coste de la decisión que ese error provoca.</p>
+      </section>
+
+      <!-- SLIDE: POR QUE EL MAE FALLA (geometria del coste, antes del duelo) -->
+      <section>
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow">03 · RESULTADOS</div>
+              <h3 style="margin-top: 8px;">Por qué el error puntual apunta al pedido equivocado</h3>
+            </div>
+            <span class="chip" style="--accent: var(--c-crit);"><span class="dot"></span>ESQUEMA · $c_u/c_o = 4$</span>
+          </div>
+          <div class="band"></div>
+        </div>
+        <div class="grid-2" style="align-items: center;">
+          <div>
+            <svg class="dg" viewBox="0 0 600 280" role="img"
+                 aria-label="La curva de coste esperado del Newsvendor es asimetrica: la rama de rotura sube cuatro veces mas rapido que la de exceso, asi que su minimo no cae en la mediana sino en el fractil 0,80.">
+              <defs>
+                <marker id="fl2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                  <path d="M0,1 L9,5 L0,9 z" fill="var(--c-conf)"/>
+                </marker>
+              </defs>
+              <!-- ejes -->
+              <line class="dg-ax" x1="78" y1="248" x2="576" y2="248"/>
+              <line class="dg-ax" x1="78" y1="36" x2="78" y2="248"/>
+              <!-- curva de coste esperado, calculada y no dibujada a mano -->
+              <polyline fill="none" stroke="var(--text-2)" stroke-width="3"
+                        points="78.0,44.0 86.0,54.0 93.9,63.8 101.9,73.6 109.9,83.3 117.8,92.9 125.8,102.3 133.8,111.6 141.7,120.7 149.7,129.6 157.7,138.3 165.6,146.7 173.6,154.9 181.6,162.8 189.5,170.3 197.5,177.5 205.5,184.4 213.4,190.9 221.4,196.9 229.4,202.5 237.3,207.8 245.3,212.5 253.3,216.8 261.2,220.7 269.2,224.1 277.2,227.0 285.1,229.5 293.1,231.6 301.1,233.2 309.0,234.5 317.0,235.4 325.0,235.8 332.9,236.0 340.9,235.8 348.9,235.4 356.8,234.6 364.8,233.7 372.8,232.5 380.7,231.1 388.7,229.5 396.7,227.8 404.6,225.9 412.6,223.9 420.6,221.8 428.5,219.7 436.5,217.4 444.5,215.1 452.4,212.8 460.4,210.4 468.4,207.9 476.3,205.5 484.3,203.0 492.3,200.5 500.2,198.0 508.2,195.4 516.2,192.9 524.1,190.3 532.1,187.8 540.1,185.2 548.0,182.7 556.0,180.1"/>
+              <!-- pedir la mediana -->
+              <line x1="257.2" y1="218.8" x2="257.2" y2="248" stroke="var(--text-3)" stroke-width="2" stroke-dasharray="5 4"/>
+              <circle cx="257.2" cy="218.8" r="5.5" fill="var(--c-crit)"/>
+              <!-- pedir el fractil critico -->
+              <line x1="332.7" y1="236.0" x2="332.7" y2="248" stroke="var(--c-conf)" stroke-width="2"/>
+              <circle cx="332.7" cy="236.0" r="5.5" fill="var(--c-conf)"/>
+              <line x1="266" y1="212" x2="322" y2="228" stroke="var(--c-conf)" stroke-width="2" marker-end="url(#fl2)"/>
+              <!-- Rotulos de las dos ramas. KaTeX no entra en el texto de un SVG, asi
+                   que los subindices van con tspan y no con $c_u$, que saldria en crudo. -->
+              <text class="dg-t" x="120" y="150" fill="var(--c-crit)">rotura</text>
+              <text class="dg-k" x="120" y="169" fill="var(--c-crit)">c<tspan dy="3" font-size="10.5">u</tspan><tspan dy="-3"> = 4</tspan></text>
+              <text class="dg-t" x="500" y="160" text-anchor="end" fill="var(--c-drift)">exceso</text>
+              <text class="dg-k" x="500" y="179" text-anchor="end" fill="var(--c-drift)">c<tspan dy="3" font-size="10.5">o</tspan><tspan dy="-3"> = 1</tspan></text>
+              <!-- rotulo del pedido optimo -->
+              <text class="dg-t" x="340" y="212" fill="var(--c-conf)">fractil 0,80</text>
+              <text class="dg-k" x="257.2" y="268" text-anchor="middle" fill="var(--text-3)">MAE</text>
+              <text class="dg-k" x="332.7" y="268" text-anchor="middle" fill="var(--c-conf)">q*</text>
+              <text class="dg-k" x="576" y="268" text-anchor="end" fill="var(--text-mute)">CANTIDAD PEDIDA</text>
+              <text class="dg-k" x="84" y="32" fill="var(--text-mute)">COSTE ESPERADO</text>
+            </svg>
+          </div>
+          <div class="glass rail" style="--accent: var(--c-crit);">
+            <h4>La asimetría mueve el óptimo</h4>
+            <ul>
+              <li>El MAE se minimiza en la <strong>mediana</strong>, que es el pedido óptimo solo si rotura y exceso cuestan lo mismo.</li>
+              <li>Aquí no lo cuestan: la rama de rotura sube <strong>cuatro veces más rápido</strong>. El mínimo de la curva se desplaza a la derecha, al fractil $\tau = 0{,}80$.</li>
+              <li>Por eso un modelo <strong>peor en MAE puede decidir mejor</strong>: acierta el fractil que paga, no el centro de la distribución.</li>
+            </ul>
+            <p style="margin: 12px 0 0; font-size: 13px; color: var(--text-3);">
+              El esquema es la curva de coste del Newsvendor, no una medición. Lo que sí
+              está medido viene a continuación.
+            </p>
+          </div>
+        </div>
       </section>
 
       <!-- SLIDE: LA TRAMPA DEL MAE · paso 1 (lente MAE) -->
@@ -1088,18 +1225,17 @@
           <div class="glass rail" style="--accent: var(--c-inv);">
             <h4>Aportaciones metodológicas y técnicas</h4>
             <ul>
-              <li><strong>Reconstrucción de censura:</strong> eliminación del sesgo de rotura (-92,15% en coste logístico).</li>
-              <li><strong>Garantías conformal:</strong> cobertura empírica real del 85,5% en series complejas.</li>
-              <li><strong>Alineación negocio-matemática:</strong> superación del MAE mediante Newsvendor asimétrico.</li>
-              <li><strong>Arquitectura MLOps end-to-end:</strong> sistema productivo desacoplado y reproducible.</li>
+              <li><strong>Reconstrucción de censura:</strong> -92,15% en coste logístico.</li>
+              <li><strong>Garantías conformal:</strong> 85,5% de cobertura empírica real.</li>
+              <li><strong>Alineación negocio-matemática:</strong> Newsvendor asimétrico frente al MAE.</li>
             </ul>
           </div>
           <div class="glass rail" style="--accent: var(--c-conf);">
             <h4>Impacto en sostenibilidad (Agenda 2030)</h4>
             <ul>
-              <li><strong>ODS 12 (Consumo y Producción Sostenibles):</strong> mitigación sustancial de mermas y desperdicio en perecederos.</li>
-              <li><strong>ODS 13 (Acción por el Clima):</strong> reducción de la huella de carbono logística evitando fletes urgentes por rotura.</li>
-              <li><strong>Ética y transparencia:</strong> cumplimiento RGPD y principios de explicabilidad del <em>EU AI Act</em>.</li>
+              <li><strong>ODS 12:</strong> menos merma y desperdicio en perecederos.</li>
+              <li><strong>ODS 13:</strong> menor huella logística al evitar fletes urgentes.</li>
+              <li><strong>Transparencia:</strong> RGPD y explicabilidad (<em>EU AI Act</em>).</li>
             </ul>
           </div>
         </div>
@@ -1120,17 +1256,17 @@
           <div class="glass rail" style="--accent: var(--c-crit);">
             <h4>Limitaciones identificadas</h4>
             <ul>
-              <li><strong>Intercambiabilidad temporal:</strong> pérdida de cobertura en regímenes con fuerte no estacionariedad.</li>
-              <li><strong>Costes sintéticos:</strong> ausencia de costes de merma reales procedentes del ERP.</li>
-              <li><strong>Decisiones estáticas aisladas:</strong> sin arrastre de existencias entre periodos encadenados.</li>
+              <li><strong>Intercambiabilidad temporal:</strong> pierde cobertura ante fuerte no estacionariedad.</li>
+              <li><strong>Costes sintéticos:</strong> sin costes de merma reales del ERP.</li>
+              <li><strong>Decisiones aisladas:</strong> sin arrastre de existencias entre periodos.</li>
             </ul>
           </div>
           <div class="glass rail" style="--accent: var(--c-inv);">
             <h4>Líneas de trabajo futuro</h4>
             <ul>
-              <li><strong>Conformal Prediction adaptativa (EnbPI / ACI):</strong> ajuste dinámico de intervalos ante drift.</li>
-              <li><strong>Gemelo digital de inventario con estado:</strong> modelado del efecto látigo y capacidades de almacén.</li>
-              <li><strong>Modelos Hurdle / Zero-Inflated:</strong> para productos con demanda genuinamente intermitente.</li>
+              <li><strong>Conformal adaptativa</strong> (EnbPI / ACI) ante drift.</li>
+              <li><strong>Gemelo digital de inventario</strong> con efecto látigo y capacidad de almacén.</li>
+              <li><strong>Modelos Hurdle / Zero-Inflated</strong> para demanda intermitente.</li>
             </ul>
           </div>
         </div>

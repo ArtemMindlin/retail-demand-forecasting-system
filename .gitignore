@@ -106,3 +106,6 @@ output/*
 # sigue excluido.
 !presentacion/vendor/**/dist/
 !presentacion/vendor/**
+
+# Guion de orador: notas personales para el acto de defensa, no material del TFG.
+presentacion/guion.md
