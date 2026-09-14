@@ -109,3 +109,5 @@ output/*
 
 # Guion de orador: notas personales para el acto de defensa, no material del TFG.
 presentacion/guion.md
+presentacion/guion_teleprompter.textream
+presentacion/.guion_tiempos.json

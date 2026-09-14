@@ -16,6 +16,18 @@
         "127.0.0.1:8000"
       ],
       "port": 8000
+    },
+    {
+      "name": "presentacion",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8123",
+        "--directory",
+        "presentacion"
+      ],
+      "port": 8123
     }
   ]
 }

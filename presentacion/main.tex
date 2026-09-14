@@ -194,6 +194,9 @@
           \item \textbf{Impacto Regulatorio:} Ley 1/2025 de prevención de pérdidas y desperdicio alimentario.
         \end{itemize}
       \end{statbox}
+      \vspace{0.15cm}
+      \centering
+      \includegraphics[width=\linewidth,height=0.28\textheight,keepaspectratio]{fresh_produce.jpg}
     \end{column}
     \begin{column}{0.48\textwidth}
       \begin{statbox}{Los Dos Cuellos de Botella Técnicos}{UPVRed}
@@ -367,7 +370,7 @@
     \footnotesize
     \begin{tabular}{lcccccc}
       \toprule
-      \textbf{Modelo} & \textbf{MAE} & \textbf{RMSE} & \textbf{Winkler (80\%)} & \textbf{Coste (u.m.)} & \textbf{Nivel Servicio} & \textbf{Cobertura} \\
+      \textbf{Modelo} & \textbf{MAE} & \textbf{RMSE} & \textbf{Winkler (80\%)} & \textbf{Coste (u.m.)} & \textbf{Nivel Servicio} & \textbf{Cobertura (obj. 80\%)} \\
       \midrule
       \textbf{Seasonal Naïve} & \textbf{6,61} & \textbf{8,90} & n/a & 162.299 & 52,45\% & n/a \\
       \textbf{CatBoost} & 11,72 & 16,87 & 46,54 & 174.527 & 78,39\% & 84,6\% \\
@@ -405,18 +408,20 @@
   \begin{columns}[c]
     \begin{column}{0.55\textwidth}
       \centering
-      \includegraphics[width=\linewidth,height=0.72\textheight,keepaspectratio]{tuning_comparison_60trials.pdf}
+      \includegraphics[width=\linewidth,keepaspectratio]{tuning_comparison_60trials.pdf}
     \end{column}
     \begin{column}{0.42\textwidth}
       \begin{statbox}{Protocolo Desacoplado}{UPVNavy}
-        \begin{itemize}\small
-          \item \textbf{60 Ensayos MOTPE (Optuna):} Búsqueda en frente de Pareto (Coste vs Winkler).
-          \item \textbf{Validación Fuera de Muestra ($N=25$ sorteos):}
-          \begin{itemize}\footnotesize
-            \item LightGBM gana \textbf{-22,66\%} en validación frente a parámetros default.
-            \item CatBoost gana \textbf{-10,01\%}.
-          \end{itemize}
-          \item Evita sobreajuste a la ventana de selección.
+        \begin{itemize}\scriptsize
+          \item \textbf{60 Ensayos MOTPE (Optuna):} Coste Newsvendor vs Winkler Score.
+          \item \textbf{Out-of-sample ($N=25$):} LightGBM $-22{,}7\%$, CatBoost $-10{,}0\%$ vs defaults.
+        \end{itemize}
+      \end{statbox}
+      \vspace{0.08cm}
+      \begin{statbox}{Matiz Metodológico}{AmberWarning}
+        \begin{itemize}\scriptsize
+          \item \textbf{CatBoost gana aquí (+12,0\%):} Más estable ($23{,}8 \rightarrow 29{,}9$) por sus árboles simétricos.
+          \item \textbf{El campeón es LightGBM:} La prueba soberana es el \textit{walk-forward} (500 series).
         \end{itemize}
       \end{statbox}
     \end{column}
@@ -424,28 +429,28 @@
 \end{frame}
 
 \begin{frame}{Evaluación Financiera de Demanda Latente}
-  \begin{statbox}{Comparativa Bajo Verdad Común no Censurada ($N=500$ series)}{EmeraldGreen}
+  \begin{statbox}{Comparativa Bajo Verdad Común ($N=30$ series, 20 sorteos sintéticos)}{EmeraldGreen}
     \centering\small
-    Evaluación del coste monetario según el tratamiento de la señal censurada.
+    Evaluación emparejada del coste logístico Newsvendor frente a la misma demanda real ($n=293$ días censurados).
   \end{statbox}
-  \vspace{0.1cm}
+  \vspace{0.05cm}
   \begin{table}[h]
     \centering
-    \footnotesize
+    \scriptsize
     \begin{tabular}{lcccc}
       \toprule
-      \textbf{Estrategia de Datos} & \textbf{Coste Total (u.m.)} & \textbf{Rotura (uds)} & \textbf{Sobrestock (uds)} & \textbf{Ahorro (\%)} \\
+      \textbf{Estrategia de Tratamiento} & \textbf{Coste Total (u.m.)} & \textbf{Fill Rate} & \textbf{$\Delta$ vs.\ Obs. (IC 95\%)} & \textbf{Ahorro (\%)} \\
       \midrule
-      \textbf{Observed (Ventas crudas)} & 48.910 & 11.240 & 950 & Base (0\%) \\
-      \textbf{Zero-filled} & 52.340 & 12.450 & 540 & +7,01\% (peor) \\
-      \textbf{Heuristic Imputed} & 18.200 & 3.810 & 2.960 & -62,79\% \\
-      \textbf{Latent Supervised (LGBM)} & \textbf{3.839} & \textbf{540} & \textbf{1.679} & \textbf{-92,15\%} \\
+      \textbf{Observed (ventas crudas)} & 3.732,37 & 60,30\% & -- & Base (0\%) \\
+      \textbf{Latent Clipped Scaling} & 2.784,60 & 70,77\% & -947,77 [-973,1; -922,4] & -25,39\% \\
+      \textbf{Latent Historical Mean} & 1.059,42 & 91,47\% & -2.672,95 [-2.775,9; -2.570,0] & -71,62\% \\
+      \textbf{Latent Supervised (LGBM)} & \textbf{293,12} & \textbf{97,50\%} & \textbf{-3.439,25 [-3.539,6; -3.338,9]} & \textbf{-92,15\%} \\
       \bottomrule
     \end{tabular}
   \end{table}
 
   \begin{herocard}
-    \small \textbf{Conclusión de Negocio:} Entrenar sobre demanda latente imputada reduce el coste logístico un \textbf{-92,15\%} frente al sesgo de ventas observadas.
+    \small \textbf{Conclusión de Negocio:} Entrenar sobre demanda latente supervisada reduce el coste un \textbf{-92,15\%} ($\Delta = -3.439{,}25$ u.m.) y eleva el \textit{fill rate} del $60{,}30\%$ al $97{,}50\%$.
   \end{herocard}
 \end{frame}
 
@@ -469,19 +474,18 @@
 
 \begin{frame}{Simulación Operacional en Streaming y Drift}
   \begin{columns}[c]
-    \begin{column}{0.48\textwidth}
+    \begin{column}{0.50\textwidth}
       \centering
-      \includegraphics[width=\linewidth,height=0.72\textheight,keepaspectratio]{cumulative_cost.png}
+      \includegraphics[width=\linewidth,keepaspectratio]{cadence_cost.pdf}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \begin{statbox}{Simulación Prequencial (41 días no vistos)}{UPVNavy}
-        \begin{itemize}\small
-          \item \textbf{Política `never` (estático):}
-          Coste $105.676{,}74$ u.m. | Fill Rate $89{,}64\%$
-          \item \textbf{Política `every\_7d` (reentreno semanal):}
-          Coste \textbf{63.112,52 u.m.} | Fill Rate \textbf{95,43\%}
-          \item \textbf{Ahorro Operativo:} \textbf{-40,28\%} ($\Delta = -42.564$ u.m.)
-          \item \textbf{Latencia de Reentreno:} Apenas \textbf{5,55 segundos}.
+      \begin{statbox}{Simulación Prequencial (41 días en streaming)}{UPVNavy}
+        \begin{itemize}\scriptsize\setlength{\itemsep}{2pt}
+          \item \textbf{Política `never` (estático):} Coste $105.676{,}74$ u.m. | Fill Rate $89{,}64\%$
+          \item \textbf{Política `every\_7d` (reentreno semanal):} Coste \textbf{63.112{,}52 u.m.} | Fill Rate \textbf{95{,}43\%}
+          \item \textbf{Ahorro Operativo:} \textbf{−40{,}28\%} ($\Delta = -42.564$ u.m.)
+          \item \textbf{Latencia Media:} Apenas \textbf{5{,}55 segundos} por ciclo.
+          \item \textbf{Rigor MLOps:} IC 95\% $[-57{,}5\%; -17{,}0\%]$. No concluyente al exigir $\ge 8$ orígenes independientes.
         \end{itemize}
       \end{statbox}
     \end{column}
