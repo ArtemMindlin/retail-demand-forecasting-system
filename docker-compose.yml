@@ -28,6 +28,20 @@ services:
       - default
       - caddy
 
+  # El mazo de la defensa, servido como estatico. Va aqui y no por Django porque no
+  # comparte nada con la aplicacion: es HTML y assets que ya viajan en el repo, asi
+  # que cada deploy lo actualiza sin tocar el contenedor de la API. Sin `ports`, por
+  # el mismo motivo que `api`: lo alcanza Caddy por nombre en la red `caddy`.
+  presentacion:
+    image: caddy:2-alpine
+    container_name: retail_forecasting_presentacion
+    command: ["caddy", "file-server", "--root", "/srv", "--listen", ":80"]
+    volumes:
+      - ./presentacion:/srv:ro
+    restart: unless-stopped
+    networks:
+      - caddy
+
 networks:
   caddy:
     external: true
