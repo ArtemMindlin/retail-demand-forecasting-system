@@ -1037,6 +1037,17 @@
     .lim-no .lim-mark { color: var(--c-crit); background: rgba(239,68,68,0.14); border: 1px solid rgba(239,68,68,0.4); }
     .lim-si .lim-mark { color: var(--c-conf); background: rgba(16,185,129,0.14); border: 1px solid rgba(16,185,129,0.4); }
 
+    /* Slide 8: Revelado progresivo de tarjeta derecha (mismo idioma que slide 7).
+       La tarjeta esta presente atenuada y una pulsacion la ilumina con transicion suave. */
+    .s8-card {
+      transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                  filter 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .s8-cards[data-revealed="0"] .s8-card {
+      opacity: 0.18;
+      filter: grayscale(70%);
+    }
+
     /* -------------------------------------------------------------------------
        El grafico se construye al entrar, en el orden en que se cuenta: escenario,
        techo, demanda real, venta que se aplana, hueco censurado, correccion. Un
@@ -1714,7 +1725,7 @@
               </div>
               <div class="io-row out">
                 <div class="io-k">Salida</div>
-                <div class="io-v">La distribución entera, sin percentiles cruzados</div>
+                <div class="io-v">Distribución completa de la demanda</div>
               </div>
             </div>
           </article>
@@ -1791,16 +1802,18 @@
         </div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~85 seg &middot; 205 palabras habladas a 145 ppm.]</strong></p>
+          <p><strong>[TIEMPO: ~83 seg &middot; 200 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"Para abordar este problema de extremo a extremo, descartamos una caja negra opaca y diseñamos una arquitectura modular en 4 etapas estrictamente desacopladas, donde la salida de cada fase alimenta y valida a la siguiente."</em></p>
           <p><em>"Antes de recorrerlas, conviene fijar qué predecimos exactamente: no la venta de mañana, sino la demanda acumulada de los siete días siguientes a cada fecha de decisión. Esa es la ventana que cubre un pedido, así que el modelo produce una cifra por producto y por pedido, no una previsión diaria."</em></p>
           <p><em>"Comenzamos en los datos, reconstruyendo la demanda latente sobre días limpios y garantizando que no exista fuga con un retardo de un día."</em></p>
           <p>👉 <em>(Pulsas Espacio: aparece la etapa 02 y el pulso viaja por el cable.)</em></p>
-          <p><em>"A partir de esa señal limpia no predecimos un único número, sino la distribución completa de la demanda: entrenamos el modelo para acertar cada percentil, no solo el valor central, y corregimos los percentiles que se cruzan entre sí."</em></p>
+          <p><em>"A partir de esa señal limpia no predecimos un único número, sino la distribución completa de la demanda: entrenamos el modelo sobre múltiples percentiles para capturar toda la incertidumbre, no solo el valor central."</em></p>
           <p><em>"Sobre esa distribución aplicamos calibración conformal, categoría a categoría y sin dejar que el modelo vea ningún día que caiga dentro del horizonte que intenta predecir, para garantizar una cobertura del 80%."</em></p>
           <p><em>"Y finalmente, conectamos esa probabilidad con la función de coste Newsvendor para prescribir la cantidad exacta q estrella que minimiza el impacto económico en tienda."</em></p>
           <p>👉 <em>(Pulsas Espacio: aparece la etapa 04 y el circuito se completa.)</em></p>
           <p>👉 <em>(Pulsas Espacio: aparece la etapa 03 y el pulso avanza.)</em></p>
+          <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre modelado cuantílico:]</strong></p>
+          <p>- <strong>"¿Cómo gestionan el cruce de percentiles (quantile crossing)?"</strong> Al ajustar modelos cuantílicos separados puede haber inversión por ruido muestral; aplicamos reordenación monótona isotónica (sorting) post-predicción para garantizar que la función de distribución empírica sea estrictamente creciente antes de calibrar con Conformal.</p>
         </aside>
       </section>
 
@@ -1814,6 +1827,11 @@
             </div>
           </div>
           <div class="band"></div>
+        </div>
+
+        <!-- Un paso invisible: el Espacio revela la tarjeta con transicion suave -->
+        <div style="position: relative; height: 0;">
+          <span class="fragment s8-step" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
         </div>
         <!-- Ecuacion anotada: cada termino lleva el color de su linea en el grafico
              de abajo, asi que no hace falta leyenda (anotacion directa, Tufte). -->
@@ -1901,66 +1919,95 @@
             </svg>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 14px;">
-              <div class="glass rail fragment" style="--accent: var(--c-drift); padding: 14px 18px;">
-                <div class="row-head">
-                  <h4 style="margin-bottom: 2px;">El límite del protocolo</h4>
-                </div>
-                <svg class="dg" viewBox="0 0 500 118" role="img" aria-label="El bucle del protocolo de censura sintetica">
-                  <!-- El limite del protocolo dibujado como lo que es: un circulo que se cierra
-                       sobre si mismo. La flecha roja de vuelta es la trampa. El numero va de
-                       insignia sobre el borde para no robarle una franja entera a la caja, y los
-                       cuerpos a 15,5 porque el svg se pinta a 379px sobre un lienzo de 500. -->
-                <g>
-                  <rect x="0" y="14" width="148" height="44" rx="9" fill="rgba(245,158,11,0.07)" stroke="rgba(245,158,11,0.32)"/>
-                  <text class="dg-t" x="74" y="31" text-anchor="middle" fill="var(--text-1)" font-size="15.5">Se oculta la demanda</text>
-                  <text class="dg-t" x="74" y="48" text-anchor="middle" fill="var(--text-1)" font-size="15.5">de un día limpio</text>
-                  <circle cx="12" cy="11" r="7.5" fill="rgba(245,158,11,0.9)"/>
-                  <text class="dg-k" x="12" y="15" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1205">1</text>
-                </g>
-                <path d="M150,36 H169" stroke="var(--text-mute)" stroke-width="2"/>
-                <path d="M171,36 l-7,-4.5 v9 z" fill="var(--text-mute)"/>
-                <g>
-                  <rect x="176" y="14" width="148" height="44" rx="9" fill="rgba(245,158,11,0.07)" stroke="rgba(245,158,11,0.32)"/>
-                  <text class="dg-t" x="250" y="31" text-anchor="middle" fill="var(--text-1)" font-size="15.5">El modelo</text>
-                  <text class="dg-t" x="250" y="48" text-anchor="middle" fill="var(--text-1)" font-size="15.5">la reconstruye</text>
-                  <circle cx="188" cy="11" r="7.5" fill="rgba(245,158,11,0.9)"/>
-                  <text class="dg-k" x="188" y="15" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1205">2</text>
-                </g>
-                <path d="M326,36 H345" stroke="var(--text-mute)" stroke-width="2"/>
-                <path d="M347,36 l-7,-4.5 v9 z" fill="var(--text-mute)"/>
-                <g>
-                  <rect x="352" y="14" width="148" height="44" rx="9" fill="rgba(245,158,11,0.07)" stroke="rgba(245,158,11,0.32)"/>
-                  <text class="dg-t" x="426" y="31" text-anchor="middle" fill="var(--text-1)" font-size="15.5">Se compara con</text>
-                  <text class="dg-t" x="426" y="48" text-anchor="middle" fill="var(--text-1)" font-size="15.5">la demanda oculta</text>
-                  <circle cx="364" cy="11" r="7.5" fill="rgba(245,158,11,0.9)"/>
-                  <text class="dg-k" x="364" y="15" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1205">3</text>
-                </g>
-                  <path d="M426,58 V78 Q426,88 416,88 H84 Q74,88 74,78 V66" fill="none" stroke="var(--c-crit)" stroke-width="2" stroke-dasharray="5 4"/>
-                  <path d="M74,56 l-5.5,9 h11 z" fill="var(--c-crit)"/>
-                  <text class="dg-t" x="250" y="110" text-anchor="middle" fill="var(--c-crit)" font-size="15" font-weight="600">Basta invertir el corte para sacar nota perfecta</text>
-                </svg>
+          <div class="s8-cards" data-revealed="0" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="glass rail s8-card" style="--accent: var(--c-drift); padding: 14px 18px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+              <div class="row-head" style="margin-bottom: 4px;">
+                <h4 style="margin: 0;">El límite del protocolo</h4>
+                <span class="chip" style="--accent: var(--c-crit); font-size: 10px; padding: 2px 7px;"><span class="dot"></span>TRAMPA CIRCULAR</span>
               </div>
 
-              <div class="glass rail fragment" style="--accent: var(--c-conf); padding: 12px 18px;">
-                <div class="row-head">
-                  <h4 style="margin-bottom: 6px;">Lo que sí se sostiene</h4>
+              <svg class="dg" viewBox="0 0 450 215" style="width: 100%; height: auto; display: block; margin: auto 0;" role="img" aria-label="El bucle escalonado del protocolo de censura sintetica">
+                <!-- 1. Escalón 1 (Superior Izquierda): Ocultar demanda -->
+                <g>
+                  <rect x="35" y="10" width="205" height="44" rx="8" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.35)"/>
+                  <circle cx="53" cy="32" r="8.5" fill="rgba(245,158,11,0.9)"/>
+                  <text class="dg-k" x="53" y="36" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1205">1</text>
+                  <text class="dg-t" x="140" y="27" text-anchor="middle" fill="var(--text-1)" font-size="13" font-weight="600">Se oculta la demanda</text>
+                  <text class="dg-t" x="140" y="44" text-anchor="middle" fill="var(--text-2)" font-size="11.5">de un día limpio</text>
+                </g>
+
+                <!-- Conector escalonado 1 -> 2 -->
+                <path d="M 140,54 V 62 Q 140,68 147,68 H 153" stroke="var(--text-mute)" stroke-width="1.8" fill="none"/>
+                <path d="M 155,68 l-5,-3.5 v7 z" fill="var(--text-mute)"/>
+
+                <!-- 2. Escalón 2 (Centro): Modelo la reconstruye -->
+                <g>
+                  <rect x="115" y="68" width="205" height="44" rx="8" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.35)"/>
+                  <circle cx="133" cy="90" r="8.5" fill="rgba(245,158,11,0.9)"/>
+                  <text class="dg-k" x="133" y="94" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1205">2</text>
+                  <text class="dg-t" x="220" y="85" text-anchor="middle" fill="var(--text-1)" font-size="13" font-weight="600">El modelo maestro</text>
+                  <text class="dg-t" x="220" y="102" text-anchor="middle" fill="var(--text-2)" font-size="11.5">la reconstruye</text>
+                </g>
+
+                <!-- Conector escalonado 2 -> 3 -->
+                <path d="M 220,112 V 120 Q 220,126 227,126 H 233" stroke="var(--text-mute)" stroke-width="1.8" fill="none"/>
+                <path d="M 235,126 l-5,-3.5 v7 z" fill="var(--text-mute)"/>
+
+                <!-- 3. Escalón 3 (Inferior Derecha): Se compara -->
+                <g>
+                  <rect x="195" y="126" width="205" height="44" rx="8" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.35)"/>
+                  <circle cx="213" cy="148" r="8.5" fill="rgba(245,158,11,0.9)"/>
+                  <text class="dg-k" x="213" y="152" text-anchor="middle" font-size="11" font-weight="700" fill="#1a1205">3</text>
+                  <text class="dg-t" x="300" y="143" text-anchor="middle" fill="var(--text-1)" font-size="13" font-weight="600">Se compara con</text>
+                  <text class="dg-t" x="300" y="160" text-anchor="middle" fill="var(--text-2)" font-size="11.5">la demanda oculta</text>
+                </g>
+
+                <!-- Bucle de retorno (Flecha roja envolvente) -->
+                <path d="M 400,148 H 422 Q 434,148 434,160 V 176 Q 434,192 418,192 H 28 Q 12,192 12,176 V 48 Q 12,32 24,32 H 33"
+                      fill="none" stroke="var(--c-crit)" stroke-width="2" stroke-dasharray="5 4"/>
+                <path d="M 35,32 l-6,-4 v8 z" fill="var(--c-crit)"/>
+
+                <!-- Cartel de advertencia sobre el trazo inferior del bucle -->
+                <g>
+                  <rect x="58" y="179" width="324" height="26" rx="6" fill="#0b0f15" stroke="var(--c-crit)" stroke-width="1.3"/>
+                  <text class="dg-t" x="220" y="196" text-anchor="middle" fill="var(--c-crit)" font-size="12" font-weight="700">Basta invertir el corte para sacar nota perfecta</text>
+                </g>
+              </svg>
+
+              <!-- Contraste metodológico: Trampa vs Prueba Real -->
+              <div style="margin-top: 8px; padding: 7px 11px; border-radius: 8px; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(148, 163, 184, 0.2); box-shadow: 0 4px 14px -2px rgba(0,0,0,0.45); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;">
+                <!-- Trampa sintética -->
+                <div style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+                  <span style="width: 20px; height: 20px; border-radius: 5px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); display: flex; align-items: center; justify-content: center; color: var(--c-crit); font-size: 11px; font-weight: 800; flex: none;">✕</span>
+                  <div style="min-width: 0; line-height: 1.2;">
+                    <div style="font-size: 9.5px; font-weight: 700; color: var(--c-crit); text-transform: uppercase; letter-spacing: 0.04em;">MAE sintético</div>
+                    <div style="font-size: 10.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Premia la circularidad</div>
+                  </div>
                 </div>
-                <div class="lim-row lim-si"><span class="lim-mark">✓</span><div><strong>Corregir compensa</strong></div></div>
-                <div class="lim-row lim-si"><span class="lim-mark">✓</span><div><strong>Cota superior de laboratorio</strong></div></div>
-                <div class="lim-row lim-si"><span class="lim-mark">✓</span><div><strong>Modelo supervisado</strong></div></div>
+
+                <!-- Flecha conectora -->
+                <span style="color: var(--text-mute); font-size: 13px; font-weight: 600; flex: none;">→</span>
+
+                <!-- Validación real -->
+                <div style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+                  <span style="width: 20px; height: 20px; border-radius: 5px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); display: flex; align-items: center; justify-content: center; color: var(--c-conf); font-size: 11px; font-weight: 800; flex: none;">✓</span>
+                  <div style="min-width: 0; line-height: 1.2;">
+                    <div style="font-size: 9.5px; font-weight: 700; color: var(--c-conf); text-transform: uppercase; letter-spacing: 0.04em;">Prueba real</div>
+                    <div style="font-size: 10.5px; color: var(--text-1); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Coste bajo verdad común</div>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
         </div>
         <aside class="notes">
-          <p><strong>[TIEMPO: ~102 seg &middot; 246 palabras habladas a 145 ppm.]</strong></p>
-          <p><em>"En esta primera etapa corregimos la censura de los datos. Como ven en la ecuación superior, lo que entra al modelo no es la venta observada, sino la venta observada más una corrección."</em></p>
-          <p><em>"Esa corrección combina dos factores: cuánto duró la rotura, que son las horas sin producto sobre las 16 de la jornada operativa, y cuánta demanda había, estimada por un modelo maestro entrenado únicamente en días sin rotura, donde la demanda es un dato real y no una incógnita."</em></p>
+          <p><strong>[TIEMPO: ~97 seg &middot; 234 palabras habladas a 145 ppm.]</strong></p>
+          <p><em>"Vimos la meta: prescribir el pedido semanal de siete días. Pero para que esa semana sea fiable, los días individuales no pueden mentirnos. Hacemos zoom en la Etapa 01: la imputación diaria. Como ven en la ecuación superior, lo que entra al modelo no es la venta observada, sino la venta observada más una corrección."</em></p>
+          <p><em>"Esa corrección combina dos factores: cuánto duró la rotura —las horas sin producto sobre las 16 de la jornada operativa—, y cuánta demanda había, estimada por un modelo maestro entrenado únicamente en días sin rotura, donde la demanda es un dato real y no una incógnita."</em></p>
           <p>👉 <em>(No hay que pulsar nada: el gráfico se construye solo en unos cuatro segundos desde que entras.)</em></p>
-          <p><em>"Fíjense en el gráfico. Al agotarse el stock, la venta observada no se hunde a cero, se aplana. Una rotura a media tarde no anula el día, lo trunca. El área roja es lo que el histórico pierde, y la curva verde es la señal reconstruida que alimenta a nuestro pipeline."</em></p>
-          <p>&#128073; <em>(Dos pulsaciones, una por tarjeta de la derecha: la primera al decir «y aquí surge la pregunta clave», la segunda al decir «adelanto la cautela». Antes de eso no toques nada: el gráfico de la izquierda se monta solo.)</em></p>
-          <p><em>"Y aquí surge la pregunta clave: ¿cómo demostramos que la corrección funciona si, cuando hay rotura, nadie sabe cuál era la demanda real? Lo resuelvo más adelante, con un experimento sobre días limpios a los que aplicamos un corte artificial."</em></p>
-          <p><em>"Adelanto la cautela, porque importa: lo que se mide ahí es una cota en condiciones de laboratorio, no una promesa de ahorro en tienda. Y el modelo supervisado lo elegí por diseño, no por su nota en ese test: porque estima la demanda según el día, el precio y las promociones, en vez de aplicar un factor fijo."</em></p>
+          <p><em>"Fíjense en el gráfico: al agotarse el stock, la venta observada no se hunde a cero, se aplana. Una rotura a media tarde no anula el día, lo trunca. El área roja es lo que el histórico pierde, y la curva verde es la señal reconstruida que alimenta a nuestro pipeline."</em></p>
+          <p>👉 <em>(Una única pulsación: se ilumina «El límite del protocolo» al decir «y aquí surge la trampa metodológica».)</em></p>
+          <p><em>"Y aquí surge la trampa metodológica: ¿cómo evaluamos si funciona? Si ocultamos artificialmente un trozo de un día limpio para ver si el modelo lo recupera, caemos en un bucle circular: bastaría invertir la regla del corte para sacar nota perfecta sin haber aprendido nada sobre la demanda real. Por eso la prueba real no es un MAE sintético, sino la evaluación económica bajo verdad común."</em></p>
           <p><em>"Con esto ya disponemos de una señal fiable. Lo siguiente es admitir cuánta incertidumbre seguimos teniendo."</em></p>
           <p><strong>[PARACAIDAS. No se dice; esta aqui por si preguntan.]</strong></p>
           <p>- <strong>"¿Por qué 30 series y no las 500?"</strong> Las 30 son una MÁSCARA de
@@ -1988,7 +2035,6 @@
               <div class="eyebrow">02 · INCERTIDUMBRE &amp; DECISIÓN</div>
               <h3 style="margin-top: 8px;">Calibración conformal y decisión Newsvendor</h3>
             </div>
-            <span class="chip" style="--accent: var(--c-conf); font-size: 11px;"><span class="dot"></span>CONFORMAL &amp; NEWSVENDOR</span>
           </div>
           <div class="band"></div>
         </div>
@@ -6073,6 +6119,21 @@ Usar si el tribunal pregunta por trazabilidad o auditoría del código.</p>
     Reveal.on('slidechanged', updateArchReveal);
     Reveal.on('fragmentshown', updateArchReveal);
     Reveal.on('fragmenthidden', updateArchReveal);
+
+    // Slide 8: Imputación - revelado progresivo de las tarjetas derechas
+    function updateS8Reveal() {
+      const grid = document.querySelector('.reveal .slides section.present .s8-cards');
+      if (!grid) return;
+      const shown = document.querySelectorAll(
+        '.reveal .slides section.present .s8-step.visible'
+      ).length;
+      grid.setAttribute('data-revealed', String(shown));
+    }
+
+    Reveal.on('ready', updateS8Reveal);
+    Reveal.on('slidechanged', updateS8Reveal);
+    Reveal.on('fragmentshown', updateS8Reveal);
+    Reveal.on('fragmenthidden', updateS8Reveal);
 
     // Objetivos: el foco pasa de O1 a O2, O3 y O4 con tres pulsaciones
     function updateObjFocus() {
