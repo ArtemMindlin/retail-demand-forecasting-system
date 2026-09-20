@@ -1802,7 +1802,7 @@
         </div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~83 seg &middot; 200 palabras habladas a 145 ppm.]</strong></p>
+          <p><strong>[TIEMPO: ~82 seg &middot; 197 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"Para abordar este problema de extremo a extremo, descartamos una caja negra opaca y diseñamos una arquitectura modular en 4 etapas estrictamente desacopladas, donde la salida de cada fase alimenta y valida a la siguiente."</em></p>
           <p><em>"Antes de recorrerlas, conviene fijar qué predecimos exactamente: no la venta de mañana, sino la demanda acumulada de los siete días siguientes a cada fecha de decisión. Esa es la ventana que cubre un pedido, así que el modelo produce una cifra por producto y por pedido, no una previsión diaria."</em></p>
           <p><em>"Comenzamos en los datos, reconstruyendo la demanda latente sobre días limpios y garantizando que no exista fuga con un retardo de un día."</em></p>
@@ -2188,121 +2188,6 @@
 
         <aside class="notes">
           <p><strong>[SIN TEXTO. Pasas de largo sin hablar, compás visual hacia los resultados.]</strong></p>
-        </aside>
-      </section>
-
-      <!-- SLIDE: POR QUE EL MAE FALLA (geometria del coste, antes del duelo) -->
-      <section>
-        <div class="slide-head">
-          <div class="row">
-            <div>
-              <div class="eyebrow">03 · RESULTADOS</div>
-              <h3 style="margin-top: 8px;">Por qué el error puntual apunta al pedido equivocado</h3>
-            </div>
-            <span class="chip" style="--accent: var(--c-crit);"><span class="dot"></span>ESQUEMA · $c_u/c_o = 4$</span>
-          </div>
-          <div class="band"></div>
-        </div>
-        <div class="grid-2" style="align-items: center;">
-          <div>
-            <svg class="dg dg-anim" viewBox="0 0 600 280" role="img"
-                 aria-label="La curva de coste esperado del Newsvendor es asimetrica: la rama de rotura sube cuatro veces mas rapido que la de exceso, asi que su minimo no cae en la mediana sino en el fractil 0,80.">
-              <defs>
-                <marker id="fl2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-                  <path d="M0,1 L9,5 L0,9 z" fill="var(--c-conf)"/>
-                </marker>
-                <clipPath id="cvWipeCurve"><rect class="wipe w-cv-curve" x="0" y="0" width="600" height="280"/></clipPath>
-              </defs>
-              <!-- 1. Escenario -->
-              <g class="dgf f-cv-ax">
-                <line class="dg-ax" x1="78" y1="248" x2="576" y2="248"/>
-                <line class="dg-ax" x1="78" y1="36" x2="78" y2="248"/>
-                <text class="dg-k" x="576" y="268" text-anchor="end" fill="var(--text-mute)">CANTIDAD PEDIDA</text>
-                <text class="dg-k" x="84" y="32" fill="var(--text-mute)">COSTE ESPERADO</text>
-              </g>
-              <!-- 2. La curva, barrida de izquierda a derecha. Calculada, no dibujada a mano. -->
-              <g clip-path="url(#cvWipeCurve)">
-                <polyline fill="none" stroke="var(--text-2)" stroke-width="3"
-                        points="78.0,44.0 86.0,54.0 93.9,63.8 101.9,73.6 109.9,83.3 117.8,92.9 125.8,102.3 133.8,111.6 141.7,120.7 149.7,129.6 157.7,138.3 165.6,146.7 173.6,154.9 181.6,162.8 189.5,170.3 197.5,177.5 205.5,184.4 213.4,190.9 221.4,196.9 229.4,202.5 237.3,207.8 245.3,212.5 253.3,216.8 261.2,220.7 269.2,224.1 277.2,227.0 285.1,229.5 293.1,231.6 301.1,233.2 309.0,234.5 317.0,235.4 325.0,235.8 332.9,236.0 340.9,235.8 348.9,235.4 356.8,234.6 364.8,233.7 372.8,232.5 380.7,231.1 388.7,229.5 396.7,227.8 404.6,225.9 412.6,223.9 420.6,221.8 428.5,219.7 436.5,217.4 444.5,215.1 452.4,212.8 460.4,210.4 468.4,207.9 476.3,205.5 484.3,203.0 492.3,200.5 500.2,198.0 508.2,195.4 516.2,192.9 524.1,190.3 532.1,187.8 540.1,185.2 548.0,182.7 556.0,180.1"/>
-              </g>
-              <!-- 3. Las dos ramas: hasta aqui, todo al entrar en la diapositiva. KaTeX no
-                   entra en el texto de un SVG, asi que los subindices van con tspan. -->
-              <g class="dgf f-cv-branch">
-                <text class="dg-t" x="120" y="150" fill="var(--c-crit)">rotura</text>
-                <text class="dg-k" x="120" y="169" fill="var(--c-crit)">c<tspan dy="3" font-size="12">u</tspan><tspan dy="-3"> = 4</tspan></text>
-                <text class="dg-t" x="500" y="160" text-anchor="end" fill="var(--c-drift)">exceso</text>
-                <text class="dg-k" x="500" y="179" text-anchor="end" fill="var(--c-drift)">c<tspan dy="3" font-size="12">o</tspan><tspan dy="-3"> = 1</tspan></text>
-              </g>
-              <!-- 4 y 5. Las dos marcas van por FRAGMENTO, no al entrar: son la respuesta de
-                   la diapositiva y aparecen cuando se nombran, no cuarenta segundos antes. -->
-              <g class="fragment">
-                <line x1="257.2" y1="218.8" x2="257.2" y2="248" stroke="var(--text-3)" stroke-width="2" stroke-dasharray="5 4"/>
-                <circle cx="257.2" cy="218.8" r="5.5" fill="var(--c-crit)"/>
-                <text class="dg-t" x="246" y="202" text-anchor="end" fill="var(--c-crit)" font-size="11.5px" font-weight="600">Mediana (50%)</text>
-                <text class="dg-k" x="257.2" y="268" text-anchor="middle" fill="var(--c-crit)" font-weight="600">Mediana</text>
-              </g>
-              <g class="fragment">
-                <line x1="332.7" y1="236.0" x2="332.7" y2="248" stroke="var(--c-conf)" stroke-width="2"/>
-                <circle cx="332.7" cy="236.0" r="5.5" fill="var(--c-conf)"/>
-                <line x1="266" y1="212" x2="322" y2="228" stroke="var(--c-conf)" stroke-width="2" marker-end="url(#fl2)"/>
-                <text class="dg-t" x="345" y="210" fill="var(--c-conf)" font-weight="700" font-size="11.5px">fractil 0,80</text>
-                <text class="dg-k" x="332.7" y="268" text-anchor="middle" fill="var(--c-conf)" font-weight="700">q*</text>
-              </g>
-            </svg>
-          </div>
-          <div class="glass rail" style="--accent: var(--c-crit); display: flex; flex-direction: column; gap: 14px; padding: 24px 28px;">
-            <div class="row-head">
-              <h4 style="font-size: 16.5px; margin-bottom: 0;">La asimetría mueve el óptimo</h4>
-              <span class="chip" style="--accent: var(--c-crit); font-size: 10px;"><span class="dot"></span>DECISIÓN VS ERROR</span>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-              <div class="lim-row" style="align-items: center; gap: 12px; font-size: 13.8px;">
-                <span class="lim-mark" style="color: var(--c-crit); background: rgba(239,68,68,0.14); min-width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; font-size: 11.5px; font-family: var(--font-mono);">4:1</span>
-                <div>
-                  <strong style="color: var(--text-1);">Coste asimétrico:</strong> la rotura sube 4× más rápido que el exceso.
-                </div>
-              </div>
-
-              <div class="lim-row" style="align-items: center; gap: 12px; font-size: 13.8px;">
-                <span class="lim-mark" style="color: var(--text-2); background: rgba(255,255,255,0.08); min-width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; font-size: 11.5px; font-family: var(--font-mono);">50%</span>
-                <div>
-                  <strong style="color: var(--text-1);">La trampa del MAE:</strong> la mediana solo es óptima con costes simétricos.
-                </div>
-              </div>
-
-              <div class="lim-row" style="align-items: center; gap: 12px; font-size: 13.8px;">
-                <span class="lim-mark" style="color: var(--c-conf); background: rgba(16,185,129,0.14); min-width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; font-size: 11.5px; font-family: var(--font-mono);">q*</span>
-                <div>
-                  <strong style="color: var(--c-conf);">Paradoja operativa:</strong> peor en MAE puede decidir mejor si acierta el fractil 0,80.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <aside class="notes">
-          <p><strong>[TIEMPO: ~98 seg &middot; 237 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Queda la pregunta incómoda: ¿funciona todo esto? Lo he puesto a prueba con 500 series en backtesting walk-forward. Pero para entender el resultado hay que plantearse una pregunta engañosamente simple: ¿qué significa que un modelo sea mejor?"</em></p>
-          <p><em>"«Mejor» depende de qué le pidas al modelo. Esta curva es el coste esperado del Newsvendor: en horizontal, cuánto pido; en vertical, cuánto me cuesta."</em></p>
-          <p><em>"Y es asimétrica, porque las dos maneras de equivocarse no cuestan lo mismo. Si me quedo corto, a la izquierda, la rama sube 4 veces más rápido. Si me paso, a la derecha, sube despacio. Y la consecuencia es geométrica: el mínimo de una curva asimétrica no cae en el centro."</em></p>
-          <p>👉 <em>(Pulsas Espacio: aparece la marca de la MEDIANA. El escenario (ejes, curva y ramas) se ha montado solo al entrar.)</em></p>
-          <p><em>"Y ahora la pregunta es dónde pido. Esta primera marca es la mediana, que es exactamente lo que minimiza el MAE. Fíjense en que no cae en el fondo de la curva: cae en la rama de subida."</em></p>
-          <p>👉 <em>(Pulsas Espacio: aparece el fractil 0,80 con la flecha desde la mediana.)</em></p>
-          <p><em>"Y el mínimo de verdad está aquí, en el fractil 0,80. Pedir la mediana te deja por encima del mínimo, y esa diferencia vertical es dinero que se paga por haber optimizado la métrica equivocada."</em></p>
-          <p><em>"De aquí sale la afirmación que sostiene el bloque: un modelo peor en MAE puede decidir mejor, porque lo que importa no es acertar el centro de la distribución, es acertar el cuantil que paga. Y quiero ser explícito: esto es el esquema teórico, no una medición. Lo medido viene ahora."</em></p>
-          <p><strong>[PARACAIDAS. No se dice; esta aqui por si preguntan.]</strong></p>
-          <p>- <strong>"¿Entonces vuestros modelos se entrenan minimizando el MAE?"</strong> No, y
-          es una distinción importante: se entrenan con pérdida Pinball cuantílica. La crítica no
-          va al entrenamiento, va al criterio de SELECCIÓN. Elegir el campeón por MAE es lo que
-          apunta al pedido equivocado, no la forma de ajustar el modelo.</p>
-          <p>- <strong>"¿La curva está medida?"</strong> Está calculada a partir de la función de
-          coste, no dibujada a mano, pero es ilustrativa: no sale de los datos del experimento.
-          Por eso el chip dice ESQUEMA y por eso lo digo también en voz alta.</p>
-          <p>- <strong>"¿Y si la asimetría fuese otra?"</strong> El mínimo se movería con ella:
-          con costes simétricos caería justo en la mediana, y entonces el MAE sí sería el criterio
-          correcto. El problema no es el MAE en abstracto, es el MAE aplicado a una decisión
-          asimétrica.</p>
         </aside>
       </section>
 
@@ -5990,16 +5875,110 @@ Usar si el tribunal pregunta por trazabilidad o auditoría del código.</p>
         </aside>
       </section>
 
-      <!-- SLIDE: SIMULACIÓN STREAMING -->
 
 
       <!-- ===================================================================== -->
-      <!-- SLIDE 16: EVALUACIÓN DEMANDA LATENTE BAJO VERDAD COMÚN -->
+      <!-- ANEXO F: ASIMETRÍA DE COSTES Y DECISIÓN NEWSVENDOR -->
       <!-- ===================================================================== -->
+      <section>
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow">ANEXO F · ASIMETRÍA Y NEWSVENDOR</div>
+              <h3 style="margin-top: 8px;">Backup: por qué el error puntual apunta al pedido equivocado</h3>
+            </div>
+            <span class="chip" style="--accent: var(--c-crit);"><span class="dot"></span>ESQUEMA · $c_u/c_o = 4$</span>
+          </div>
+          <div class="band"></div>
+        </div>
+        <div class="grid-2" style="align-items: center;">
+          <div>
+            <svg class="dg dg-anim" viewBox="0 0 600 280" role="img"
+                 aria-label="La curva de coste esperado del Newsvendor es asimetrica: la rama de rotura sube cuatro veces mas rapido que la de exceso, asi que su minimo no cae en la mediana sino en el fractil 0,80.">
+              <defs>
+                <marker id="fl2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                  <path d="M0,1 L9,5 L0,9 z" fill="var(--c-conf)"/>
+                </marker>
+                <clipPath id="cvWipeCurve"><rect class="wipe w-cv-curve" x="0" y="0" width="600" height="280"/></clipPath>
+              </defs>
+              <!-- 1. Escenario -->
+              <g class="dgf f-cv-ax">
+                <line class="dg-ax" x1="78" y1="248" x2="576" y2="248"/>
+                <line class="dg-ax" x1="78" y1="36" x2="78" y2="248"/>
+                <text class="dg-k" x="576" y="268" text-anchor="end" fill="var(--text-mute)">CANTIDAD PEDIDA</text>
+                <text class="dg-k" x="84" y="32" fill="var(--text-mute)">COSTE ESPERADO</text>
+              </g>
+              <!-- 2. La curva, barrida de izquierda a derecha. Calculada, no dibujada a mano. -->
+              <g clip-path="url(#cvWipeCurve)">
+                <polyline fill="none" stroke="var(--text-2)" stroke-width="3"
+                        points="78.0,44.0 86.0,54.0 93.9,63.8 101.9,73.6 109.9,83.3 117.8,92.9 125.8,102.3 133.8,111.6 141.7,120.7 149.7,129.6 157.7,138.3 165.6,146.7 173.6,154.9 181.6,162.8 189.5,170.3 197.5,177.5 205.5,184.4 213.4,190.9 221.4,196.9 229.4,202.5 237.3,207.8 245.3,212.5 253.3,216.8 261.2,220.7 269.2,224.1 277.2,227.0 285.1,229.5 293.1,231.6 301.1,233.2 309.0,234.5 317.0,235.4 325.0,235.8 332.9,236.0 340.9,235.8 348.9,235.4 356.8,234.6 364.8,233.7 372.8,232.5 380.7,231.1 388.7,229.5 396.7,227.8 404.6,225.9 412.6,223.9 420.6,221.8 428.5,219.7 436.5,217.4 444.5,215.1 452.4,212.8 460.4,210.4 468.4,207.9 476.3,205.5 484.3,203.0 492.3,200.5 500.2,198.0 508.2,195.4 516.2,192.9 524.1,190.3 532.1,187.8 540.1,185.2 548.0,182.7 556.0,180.1"/>
+              </g>
+              <!-- 3. Las dos ramas: hasta aqui, todo al entrar en la diapositiva. KaTeX no
+                   entra en el texto de un SVG, asi que los subindices van con tspan. -->
+              <g class="dgf f-cv-branch">
+                <text class="dg-t" x="120" y="150" fill="var(--c-crit)">rotura</text>
+                <text class="dg-k" x="120" y="169" fill="var(--c-crit)">c<tspan dy="3" font-size="12">u</tspan><tspan dy="-3"> = 4</tspan></text>
+                <text class="dg-t" x="500" y="160" text-anchor="end" fill="var(--c-drift)">exceso</text>
+                <text class="dg-k" x="500" y="179" text-anchor="end" fill="var(--c-drift)">c<tspan dy="3" font-size="12">o</tspan><tspan dy="-3"> = 1</tspan></text>
+              </g>
+              <!-- 4 y 5. Las dos marcas van por FRAGMENTO, no al entrar: son la respuesta de
+                   la diapositiva y aparecen cuando se nombran, no cuarenta segundos antes. -->
+              <g>
+                <line x1="257.2" y1="218.8" x2="257.2" y2="248" stroke="var(--text-3)" stroke-width="2" stroke-dasharray="5 4"/>
+                <circle cx="257.2" cy="218.8" r="5.5" fill="var(--c-crit)"/>
+                <text class="dg-t" x="246" y="202" text-anchor="end" fill="var(--c-crit)" font-size="11.5px" font-weight="600">Mediana (50%)</text>
+                <text class="dg-k" x="257.2" y="268" text-anchor="middle" fill="var(--c-crit)" font-weight="600">Mediana</text>
+              </g>
+              <g>
+                <line x1="332.7" y1="236.0" x2="332.7" y2="248" stroke="var(--c-conf)" stroke-width="2"/>
+                <circle cx="332.7" cy="236.0" r="5.5" fill="var(--c-conf)"/>
+                <line x1="266" y1="212" x2="322" y2="228" stroke="var(--c-conf)" stroke-width="2" marker-end="url(#fl2)"/>
+                <text class="dg-t" x="345" y="210" fill="var(--c-conf)" font-weight="700" font-size="11.5px">fractil 0,80</text>
+                <text class="dg-k" x="332.7" y="268" text-anchor="middle" fill="var(--c-conf)" font-weight="700">q*</text>
+              </g>
+            </svg>
+          </div>
+          <div class="glass rail" style="--accent: var(--c-crit); display: flex; flex-direction: column; gap: 14px; padding: 24px 28px;">
+            <div class="row-head">
+              <h4 style="font-size: 16.5px; margin-bottom: 0;">La asimetría mueve el óptimo</h4>
+              <span class="chip" style="--accent: var(--c-crit); font-size: 10px;"><span class="dot"></span>DECISIÓN VS ERROR</span>
+            </div>
 
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div class="lim-row" style="align-items: center; gap: 12px; font-size: 13.8px;">
+                <span class="lim-mark" style="color: var(--c-crit); background: rgba(239,68,68,0.14); min-width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; font-size: 11.5px; font-family: var(--font-mono);">4:1</span>
+                <div>
+                  <strong style="color: var(--text-1);">Coste asimétrico:</strong> la rotura sube 4× más rápido que el exceso.
+                </div>
+              </div>
 
+              <div class="lim-row" style="align-items: center; gap: 12px; font-size: 13.8px;">
+                <span class="lim-mark" style="color: var(--text-2); background: rgba(255,255,255,0.08); min-width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; font-size: 11.5px; font-family: var(--font-mono);">50%</span>
+                <div>
+                  <strong style="color: var(--text-1);">La trampa del MAE:</strong> la mediana solo es óptima con costes simétricos.
+                </div>
+              </div>
 
-    </div>
+              <div class="lim-row" style="align-items: center; gap: 12px; font-size: 13.8px;">
+                <span class="lim-mark" style="color: var(--c-conf); background: rgba(16,185,129,0.14); min-width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; font-size: 11.5px; font-family: var(--font-mono);">q*</span>
+                <div>
+                  <strong style="color: var(--c-conf);">Paradoja operativa:</strong> peor en MAE puede decidir mejor si acierta el fractil 0,80.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="notes">
+          <p><strong>[ANEXO F. Respaldo teórico. No se presenta en el flujo principal.]</strong></p>
+          <p><em>"Función de coste esperado del Newsvendor: al ser asimétrica (c_u = 4, c_o = 1), el mínimo no cae en la mediana (que minimiza el MAE), sino en el fractil crítico 0,80. Optimizar o elegir modelos por MAE en entornos asimétricos induce un infrapedido sistemático."</em></p>
+          <p><strong>[PARACAÍDAS. Preguntas esperables]:</strong></p>
+          <p>- <strong>"¿Entonces los modelos se entrenan minimizando el MAE?"</strong> No: se entrenan con pérdida Pinball cuantílica. La crítica va al criterio de selección del campeón.</p>
+          <p>- <strong>"¿La curva está medida?"</strong> Está calculada analíticamente a partir de la función de coste esperado, no es un gráfico inventado a mano.</p>
+          <p>- <strong>"¿Y si los costes fuesen simétricos (cu = co)?"</strong> El mínimo caería exactamente en la mediana (50%), y entonces el MAE sí coincidiría con el óptimo económico.</p>
+        </aside>
+      </section>
+</div>
   </div>
 
   <!-- Reveal.js Core & Plugins -->
