@@ -1803,15 +1803,15 @@
 
         <aside class="notes">
           <p><strong>[TIEMPO: ~82 seg &middot; 197 palabras habladas a 145 ppm.]</strong></p>
-          <p><em>"Para abordar este problema de extremo a extremo, descartamos una caja negra opaca y diseñamos una arquitectura modular en 4 etapas estrictamente desacopladas, donde la salida de cada fase alimenta y valida a la siguiente."</em></p>
+          <p><em>"Para abordar este problema de extremo a extremo diseñamos una arquitectura modular en 4 etapas donde la salida de cada fase alimenta y valida a la siguiente."</em></p>
           <p><em>"Antes de recorrerlas, conviene fijar qué predecimos exactamente: no la venta de mañana, sino la demanda acumulada de los siete días siguientes a cada fecha de decisión. Esa es la ventana que cubre un pedido, así que el modelo produce una cifra por producto y por pedido, no una previsión diaria."</em></p>
           <p><em>"Comenzamos en los datos, reconstruyendo la demanda latente sobre días limpios y garantizando que no exista fuga con un retardo de un día."</em></p>
           <p>👉 <em>(Pulsas Espacio: aparece la etapa 02 y el pulso viaja por el cable.)</em></p>
-          <p><em>"A partir de esa señal limpia no predecimos un único número, sino la distribución completa de la demanda: entrenamos el modelo sobre múltiples percentiles para capturar toda la incertidumbre, no solo el valor central."</em></p>
-          <p><em>"Sobre esa distribución aplicamos calibración conformal, categoría a categoría y sin dejar que el modelo vea ningún día que caiga dentro del horizonte que intenta predecir, para garantizar una cobertura del 80%."</em></p>
-          <p><em>"Y finalmente, conectamos esa probabilidad con la función de coste Newsvendor para prescribir la cantidad exacta q estrella que minimiza el impacto económico en tienda."</em></p>
-          <p>👉 <em>(Pulsas Espacio: aparece la etapa 04 y el circuito se completa.)</em></p>
+          <p><em>"A partir de esa señal limpia no predecimos un único número, sino la distribución completa de la demanda: entrenamos el modelo para acertar cada percentil, no solo el valor central, y corregimos los percentiles que se cruzan entre sí."</em></p>
           <p>👉 <em>(Pulsas Espacio: aparece la etapa 03 y el pulso avanza.)</em></p>
+          <p><em>"Sobre esa distribución aplicamos calibración conformal, categoría a categoría y sin dejar que el modelo vea ningún día que caiga dentro del horizonte que intenta predecir, para garantizar una cobertura del 80%."</em></p>
+          <p>👉 <em>(Pulsas Espacio: aparece la etapa 04 y el circuito se completa.)</em></p>
+          <p><em>"Y finalmente, conectamos esa probabilidad con la función de coste Newsvendor para prescribir la cantidad exacta q estrella que minimiza el impacto económico en tienda."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre modelado cuantílico:]</strong></p>
           <p>- <strong>"¿Cómo gestionan el cruce de percentiles (quantile crossing)?"</strong> Al ajustar modelos cuantílicos separados puede haber inversión por ruido muestral; aplicamos reordenación monótona isotónica (sorting) post-predicción para garantizar que la función de distribución empírica sea estrictamente creciente antes de calibrar con Conformal.</p>
         </aside>
