@@ -1048,6 +1048,17 @@
       filter: grayscale(70%);
     }
 
+    /* Slide 9: la tarjeta de la garantia conformal espera atenuada hasta que el
+       guion llega a "A la derecha". Mismo idioma que .s8-card. */
+    .s9-card {
+      transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                  filter 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .s9-cards[data-revealed="0"] .s9-card {
+      opacity: 0.18;
+      filter: grayscale(70%);
+    }
+
     /* -------------------------------------------------------------------------
        El grafico se construye al entrar, en el orden en que se cuenta: escenario,
        techo, demanda real, venta que se aplana, hueco censurado, correccion. Un
@@ -2037,6 +2048,10 @@
           </div>
           <div class="band"></div>
         </div>
+        <!-- Un paso invisible: el Espacio ilumina la tarjeta de la garantia -->
+        <div style="position: relative; height: 0;">
+          <span class="fragment s9-step" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
+        </div>
 
         <div class="eq-hero" style="max-width: 840px; margin: 0 auto; padding: 6px 24px 4px;">
           <div class="eq-hero-body" style="font-size: 1.05em;">
@@ -2111,8 +2126,8 @@
             </svg>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 10px; justify-content: center;">
-            <div class="glass rail tight" style="--accent: var(--c-ai);">
+          <div class="s9-cards" data-revealed="0" style="display: flex; flex-direction: column; gap: 10px; justify-content: center;">
+            <div class="glass rail tight s9-card" style="--accent: var(--c-ai);">
               <div class="row-head">
                 <h4 style="font-size: 15.5px; margin-bottom: 0;">El intervalo acierta 8 de cada 10 veces</h4>
               </div>
@@ -6100,6 +6115,21 @@ Usar si el tribunal pregunta por trazabilidad o auditoría del código.</p>
     Reveal.on('slidechanged', updateS8Reveal);
     Reveal.on('fragmentshown', updateS8Reveal);
     Reveal.on('fragmenthidden', updateS8Reveal);
+
+    // Slide 9: una pulsacion ilumina la tarjeta de la garantia conformal
+    function updateS9Reveal() {
+      const grid = document.querySelector('.reveal .slides section.present .s9-cards');
+      if (!grid) return;
+      const shown = document.querySelectorAll(
+        '.reveal .slides section.present .s9-step.visible'
+      ).length;
+      grid.setAttribute('data-revealed', String(shown));
+    }
+
+    Reveal.on('ready', updateS9Reveal);
+    Reveal.on('slidechanged', updateS9Reveal);
+    Reveal.on('fragmentshown', updateS9Reveal);
+    Reveal.on('fragmenthidden', updateS9Reveal);
 
     // Objetivos: el foco pasa de O1 a O2, O3 y O4 con tres pulsaciones
     function updateObjFocus() {
