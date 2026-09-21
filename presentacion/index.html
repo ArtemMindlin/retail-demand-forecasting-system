@@ -2410,7 +2410,7 @@
         <div style="width: 100%; max-width: 1100px; margin: 16px auto 0;">
           <div class="glass rail" style="--accent: var(--c-conf); padding: 10px 16px; display: flex; flex-direction: column; justify-content: space-between;">
             <svg class="dg dg-anim" viewBox="0 0 900 300" style="width: 100%; height: auto; display: block;" role="img"
-                 aria-label="Distribución de densidad de la demanda con la mediana en el centro, el punto de pedido 0,80 desplazado a la derecha y el colchón de seguridad sombreado entre ambos.">
+                 aria-label="Densidad de la demanda: la mediana en el cuantil 0,50 y el punto de pedido en el 0,80, con el colchón de seguridad sombreado entre ambos.">
               <defs>
                 <clipPath id="dgWipeCurveNV">
                   <rect class="wipe w-nv-band" x="0" y="0" width="900" height="300"/>
@@ -2432,14 +2432,12 @@
                 <g class="dgf f-nv-med">
                   <line x1="428.4" y1="62.6" x2="428.4" y2="250" stroke="var(--text-3)" stroke-width="2" stroke-dasharray="6 5"/>
                   <circle cx="428.4" cy="62.6" r="5" fill="var(--text-2)"/>
-                  <text class="dg-t" x="418.4" y="49.6" text-anchor="end" fill="var(--text-2)" font-weight="600" font-size="12px">Mediana (50%)</text>
-                  <text class="dg-k" x="428.4" y="269" text-anchor="middle" fill="var(--text-2)" font-size="11px" font-weight="700">MEDIANA</text>
+                  <text class="dg-k" x="428.4" y="269" text-anchor="middle" fill="var(--text-2)" font-size="11px" font-weight="700">MEDIANA 0,50</text>
                   <text class="dg-k" x="428.4" y="282" text-anchor="middle" fill="var(--text-mute)" font-size="9.5px">menor error</text>
                 </g>
                 <g class="dgf f-nv-frac">
                   <line x1="644.0" y1="167.2" x2="644.0" y2="250" stroke="var(--c-conf)" stroke-width="2.8"/>
                   <circle cx="644.0" cy="167.2" r="5.5" fill="var(--c-conf)"/>
-                  <text class="dg-t" x="656.0" y="159.2" text-anchor="start" fill="var(--c-conf)" font-weight="700" font-size="12px">Pedido (80%)</text>
                   <text class="dg-k" x="644.0" y="269" text-anchor="middle" fill="var(--c-conf)" font-size="11px" font-weight="700">PUNTO DE PEDIDO 0,80</text>
                   <text class="dg-k" x="644.0" y="282" text-anchor="middle" fill="var(--text-mute)" font-size="9.5px">lo decide el coste</text>
                 </g>
