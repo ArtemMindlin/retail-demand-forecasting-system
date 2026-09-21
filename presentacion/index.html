@@ -298,9 +298,28 @@
     .d2-wrap { display: flex; flex-direction: column; justify-content: center; min-height: 460px; }
     .d2-stack { display: grid; }
     .d2-stack > * { grid-area: 1 / 1; transition: opacity 0.55s ease; white-space: nowrap; }
-    .d2-stack > .t2 { opacity: 0; }
+    .d2-stack > .t0, .d2-stack > .t2 { opacity: 0; }
+    section[data-step="0"] .d2-stack > .t0 { opacity: 1; }
+    section[data-step="0"] .d2-stack > .t1 { opacity: 0; }
     section[data-lens="2"] .d2-stack > .t1 { opacity: 0; }
     section[data-lens="2"] .d2-stack > .t2 { opacity: 1; }
+
+    /* Carrusel: el protocolo ocupa el escenario, luego entran las tarjetas */
+    .d2-stage { display: grid; min-height: 460px; align-items: center; }
+    .d2-panel {
+      grid-area: 1 / 1;
+      transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .wf-panel { opacity: 0; transform: translateX(-56px); pointer-events: none; }
+    section[data-step="0"] .wf-panel { opacity: 1; transform: none; pointer-events: auto; }
+    section[data-step="0"] .d2-cards { opacity: 0; transform: translateX(56px); pointer-events: none; }
+
+    .wf-mini {
+      margin-top: 10px; text-align: center;
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
+      color: var(--text-mute); opacity: 0.8; transition: opacity 0.45s ease;
+    }
+    section[data-step="0"] .wf-mini { opacity: 0; }
     h3.d2-stack > * { white-space: normal; }
 
     .d2-verdict { min-height: 16px; }
@@ -1050,11 +1069,10 @@
 
     /* Referencia a la memoria: el tribunal puede verificar sin preguntar.
        Absoluta a proposito, para no tocar la altura de ninguna diapositiva. */
-    .wf-strip {
-      display: block;
-      width: 100%;
-      height: auto;
-      margin-bottom: 16px;
+    .wf-strip { display: block; width: 100%; height: auto; }
+    .wf-claim {
+      margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+      font-size: 15px; color: var(--text-1); text-align: center;
     }
 
     .memref {
@@ -2529,93 +2547,153 @@
       </section>
 
       <!-- SLIDE: LA TRAMPA DEL MAE · una sola diapositiva, lente por fragmento -->
-      <section data-lens="1">
+      <section data-lens="1" data-step="0">
+        <span class="fragment d2-frag" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
         <span class="fragment d2-frag" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
         <div class="slide-head">
           <div class="row">
             <div>
               <div class="eyebrow">03 · RESULTADOS</div>
               <h3 class="d2-stack" style="margin-top: 8px;">
+                <span class="t0">Antes de las cifras: cómo se ha medido todo lo que viene</span>
                 <span class="t1">Si mides el error puntual, gana el baseline</span>
                 <span class="t2">Si mides el dinero, el orden se invierte</span>
               </h3>
             </div>
-            <span class="chip d2-chip"><span class="dot"></span><span class="d2-stack"><span class="t1">LENTE: MAE</span><span class="t2">LENTE: COSTE</span></span></span>
+            <span class="chip d2-chip"><span class="dot"></span><span class="d2-stack"><span class="t0">PROTOCOLO</span><span class="t1">LENTE: MAE</span><span class="t2">LENTE: COSTE</span></span></span>
           </div>
           <div class="band"></div>
         </div>
 
-        <div class="d2-wrap">
-          <div class="duel">
-            <div class="model-card d2-card-naive">
-              <div class="model-name">Seasonal Naïve</div>
-              <div class="verdict d2-stack d2-verdict">
-                <span class="t1" style="color: var(--c-conf);">▲ Gana por MAE</span>
-                <span class="t2" style="color: var(--c-crit);">▼ Rotura en la mitad de los días</span>
-              </div>
-              <div style="margin-top: 14px;">
-                <div class="cstat">
-                  <div class="stat-row">
-                    <span class="stat-k">MAE</span>
-                    <span class="metric d2-metric d2-m-mae">6,61</span>
-                  </div>
-                  <div class="ctrack"><i class="d2-bar d2-b-mae" style="width: 82.0%"></i></div>
-                </div>
-                <div class="cstat">
-                  <div class="stat-row">
-                    <span class="stat-k">Nivel de servicio</span>
-                    <span class="metric d2-metric d2-m-svc">52,45<span class="u">%</span></span>
-                  </div>
-                  <div class="ctrack"><i class="d2-bar d2-b-svc" style="width: 62.8%"></i></div>
-                </div>
-                <div class="cstat">
-                  <div class="stat-row">
-                    <span class="stat-k">Coste inventario</span>
-                    <span class="metric d2-metric d2-m-cost">162.299</span>
-                  </div>
-                  <div class="ctrack"><i class="d2-bar d2-b-cost" style="width: 100.0%"></i></div>
-                </div>
-              </div>
-            </div>
+        <div class="d2-stage">
+          <div class="d2-panel wf-panel">
+            <div class="glass rail" style="--accent: var(--c-conf); padding: 20px 26px 14px;">
+              <svg class="wf-strip" viewBox="0 0 1280 200" role="img"
+                   aria-label="Esquema del backtesting walk-forward: tres pliegues; en cada uno el entrenamiento acaba siete dias antes de la semana de validacion, y la ventana avanza una semana.">
+                <defs>
+                  <pattern id="wfHueco" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                    <line x1="0" y1="0" x2="0" y2="8" stroke="#ef4444" stroke-width="2" stroke-opacity="0.5"/>
+                  </pattern>
+                </defs>
 
-            <div class="model-card d2-card-lgbm">
-              <div class="model-name">LightGBM conformal</div>
-              <div class="verdict d2-stack d2-verdict">
-                <span class="t1" style="color: var(--text-mute);">Pierde por MAE</span>
-                <span class="t2" style="color: var(--c-conf);">▲ Menor coste y +31,1 p.p. de servicio</span>
-              </div>
-              <div style="margin-top: 14px;">
-                <div class="cstat">
-                  <div class="stat-row">
-                    <span class="stat-k">MAE</span>
-                    <span class="metric d2-metric d2-m-mae">8,06</span>
-                  </div>
-                  <div class="ctrack"><i class="d2-bar d2-b-mae" style="width: 100.0%"></i></div>
-                </div>
-                <div class="cstat">
-                  <div class="stat-row">
-                    <span class="stat-k">Nivel de servicio</span>
-                    <span class="metric d2-metric d2-m-svc">83,55<span class="u">%</span></span>
-                  </div>
-                  <div class="ctrack"><i class="d2-bar d2-b-svc" style="width: 100.0%"></i></div>
-                </div>
-                <div class="cstat">
-                  <div class="stat-row">
-                    <span class="stat-k">Coste inventario</span>
-                    <span class="metric d2-metric d2-m-cost">147.646</span>
-                  </div>
-                  <div class="ctrack"><i class="d2-bar d2-b-cost" style="width: 91.0%"></i></div>
-                </div>
-              </div>
+                <g font-family="var(--font-mono)" font-size="13" fill="var(--text-mute)">
+                  <rect x="128" y="4" width="13" height="13" rx="2" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+                  <text x="149" y="15">ENTRENAMIENTO · solo pasado</text>
+                  <rect x="440" y="4" width="13" height="13" rx="2" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
+                  <text x="461" y="15">HUECO H = 7 d · corta la fuga temporal</text>
+                  <rect x="826" y="4" width="13" height="13" rx="2" fill="#10b981" fill-opacity="0.85"/>
+                  <text x="847" y="15">VALIDACIÓN · la semana que el modelo no ha visto</text>
+                </g>
+
+                <g font-family="var(--font-mono)" font-size="13" fill="var(--text-3)" text-anchor="end">
+                  <text x="112" y="63">PLIEGUE 1</text>
+                  <text x="112" y="101">PLIEGUE 2</text>
+                  <text x="112" y="139">PLIEGUE 3</text>
+                </g>
+
+                <g>
+                  <rect x="128" y="46" width="760" height="22" rx="4" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+                  <rect x="888" y="46" width="88" height="22" rx="4" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
+                  <rect x="976" y="46" width="88" height="22" rx="4" fill="#10b981" fill-opacity="0.85"/>
+
+                  <rect x="128" y="84" width="848" height="22" rx="4" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+                  <rect x="976" y="84" width="88" height="22" rx="4" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
+                  <rect x="1064" y="84" width="88" height="22" rx="4" fill="#10b981" fill-opacity="0.85"/>
+
+                  <rect x="128" y="122" width="936" height="22" rx="4" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+                  <rect x="1064" y="122" width="88" height="22" rx="4" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
+                  <rect x="1152" y="122" width="88" height="22" rx="4" fill="#10b981" fill-opacity="0.85"/>
+                </g>
+
+                <line x1="128" y1="162" x2="1240" y2="162" stroke="var(--border)" stroke-width="1"/>
+                <g font-family="var(--font-mono)" font-size="13" fill="var(--text-mute)">
+                  <text x="128" y="184">La ventana avanza una semana en cada pliegue · el modelo entrena siempre hacia atrás y nunca ve el futuro</text>
+                  <text x="1240" y="184" text-anchor="end">tiempo →</text>
+                </g>
+              </svg>
+              <div class="wf-claim">Ninguna cifra de este bloque se ha medido sobre datos que el modelo ya hubiera visto.</div>
             </div>
           </div>
+
+          <div class="d2-panel d2-cards">
+            <div class="d2-wrap">
+            <div class="duel">
+              <div class="model-card d2-card-naive">
+                <div class="model-name">Seasonal Naïve</div>
+                <div class="verdict d2-stack d2-verdict">
+                  <span class="t1" style="color: var(--c-conf);">▲ Gana por MAE</span>
+                  <span class="t2" style="color: var(--c-crit);">▼ Rotura en la mitad de los días</span>
+                </div>
+                <div style="margin-top: 14px;">
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">MAE</span>
+                      <span class="metric d2-metric d2-m-mae">6,61</span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-mae" style="width: 82.0%"></i></div>
+                  </div>
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">Nivel de servicio</span>
+                      <span class="metric d2-metric d2-m-svc">52,45<span class="u">%</span></span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-svc" style="width: 62.8%"></i></div>
+                  </div>
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">Coste inventario</span>
+                      <span class="metric d2-metric d2-m-cost">162.299</span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-cost" style="width: 100.0%"></i></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="model-card d2-card-lgbm">
+                <div class="model-name">LightGBM conformal</div>
+                <div class="verdict d2-stack d2-verdict">
+                  <span class="t1" style="color: var(--text-mute);">Pierde por MAE</span>
+                  <span class="t2" style="color: var(--c-conf);">▲ Menor coste y +31,1 p.p. de servicio</span>
+                </div>
+                <div style="margin-top: 14px;">
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">MAE</span>
+                      <span class="metric d2-metric d2-m-mae">8,06</span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-mae" style="width: 100.0%"></i></div>
+                  </div>
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">Nivel de servicio</span>
+                      <span class="metric d2-metric d2-m-svc">83,55<span class="u">%</span></span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-svc" style="width: 100.0%"></i></div>
+                  </div>
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">Coste inventario</span>
+                      <span class="metric d2-metric d2-m-cost">147.646</span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-cost" style="width: 91.0%"></i></div>
+                  </div>
+                </div>
+              </div>
+            </div>
         </div>
+          </div>
+        </div>
+
+        <div class="wf-mini">walk-forward · 500 series · 3 pliegues · hueco de 7 días · valida 7 días no vistos</div>
 
         <div class="memref">Memoria, §6.2 · Rendimiento predictivo y la trampa del MAE</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~94 seg &middot; 226 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Pasamos a la realidad empírica: los resultados sobre las 500 series. Los mido primero con la lente que usaría cualquiera por defecto, la del error puntual."</em></p>
+          <p><strong>[TIEMPO: ~123 seg &middot; 297 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"Pasamos a la realidad empírica: los resultados sobre las 500 series. Pero antes de enseñar una sola cifra, conviene decir cómo se han medido."</em></p>
+          <p><em>"Backtesting walk-forward. El modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. Después la ventana avanza y se repite: tres pliegues. Nunca ve el futuro, así que no hay fuga temporal. Ninguna de las cifras que vienen se ha medido sobre datos que el modelo ya conociera."</em></p>
+          <p>👉 <em>(Pulsas Espacio: el esquema se retira hacia la izquierda y entran las dos tarjetas. El protocolo queda resumido en una linea al pie.)</em></p>
+          <p><em>"Los mido primero con la lente que usaría cualquiera por defecto, la del error puntual."</em></p>
           <p><em>"Dos modelos. A la izquierda un Seasonal Naïve y a la derecha el LightGBM con calibración conformal."</em></p>
           <p><em>"El error absoluto medio del Naïve es 6,61 unidades sobre esa ventana de siete días. El de LightGBM, 8,06. Es decir: el modelo tiene más error que la heurística. Y no por poco, un 22% más."</em></p>
           <p><em>"Si yo cerrara la evaluación aquí, la conclusión de este trabajo sería que el modelo más simple es el mejor y que todo lo demás ha sido un ejercicio inútil."</em></p>
@@ -2672,7 +2750,7 @@
           <div class="band"></div>
         </div>
 
-        <table class="dt" style="margin-bottom: 14px;">
+        <table class="dt" style="margin-bottom: 22px;">
           <thead>
             <tr>
               <th>Modelo</th><th>MAE</th><th>Coste (u.m.)</th>
@@ -2698,53 +2776,7 @@
           </tbody>
         </table>
 
-        <svg class="wf-strip" viewBox="0 0 1280 122" role="img"
-             aria-label="Esquema del backtesting walk-forward: tres pliegues; en cada uno el entrenamiento acaba siete dias antes de la semana de validacion, y la ventana avanza una semana.">
-          <defs>
-            <pattern id="wfHueco" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <line x1="0" y1="0" x2="0" y2="7" stroke="#ef4444" stroke-width="1.6" stroke-opacity="0.45"/>
-            </pattern>
-          </defs>
-
-          <g font-family="var(--font-mono)" font-size="10.5">
-            <rect x="128" y="4" width="11" height="11" rx="2" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
-            <text x="146" y="13" fill="var(--text-mute)">ENTRENAMIENTO · solo pasado</text>
-
-            <rect x="382" y="4" width="11" height="11" rx="2" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.45)"/>
-            <text x="400" y="13" fill="var(--text-mute)">HUECO H = 7 d · corta la fuga temporal</text>
-
-            <rect x="702" y="4" width="11" height="11" rx="2" fill="#10b981" fill-opacity="0.85"/>
-            <text x="720" y="13" fill="var(--text-mute)">VALIDACIÓN · la semana que el modelo no ha visto</text>
-          </g>
-
-          <g font-family="var(--font-mono)" font-size="10.5" fill="var(--text-3)" text-anchor="end">
-            <text x="112" y="41">PLIEGUE 1</text>
-            <text x="112" y="65">PLIEGUE 2</text>
-            <text x="112" y="89">PLIEGUE 3</text>
-          </g>
-
-          <g>
-            <rect x="128" y="29" width="760" height="15" rx="3" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
-            <rect x="888" y="29" width="88" height="15" rx="3" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.45)"/>
-            <rect x="976" y="29" width="88" height="15" rx="3" fill="#10b981" fill-opacity="0.85"/>
-
-            <rect x="128" y="53" width="848" height="15" rx="3" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
-            <rect x="976" y="53" width="88" height="15" rx="3" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.45)"/>
-            <rect x="1064" y="53" width="88" height="15" rx="3" fill="#10b981" fill-opacity="0.85"/>
-
-            <rect x="128" y="77" width="936" height="15" rx="3" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
-            <rect x="1064" y="77" width="88" height="15" rx="3" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.45)"/>
-            <rect x="1152" y="77" width="88" height="15" rx="3" fill="#10b981" fill-opacity="0.85"/>
-          </g>
-
-          <line x1="128" y1="100" x2="1240" y2="100" stroke="var(--border)" stroke-width="1"/>
-          <text x="128" y="117" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">La ventana avanza una semana en cada pliegue · el modelo entrena siempre hacia atrás y nunca ve el futuro</text>
-          <text x="1240" y="117" text-anchor="end" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">tiempo →</text>
-        </svg>
-
-
-
-        <div class="grid-3">
+<div class="grid-3">
           <div class="glass rail eval-kpi-card" style="--accent: var(--c-inv);">
             <div class="kpi-lab">Ahorro logístico</div>
             <div class="metric kpi-val" id="eval-kpi-saving" style="color: var(--c-inv);">−9,03<span class="u">%</span></div>
@@ -2765,10 +2797,9 @@
         <div class="memref">Memoria, §6.2 y §6.4 · Rendimiento predictivo y calibración conformal</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~66 seg &middot; 159 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~47 seg &middot; 113 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Aquí tienen la imagen completa del experimento: añadimos a CatBoost y evaluamos también la calidad de los intervalos."</em></p>
           <p><em>"Fíjense en el patrón de la tabla: con CatBoost no hay paradoja, es el peor en error puntual y también el de mayor coste. La paradoja se concentra entre el Naïve y LightGBM."</em></p>
-          <p><em>"Debajo está el protocolo detrás de todas estas cifras, el backtesting walk-forward: el modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. La ventana avanza tres veces. Nunca ve el futuro: no hay fuga temporal."</em></p>
           <p><em>"Y esa superioridad se consolida en las tres cifras inferiores: primero, un ahorro logístico del 9%, con un intervalo al 95% enteramente negativo. Segundo, una ganancia de 31 puntos en nivel de servicio, pasando del 52% al 83,55%. Y tercero, aunque ambos modelos superan el 80% de cobertura, LightGBM logra el mejor Winkler Score con 36,11, generando intervalos un 19% más compactos."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre esta tabla:]</strong></p>
           <p>- <strong>"¿Por qué la cobertura empírica da 85,5% si el objetivo era 80%?"</strong> La predicción conformal garantiza una cota inferior finita $1 - \alpha \le \mathbb{E}[\text{cobertura}]$. Al haber soporte discreto y cuantiles empíricos, la cobertura es conservadoramente superior. Lo crítico es que no existe infracobertura en ningún fold temporal a escala 500.</p>
@@ -6631,7 +6662,8 @@ Usar si el tribunal pregunta por trazabilidad o auditoría del código.</p>
       const sec = document.querySelector('.reveal .slides section.present[data-lens]');
       if (!sec) return;
       const shown = sec.querySelectorAll('.d2-frag.visible').length;
-      sec.setAttribute('data-lens', shown > 0 ? '2' : '1');
+      sec.setAttribute('data-step', String(Math.min(2, shown)));
+      sec.setAttribute('data-lens', shown > 1 ? '2' : '1');
     }
     Reveal.on('ready', updateD2Lens);
     Reveal.on('slidechanged', updateD2Lens);
