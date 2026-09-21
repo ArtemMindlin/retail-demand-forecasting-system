@@ -322,6 +322,12 @@
     section[data-step="0"] .wf-panel { opacity: 1; transform: none; pointer-events: auto; }
     section[data-step="0"] .d2-cards { opacity: 0; transform: translateX(56px); pointer-events: none; }
 
+    .d2-ic {
+      font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute);
+      margin-top: 6px; opacity: 0; transition: opacity 0.5s ease;
+    }
+    section[data-lens="2"] .d2-ic { opacity: 0.85; }
+
     .wf-mini {
       margin-top: 10px; text-align: center;
       font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
@@ -2683,6 +2689,7 @@
                       <span class="metric d2-metric d2-m-cost">147.646</span>
                     </div>
                     <div class="ctrack"><i class="d2-bar d2-b-cost" style="width: 91.0%"></i></div>
+                  <div class="d2-ic">−9,03% vs Naïve · IC 95% [−15,5%; −2,7%]</div>
                   </div>
                 </div>
               </div>
@@ -2696,7 +2703,7 @@
         <div class="memref">Memoria, §6.2 · Rendimiento predictivo y la trampa del MAE</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~130 seg &middot; 315 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~137 seg &middot; 331 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Pasamos a la realidad empírica: los resultados sobre las 500 series. Pero antes de enseñar una sola cifra, conviene decir de dónde salen."</em></p>
           <p><em>"Backtesting walk-forward. El modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. Después la ventana avanza y se repite: tres pliegues. Nunca ve el futuro, así que no hay fuga temporal. Ninguna de las cifras que vienen se ha medido sobre datos que el modelo ya conociera."</em></p>
           <p>👉 <em>(Pulsas Espacio: el esquema se retira hacia la izquierda y entran las dos tarjetas. El protocolo queda resumido en una linea al pie.)</em></p>
@@ -2706,7 +2713,7 @@
           <p><em>"Si yo cerrara la evaluación aquí, la conclusión de este trabajo sería que el modelo más simple es el mejor y que todo lo demás ha sido un ejercicio inútil."</em></p>
           <p><em>"Y esa conclusión sería falsa."</em></p>
           <p>👉 <em>(Pulsas Espacio: NO cambia de diapositiva. Es la misma, cambiando de lente: titulo, chip y las tres cifras de cada tarjeta, y las barras se encienden.)</em></p>
-          <p><em>"Cambio de lente. Ahora mido lo mismo con la métrica de negocio, y el orden se invierte. El Naïve, que ganaba hace un segundo, rompe stock prácticamente la mitad de los días con apenas un 52% de servicio. LightGBM sube al 83,55%, 31 puntos más, con un coste un 9% menor."</em></p>
+          <p><em>"Cambio de lente. Ahora mido lo mismo con la métrica de negocio, y el orden se invierte. El Naïve, que ganaba hace un segundo, rompe stock prácticamente la mitad de los días con apenas un 52% de servicio. LightGBM sube al 83,55%, 31 puntos más, con un coste un 9% menor. Y ese ahorro no es ruido: el intervalo de confianza al 95% queda entero en negativo."</em></p>
           <p><em>"Conviene decir en qué se mide ese coste: son unidades monetarias simuladas, lo que cuesta cada unidad que falta y cada unidad que sobra, con la rotura pesando cuatro veces más que la merma."</em></p>
           <p><em>"El modelo con peor error puntual es el que toma la mejor decisión. Por eso este trabajo no evalúa por MAE: evalúa por lo que cuesta equivocarse."</em></p>
           <p><strong>[NO NOMBRES EL NIVEL DE SERVICIO NI EL COSTE ANTES DE PULSAR.]</strong> Estan
@@ -2750,18 +2757,13 @@
           <div class="row">
             <div>
               <div class="eyebrow">03 · RESULTADOS</div>
-              <h3 style="margin-top: 8px;">Evaluación predictiva y financiera walk-forward</h3>
+              <h3 style="margin-top: 8px;">Cobertura cumplida e intervalos más estrechos</h3>
             </div>
             </div>
           <div class="band"></div>
         </div>
 
-        <div class="grid-3">
-          <div class="glass rail eval-kpi-card" style="--accent: var(--c-inv);">
-            <div class="kpi-lab">Ahorro logístico</div>
-            <div class="metric kpi-val" id="eval-kpi-saving" style="color: var(--c-inv);">−9,03<span class="u">%</span></div>
-            <div class="kpi-sub">IC 95% [−15,5%; −2,7%] · vs Seasonal Naïve</div>
-          </div>
+        <div class="grid-2" style="gap: 24px;">
           <div class="glass rail eval-kpi-card" style="--accent: var(--c-conf);">
             <div class="kpi-lab">Cobertura empírica</div>
             <div class="metric kpi-val" id="eval-kpi-service" style="color: var(--c-conf);">85,5<span class="u">%</span></div>
@@ -2807,9 +2809,9 @@
         <div class="memref">Memoria, §6.2 y §6.4 · Rendimiento predictivo y calibración conformal</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~68 seg &middot; 165 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Esa conclusión es la que sostiene el trabajo, y estas tres cifras son las que la respaldan. Ninguna ha salido todavía."</em></p>
-          <p><em>"La primera dice que el ahorro no es ruido: el intervalo al 95% queda entero en negativo, entre el 15 y el 3 por ciento. La segunda cierra la promesa de la calibración: prometíamos un 80% de cobertura y en la práctica sale un 85,5%, sin quedarse corta en ningún pliegue. Y la tercera es el Winkler Score, que castiga a la vez lo ancho del intervalo y cada valor que se queda fuera, así que cuanto más bajo mejor: 36,11 frente a 46,54, intervalos un 19% más compactos con la misma cobertura."</em></p>
+          <p><strong>[TIEMPO: ~59 seg &middot; 143 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"Queda una pregunta que el coste no responde: ¿y los intervalos? Porque en la diapositiva de la calibración prometimos un 80% de cobertura, y eso hay que demostrarlo."</em></p>
+          <p><em>"Se cumple: 85,5% de cobertura empírica frente al 80% prometido, y sin quedarse corta en ningún pliegue. El error va en la dirección segura. Y no a cualquier precio: el Winkler Score, que castiga a la vez lo ancho del intervalo y cada valor que se queda fuera, da 36,11 frente a 46,54 de CatBoost. Intervalos un 19% más compactos con la misma cobertura."</em></p>
           <p><em>"Debajo tienen la tabla completa, por si quieren comprobarlo. Las columnas del Naïve y de LightGBM ya las han visto; lo nuevo es CatBoost, y con él no hay paradoja: es el peor en error puntual y también el de mayor coste. La paradoja se concentra entre el Naïve y LightGBM."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre esta tabla:]</strong></p>
           <p>- <strong>"¿Por qué la cobertura empírica da 85,5% si el objetivo era 80%?"</strong> La predicción conformal garantiza una cota inferior finita $1 - \alpha \le \mathbb{E}[\text{cobertura}]$. Al haber soporte discreto y cuantiles empíricos, la cobertura es conservadoramente superior. Lo crítico es que no existe infracobertura en ningún fold temporal a escala 500.</p>
@@ -6799,10 +6801,9 @@ Usar si el tribunal pregunta por trazabilidad o auditoría del código.</p>
     function animateEvalCountUp() {
       const slide = Reveal.getCurrentSlide();
       if (!slide || slide.id !== 'slide-eval-wf') return;
-      const v1 = document.getElementById('eval-kpi-saving');
       const v2 = document.getElementById('eval-kpi-service');
       const v3 = document.getElementById('eval-kpi-winkler');
-      if (!v1 || !v2 || !v3) return;
+      if (!v2 || !v3) return;
 
       const duration = 850;
       const startTime = performance.now();
@@ -6812,11 +6813,9 @@ Usar si el tribunal pregunta por trazabilidad o auditoría del código.</p>
         const progress = Math.min(elapsed / duration, 1);
         const ease = 1 - Math.pow(1 - progress, 3); // easeOutCubic
 
-        const cur1 = (-9.03 * ease).toFixed(2).replace('.', ',');
         const cur2 = (85.5 * ease).toFixed(1).replace('.', ',');
         const cur3 = (36.11 * ease).toFixed(2).replace('.', ',');
 
-        v1.innerHTML = cur1 + '<span class="u">%</span>';
         v2.innerHTML = cur2 + '<span class="u">%</span>';
         v3.innerHTML = cur3;
 
