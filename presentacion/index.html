@@ -1050,6 +1050,13 @@
 
     /* Referencia a la memoria: el tribunal puede verificar sin preguntar.
        Absoluta a proposito, para no tocar la altura de ninguna diapositiva. */
+    .wf-strip {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin-bottom: 16px;
+    }
+
     .memref {
       position: absolute;
       left: 0;
@@ -2607,8 +2614,8 @@
         <div class="memref">Memoria, §6.2 · Rendimiento predictivo y la trampa del MAE</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~95 seg &middot; 229 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Pasamos a la realidad empírica: los resultados del backtesting walk-forward sobre las 500 series. Los mido primero con la lente que usaría cualquiera por defecto, la del error puntual."</em></p>
+          <p><strong>[TIEMPO: ~106 seg &middot; 257 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"Pasamos a la realidad empírica. Todo lo que viene sale de un backtesting walk-forward sobre las 500 series: el modelo entrena solo con el pasado, predice una semana que no ha visto, y la ventana avanza. Tres pliegues. Nunca ve el futuro. Los mido primero con la lente que usaría cualquiera por defecto, la del error puntual."</em></p>
           <p><em>"Dos modelos. A la izquierda un Seasonal Naïve y a la derecha el LightGBM con calibración conformal."</em></p>
           <p><em>"El error absoluto medio del Naïve es 6,61 unidades sobre esa ventana de siete días. El de LightGBM, 8,06. Es decir: el modelo tiene más error que la heurística. Y no por poco, un 22% más."</em></p>
           <p><em>"Si yo cerrara la evaluación aquí, la conclusión de este trabajo sería que el modelo más simple es el mejor y que todo lo demás ha sido un ejercicio inútil."</em></p>
@@ -2665,7 +2672,7 @@
           <div class="band"></div>
         </div>
 
-        <table class="dt" style="margin-bottom: 22px;">
+        <table class="dt" style="margin-bottom: 14px;">
           <thead>
             <tr>
               <th>Modelo</th><th>MAE</th><th>Coste (u.m.)</th>
@@ -2690,6 +2697,52 @@
             </tr>
           </tbody>
         </table>
+
+        <svg class="wf-strip" viewBox="0 0 1280 122" role="img"
+             aria-label="Esquema del backtesting walk-forward: tres pliegues; en cada uno el entrenamiento acaba siete dias antes de la semana de validacion, y la ventana avanza una semana.">
+          <defs>
+            <pattern id="wfHueco" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="7" stroke="#ef4444" stroke-width="1.6" stroke-opacity="0.45"/>
+            </pattern>
+          </defs>
+
+          <g font-family="var(--font-mono)" font-size="10.5">
+            <rect x="128" y="4" width="11" height="11" rx="2" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+            <text x="146" y="13" fill="var(--text-mute)">ENTRENAMIENTO · solo pasado</text>
+
+            <rect x="382" y="4" width="11" height="11" rx="2" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.45)"/>
+            <text x="400" y="13" fill="var(--text-mute)">HUECO H = 7 d · corta la fuga temporal</text>
+
+            <rect x="702" y="4" width="11" height="11" rx="2" fill="#10b981" fill-opacity="0.85"/>
+            <text x="720" y="13" fill="var(--text-mute)">VALIDACIÓN · la semana que el modelo no ha visto</text>
+          </g>
+
+          <g font-family="var(--font-mono)" font-size="10.5" fill="var(--text-3)" text-anchor="end">
+            <text x="112" y="41">PLIEGUE 1</text>
+            <text x="112" y="65">PLIEGUE 2</text>
+            <text x="112" y="89">PLIEGUE 3</text>
+          </g>
+
+          <g>
+            <rect x="128" y="29" width="760" height="15" rx="3" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+            <rect x="888" y="29" width="88" height="15" rx="3" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.45)"/>
+            <rect x="976" y="29" width="88" height="15" rx="3" fill="#10b981" fill-opacity="0.85"/>
+
+            <rect x="128" y="53" width="848" height="15" rx="3" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+            <rect x="976" y="53" width="88" height="15" rx="3" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.45)"/>
+            <rect x="1064" y="53" width="88" height="15" rx="3" fill="#10b981" fill-opacity="0.85"/>
+
+            <rect x="128" y="77" width="936" height="15" rx="3" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+            <rect x="1064" y="77" width="88" height="15" rx="3" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.45)"/>
+            <rect x="1152" y="77" width="88" height="15" rx="3" fill="#10b981" fill-opacity="0.85"/>
+          </g>
+
+          <line x1="128" y1="100" x2="1240" y2="100" stroke="var(--border)" stroke-width="1"/>
+          <text x="128" y="117" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">La ventana avanza una semana en cada pliegue · el modelo entrena siempre hacia atrás y nunca ve el futuro</text>
+          <text x="1240" y="117" text-anchor="end" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">tiempo →</text>
+        </svg>
+
+
 
         <div class="grid-3">
           <div class="glass rail eval-kpi-card" style="--accent: var(--c-inv);">
