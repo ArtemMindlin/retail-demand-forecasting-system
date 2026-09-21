@@ -320,6 +320,8 @@
       color: var(--text-mute); opacity: 0.8; transition: opacity 0.45s ease;
     }
     section[data-step="0"] .wf-mini { opacity: 0; }
+    .d2-chip { transition: opacity 0.45s ease; }
+    section[data-step="0"] .d2-chip { opacity: 0; }
     h3.d2-stack > * { white-space: normal; }
 
     .d2-verdict { min-height: 16px; }
@@ -1070,10 +1072,6 @@
     /* Referencia a la memoria: el tribunal puede verificar sin preguntar.
        Absoluta a proposito, para no tocar la altura de ninguna diapositiva. */
     .wf-strip { display: block; width: 100%; height: auto; }
-    .wf-claim {
-      margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
-      font-size: 15px; color: var(--text-1); text-align: center;
-    }
 
     .memref {
       position: absolute;
@@ -2560,7 +2558,7 @@
                 <span class="t2">Si mides el dinero, el orden se invierte</span>
               </h3>
             </div>
-            <span class="chip d2-chip"><span class="dot"></span><span class="d2-stack"><span class="t0">PROTOCOLO</span><span class="t1">LENTE: MAE</span><span class="t2">LENTE: COSTE</span></span></span>
+            <span class="chip d2-chip"><span class="dot"></span><span class="d2-stack"><span class="t1">LENTE: MAE</span><span class="t2">LENTE: COSTE</span></span></span>
           </div>
           <div class="band"></div>
         </div>
@@ -2611,8 +2609,7 @@
                   <text x="1240" y="184" text-anchor="end">tiempo →</text>
                 </g>
               </svg>
-              <div class="wf-claim">Ninguna cifra de este bloque se ha medido sobre datos que el modelo ya hubiera visto.</div>
-            </div>
+</div>
           </div>
 
           <div class="d2-panel d2-cards">
