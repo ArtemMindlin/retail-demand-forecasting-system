@@ -271,6 +271,14 @@
       background: var(--surface-glass);
     }
     .model-name { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text-1); }
+    .model-gloss {
+      font-family: var(--font-mono); font-size: 11px; color: var(--text-mute);
+      margin-top: 3px; letter-spacing: 0.01em;
+    }
+    .dt-nota {
+      font-family: var(--font-mono); font-size: 11px; color: var(--text-mute);
+      margin: -12px 0 18px; letter-spacing: 0.01em;
+    }
     .verdict {
       font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em;
       text-transform: uppercase; margin-top: 4px;
@@ -2617,6 +2625,7 @@
             <div class="duel">
               <div class="model-card d2-card-naive">
                 <div class="model-name">Seasonal Naïve</div>
+              <div class="model-gloss">predice que la próxima semana se venderá lo mismo que la anterior</div>
                 <div class="verdict d2-stack d2-verdict">
                   <span class="t1" style="color: var(--c-conf);">▲ Gana por MAE</span>
                   <span class="t2" style="color: var(--c-crit);">▼ Rotura en la mitad de los días</span>
@@ -2648,6 +2657,7 @@
 
               <div class="model-card d2-card-lgbm">
                 <div class="model-name">LightGBM conformal</div>
+              <div class="model-gloss">cuantiles aprendidos, ensanchados por la calibración conformal</div>
                 <div class="verdict d2-stack d2-verdict">
                   <span class="t1" style="color: var(--text-mute);">Pierde por MAE</span>
                   <span class="t2" style="color: var(--c-conf);">▲ Menor coste y +31,1 p.p. de servicio</span>
@@ -2686,12 +2696,12 @@
         <div class="memref">Memoria, §6.2 · Rendimiento predictivo y la trampa del MAE</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~120 seg &middot; 291 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~130 seg &middot; 315 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Pasamos a la realidad empírica: los resultados sobre las 500 series. Pero antes de enseñar una sola cifra, conviene decir de dónde salen."</em></p>
           <p><em>"Backtesting walk-forward. El modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. Después la ventana avanza y se repite: tres pliegues. Nunca ve el futuro, así que no hay fuga temporal. Ninguna de las cifras que vienen se ha medido sobre datos que el modelo ya conociera."</em></p>
           <p>👉 <em>(Pulsas Espacio: el esquema se retira hacia la izquierda y entran las dos tarjetas. El protocolo queda resumido en una linea al pie.)</em></p>
           <p><em>"Empiezo por la lente que usaría cualquiera por defecto: la del error puntual."</em></p>
-          <p><em>"Dos modelos. A la izquierda un Seasonal Naïve y a la derecha el LightGBM con calibración conformal."</em></p>
+          <p><em>"Dos modelos. A la izquierda un Seasonal Naïve: la heurística que usa hoy la tienda, que predice que la próxima semana se venderá lo mismo que la anterior. A la derecha el LightGBM con sus cuantiles ensanchados por la calibración conformal."</em></p>
           <p><em>"El error absoluto medio del Naïve es 6,61 unidades sobre esa semana. El de LightGBM, 8,06. Es decir: el modelo tiene más error que la heurística. Y no por poco, un 22% más."</em></p>
           <p><em>"Si yo cerrara la evaluación aquí, la conclusión de este trabajo sería que el modelo más simple es el mejor y que todo lo demás ha sido un ejercicio inútil."</em></p>
           <p><em>"Y esa conclusión sería falsa."</em></p>
@@ -2773,6 +2783,8 @@
           </tbody>
         </table>
 
+        <div class="dt-nota">Winkler 80%: penaliza a la vez lo ancho del intervalo y cada valor real que se queda fuera; cuanto más bajo, mejor.</div>
+
 <div class="grid-3">
           <div class="glass rail eval-kpi-card" style="--accent: var(--c-inv);">
             <div class="kpi-lab">Ahorro logístico</div>
@@ -2794,10 +2806,10 @@
         <div class="memref">Memoria, §6.2 y §6.4 · Rendimiento predictivo y calibración conformal</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~50 seg &middot; 122 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~62 seg &middot; 151 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Esa conclusión es la que sostiene el trabajo. Esta tabla la completa: entra también CatBoost, y además del coste medimos la calidad de los intervalos."</em></p>
           <p><em>"Fíjense en el patrón de la tabla: con CatBoost no hay paradoja, es el peor en error puntual y también el de mayor coste. La paradoja se concentra entre el Naïve y LightGBM."</em></p>
-          <p><em>"Y la superioridad de LightGBM se consolida en las tres cifras inferiores: primero, un ahorro logístico del 9%, con un intervalo al 95% enteramente negativo. Segundo, una ganancia de 31 puntos en nivel de servicio, pasando del 52% al 83,55%. Y tercero, aunque ambos modelos superan el 80% de cobertura, LightGBM logra el mejor Winkler Score con 36,11, generando intervalos un 19% más compactos."</em></p>
+          <p><em>"Y la superioridad de LightGBM se consolida en las tres cifras inferiores: primero, un ahorro logístico del 9%, con un intervalo al 95% enteramente negativo. Segundo, una ganancia de 31 puntos en nivel de servicio, pasando del 52% al 83,55%. Y tercero, aunque ambos modelos superan el 80% de cobertura, LightGBM logra el mejor Winkler Score. Esa métrica castiga a la vez lo ancho del intervalo y cada valor real que se queda fuera, así que cuanto más bajo, mejor: 36,11 frente a 46,54, intervalos un 19% más compactos con la misma cobertura."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre esta tabla:]</strong></p>
           <p>- <strong>"¿Por qué la cobertura empírica da 85,5% si el objetivo era 80%?"</strong> La predicción conformal garantiza una cota inferior finita $1 - \alpha \le \mathbb{E}[\text{cobertura}]$. Al haber soporte discreto y cuantiles empíricos, la cobertura es conservadoramente superior. Lo crítico es que no existe infracobertura en ningún fold temporal a escala 500.</p>
           <p>- <strong>"¿Por qué CatBoost cuesta más que el Naïve (174k vs 162k) si da mucho mejor servicio (78% vs 52%)?"</strong> Por la penalización asimétrica: CatBoost sobrepredice en colas intermedias y acumula coste de exceso de stock ($c_o$). LightGBM equilibra el trade-off con mayor precisión de cuantil.</p>
