@@ -1086,7 +1086,6 @@
     .eqn-inline .katex { font-size: 1.02em; }
 
     .lim-in .lim-mark { color: var(--c-ai); background: rgba(155,124,248,0.14); border: 1px solid rgba(155,124,248,0.4); }
-    .lim-nv .lim-mark { color: var(--c-crit); background: rgba(239,68,68,0.14); border: 1px solid rgba(239,68,68,0.4); }
 
     /* Diapositiva 9: el abanico se construye en el orden del argumento. La banda
        primero (la incertidumbre existe), la mediana despues (lo que optimiza el
@@ -2052,7 +2051,6 @@
                     <div class="glass rail" style="--accent: var(--c-conf); padding: 10px 16px; display: flex; flex-direction: column; justify-content: space-between;">
             <div class="row-head" style="margin-bottom: 2px;">
               <h4 style="margin-bottom: 0;">El pedido óptimo en la distribución</h4>
-              <span class="chip" style="--accent: var(--c-conf); font-size: 10px;"><span class="dot"></span>DENSIDAD $\hat{f}(y)$</span>
             </div>
             <svg class="dg dg-anim" viewBox="20 4 540 166" style="width: 100%; height: auto; display: block;" role="img"
                  aria-label="Distribución de densidad f̂(y) con la mediana en el centro, el fractil Newsvendor q* desplazado a la derecha y el colchón de seguridad sombreado.">
@@ -2080,8 +2078,9 @@
 
               <!-- 2b. Etiqueta Conformal (t = 1.15s) -->
               <g class="dgf f-nv-band">
-                <text class="dg-k" x="70" y="52" fill="var(--text-3)" font-size="9.5px">Banda 80% (CQR)</text>
-                <line x1="70" y1="57" x2="135" y2="57" stroke="var(--c-ai)" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.6"/>
+                <text class="dg-k" x="70" y="42" fill="var(--text-3)" font-size="9.5px">Aquí cae el 80%</text>
+                <text class="dg-k" x="70" y="53" fill="var(--text-3)" font-size="9.5px">de la demanda</text>
+                <line x1="70" y1="59" x2="135" y2="59" stroke="var(--c-ai)" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.6"/>
               </g>
 
               <!-- 3. Mediana (50% de probabilidad, minimiza MAE) (t = 1.65s) -->
@@ -2090,7 +2089,7 @@
                 <circle cx="225" cy="22.0" r="4.5" fill="var(--text-2)"/>
                 <text class="dg-t" x="225" y="14" text-anchor="middle" fill="var(--text-2)" font-weight="600" font-size="11px">Mediana (50%)</text>
                 <text class="dg-k" x="225" y="153" text-anchor="middle" fill="var(--text-2)" font-size="10.5px" font-weight="600">MEDIANA</text>
-                <text class="dg-k" x="225" y="163" text-anchor="middle" fill="var(--text-mute)" font-size="9px">Minimiza MAE</text>
+                <text class="dg-k" x="225" y="163" text-anchor="middle" fill="var(--text-mute)" font-size="9px">El que menos error comete</text>
               </g>
 
               <!-- 4. Fractil 0.80 (Pedido q* Newsvendor) (t = 2.35s) -->
@@ -2098,8 +2097,7 @@
                 <line x1="365" y1="93.5" x2="365" y2="140" stroke="var(--c-conf)" stroke-width="2.5"/>
                 <circle cx="365" cy="93.5" r="5" fill="var(--c-conf)"/>
                 <text class="dg-k" x="375" y="88" text-anchor="start" fill="var(--c-conf)" font-weight="700" font-size="12px">q* = 0,80</text>
-                <text class="dg-k" x="365" y="153" text-anchor="middle" fill="var(--c-conf)" font-size="10.5px" font-weight="700">PEDIDO q*</text>
-                <text class="dg-k" x="365" y="163" text-anchor="middle" fill="var(--c-conf)" font-size="9px">Newsvendor</text>
+                <text class="dg-k" x="365" y="153" text-anchor="middle" fill="var(--c-conf)" font-size="10.5px" font-weight="700">PUNTO DE PEDIDO 0,80</text>
               </g>
 
               <!-- 5. Área del Colchón de seguridad y cota (t = 2.95s) -->
@@ -2113,52 +2111,41 @@
             </svg>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; flex-direction: column; gap: 10px; justify-content: center;">
             <div class="glass rail tight" style="--accent: var(--c-ai);">
               <div class="row-head">
-                <h4 style="font-size: 15.5px; margin-bottom: 0;">Mondrian Conformal Prediction</h4>
-                <span class="chip" style="--accent: var(--c-ai); font-size: 10px;"><span class="dot"></span>SIN DISTRIBUCIÓN</span>
+                <h4 style="font-size: 15.5px; margin-bottom: 0;">El intervalo acierta 8 de cada 10 veces</h4>
               </div>
               <div class="eqn-inline">
                 $P\!\left(Y_{n+1} \in \hat{C}(X_{n+1})\right) \ge 1 - \alpha = 80\%$
               </div>
+              <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--text-mute); line-height: 1.35;">
+                Confianza del intervalo, 80&nbsp;%. No es el 0,80 del punto de pedido: coinciden por casualidad.
+              </p>
               <div class="lim-row lim-in" style="align-items: center; padding: 6px 0; font-size: 13.8px;">
                 <span class="lim-mark">1</span>
-                <strong style="color: var(--text-1); font-weight: 600;">Cobertura universal sin asumir distribución</strong>
+                <strong style="color: var(--text-1); font-weight: 600;">Vale sea cual sea la forma de la demanda</strong>
               </div>
               <div class="lim-row lim-in" style="align-items: center; padding: 6px 0; font-size: 13.8px;">
                 <span class="lim-mark">2</span>
-                <strong style="color: var(--text-1); font-weight: 600;">Garantía matemática exacta en muestra finita</strong>
+                <strong style="color: var(--text-1); font-weight: 600;">Demostrada, no estimada: vale con los datos que hay</strong>
               </div>
               <div class="lim-row lim-in" style="align-items: center; padding: 6px 0; font-size: 13.8px;">
                 <span class="lim-mark">3</span>
-                <strong style="color: var(--text-1); font-weight: 600;">Calibración Mondrian estratificada por categoría</strong>
-              </div>
-            </div>
-            <div class="glass rail tight" style="--accent: var(--c-crit); display: flex; flex-direction: column;">
-              <div class="row-head">
-                <h4 style="font-size: 15.5px; margin-bottom: 0;">Política Newsvendor asimétrica</h4>
-                <span class="chip" style="--accent: var(--c-crit); font-size: 10px;"><span class="dot"></span>UN ORIGEN, UNA DECISIÓN</span>
-              </div>
-              <div class="lim-row lim-nv" style="align-items: center; padding: 6px 0; font-size: 13.8px;">
-                <span class="lim-mark">↑</span>
-                <strong style="color: var(--text-1); font-weight: 600;">Rotura 4× más costosa $\implies q^{*}$ supera la mediana</strong>
-              </div>
-              <div class="lim-row lim-nv" style="align-items: center; padding: 6px 0; font-size: 13.8px;">
-                <span class="lim-mark">∫</span>
-                <strong style="color: var(--text-1); font-weight: 600;">Pedido óptimo $q^{*}$ sobre cuantiles conformalizados</strong>
+                <strong style="color: var(--text-1); font-weight: 600;">Se cumple categoría a categoría, no solo de media (Mondrian)</strong>
               </div>
             </div>
           </div>
         </div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~74 seg &middot; 180 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Empiezo por la cabecera. El punto de la distribución en el que hay que pedir no lo elige la estadística, lo decide la economía: es el fractil crítico. Con una rotura que cuesta 4 veces la merma, el ratio es 0,80. Y el pedido óptimo es ese cuantil, no la media."</em></p>
+          <p><strong>[TIEMPO: ~83 seg &middot; 201 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"El punto de la distribución en el que hay que pedir no lo elige la estadística, lo decide la economía: es el fractil crítico. Con una rotura que cuesta 4 veces la merma, el ratio es 0,80. Y el pedido óptimo es ese cuantil, no la media."</em></p>
           <p>👉 <em>(Señalas la curva de densidad y el colchón verde entre mediana y pedido.)</em></p>
           <p><em>"En la curva de densidad vemos qué significa esta fórmula: la mediana al 50% minimiza el error puntual, pero nos dejaría desprotegidos. Por eso el pedido óptimo q estrella se desplaza a la derecha, al fractil 0,80. Esa separación verde entre ambos es el colchón de seguridad: las unidades adicionales que pedimos sobre la mediana para absorber la incertidumbre sin romper stock."</em></p>
           <p>👉 <em>(Señalas la fórmula de predicción conformal a la derecha.)</em></p>
-          <p><em>"A la derecha formalizamos la garantía matemática mediante predicción conformal: aseguramos que la demanda real caerá dentro del intervalo con al menos un 80% de probabilidad, sin asumir normalidad ni distribuciones teóricas. Y con la calibración Mondrian estratificada por categoría, garantizamos que ese 80% se cumpla producto a producto. Para evitar intervalos artificialmente anchos, auditamos su calidad con el Winkler Score, que penaliza la falta de nitidez."</em></p>
+          <p><em>"A la derecha formalizamos la garantía matemática mediante predicción conformal: aseguramos que la demanda real caerá dentro del intervalo con al menos un 80% de probabilidad, sin asumir normalidad ni distribuciones teóricas. Y con la calibración Mondrian estratificada por categoría, garantizamos que ese 80% se cumpla producto a producto."</em></p>
+          <p><em>"Y un aviso, porque en esta diapositiva hay dos ochenta y no son el mismo: el 0,80 de la izquierda es el punto de pedido y sale de los costes; el 80% de la derecha es la confianza del intervalo. Coinciden por casualidad."</em></p>
 
           <p><strong>[PARACAIDAS. No se dice; esta aqui por si preguntan.]</strong></p>
           <p>- <strong>"Los dos 0,80, ¿son el mismo?"</strong> No, es una COINCIDENCIA de esta
