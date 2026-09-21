@@ -2614,8 +2614,8 @@
         <div class="memref">Memoria, §6.2 · Rendimiento predictivo y la trampa del MAE</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~106 seg &middot; 257 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Pasamos a la realidad empírica. Todo lo que viene sale de un backtesting walk-forward sobre las 500 series: el modelo entrena solo con el pasado, predice una semana que no ha visto, y la ventana avanza. Tres pliegues. Nunca ve el futuro. Los mido primero con la lente que usaría cualquiera por defecto, la del error puntual."</em></p>
+          <p><strong>[TIEMPO: ~94 seg &middot; 226 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"Pasamos a la realidad empírica: los resultados sobre las 500 series. Los mido primero con la lente que usaría cualquiera por defecto, la del error puntual."</em></p>
           <p><em>"Dos modelos. A la izquierda un Seasonal Naïve y a la derecha el LightGBM con calibración conformal."</em></p>
           <p><em>"El error absoluto medio del Naïve es 6,61 unidades sobre esa ventana de siete días. El de LightGBM, 8,06. Es decir: el modelo tiene más error que la heurística. Y no por poco, un 22% más."</em></p>
           <p><em>"Si yo cerrara la evaluación aquí, la conclusión de este trabajo sería que el modelo más simple es el mejor y que todo lo demás ha sido un ejercicio inútil."</em></p>
@@ -2765,9 +2765,10 @@
         <div class="memref">Memoria, §6.2 y §6.4 · Rendimiento predictivo y calibración conformal</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~47 seg &middot; 113 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~66 seg &middot; 159 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Aquí tienen la imagen completa del experimento: añadimos a CatBoost y evaluamos también la calidad de los intervalos."</em></p>
           <p><em>"Fíjense en el patrón de la tabla: con CatBoost no hay paradoja, es el peor en error puntual y también el de mayor coste. La paradoja se concentra entre el Naïve y LightGBM."</em></p>
+          <p><em>"Debajo está el protocolo detrás de todas estas cifras, el backtesting walk-forward: el modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. La ventana avanza tres veces. Nunca ve el futuro: no hay fuga temporal."</em></p>
           <p><em>"Y esa superioridad se consolida en las tres cifras inferiores: primero, un ahorro logístico del 9%, con un intervalo al 95% enteramente negativo. Segundo, una ganancia de 31 puntos en nivel de servicio, pasando del 52% al 83,55%. Y tercero, aunque ambos modelos superan el 80% de cobertura, LightGBM logra el mejor Winkler Score con 36,11, generando intervalos un 19% más compactos."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre esta tabla:]</strong></p>
           <p>- <strong>"¿Por qué la cobertura empírica da 85,5% si el objetivo era 80%?"</strong> La predicción conformal garantiza una cota inferior finita $1 - \alpha \le \mathbb{E}[\text{cobertura}]$. Al haber soporte discreto y cuantiles empíricos, la cobertura es conservadoramente superior. Lo crítico es que no existe infracobertura en ningún fold temporal a escala 500.</p>
