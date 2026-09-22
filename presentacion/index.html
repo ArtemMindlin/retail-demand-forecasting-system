@@ -1211,8 +1211,11 @@
     .reveal .slides section.present .dg-anim .f-optuna-mins { animation: dgFade 0.40s ease-out 0.80s both; }
 
     /* Diapositiva 18: micro-animaciones streaming */
-    .reveal .slides section.present .dg-anim .w-stream { animation: dgWipe 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
-    .reveal .slides section.present .dg-anim .f-stream { animation: dgFade 0.45s ease-out 0.65s both; }
+    .dg-anim .strm-draw { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    .reveal .slides section.present .dg-anim .strm-a { animation: dgDraw 0.95s cubic-bezier(0.4, 0.05, 0.25, 1) 0.15s both; }
+    .reveal .slides section.present .dg-anim .strm-b { animation: dgDraw 0.95s cubic-bezier(0.4, 0.05, 0.25, 1) 1.20s both; }
+    .reveal .slides section.present .dg-anim .f-strm-area { animation: dgFade 0.55s ease-out 2.20s both; }
+    .reveal .slides section.present .dg-anim .f-stream { animation: dgFade 0.45s ease-out 2.45s both; }
 
     @keyframes barGrow {
       from { transform: scaleY(0); }
@@ -1230,6 +1233,7 @@
 
     @keyframes dgWipe { from { transform: scaleX(0); } to { transform: scaleX(1); } }
     @keyframes dgFade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes dgDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 
     /* Diapositiva 21: Terminal Test Runner & Pipeline CI/CD Stepper */
     .term-line {
@@ -2990,9 +2994,6 @@
             <svg class="dg dg-anim" viewBox="0 0 580 295" role="img" style="width: 100%; height: auto; display: block; margin: auto 0;"
                  aria-label="Coste de inventario acumulado por cadencia: never alcanza 105.677 u.m. y every_7d alcanza 63.113 u.m., con un ahorro del 40,28%">
               <defs>
-                <clipPath id="dgWipeStreaming">
-                  <rect class="wipe w-stream" x="0" y="0" width="580" height="295"/>
-                </clipPath>
                 <linearGradient id="gradStreamShade" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.28"/>
                   <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.04"/>
@@ -3047,19 +3048,13 @@
               <text x="255" y="264" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">Origen de decisión semanal (no solapado · H = 7 días)</text>
 
               <!-- Curvas y Área con Wipe Animation -->
-              <g clip-path="url(#dgWipeStreaming)">
-                <!-- Área sombreada entre las dos curvas -->
-                <path d="M 75 201.8 L 165 163.7 L 255 129.9 L 345 90.2 L 435 42.5 L 435 116.0 L 345 135.3 L 255 151.7 L 165 168.5 Z"
-                      fill="url(#gradStreamShade)"/>
-
-                <!-- Línea: never (rojo / coral) -->
-                <path d="M 75 201.8 L 165 163.7 L 255 129.9 L 345 90.2 L 435 42.5"
-                      fill="none" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-
-                <!-- Línea: every_7d (azul / cian) -->
-                <path d="M 75 201.8 L 165 168.5 L 255 151.7 L 345 135.3 L 435 116.0"
-                      fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-              </g>
+              <!-- Primero se dibuja el estatico, luego el reentrenado, y al final la cuna del ahorro -->
+              <path class="dgf f-strm-area" d="M 75 201.8 L 165 163.7 L 255 129.9 L 345 90.2 L 435 42.5 L 435 116.0 L 345 135.3 L 255 151.7 L 165 168.5 Z"
+                    fill="url(#gradStreamShade)"/>
+              <path class="strm-draw strm-a" pathLength="1" d="M 75 201.8 L 165 163.7 L 255 129.9 L 345 90.2 L 435 42.5"
+                    fill="none" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <path class="strm-draw strm-b" pathLength="1" d="M 75 201.8 L 165 168.5 L 255 151.7 L 345 135.3 L 435 116.0"
+                    fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 
               <!-- Puntos de datos y badges finales con Fade -->
               <g class="dgf f-stream">
@@ -3143,8 +3138,9 @@
         <div class="memref">Memoria, §6.7 · Simulación operacional en streaming</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~34 seg &middot; 83 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Para saber cómo envejece el modelo en producción ejecutamos una simulación prequencial en streaming, 41 días sobre 500 series con 5 orígenes independientes. Reentrenar cada 7 días reduce el coste un 40% y eleva el nivel de servicio al 95%, y cada ciclo tarda 5,5 segundos: es un proceso nocturno viable."</em></p>
+          <p><strong>[TIEMPO: ~45 seg &middot; 108 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"Los tres objetivos que acabo de cerrar se miden una vez. Pero un modelo en producción no vive una vez: envejece, porque la demanda cambia por debajo de él."</em></p>
+          <p><em>"Para medir cuánto aguanta ejecutamos una simulación prequencial en streaming, 41 días sobre 500 series con 5 orígenes independientes. Reentrenar cada 7 días reduce el coste un 40% y eleva el nivel de servicio al 95%, y cada ciclo tarda 5,5 segundos: es un proceso nocturno viable."</em></p>
           <p><em>"Pero un detalle de honestidad: aunque el intervalo queda entero en terreno favorable, el sistema lo declara no concluyente, porque con 5 orígenes no solapados nuestro protocolo exige 8 para ordenar políticas."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre streaming y drift:]</strong></p>
           <p>- <strong>"¿Por qué declarar la comparativa 'no concluyente' si el IC 95% es estrictamente negativo (−57% a −17%)?"</strong> Porque en series temporales de retail las demandas de una misma semana comparten choques macroeconómicos y no son independientes. La unidad de remuestreo debe ser el origen semanal, no la serie individual. Con 5 orígenes, un remuestreo bootstrap es estadísticamente infradotado (underpowered). Exigir a priori un umbral de 8 orígenes antes de aceptar el resultado evita declarar victorias prematuras.</p>
