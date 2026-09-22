@@ -2857,17 +2857,17 @@
         <div class="memref">Memoria, §6.2 · Rendimiento predictivo y la trampa del MAE</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~116 seg &middot; 280 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~99 seg &middot; 239 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Con la señal ya limpia, segundo objetivo: el modelo. Y antes de enseñar una sola cifra, conviene decir de dónde salen."</em></p>
-          <p><em>"En Backtesting walk-forward el modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. Después la ventana avanza y se repite: tres pliegues. Nunca ve el futuro, así que no hay fuga temporal. Ninguna de las cifras que vienen se ha medido sobre datos que el modelo ya conociera."</em></p>
+          <p><em>"En Backtesting walk-forward el modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. Después la ventana avanza y se repite: tres pliegues. Nunca ve el futuro, así que no hay fuga temporal."</em></p>
           <p>👉 <em>(Pulsas Espacio: el esquema se retira hacia la izquierda y entran las dos tarjetas. El protocolo queda resumido en una linea al pie.)</em></p>
           <p><em>"Empiezo por la lente que usaría cualquiera por defecto: la del error puntual."</em></p>
-          <p><em>"Dos modelos. A la izquierda un Seasonal Naïve: la heurística que usa hoy la tienda, que predice que la próxima semana se venderá lo mismo que la anterior. A la derecha el LightGBM con sus cuantiles ensanchados por la calibración conformal."</em></p>
-          <p><em>"El error absoluto medio del Naïve es 6,61 unidades sobre esa semana. El de LightGBM, 8,06. Es decir: el modelo tiene más error que la heurística. Y no por poco, un 22% más."</em></p>
+          <p><em>"Dos modelos. A la izquierda un Seasonal Naïve: la heurística que usa hoy la tienda, que predice que la próxima semana se venderá lo mismo que la anterior. A la derecha, el LightGBM conformal."</em></p>
+          <p><em>"6,61 de error medio el Naïve, 8,06 LightGBM. El modelo tiene más error que la heurística, y no por poco: un 22% más."</em></p>
           <p><em>"Si yo cerrara la evaluación aquí, la conclusión de este trabajo sería que el modelo más simple es el mejor y que todo lo demás ha sido un ejercicio inútil."</em></p>
           <p><em>"Y esa conclusión sería falsa."</em></p>
           <p>👉 <em>(Pulsas Espacio: NO cambia de diapositiva. Es la misma, cambiando de lente: titulo, chip y las tres cifras de cada tarjeta, y las barras se encienden.)</em></p>
-          <p><em>"Cambio de lente. Ahora mido lo mismo con la métrica de negocio, y el orden se invierte. El Naïve, que ganaba hace un segundo, rompe stock prácticamente la mitad de los días con apenas un 52% de servicio. LightGBM sube al 83,55%, 31 puntos más, con un coste un 9% menor."</em></p>
+          <p><em>"Cambio de lente. Ahora mido lo mismo con la métrica de negocio, y el orden se invierte. El Naïve, que ganaba hace un segundo, rompe stock casi la mitad de los días. LightGBM sube al 83,55% de servicio y cuesta un 9% menos."</em></p>
           <p><em>"El modelo con peor error puntual es el que toma la mejor decisión. Por eso este trabajo no evalúa por MAE: evalúa por lo que cuesta equivocarse."</em></p>
           <p><strong>[NO NOMBRES EL NIVEL DE SERVICIO NI EL COSTE ANTES DE PULSAR.]</strong> Estan
           en pantalla, en gris y en pequeno, porque la animacion los necesita colocados. Si los
