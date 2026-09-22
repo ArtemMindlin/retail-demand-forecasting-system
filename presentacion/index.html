@@ -2989,7 +2989,6 @@
           <div class="glass rail" style="--accent: var(--c-drift); padding: 14px 18px 12px; display: flex; flex-direction: column; justify-content: space-between; height: 100%; box-sizing: border-box;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
               <h4 style="font-size: 14.5px; margin: 0;">Coste acumulado por cadencia de reentreno</h4>
-              <span style="font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute);">deriva de entrada: PSI 0,139 · respaldo G</span>
             </div>
 
             <svg class="dg dg-anim" viewBox="0 0 580 295" role="img" style="width: 100%; height: auto; display: block; margin: auto 0;"
@@ -3093,6 +3092,15 @@
 
           <!-- Métricas y Conclusiones Operacionales -->
           <div style="display: flex; flex-direction: column; gap: 10px;">
+            <!-- Tarjeta 0: la premisa, por que hay que reentrenar -->
+            <div class="glass rail tight" style="--accent: var(--c-drift);">
+              <h4 style="font-size: 14px; margin: 0;">Deriva de la entrada</h4>
+              <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--c-drift); margin: 2px 0 4px;">PSI 0,139</div>
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); background: rgba(7,9,13,0.5); padding: 5px 8px; border-radius: 5px; border: 1px solid var(--border);">
+                demanda media de 14 días · el decil alto duplica su masa · respaldo G
+              </div>
+            </div>
+
             <!-- Tarjeta 1: Ahorro logístico -->
             <div class="glass rail tight" style="--accent: var(--c-conf);">
               <div class="row-head" style="margin-bottom: 3px;">
@@ -3118,23 +3126,10 @@
                 de la demanda atendida a lo largo de los 41 días
               </div>
             </div>
-
-            <!-- Tarjeta 3: Viabilidad computacional -->
-            <div class="glass rail tight" style="--accent: var(--c-drift);">
-              <div class="row-head" style="margin-bottom: 3px;">
-                <h4 style="font-size: 14px; margin: 0;">Coste de cómputo</h4>
-              </div>
-              <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: #fb923c; margin: 2px 0 4px;">
-                5,55 s
-              </div>
-              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); background: rgba(7,9,13,0.5); padding: 5px 8px; border-radius: 5px; border: 1px solid var(--border);">
-                por ciclo de reentreno y calibración · viable como proceso nocturno
-              </div>
             </div>
-          </div>
         </div>
 
-        <div class="wf-mini">41 días · 500 series · 5 orígenes semanales no solapados · 5 reentrenos ejecutados</div>
+        <div class="wf-mini">41 días · 500 series · 5 orígenes semanales no solapados · 5 reentrenos · 5,55 s por ciclo</div>
 
         <div class="memref">Memoria, §6.7 · Simulación operacional en streaming</div>
 
