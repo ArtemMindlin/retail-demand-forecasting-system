@@ -3173,22 +3173,13 @@
                 <span>04 · OPERACIÓN</span></div>
               <h3 style="margin-top: 8px;">Cómo opera el sistema cada día</h3>
             </div>
-
+            <span class="chip" style="--accent: var(--c-inv); font-size: 11px;"><span class="dot"></span><span>diario &lt;50 ms/SKU · semanal 5,55 s</span></span>
           </div>
           <div class="band"></div>
         </div>
 
-        <div>
-          <!-- Columna Izquierda: Arquitectura MLOps y Gobernanza -->
-          <div class="glass rail" id="dss-rail-card" style="--accent: var(--c-inv); display: flex; flex-direction: column; justify-content: space-between;">
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
-                <h4 style="margin: 0; font-size: 16.5px; color: #fff;">Cómo opera el sistema cada día</h4>
-                <span class="chip" style="--accent: var(--c-conf); font-size: 9.5px;"><span class="dot"></span>DESACOPLADO</span>
-              </div>
-
-              <!-- Bloque 1: Pipeline de Modos Desacoplados -->
-              <svg class="dg" viewBox="0 0 1240 302" role="img" style="width: 100%; height: auto; display: block;"
+        <div class="glass rail" style="--accent: var(--c-inv); padding: 20px 22px 16px; margin-top: 16px;">
+          <svg class="dg" viewBox="0 0 1240 302" role="img" style="width: 100%; height: auto; display: block;"
                  aria-label="Bucle operativo diario y ciclo semanal de gobierno del modelo">
                 <text x="0" y="16" text-anchor="start" font-family="var(--font-mono)" font-size="12.5" font-weight="700" fill="var(--c-conf)">CADA DÍA · lote nocturno</text>
                 <rect x="0" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
@@ -3232,25 +3223,11 @@
                 <text x="1045.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">sellado en MLflow</text>
                 <text x="620" y="294" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="400" fill="var(--text-mute)">el challenger solo sustituye al campeón si pasa los tres</text>
               </svg>
-            </div>
+        </div>
 
-            <!-- Footer con Stack y Rendimiento en producción -->
-            <div>
-              <div style="padding: 7px 10px; background: rgba(7,9,13,0.7); border: 1px solid var(--border-2); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10.5px;">
-                <div style="display: flex; gap: 5px; align-items: center;">
-                  <span style="color: var(--text-mute); font-weight: 700;">MLOps:</span>
-                  <span class="chip" style="--accent: var(--c-ai); padding: 1px 6px;">MLflow</span>
-                  <span class="chip" style="--accent: var(--c-inv); padding: 1px 6px;">CLI 4 Modos</span>
-                  <span class="chip" style="--accent: var(--c-conf); padding: 1px 6px;">DSS Web</span>
-                </div>
-                <div style="color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 4px;">
-                  <span>⚡</span> &lt;50 ms/SKU
-                </div>
-              </div>
-            </div>
-          </div>
+        <div class="wf-mini">MLflow · CLI de 4 modos · cuadro de mandos Django · inferencia &lt;50 ms/SKU</div>
 
-          </div>
+        <div class="memref">Memoria, §4.2 · Operación y gobierno del modelo</div>
 
         <aside class="notes">
           <p><strong>[TIEMPO: ~58 seg &middot; 141 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
@@ -3280,7 +3257,7 @@
           <div class="band"></div>
         </div>
 
-        <div style="margin-top: 26px;">
+        <div class="glass rail" style="--accent: var(--c-conf); padding: 20px 22px 16px; margin-top: 16px;">
           <svg class="dg" viewBox="0 0 1240 288" role="img" style="width: 100%; height: auto; display: block;" aria-label="El camino de un commit">
                 <text x="0" y="14" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-conf)">EL CAMINO DE UN COMMIT</text>
                 <rect x="0" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
@@ -3329,6 +3306,8 @@
                 <text x="0" y="276" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="#fcd34d">y esta presentación la está sirviendo ese segundo contenedor</text>
               </svg>
         </div>
+
+        <div class="wf-mini">GitHub Actions · Docker Compose · Caddy con TLS · despliegue automático en cada push a main</div>
 
         <div class="memref">Memoria, §5.7 · Calidad, verificación y despliegue</div>
 
