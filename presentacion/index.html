@@ -271,10 +271,6 @@
       background: var(--surface-glass);
     }
     .model-name { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text-1); }
-    .model-gloss {
-      font-family: var(--font-mono); font-size: 11px; color: var(--text-mute);
-      margin-top: 3px; letter-spacing: 0.01em;
-    }
     .dt-nota {
       font-family: var(--font-mono); font-size: 11px; color: var(--text-mute);
       margin: -12px 0 18px; letter-spacing: 0.01em;
@@ -2631,7 +2627,6 @@
             <div class="duel">
               <div class="model-card d2-card-naive">
                 <div class="model-name">Seasonal Naïve</div>
-              <div class="model-gloss">predice que la próxima semana se venderá lo mismo que la anterior</div>
                 <div class="verdict d2-stack d2-verdict">
                   <span class="t1" style="color: var(--c-conf);">▲ Gana por MAE</span>
                   <span class="t2" style="color: var(--c-crit);">▼ Rotura en la mitad de los días</span>
@@ -2663,7 +2658,6 @@
 
               <div class="model-card d2-card-lgbm">
                 <div class="model-name">LightGBM conformal</div>
-              <div class="model-gloss">cuantiles aprendidos, ensanchados por la calibración conformal</div>
                 <div class="verdict d2-stack d2-verdict">
                   <span class="t1" style="color: var(--text-mute);">Pierde por MAE</span>
                   <span class="t2" style="color: var(--c-conf);">▲ Menor coste y +31,1 p.p. de servicio</span>
