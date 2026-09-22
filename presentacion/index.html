@@ -2550,267 +2550,7 @@
         </aside>
       </section>
 
-      <!-- SLIDE: LA TRAMPA DEL MAE · una sola diapositiva, lente por fragmento -->
-      <section data-lens="1" data-step="0">
-        <span class="fragment d2-frag" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
-        <span class="fragment d2-frag" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
-        <div class="slide-head">
-          <div class="row">
-            <div>
-              <div class="eyebrow">03 · RESULTADOS</div>
-              <h3 class="d2-stack" style="margin-top: 8px;">
-                <span class="t0">Antes de las cifras: cómo se ha medido todo lo que viene</span>
-                <span class="t1">Si mides el error puntual, gana el baseline</span>
-                <span class="t2">Si mides el dinero, el orden se invierte</span>
-              </h3>
-            </div>
-            <span class="chip d2-chip"><span class="dot"></span><span class="d2-stack"><span class="t1">LENTE: MAE</span><span class="t2">LENTE: COSTE</span></span></span>
-          </div>
-          <div class="band"></div>
-        </div>
-
-        <div class="d2-stage">
-          <div class="d2-panel wf-panel">
-            <div class="glass rail" style="--accent: var(--c-conf); padding: 20px 26px 14px;">
-              <svg class="wf-strip" viewBox="0 0 1280 200" role="img"
-                   aria-label="Esquema del backtesting walk-forward: tres pliegues; en cada uno el entrenamiento acaba siete dias antes de la semana de validacion, y la ventana avanza una semana.">
-                <defs>
-                  <pattern id="wfHueco" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                    <line x1="0" y1="0" x2="0" y2="8" stroke="#ef4444" stroke-width="2" stroke-opacity="0.5"/>
-                  </pattern>
-                </defs>
-
-                <g font-family="var(--font-mono)" font-size="13" fill="var(--text-mute)">
-                  <rect x="128" y="4" width="13" height="13" rx="2" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
-                  <text x="149" y="15">ENTRENAMIENTO · solo pasado</text>
-                  <rect x="440" y="4" width="13" height="13" rx="2" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
-                  <text x="461" y="15">HUECO H = 7 d · corta la fuga temporal</text>
-                  <rect x="826" y="4" width="13" height="13" rx="2" fill="#10b981" fill-opacity="0.85"/>
-                  <text x="847" y="15">VALIDACIÓN · la semana que el modelo no ha visto</text>
-                </g>
-
-                <g font-family="var(--font-mono)" font-size="13" fill="var(--text-3)" text-anchor="end">
-                  <text x="112" y="63">PLIEGUE 1</text>
-                  <text x="112" y="101">PLIEGUE 2</text>
-                  <text x="112" y="139">PLIEGUE 3</text>
-                </g>
-
-                <g>
-                  <rect x="128" y="46" width="760" height="22" rx="4" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
-                  <rect x="888" y="46" width="88" height="22" rx="4" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
-                  <rect x="976" y="46" width="88" height="22" rx="4" fill="#10b981" fill-opacity="0.85"/>
-
-                  <rect x="128" y="84" width="848" height="22" rx="4" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
-                  <rect x="976" y="84" width="88" height="22" rx="4" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
-                  <rect x="1064" y="84" width="88" height="22" rx="4" fill="#10b981" fill-opacity="0.85"/>
-
-                  <rect x="128" y="122" width="936" height="22" rx="4" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
-                  <rect x="1064" y="122" width="88" height="22" rx="4" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
-                  <rect x="1152" y="122" width="88" height="22" rx="4" fill="#10b981" fill-opacity="0.85"/>
-                </g>
-
-                <line x1="128" y1="162" x2="1240" y2="162" stroke="var(--border)" stroke-width="1"/>
-                <g font-family="var(--font-mono)" font-size="13" fill="var(--text-mute)">
-                  <text x="128" y="184">La ventana avanza una semana en cada pliegue · el modelo entrena siempre hacia atrás y nunca ve el futuro</text>
-                  <text x="1240" y="184" text-anchor="end">tiempo →</text>
-                </g>
-              </svg>
-</div>
-          </div>
-
-          <div class="d2-panel d2-cards">
-            <div class="d2-wrap">
-            <div class="duel">
-              <div class="model-card d2-card-naive">
-                <div class="model-name">Seasonal Naïve</div>
-                <div class="verdict d2-stack d2-verdict">
-                  <span class="t1" style="color: var(--c-conf);">▲ Gana por MAE</span>
-                  <span class="t2" style="color: var(--c-crit);">▼ Rotura en la mitad de los días</span>
-                </div>
-                <div style="margin-top: 14px;">
-                  <div class="cstat">
-                    <div class="stat-row">
-                      <span class="stat-k">MAE</span>
-                      <span class="metric d2-metric d2-m-mae">6,61</span>
-                    </div>
-                    <div class="ctrack"><i class="d2-bar d2-b-mae" style="width: 82.0%"></i></div>
-                  </div>
-                  <div class="cstat">
-                    <div class="stat-row">
-                      <span class="stat-k">Nivel de servicio</span>
-                      <span class="metric d2-metric d2-m-svc">52,45<span class="u">%</span></span>
-                    </div>
-                    <div class="ctrack"><i class="d2-bar d2-b-svc" style="width: 62.8%"></i></div>
-                  </div>
-                  <div class="cstat">
-                    <div class="stat-row">
-                      <span class="stat-k">Coste inventario</span>
-                      <span class="metric d2-metric d2-m-cost">162.299</span>
-                    </div>
-                    <div class="ctrack"><i class="d2-bar d2-b-cost" style="width: 100.0%"></i></div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="model-card d2-card-lgbm">
-                <div class="model-name">LightGBM conformal</div>
-                <div class="verdict d2-stack d2-verdict">
-                  <span class="t1" style="color: var(--text-mute);">Pierde por MAE</span>
-                  <span class="t2" style="color: var(--c-conf);">▲ Menor coste y +31,1 p.p. de servicio</span>
-                </div>
-                <div style="margin-top: 14px;">
-                  <div class="cstat">
-                    <div class="stat-row">
-                      <span class="stat-k">MAE</span>
-                      <span class="metric d2-metric d2-m-mae">8,06</span>
-                    </div>
-                    <div class="ctrack"><i class="d2-bar d2-b-mae" style="width: 100.0%"></i></div>
-                  </div>
-                  <div class="cstat">
-                    <div class="stat-row">
-                      <span class="stat-k">Nivel de servicio</span>
-                      <span class="metric d2-metric d2-m-svc">83,55<span class="u">%</span></span>
-                    </div>
-                    <div class="ctrack"><i class="d2-bar d2-b-svc" style="width: 100.0%"></i></div>
-                  </div>
-                  <div class="cstat">
-                    <div class="stat-row">
-                      <span class="stat-k">Coste inventario</span>
-                      <span class="metric d2-metric d2-m-cost">147.646</span>
-                    </div>
-                    <div class="ctrack"><i class="d2-bar d2-b-cost" style="width: 91.0%"></i></div>
-                  <div class="d2-ic">−9,03% vs Naïve · IC 95% [−15,5%; −2,7%]</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-        </div>
-          </div>
-        </div>
-
-        <div class="wf-mini">walk-forward · 500 series · 3 pliegues · hueco de 7 días · valida 7 días no vistos</div>
-
-        <div class="memref">Memoria, §6.2 · Rendimiento predictivo y la trampa del MAE</div>
-
-        <aside class="notes">
-          <p><strong>[TIEMPO: ~137 seg &middot; 331 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Pasamos a la realidad empírica: los resultados sobre las 500 series. Pero antes de enseñar una sola cifra, conviene decir de dónde salen."</em></p>
-          <p><em>"Backtesting walk-forward. El modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. Después la ventana avanza y se repite: tres pliegues. Nunca ve el futuro, así que no hay fuga temporal. Ninguna de las cifras que vienen se ha medido sobre datos que el modelo ya conociera."</em></p>
-          <p>👉 <em>(Pulsas Espacio: el esquema se retira hacia la izquierda y entran las dos tarjetas. El protocolo queda resumido en una linea al pie.)</em></p>
-          <p><em>"Empiezo por la lente que usaría cualquiera por defecto: la del error puntual."</em></p>
-          <p><em>"Dos modelos. A la izquierda un Seasonal Naïve: la heurística que usa hoy la tienda, que predice que la próxima semana se venderá lo mismo que la anterior. A la derecha el LightGBM con sus cuantiles ensanchados por la calibración conformal."</em></p>
-          <p><em>"El error absoluto medio del Naïve es 6,61 unidades sobre esa semana. El de LightGBM, 8,06. Es decir: el modelo tiene más error que la heurística. Y no por poco, un 22% más."</em></p>
-          <p><em>"Si yo cerrara la evaluación aquí, la conclusión de este trabajo sería que el modelo más simple es el mejor y que todo lo demás ha sido un ejercicio inútil."</em></p>
-          <p><em>"Y esa conclusión sería falsa."</em></p>
-          <p>👉 <em>(Pulsas Espacio: NO cambia de diapositiva. Es la misma, cambiando de lente: titulo, chip y las tres cifras de cada tarjeta, y las barras se encienden.)</em></p>
-          <p><em>"Cambio de lente. Ahora mido lo mismo con la métrica de negocio, y el orden se invierte. El Naïve, que ganaba hace un segundo, rompe stock prácticamente la mitad de los días con apenas un 52% de servicio. LightGBM sube al 83,55%, 31 puntos más, con un coste un 9% menor. Y ese ahorro no es ruido: el intervalo de confianza al 95% queda entero en negativo."</em></p>
-          <p><em>"Conviene decir en qué se mide ese coste: son unidades monetarias simuladas, lo que cuesta cada unidad que falta y cada unidad que sobra, con la rotura pesando cuatro veces más que la merma."</em></p>
-          <p><em>"El modelo con peor error puntual es el que toma la mejor decisión. Por eso este trabajo no evalúa por MAE: evalúa por lo que cuesta equivocarse."</em></p>
-          <p><strong>[NO NOMBRES EL NIVEL DE SERVICIO NI EL COSTE ANTES DE PULSAR.]</strong> Estan
-          en pantalla, en gris y en pequeno, porque la animacion los necesita colocados. Si los
-          dices en voz alta, el giro de la segunda lente deja de tener efecto: el tribunal ya
-          sabra el final. Hasta que pulses, aqui solo se habla de MAE.</p>
-          <p><strong>[Y no lo digas en tono de disculpa.]</strong> El 6,61 frente al 8,06 se dice
-          como un dato, no como una concesion incomoda. Todo el giro depende de que se crean la
-          primera lente; si suenas a que te estas defendiendo, se huele que viene un pero.</p>
-          <p><strong>[PARACAIDAS. No se dice; esta aqui por si preguntan.]</strong></p>
-          <p>- <strong>"¿Por qué tu modelo tiene peor MAE?"</strong> Es estructural antes que
-          empirico. El MAE se minimiza en esperanza por la MEDIANA condicional, y la prediccion
-          puntual de los dos motores de boosting se ajusta por diseno con pinball loss evaluada en
-          el fractil critico 0,80. La tabla contrapone entonces un estimador que persigue un
-          cuantil alto con una metrica que premia al central, y el Seasonal Naive, que si produce
-          una prediccion central, no paga ese peaje.</p>
-          <p>- <strong>Y el matiz honesto, que conviene decir TU antes de que lo encuentren
-          ellos:</strong> si la prediccion puntual se comportase de verdad como el percentil 80,
-          deberia haber un sesgo positivo apreciable, y solo LightGBM lo exhibe ($+3{,}49\%$
-          frente al $+0{,}78\%$ del Naive); CatBoost tiene sesgo NEGATIVO ($-7{,}33\%$) pese a
-          registrar el peor MAE. Medido directamente, la fraccion de demanda real por debajo de la
-          prediccion puntual es del $64{,}5\%$ en LightGBM y del $35{,}2\%$ en CatBoost, lejos
-          del 80% nominal en ambos. Conclusion: el objetivo de entrenamiento explica la DIRECCION
-          del efecto, no su magnitud exacta. Esta en la memoria asi, sin cerrarlo de mas.</p>
-          <p>- <strong>Y por que eso no rompe nada:</strong> precisamente porque la garantia de
-          cobertura no descansa en que la prediccion puntual este bien calibrada. El intervalo se
-          calibra aparte, con conformal, que es el paso de la diapositiva anterior.</p>
-          <p>- <strong>"¿El coste está en euros?"</strong> No: son unidades monetarias derivadas
-          de los costes declarados 4 a 1. La cifra defendible no es el 162.299 en absoluto, es la
-          diferencia relativa: $-9{,}03\%$, con intervalo al 95% de $[-15{,}52\%,\ -2{,}68\%]$.</p>
-          <p>- <strong>"¿Y las barras, para que estan?"</strong> El numero grande compara solo
-          Naive contra LightGBM en esa metrica; la barra da la magnitud dentro de la propia
-          metrica, para que se vea de un vistazo que el coste apenas los separa mientras el nivel
-          de servicio los separa del todo. No se explica en voz alta, se deja que se lea sola.</p>
-        </aside>
-      </section>
-
-      <!-- SLIDE 13: EVALUACIÓN PREDICTIVA Y FINANCIERA WALK-FORWARD (COUNT-UP DIGITAL AUTOMÁTICO) -->
-      <section id="slide-eval-wf">
-        <div class="slide-head">
-          <div class="row">
-            <div>
-              <div class="eyebrow">03 · RESULTADOS</div>
-              <h3 style="margin-top: 8px;">Cobertura cumplida e intervalos más estrechos</h3>
-            </div>
-            </div>
-          <div class="band"></div>
-        </div>
-
-        <div class="grid-2" style="gap: 24px;">
-          <div class="glass rail eval-kpi-card" style="--accent: var(--c-conf);">
-            <div class="kpi-lab">Cobertura empírica</div>
-            <div class="metric kpi-val" id="eval-kpi-service" style="color: var(--c-conf);">85,5<span class="u">%</span></div>
-            <div class="kpi-sub">objetivo 80% · sin infracobertura en ningún pliegue</div>
-          </div>
-          <div class="glass rail eval-kpi-card" style="--accent: var(--c-ai);">
-            <div class="kpi-lab">Winkler score campeón</div>
-            <div class="metric kpi-val" id="eval-kpi-winkler" style="color: var(--c-ai);">36,11</div>
-            <div class="kpi-sub">frente a 46,54 de CatBoost · intervalos 19% más compactos</div>
-          </div>
-        </div>
-
-        <table class="dt" style="margin-top: 26px; margin-bottom: 22px;">
-          <thead>
-            <tr>
-              <th>Modelo</th><th>MAE</th><th>Coste (u.m.)</th>
-              <th>Nivel servicio</th><th>Cobertura (obj. 80%)</th><th>Winkler 80%</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Seasonal Naïve</td>
-              <td class="best">6,61</td><td>162.299</td>
-              <td>52,45%</td><td class="muted">n/a</td><td class="muted">n/a</td>
-            </tr>
-            <tr>
-              <td>CatBoost</td>
-              <td>11,72</td><td>174.527</td>
-              <td>78,39%</td><td>84,6%</td><td>46,54</td>
-            </tr>
-            <tr class="win">
-              <td>LightGBM · campeón</td>
-              <td>8,06</td><td class="best">147.646</td>
-              <td class="best">83,55%</td><td class="best">85,5%</td><td class="best">36,11</td>
-            </tr>
-          </tbody>
-        </table>
-
-
-        <div class="wf-mini">walk-forward · 500 series · 3 pliegues · hueco de 7 días · valida 7 días no vistos</div>
-
-        <div class="memref">Memoria, §6.2 y §6.4 · Rendimiento predictivo y calibración conformal</div>
-
-        <aside class="notes">
-          <p><strong>[TIEMPO: ~59 seg &middot; 143 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Queda una pregunta que el coste no responde: ¿y los intervalos? Porque en la diapositiva de la calibración prometimos un 80% de cobertura, y eso hay que demostrarlo."</em></p>
-          <p><em>"Se cumple: 85,5% de cobertura empírica frente al 80% prometido, y sin quedarse corta en ningún pliegue. El error va en la dirección segura. Y no a cualquier precio: el Winkler Score, que castiga a la vez lo ancho del intervalo y cada valor que se queda fuera, da 36,11 frente a 46,54 de CatBoost. Intervalos un 19% más compactos con la misma cobertura."</em></p>
-          <p><em>"Debajo tienen la tabla completa, por si quieren comprobarlo. Las columnas del Naïve y de LightGBM ya las han visto; lo nuevo es CatBoost, y con él no hay paradoja: es el peor en error puntual y también el de mayor coste. La paradoja se concentra entre el Naïve y LightGBM."</em></p>
-          <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre esta tabla:]</strong></p>
-          <p>- <strong>"¿Por qué la cobertura empírica da 85,5% si el objetivo era 80%?"</strong> La predicción conformal garantiza una cota inferior finita $1 - \alpha \le \mathbb{E}[\text{cobertura}]$. Al haber soporte discreto y cuantiles empíricos, la cobertura es conservadoramente superior. Lo crítico es que no existe infracobertura en ningún fold temporal a escala 500.</p>
-          <p>- <strong>"¿Por qué CatBoost cuesta más que el Naïve (174k vs 162k) si da mucho mejor servicio (78% vs 52%)?"</strong> Por la penalización asimétrica: CatBoost sobrepredice en colas intermedias y acumula coste de exceso de stock ($c_o$). LightGBM equilibra el trade-off con mayor precisión de cuantil.</p>
-          <p>- <strong>"¿Cómo se obtuvo el IC 95% del ahorro [-15,5%; -2,7%]?"</strong> Mediante bootstrapping pareado por series temporales ($B=1.000$ réplicas) sobre los 500 productos. El intervalo estrictamente negativo confirma significación estadística al nivel $\alpha = 0,05$.</p>
-          <p>- <strong>"¿Qué mide el Winkler Score?"</strong> Es una proper scoring rule para intervalos que premia la estrechez del intervalo pero penaliza severamente cualquier valor real que quede fuera. A menor valor, mayor calidad y eficiencia del intervalo.</p>
-        </aside>
-      </section>
-
-      <!-- SLIDE 14: SINTONIZACIÓN BIOBJETIVO (CONVERGENCIA) -->
+      <!-- SLIDE: DEMANDA LATENTE BAJO VERDAD COMÚN -->
       <section id="slide-censura">
         <div class="slide-head">
           <div class="row">
@@ -2950,8 +2690,8 @@
         <div class="memref">Memoria, §6.1 · Reconstrucción de la demanda censurada</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~66 seg &middot; 160 palabras habladas a 145 ppm.]</strong></p>
-          <p><em>"Fijado el modelo campeón, cerramos el primer objetivo: los datos. ¿Genera valor económico reconstruir la demanda censurada?"</em></p>
+          <p><strong>[TIEMPO: ~71 seg &middot; 172 palabras habladas a 145 ppm.]</strong></p>
+          <p><em>"Empezamos por el primer objetivo, el de los datos. La pregunta es si reconstruir la demanda que la rotura esconde genera valor económico, o si es un adorno estadístico."</em></p>
           <p><em>"Aquí cierro el bucle que dejé abierto en la diapositiva de la imputación. Se rompe así: las cuatro estrategias se evalúan sobre el mismo sorteo de censura, así que la ventaja de conocer el corte se cancela entre ellas y lo único que queda en pie es la diferencia de coste."</em></p>
           <p><em>"Y lo que sale es una escalera. Con ventas crudas el coste se dispara a 3.732 y el servicio se queda en el 60%. Recortar por stock y usar la media histórica lo van mejorando. Y con la imputación supervisada el coste cae a 293: un 92% menos, con un 97,5% de servicio. Cuanto mejor se reconstruye la demanda, más barata sale la decisión."</em></p>
           <p><em>"Y una advertencia, porque el número es grande y conviene acotarlo: es una cota de laboratorio, medida sobre censura sintética. No es una promesa de ahorro en tienda."</em></p>
@@ -2960,6 +2700,266 @@
           <p>- <strong>"¿Por qué el $\Delta$ es una diferencia emparejada y no una resta de totales?"</strong> Porque resta día a día y sorteo a sorteo sobre el mismo escenario: $\text{Coste}_{\text{tratamiento}}(s, t) - \text{Coste}_{\text{observado}}(s, t)$. Al cancelar la varianza entre productos y días, el IC 95% [−3.540; −3.339 u.m.] no cruza el cero y certifica significación estadística formal.</p>
           <p>- <strong>"¿Por qué la imputación supervisada (LightGBM) supera con tanto margen a la media histórica (−92% vs −71%)?"</strong> Porque la media histórica aplana la demanda e ignora la estacionalidad intradiaria y el efecto de promociones. LightGBM recupera el perfil exacto del pico de demanda en función de las covariables del día.</p>
           <p>- <strong>"¿Cómo se garantiza la ausencia de fuga temporal (data leakage)?"</strong> El regresor maestro de imputación solo se ajusta sobre días limpios pasados y emplea exclusivamente retardos con <code>shift(1)</code> o superior, sin acceder jamás a variables concurrentes o futuras del día censurado.</p>
+        </aside>
+      </section>
+
+      <!-- SLIDE: LA TRAMPA DEL MAE · una sola diapositiva, lente por fragmento -->
+      <section data-lens="1" data-step="0">
+        <span class="fragment d2-frag" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
+        <span class="fragment d2-frag" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow">03 · RESULTADOS</div>
+              <h3 class="d2-stack" style="margin-top: 8px;">
+                <span class="t0">Antes de comparar modelos: cómo se ha medido</span>
+                <span class="t1">Si mides el error puntual, gana el baseline</span>
+                <span class="t2">Si mides el dinero, el orden se invierte</span>
+              </h3>
+            </div>
+            <span class="chip d2-chip"><span class="dot"></span><span class="d2-stack"><span class="t1">LENTE: MAE</span><span class="t2">LENTE: COSTE</span></span></span>
+          </div>
+          <div class="band"></div>
+        </div>
+
+        <div class="d2-stage">
+          <div class="d2-panel wf-panel">
+            <div class="glass rail" style="--accent: var(--c-conf); padding: 20px 26px 14px;">
+              <svg class="wf-strip" viewBox="0 0 1280 200" role="img"
+                   aria-label="Esquema del backtesting walk-forward: tres pliegues; en cada uno el entrenamiento acaba siete dias antes de la semana de validacion, y la ventana avanza una semana.">
+                <defs>
+                  <pattern id="wfHueco" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                    <line x1="0" y1="0" x2="0" y2="8" stroke="#ef4444" stroke-width="2" stroke-opacity="0.5"/>
+                  </pattern>
+                </defs>
+
+                <g font-family="var(--font-mono)" font-size="13" fill="var(--text-mute)">
+                  <rect x="128" y="4" width="13" height="13" rx="2" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+                  <text x="149" y="15">ENTRENAMIENTO · solo pasado</text>
+                  <rect x="440" y="4" width="13" height="13" rx="2" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
+                  <text x="461" y="15">HUECO H = 7 d · corta la fuga temporal</text>
+                  <rect x="826" y="4" width="13" height="13" rx="2" fill="#10b981" fill-opacity="0.85"/>
+                  <text x="847" y="15">VALIDACIÓN · la semana que el modelo no ha visto</text>
+                </g>
+
+                <g font-family="var(--font-mono)" font-size="13" fill="var(--text-3)" text-anchor="end">
+                  <text x="112" y="63">PLIEGUE 1</text>
+                  <text x="112" y="101">PLIEGUE 2</text>
+                  <text x="112" y="139">PLIEGUE 3</text>
+                </g>
+
+                <g>
+                  <rect x="128" y="46" width="760" height="22" rx="4" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+                  <rect x="888" y="46" width="88" height="22" rx="4" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
+                  <rect x="976" y="46" width="88" height="22" rx="4" fill="#10b981" fill-opacity="0.85"/>
+
+                  <rect x="128" y="84" width="848" height="22" rx="4" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+                  <rect x="976" y="84" width="88" height="22" rx="4" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
+                  <rect x="1064" y="84" width="88" height="22" rx="4" fill="#10b981" fill-opacity="0.85"/>
+
+                  <rect x="128" y="122" width="936" height="22" rx="4" fill="rgba(148,163,184,0.26)" stroke="var(--border)"/>
+                  <rect x="1064" y="122" width="88" height="22" rx="4" fill="url(#wfHueco)" stroke="rgba(239,68,68,0.5)"/>
+                  <rect x="1152" y="122" width="88" height="22" rx="4" fill="#10b981" fill-opacity="0.85"/>
+                </g>
+
+                <line x1="128" y1="162" x2="1240" y2="162" stroke="var(--border)" stroke-width="1"/>
+                <g font-family="var(--font-mono)" font-size="13" fill="var(--text-mute)">
+                  <text x="128" y="184">La ventana avanza una semana en cada pliegue · el modelo entrena siempre hacia atrás y nunca ve el futuro</text>
+                  <text x="1240" y="184" text-anchor="end">tiempo →</text>
+                </g>
+              </svg>
+</div>
+          </div>
+
+          <div class="d2-panel d2-cards">
+            <div class="d2-wrap">
+            <div class="duel">
+              <div class="model-card d2-card-naive">
+                <div class="model-name">Seasonal Naïve</div>
+                <div class="verdict d2-stack d2-verdict">
+                  <span class="t1" style="color: var(--c-conf);">▲ Gana por MAE</span>
+                  <span class="t2" style="color: var(--c-crit);">▼ Rotura en la mitad de los días</span>
+                </div>
+                <div style="margin-top: 14px;">
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">MAE</span>
+                      <span class="metric d2-metric d2-m-mae">6,61</span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-mae" style="width: 82.0%"></i></div>
+                  </div>
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">Nivel de servicio</span>
+                      <span class="metric d2-metric d2-m-svc">52,45<span class="u">%</span></span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-svc" style="width: 62.8%"></i></div>
+                  </div>
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">Coste inventario</span>
+                      <span class="metric d2-metric d2-m-cost">162.299</span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-cost" style="width: 100.0%"></i></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="model-card d2-card-lgbm">
+                <div class="model-name">LightGBM conformal</div>
+                <div class="verdict d2-stack d2-verdict">
+                  <span class="t1" style="color: var(--text-mute);">Pierde por MAE</span>
+                  <span class="t2" style="color: var(--c-conf);">▲ Menor coste y +31,1 p.p. de servicio</span>
+                </div>
+                <div style="margin-top: 14px;">
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">MAE</span>
+                      <span class="metric d2-metric d2-m-mae">8,06</span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-mae" style="width: 100.0%"></i></div>
+                  </div>
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">Nivel de servicio</span>
+                      <span class="metric d2-metric d2-m-svc">83,55<span class="u">%</span></span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-svc" style="width: 100.0%"></i></div>
+                  </div>
+                  <div class="cstat">
+                    <div class="stat-row">
+                      <span class="stat-k">Coste inventario</span>
+                      <span class="metric d2-metric d2-m-cost">147.646</span>
+                    </div>
+                    <div class="ctrack"><i class="d2-bar d2-b-cost" style="width: 91.0%"></i></div>
+                  <div class="d2-ic">−9,03% vs Naïve · IC 95% [−15,5%; −2,7%]</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+        </div>
+          </div>
+        </div>
+
+        <div class="wf-mini">walk-forward · 500 series · 3 pliegues · hueco de 7 días · valida 7 días no vistos</div>
+
+        <div class="memref">Memoria, §6.2 · Rendimiento predictivo y la trampa del MAE</div>
+
+        <aside class="notes">
+          <p><strong>[TIEMPO: ~136 seg &middot; 329 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"Con la señal ya limpia, segundo objetivo: el modelo. Y antes de enseñar una sola cifra, conviene decir de dónde salen."</em></p>
+          <p><em>"Backtesting walk-forward. El modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. Después la ventana avanza y se repite: tres pliegues. Nunca ve el futuro, así que no hay fuga temporal. Ninguna de las cifras que vienen se ha medido sobre datos que el modelo ya conociera."</em></p>
+          <p>👉 <em>(Pulsas Espacio: el esquema se retira hacia la izquierda y entran las dos tarjetas. El protocolo queda resumido en una linea al pie.)</em></p>
+          <p><em>"Empiezo por la lente que usaría cualquiera por defecto: la del error puntual."</em></p>
+          <p><em>"Dos modelos. A la izquierda un Seasonal Naïve: la heurística que usa hoy la tienda, que predice que la próxima semana se venderá lo mismo que la anterior. A la derecha el LightGBM con sus cuantiles ensanchados por la calibración conformal."</em></p>
+          <p><em>"El error absoluto medio del Naïve es 6,61 unidades sobre esa semana. El de LightGBM, 8,06. Es decir: el modelo tiene más error que la heurística. Y no por poco, un 22% más."</em></p>
+          <p><em>"Si yo cerrara la evaluación aquí, la conclusión de este trabajo sería que el modelo más simple es el mejor y que todo lo demás ha sido un ejercicio inútil."</em></p>
+          <p><em>"Y esa conclusión sería falsa."</em></p>
+          <p>👉 <em>(Pulsas Espacio: NO cambia de diapositiva. Es la misma, cambiando de lente: titulo, chip y las tres cifras de cada tarjeta, y las barras se encienden.)</em></p>
+          <p><em>"Cambio de lente. Ahora mido lo mismo con la métrica de negocio, y el orden se invierte. El Naïve, que ganaba hace un segundo, rompe stock prácticamente la mitad de los días con apenas un 52% de servicio. LightGBM sube al 83,55%, 31 puntos más, con un coste un 9% menor. Y ese ahorro no es ruido: el intervalo de confianza al 95% queda entero en negativo."</em></p>
+          <p><em>"Conviene decir en qué se mide ese coste: son unidades monetarias simuladas, lo que cuesta cada unidad que falta y cada unidad que sobra, con la rotura pesando cuatro veces más que la merma."</em></p>
+          <p><em>"El modelo con peor error puntual es el que toma la mejor decisión. Por eso este trabajo no evalúa por MAE: evalúa por lo que cuesta equivocarse."</em></p>
+          <p><strong>[NO NOMBRES EL NIVEL DE SERVICIO NI EL COSTE ANTES DE PULSAR.]</strong> Estan
+          en pantalla, en gris y en pequeno, porque la animacion los necesita colocados. Si los
+          dices en voz alta, el giro de la segunda lente deja de tener efecto: el tribunal ya
+          sabra el final. Hasta que pulses, aqui solo se habla de MAE.</p>
+          <p><strong>[Y no lo digas en tono de disculpa.]</strong> El 6,61 frente al 8,06 se dice
+          como un dato, no como una concesion incomoda. Todo el giro depende de que se crean la
+          primera lente; si suenas a que te estas defendiendo, se huele que viene un pero.</p>
+          <p><strong>[PARACAIDAS. No se dice; esta aqui por si preguntan.]</strong></p>
+          <p>- <strong>"¿Por qué tu modelo tiene peor MAE?"</strong> Es estructural antes que
+          empirico. El MAE se minimiza en esperanza por la MEDIANA condicional, y la prediccion
+          puntual de los dos motores de boosting se ajusta por diseno con pinball loss evaluada en
+          el fractil critico 0,80. La tabla contrapone entonces un estimador que persigue un
+          cuantil alto con una metrica que premia al central, y el Seasonal Naive, que si produce
+          una prediccion central, no paga ese peaje.</p>
+          <p>- <strong>Y el matiz honesto, que conviene decir TU antes de que lo encuentren
+          ellos:</strong> si la prediccion puntual se comportase de verdad como el percentil 80,
+          deberia haber un sesgo positivo apreciable, y solo LightGBM lo exhibe ($+3{,}49\%$
+          frente al $+0{,}78\%$ del Naive); CatBoost tiene sesgo NEGATIVO ($-7{,}33\%$) pese a
+          registrar el peor MAE. Medido directamente, la fraccion de demanda real por debajo de la
+          prediccion puntual es del $64{,}5\%$ en LightGBM y del $35{,}2\%$ en CatBoost, lejos
+          del 80% nominal en ambos. Conclusion: el objetivo de entrenamiento explica la DIRECCION
+          del efecto, no su magnitud exacta. Esta en la memoria asi, sin cerrarlo de mas.</p>
+          <p>- <strong>Y por que eso no rompe nada:</strong> precisamente porque la garantia de
+          cobertura no descansa en que la prediccion puntual este bien calibrada. El intervalo se
+          calibra aparte, con conformal, que es el paso de la diapositiva anterior.</p>
+          <p>- <strong>"¿El coste está en euros?"</strong> No: son unidades monetarias derivadas
+          de los costes declarados 4 a 1. La cifra defendible no es el 162.299 en absoluto, es la
+          diferencia relativa: $-9{,}03\%$, con intervalo al 95% de $[-15{,}52\%,\ -2{,}68\%]$.</p>
+          <p>- <strong>"¿Y las barras, para que estan?"</strong> El numero grande compara solo
+          Naive contra LightGBM en esa metrica; la barra da la magnitud dentro de la propia
+          metrica, para que se vea de un vistazo que el coste apenas los separa mientras el nivel
+          de servicio los separa del todo. No se explica en voz alta, se deja que se lea sola.</p>
+        </aside>
+      </section>
+
+      <!-- SLIDE 13: EVALUACIÓN PREDICTIVA Y FINANCIERA WALK-FORWARD (COUNT-UP DIGITAL AUTOMÁTICO) -->
+      <section id="slide-eval-wf">
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow">03 · RESULTADOS</div>
+              <h3 style="margin-top: 8px;">Cobertura cumplida e intervalos más estrechos</h3>
+            </div>
+            </div>
+          <div class="band"></div>
+        </div>
+
+        <div class="grid-2" style="gap: 24px;">
+          <div class="glass rail eval-kpi-card" style="--accent: var(--c-conf);">
+            <div class="kpi-lab">Cobertura empírica</div>
+            <div class="metric kpi-val" id="eval-kpi-service" style="color: var(--c-conf);">85,5<span class="u">%</span></div>
+            <div class="kpi-sub">objetivo 80% · sin infracobertura en ningún pliegue</div>
+          </div>
+          <div class="glass rail eval-kpi-card" style="--accent: var(--c-ai);">
+            <div class="kpi-lab">Winkler score campeón</div>
+            <div class="metric kpi-val" id="eval-kpi-winkler" style="color: var(--c-ai);">36,11</div>
+            <div class="kpi-sub">frente a 46,54 de CatBoost · intervalos 19% más compactos</div>
+          </div>
+        </div>
+
+        <table class="dt" style="margin-top: 26px; margin-bottom: 22px;">
+          <thead>
+            <tr>
+              <th>Modelo</th><th>MAE</th><th>Coste (u.m.)</th>
+              <th>Nivel servicio</th><th>Cobertura (obj. 80%)</th><th>Winkler 80%</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Seasonal Naïve</td>
+              <td class="best">6,61</td><td>162.299</td>
+              <td>52,45%</td><td class="muted">n/a</td><td class="muted">n/a</td>
+            </tr>
+            <tr>
+              <td>CatBoost</td>
+              <td>11,72</td><td>174.527</td>
+              <td>78,39%</td><td>84,6%</td><td>46,54</td>
+            </tr>
+            <tr class="win">
+              <td>LightGBM · campeón</td>
+              <td>8,06</td><td class="best">147.646</td>
+              <td class="best">83,55%</td><td class="best">85,5%</td><td class="best">36,11</td>
+            </tr>
+          </tbody>
+        </table>
+
+
+        <div class="wf-mini">walk-forward · 500 series · 3 pliegues · hueco de 7 días · valida 7 días no vistos</div>
+
+        <div class="memref">Memoria, §6.2 y §6.4 · Rendimiento predictivo y calibración conformal</div>
+
+        <aside class="notes">
+          <p><strong>[TIEMPO: ~59 seg &middot; 143 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"Queda una pregunta que el coste no responde: ¿y los intervalos? Porque en la diapositiva de la calibración prometimos un 80% de cobertura, y eso hay que demostrarlo."</em></p>
+          <p><em>"Se cumple: 85,5% de cobertura empírica frente al 80% prometido, y sin quedarse corta en ningún pliegue. El error va en la dirección segura. Y no a cualquier precio: el Winkler Score, que castiga a la vez lo ancho del intervalo y cada valor que se queda fuera, da 36,11 frente a 46,54 de CatBoost. Intervalos un 19% más compactos con la misma cobertura."</em></p>
+          <p><em>"Debajo tienen la tabla completa, por si quieren comprobarlo. Las columnas del Naïve y de LightGBM ya las han visto; lo nuevo es CatBoost, y con él no hay paradoja: es el peor en error puntual y también el de mayor coste. La paradoja se concentra entre el Naïve y LightGBM."</em></p>
+          <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre esta tabla:]</strong></p>
+          <p>- <strong>"¿Por qué la cobertura empírica da 85,5% si el objetivo era 80%?"</strong> La predicción conformal garantiza una cota inferior finita $1 - \alpha \le \mathbb{E}[\text{cobertura}]$. Al haber soporte discreto y cuantiles empíricos, la cobertura es conservadoramente superior. Lo crítico es que no existe infracobertura en ningún fold temporal a escala 500.</p>
+          <p>- <strong>"¿Por qué CatBoost cuesta más que el Naïve (174k vs 162k) si da mucho mejor servicio (78% vs 52%)?"</strong> Por la penalización asimétrica: CatBoost sobrepredice en colas intermedias y acumula coste de exceso de stock ($c_o$). LightGBM equilibra el trade-off con mayor precisión de cuantil.</p>
+          <p>- <strong>"¿Cómo se obtuvo el IC 95% del ahorro [-15,5%; -2,7%]?"</strong> Mediante bootstrapping pareado por series temporales ($B=1.000$ réplicas) sobre los 500 productos. El intervalo estrictamente negativo confirma significación estadística al nivel $\alpha = 0,05$.</p>
+          <p>- <strong>"¿Qué mide el Winkler Score?"</strong> Es una proper scoring rule para intervalos que premia la estrechez del intervalo pero penaliza severamente cualquier valor real que quede fuera. A menor valor, mayor calidad y eficiencia del intervalo.</p>
         </aside>
       </section>
 
