@@ -6491,6 +6491,447 @@ Usar si el tribunal pregunta por trazabilidad o auditoría del código.</p>
           <p>- <strong>"Un PSI de 1,108 es enorme. ¿No invalida el modelo?"</strong> No, por dos razones medidas: esa variable pesa un 3,3% en la importancia SHAP del campeon, y la senal de demanda ya viene reconstruida por el imputador latente, que desacopla la demanda real del indicador bruto de disponibilidad en estanteria.</p>
         </aside>
       </section>
+
+      <!-- COMPARATIVA · OPCION 1 -->
+      <section>
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow" style="color: #fbbf24;">COMPARATIVA · OPCIÓN 1 DE 4</div>
+              <h3 style="margin-top: 8px;">El camino de un commit</h3>
+            </div>
+            <span class="chip" style="--accent: #fbbf24;"><span class="dot"></span>una diapositiva · sustituye la 18</span>
+          </div>
+          <div class="band"></div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <svg class="dg" viewBox="0 0 1240 288" role="img" style="width: 100%; height: auto; display: block;" aria-label="El camino de un commit">
+                <text x="0" y="14" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-conf)">EL CAMINO DE UN COMMIT</text>
+                <rect x="0" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="90.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">commit</text>
+                <text x="90.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">git push</text>
+                <path d="M 185 59 L 203 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="209,59 202,55 202,63" fill="var(--text-mute)"/>
+                <rect x="212" y="30" width="180" height="58" rx="7" fill="rgba(16,185,129,0.10)" stroke="#10b981" stroke-width="1.5"/>
+                <text x="302.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="#6ee7b7">CI</text>
+                <text x="302.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">ruff · mypy</text>
+                <path d="M 397 59 L 415 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="421,59 414,55 414,63" fill="var(--text-mute)"/>
+                <rect x="424" y="30" width="180" height="58" rx="7" fill="rgba(16,185,129,0.10)" stroke="#10b981" stroke-width="1.5"/>
+                <text x="514.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="#6ee7b7">309 tests</text>
+                <text x="514.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">pytest</text>
+                <path d="M 609 59 L 627 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="633,59 626,55 626,63" fill="var(--text-mute)"/>
+                <rect x="636" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="726.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">merge a main</text>
+                <text x="726.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">origin</text>
+                <path d="M 821 59 L 839 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="845,59 838,55 838,63" fill="var(--text-mute)"/>
+                <rect x="848" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="938.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">SSH al VPS</text>
+                <text x="938.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">reset --hard</text>
+                <path d="M 1033 59 L 1051 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="1057,59 1050,55 1050,63" fill="var(--text-mute)"/>
+                <rect x="1060" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1150.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">compose up</text>
+                <text x="1150.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">--build</text>
+                <text x="302.0" y="106" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="400" fill="#6ee7b7">0 errores · 309 verdes</text>
+                <line x1="0" y1="132" x2="1240" y2="132" stroke="var(--border)"/>
+                <text x="0" y="158" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-inv)">LO QUE QUEDA CORRIENDO</text>
+                <rect x="0" y="172" width="190" height="54" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="95.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="var(--text-1)">internet</text>
+                <text x="95.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">:443</text>
+                <path d="M 196 199 L 238 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="244,199 237,195 237,203" fill="var(--text-mute)"/>
+                <rect x="250" y="172" width="210" height="54" rx="7" fill="rgba(56,189,248,0.10)" stroke="#38bdf8" stroke-width="1"/>
+                <text x="355.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="#93c5fd">Caddy</text>
+                <text x="355.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">TLS · host</text>
+                <path d="M 466 199 L 508 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="514,199 507,195 507,203" fill="var(--text-mute)"/>
+                <rect x="520" y="166" width="380" height="32" rx="7" fill="rgba(155,124,248,0.10)" stroke="var(--c-ai)" stroke-width="1"/>
+                <text x="710.0" y="186.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11.5" font-weight="700" fill="#c4b5fd">api · Django + uvicorn</text>
+                <rect x="520" y="204" width="380" height="32" rx="7" fill="rgba(245,158,11,0.10)" stroke="var(--c-drift)" stroke-width="1"/>
+                <text x="710.0" y="224.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11.5" font-weight="700" fill="#fcd34d">presentacion · estáticos</text>
+                <path d="M 906 199 L 948 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="954,199 947,195 947,203" fill="var(--text-mute)"/>
+                <rect x="960" y="172" width="280" height="54" rx="7" fill="rgba(148,163,184,0.05)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1100.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-2)">mlflow.db · mlruns/</text>
+                <text x="1100.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--text-mute)">models/ · var/</text>
+                <text x="0" y="254" text-anchor="start" font-family="var(--font-mono)" font-size="10.5" font-weight="400" fill="var(--text-mute)">ningún contenedor publica puertos: Caddy los alcanza por nombre en la red interna, así nada se salta el TLS</text>
+                <text x="0" y="276" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="#fcd34d">y esta presentación la está sirviendo ese segundo contenedor</text>
+              </svg>
+        </div>
+
+        <aside class="notes"><p><strong>[DIAPOSITIVA DE COMPARATIVA. No forma parte del mazo: se borra al elegir opcion.]</strong></p></aside>
+      </section>
+
+      <!-- COMPARATIVA · OPCION 2a -->
+      <section>
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow" style="color: #fbbf24;">COMPARATIVA · OPCIÓN 2a DE 4</div>
+              <h3 style="margin-top: 8px;">El camino de un commit · integración</h3>
+            </div>
+            <span class="chip" style="--accent: #fbbf24;"><span class="dot"></span>dos diapositivas · la de CI</span>
+          </div>
+          <div class="band"></div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <svg class="dg" viewBox="0 0 1240 300" role="img" style="width: 100%; height: auto; display: block;" aria-label="El camino de un commit · integración">
+                <text x="0" y="14" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-conf)">GITHUB ACTIONS · cada push a main</text>
+                <rect x="0" y="30" width="290" height="76" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.4"/>
+                <text x="18" y="54" text-anchor="start" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="#6ee7b7">ruff</text>
+                <text x="18" y="74" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">estilo y lint</text>
+                <text x="272" y="54" text-anchor="end" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="#6ee7b7">✓ 0 errores</text>
+                <path d="M 296 68 L 311 68" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="317,68 310,64 310,72" fill="var(--text-mute)"/>
+                <rect x="317" y="30" width="290" height="76" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.4"/>
+                <text x="335" y="54" text-anchor="start" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="#6ee7b7">ruff format</text>
+                <text x="335" y="74" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">formato</text>
+                <text x="589" y="54" text-anchor="end" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="#6ee7b7">✓ determinista</text>
+                <path d="M 613 68 L 628 68" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="634,68 627,64 627,72" fill="var(--text-mute)"/>
+                <rect x="634" y="30" width="290" height="76" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.4"/>
+                <text x="652" y="54" text-anchor="start" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="#6ee7b7">mypy</text>
+                <text x="652" y="74" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">tipos en src/</text>
+                <text x="906" y="54" text-anchor="end" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="#6ee7b7">✓ estricto</text>
+                <path d="M 930 68 L 945 68" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="951,68 944,64 944,72" fill="var(--text-mute)"/>
+                <rect x="951" y="30" width="290" height="76" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.4"/>
+                <text x="969" y="54" text-anchor="start" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="#6ee7b7">pytest</text>
+                <text x="969" y="74" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">309 tests</text>
+                <text x="1223" y="54" text-anchor="end" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="#6ee7b7">✓ 3,68 s</text>
+                <line x1="0" y1="132" x2="1240" y2="132" stroke="var(--border)"/>
+                <text x="0" y="158" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-ai)">LOS 309 TESTS, POR NIVEL DE FALLO</text>
+                <text x="0" y="188" text-anchor="start" font-family="var(--font-mono)" font-size="12" font-weight="700" fill="var(--text-1)">L1</text>
+                <text x="34" y="188" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">esquemas y tipos</text>
+                <rect x="300" y="177" width="426" height="15" rx="3" fill="rgba(155,124,248,0.55)"/>
+                <text x="736" y="188" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-2)">64</text>
+                <text x="0" y="220" text-anchor="start" font-family="var(--font-mono)" font-size="12" font-weight="700" fill="var(--text-1)">L2</text>
+                <text x="34" y="220" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">anti-fuga temporal</text>
+                <rect x="300" y="209" width="346" height="15" rx="3" fill="#f43f5e"/>
+                <text x="656" y="220" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-2)">52</text>
+                <text x="0" y="252" text-anchor="start" font-family="var(--font-mono)" font-size="12" font-weight="700" fill="var(--text-1)">L3</text>
+                <text x="34" y="252" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">validez conformal</text>
+                <rect x="300" y="241" width="520" height="15" rx="3" fill="rgba(155,124,248,0.55)"/>
+                <text x="830" y="252" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-2)">78</text>
+                <text x="0" y="284" text-anchor="start" font-family="var(--font-mono)" font-size="12" font-weight="700" fill="var(--text-1)">L4</text>
+                <text x="34" y="284" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">coherencia Newsvendor</text>
+                <rect x="300" y="273" width="300" height="15" rx="3" fill="rgba(155,124,248,0.55)"/>
+                <text x="610" y="284" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-2)">45</text>
+                <text x="0" y="316" text-anchor="start" font-family="var(--font-mono)" font-size="12" font-weight="700" fill="var(--text-1)">L5</text>
+                <text x="34" y="316" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">API REST</text>
+                <rect x="300" y="305" width="466" height="15" rx="3" fill="rgba(155,124,248,0.55)"/>
+                <text x="776" y="316" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-2)">70</text>
+                <text x="900" y="190" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">el crítico es L2: la ausencia de fuga</text>
+                <text x="900" y="208" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">temporal no se confía a la disciplina,</text>
+                <text x="900" y="226" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-mute)">se valida con contratos</text>
+                <text x="900" y="262" text-anchor="start" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="#6ee7b7">309 passed in 3,68 s</text>
+                <text x="900" y="280" text-anchor="start" font-family="var(--font-mono)" font-size="10.5" font-weight="400" fill="var(--text-mute)">29 módulos · cobertura >80%</text>
+              </svg>
+        </div>
+
+        <aside class="notes"><p><strong>[DIAPOSITIVA DE COMPARATIVA. No forma parte del mazo: se borra al elegir opcion.]</strong></p></aside>
+      </section>
+
+      <!-- COMPARATIVA · OPCION 2b -->
+      <section>
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow" style="color: #fbbf24;">COMPARATIVA · OPCIÓN 2b DE 4</div>
+              <h3 style="margin-top: 8px;">Dónde corre: topología del VPS</h3>
+            </div>
+            <span class="chip" style="--accent: #fbbf24;"><span class="dot"></span>dos diapositivas · la de despliegue</span>
+          </div>
+          <div class="band"></div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <svg class="dg" viewBox="0 0 1240 288" role="img" style="width: 100%; height: auto; display: block;" aria-label="Dónde corre: topología del VPS">
+                <text x="0" y="14" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-inv)">VPS · un solo host, Docker Compose</text>
+                <rect x="0" y="26" width="1240" height="250" rx="10" fill="rgba(56,189,248,0.03)" stroke="var(--border)" stroke-dasharray="6 4"/>
+                <rect x="28" y="54" width="200" height="60" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="128.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="var(--text-1)">internet</text>
+                <text x="128.0" y="98.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">:443 · TLS</text>
+                <path d="M 234 84 L 280 84" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="286,84 279,80 279,88" fill="var(--text-mute)"/>
+                <rect x="292" y="54" width="230" height="60" rx="7" fill="rgba(56,189,248,0.10)" stroke="#38bdf8" stroke-width="1"/>
+                <text x="407.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="#93c5fd">Caddy compartido</text>
+                <text x="407.0" y="98.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">termina el TLS</text>
+                <rect x="560" y="40" width="440" height="180" rx="9" fill="rgba(148,163,184,0.04)" stroke="var(--border)"/>
+                <text x="580" y="60" text-anchor="start" font-family="var(--font-mono)" font-size="10" font-weight="400" fill="var(--text-mute)">red docker `caddy` (externa)</text>
+                <path d="M 528 84 L 550 84" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="556,84 549,80 549,88" fill="var(--text-mute)"/>
+                <rect x="584" y="74" width="392" height="54" rx="7" fill="rgba(155,124,248,0.10)" stroke="var(--c-ai)" stroke-width="1"/>
+                <text x="780.0" y="98.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="#c4b5fd">api</text>
+                <text x="780.0" y="115.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">uvicorn · Django · :8000</text>
+                <rect x="584" y="144" width="392" height="54" rx="7" fill="rgba(245,158,11,0.10)" stroke="var(--c-drift)" stroke-width="1"/>
+                <text x="780.0" y="168.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="#fcd34d">presentacion</text>
+                <text x="780.0" y="185.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">caddy file-server · :80</text>
+                <text x="780" y="242" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="400" fill="var(--text-mute)">sin `ports`: no hay forma de saltarse el proxy</text>
+                <rect x="1030" y="40" width="182" height="180" rx="9" fill="rgba(148,163,184,0.04)" stroke="var(--border)"/>
+                <text x="1121" y="60" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="400" fill="var(--text-mute)">volúmenes</text>
+                <rect x="1046" y="72" width="150" height="30" rx="7" fill="rgba(148,163,184,0.06)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1121.0" y="91.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="600" fill="var(--text-2)">mlflow.db</text>
+                <text x="1196" y="92" text-anchor="end" font-family="var(--font-mono)" font-size="9" font-weight="400" fill="var(--text-mute)">índice</text>
+                <rect x="1046" y="109" width="150" height="30" rx="7" fill="rgba(148,163,184,0.06)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1121.0" y="128.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="600" fill="var(--text-2)">mlruns/</text>
+                <text x="1196" y="129" text-anchor="end" font-family="var(--font-mono)" font-size="9" font-weight="400" fill="var(--text-mute)">artefactos</text>
+                <rect x="1046" y="146" width="150" height="30" rx="7" fill="rgba(148,163,184,0.06)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1121.0" y="165.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="600" fill="var(--text-2)">models/</text>
+                <text x="1196" y="166" text-anchor="end" font-family="var(--font-mono)" font-size="9" font-weight="400" fill="var(--text-mute)">campeón</text>
+                <rect x="1046" y="183" width="150" height="30" rx="7" fill="rgba(148,163,184,0.06)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1121.0" y="202.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="600" fill="var(--text-2)">var/</text>
+                <text x="1196" y="203" text-anchor="end" font-family="var(--font-mono)" font-size="9" font-weight="400" fill="var(--text-mute)">log en vuelo</text>
+                <path d="M 1006 140 L 1020 140" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="1026,140 1019,136 1019,144" fill="var(--text-mute)"/>
+              </svg>
+        </div>
+
+        <aside class="notes"><p><strong>[DIAPOSITIVA DE COMPARATIVA. No forma parte del mazo: se borra al elegir opcion.]</strong></p></aside>
+      </section>
+
+      <!-- COMPARATIVA · OPCION 3 -->
+      <section>
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow" style="color: #fbbf24;">COMPARATIVA · OPCIÓN 3 DE 4</div>
+              <h3 style="margin-top: 8px;">Topología del VPS, con la calidad al pie</h3>
+            </div>
+            <span class="chip" style="--accent: #fbbf24;"><span class="dot"></span>una diapositiva · infra primero</span>
+          </div>
+          <div class="band"></div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <svg class="dg" viewBox="0 0 1240 288" role="img" style="width: 100%; height: auto; display: block;" aria-label="Topología del VPS, con la calidad al pie">
+                <text x="0" y="14" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-inv)">VPS · un solo host, Docker Compose</text>
+                <rect x="0" y="26" width="1240" height="250" rx="10" fill="rgba(56,189,248,0.03)" stroke="var(--border)" stroke-dasharray="6 4"/>
+                <rect x="28" y="54" width="200" height="60" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="128.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="var(--text-1)">internet</text>
+                <text x="128.0" y="98.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">:443 · TLS</text>
+                <path d="M 234 84 L 280 84" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="286,84 279,80 279,88" fill="var(--text-mute)"/>
+                <rect x="292" y="54" width="230" height="60" rx="7" fill="rgba(56,189,248,0.10)" stroke="#38bdf8" stroke-width="1"/>
+                <text x="407.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="#93c5fd">Caddy compartido</text>
+                <text x="407.0" y="98.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">termina el TLS</text>
+                <rect x="560" y="40" width="440" height="180" rx="9" fill="rgba(148,163,184,0.04)" stroke="var(--border)"/>
+                <text x="580" y="60" text-anchor="start" font-family="var(--font-mono)" font-size="10" font-weight="400" fill="var(--text-mute)">red docker `caddy` (externa)</text>
+                <path d="M 528 84 L 550 84" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="556,84 549,80 549,88" fill="var(--text-mute)"/>
+                <rect x="584" y="74" width="392" height="54" rx="7" fill="rgba(155,124,248,0.10)" stroke="var(--c-ai)" stroke-width="1"/>
+                <text x="780.0" y="98.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="#c4b5fd">api</text>
+                <text x="780.0" y="115.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">uvicorn · Django · :8000</text>
+                <rect x="584" y="144" width="392" height="54" rx="7" fill="rgba(245,158,11,0.10)" stroke="var(--c-drift)" stroke-width="1"/>
+                <text x="780.0" y="168.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="#fcd34d">presentacion</text>
+                <text x="780.0" y="185.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">caddy file-server · :80</text>
+                <text x="780" y="242" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="400" fill="var(--text-mute)">sin `ports`: no hay forma de saltarse el proxy</text>
+                <rect x="1030" y="40" width="182" height="180" rx="9" fill="rgba(148,163,184,0.04)" stroke="var(--border)"/>
+                <text x="1121" y="60" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="400" fill="var(--text-mute)">volúmenes</text>
+                <rect x="1046" y="72" width="150" height="30" rx="7" fill="rgba(148,163,184,0.06)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1121.0" y="91.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="600" fill="var(--text-2)">mlflow.db</text>
+                <text x="1196" y="92" text-anchor="end" font-family="var(--font-mono)" font-size="9" font-weight="400" fill="var(--text-mute)">índice</text>
+                <rect x="1046" y="109" width="150" height="30" rx="7" fill="rgba(148,163,184,0.06)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1121.0" y="128.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="600" fill="var(--text-2)">mlruns/</text>
+                <text x="1196" y="129" text-anchor="end" font-family="var(--font-mono)" font-size="9" font-weight="400" fill="var(--text-mute)">artefactos</text>
+                <rect x="1046" y="146" width="150" height="30" rx="7" fill="rgba(148,163,184,0.06)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1121.0" y="165.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="600" fill="var(--text-2)">models/</text>
+                <text x="1196" y="166" text-anchor="end" font-family="var(--font-mono)" font-size="9" font-weight="400" fill="var(--text-mute)">campeón</text>
+                <rect x="1046" y="183" width="150" height="30" rx="7" fill="rgba(148,163,184,0.06)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1121.0" y="202.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="600" fill="var(--text-2)">var/</text>
+                <text x="1196" y="203" text-anchor="end" font-family="var(--font-mono)" font-size="9" font-weight="400" fill="var(--text-mute)">log en vuelo</text>
+                <path d="M 1006 140 L 1020 140" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="1026,140 1019,136 1019,144" fill="var(--text-mute)"/>
+              </svg>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 9px 16px; background: rgba(7,9,13,0.6); border: 1px solid var(--border); border-left: 3px solid var(--c-ai); border-radius: 6px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);">
+          <span><strong style="color: #c4b5fd;">309 tests</strong> en 5 niveles · L2 anti-fuga temporal</span>
+          <span>ruff · ruff format · mypy estricto</span>
+          <span><strong style="color: #6ee7b7;">309 passed in 3,68 s</strong></span>
+        </div>
+
+        <aside class="notes"><p><strong>[DIAPOSITIVA DE COMPARATIVA. No forma parte del mazo: se borra al elegir opcion.]</strong></p></aside>
+      </section>
+
+      <!-- COMPARATIVA · OPCION 4 -->
+      <section>
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow">
+                <span style="color: #fbbf24;">COMPARATIVA · OPCIÓN 4 DE 4</span></div>
+              <h3 style="margin-top: 8px;">La 18 actual <span style="font-size: 15px; color: #fbbf24; font-weight: 500;">+ franja de infraestructura</span></h3>
+            </div>
+            <span class="chip" style="--accent: var(--c-conf); font-size: 11px;"><span class="dot"></span><span>SUITE 100% AUDITABLE</span></span>
+          </div>
+          <div class="band"></div>
+        </div>
+
+        <div class="grid-2" style="align-items: stretch;">
+          <!-- Panel Izquierdo: Jerarquía de Contratos (pytest) -->
+          <div class="glass rail" style="--accent: var(--c-inv); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                <h4 style="margin: 0; font-size: 16.5px; color: #fff;">Pirámide de Contratos de Datos</h4>
+                <span class="chip" style="--accent: var(--c-conf); font-size: 9.5px;"><span class="dot"></span>5 NIVELES DE FALLO</span>
+              </div>
+
+              <!-- Terminal Mock con desglose de los 5 niveles -->
+              <div style="background: #06090e; border: 1px solid var(--border-2); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5); font-family: var(--font-mono); font-size: 11px;">
+                <div style="background: #0f141c; padding: 6px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border);">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span>
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+                    <span style="color: var(--text-mute); font-size: 10px; margin-left: 6px;">pytest tests/ -q --durations=0</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 9px; padding: 1px 5px; border-radius: 3px; background: rgba(16,185,129,0.2); color: #10b981; font-weight: 700;">PASSED</span>
+                    <span style="color: #38bdf8; font-size: 10px; font-weight: 600;">git:(main)</span>
+                  </div>
+                </div>
+                <div style="padding: 12px 14px; line-height: 1.8; color: var(--text-2); font-size: 11px;">
+                  <!-- L1 -->
+                  <div class="term-line" style="padding: 4px 6px;">
+                    <span><strong style="color: var(--c-inv);">L1</strong> · Esquemas &amp; Tipos (Pandera/Pydantic)</span>
+                    <span class="term-badge passed">64 PASSED</span>
+                  </div>
+                  <!-- L2 -->
+                  <div class="term-line" style="padding: 4px 6px;">
+                    <span><strong style="color: #38bdf8;">L2</strong> · Invariantes anti-leakage (shift&ge;1)</span>
+                    <span class="term-badge passed">52 PASSED</span>
+                  </div>
+                  <!-- L3 -->
+                  <div class="term-line" style="padding: 4px 6px;">
+                    <span><strong style="color: var(--c-ai);">L3</strong> · Validez conformal &amp; cuantiles</span>
+                    <span class="term-badge passed">78 PASSED</span>
+                  </div>
+                  <!-- L4 -->
+                  <div class="term-line" style="padding: 4px 6px;">
+                    <span><strong style="color: var(--c-drift);">L4</strong> · Consistencia económica Newsvendor</span>
+                    <span class="term-badge passed">45 PASSED</span>
+                  </div>
+                  <!-- L5 -->
+                  <div class="term-line" style="padding: 4px 6px;">
+                    <span><strong style="color: #f43f5e;">L5</strong> · Endpoints API REST &amp; serialización</span>
+                    <span class="term-badge passed">70 PASSED</span>
+                  </div>
+                  <!-- Footer resumen -->
+                  <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.14); display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: var(--c-conf); font-weight: 700; font-size: 11.5px; transition: all 0.3s;">✔ 309 passed in 3.68s</span>
+                    <span style="color: var(--text-mute); font-size: 10px;">29 módulos · Cobertura &gt;80%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Zócalo de Integridad Temporal (simétrico al de la derecha) -->
+            <div style="margin-top: 10px; padding: 7px 10px; background: rgba(7,9,13,0.7); border: 1px solid var(--border-2); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10px;">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <span style="color: var(--text-mute); font-weight: 700;">INVARIANTE:</span>
+                <span class="chip" style="--accent: var(--c-inv); padding: 1px 6px; font-size: 9px;">Strictly Past-Only (t' &lt; t)</span>
+              </div>
+              <div>
+                <span class="chip" style="--accent: var(--c-conf); padding: 1px 6px; font-size: 9.5px;"><span class="dot"></span>ZERO DATA LEAKAGE</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel Derecho: Pipeline CI/CD Automatizado con Stepper Visual Estilo GitHub Actions -->
+          <div class="glass rail" style="--accent: var(--c-conf); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                <h4 style="margin: 0; font-size: 16.5px; color: #fff;">Automated Quality Gates (CI/CD)</h4>
+                <span class="chip" style="--accent: var(--c-conf); font-size: 9.5px;"><span class="dot"></span>ZERO DEFECTS</span>
+              </div>
+
+              <!-- Stepper Timeline: Conectores a la izquierda + Tarjetas a la derecha -->
+              <div class="ci-pipeline-flow">
+                <div class="ci-track-line"></div>
+                <div class="ci-track-progress"></div>
+
+                <!-- Step 1: Ruff -->
+                <div class="ci-step-row passed">
+                  <div class="ci-step-node">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                  <div class="ci-step-card">
+                    <div>
+                      <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-1);">01 · Ruff Linter &amp; PEP 8</div>
+                      <div style="font-size: 9.5px; color: var(--text-mute);">Formateo determinista y análisis estático (&lt;1 s)</div>
+                    </div>
+                    <span class="chip" style="--accent: var(--c-conf); font-size: 9px; padding: 1px 6px;"><span class="dot"></span>0 ERRORES</span>
+                  </div>
+                </div>
+
+                <!-- Step 2: Mypy -->
+                <div class="ci-step-row passed">
+                  <div class="ci-step-node">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                  <div class="ci-step-card">
+                    <div>
+                      <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-1);">02 · Mypy Strict Static Typing</div>
+                      <div style="font-size: 9.5px; color: var(--text-mute);">Comprobación de tipos en toda la librería (Zero Any)</div>
+                    </div>
+                    <span class="chip" style="--accent: var(--c-conf); font-size: 9px; padding: 1px 6px;"><span class="dot"></span>TYPE SAFE</span>
+                  </div>
+                </div>
+
+                <!-- Step 3: Pytest Contracts -->
+                <div class="ci-step-row passed">
+                  <div class="ci-step-node">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                  <div class="ci-step-card">
+                    <div>
+                      <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-1);">03 · Pytest Contract Suites</div>
+                      <div style="font-size: 9.5px; color: var(--text-mute);">309 tests de invariantes matemáticos y regresión</div>
+                    </div>
+                    <span class="chip" style="--accent: var(--c-conf); font-size: 9px; padding: 1px 6px;"><span class="dot"></span>309 / 309 PASS</span>
+                  </div>
+                </div>
+
+                <!-- Step 4: Docker -->
+                <div class="ci-step-row passed">
+                  <div class="ci-step-node">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                  <div class="ci-step-card">
+                    <div>
+                      <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-1);">04 · Docker Multi-Stage Build</div>
+                      <div style="font-size: 9.5px; color: var(--text-mute);">Contenedorización lista para despliegue productivo cloud</div>
+                    </div>
+                    <span class="chip" style="--accent: var(--c-conf); font-size: 9px; padding: 1px 6px;"><span class="dot"></span>DIST READY</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Zócalo de Gobernanza & Código Abierto -->
+            <div style="margin-top: 10px; padding: 7px 10px; background: rgba(7,9,13,0.7); border: 1px solid var(--border-2); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10.5px;">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <span style="color: var(--text-mute); font-weight: 700;">HOOKS:</span>
+                <span class="chip" style="--accent: var(--c-ai); padding: 1px 6px; font-size: 9.5px;">Pre-commit</span>
+                <span class="chip" style="--accent: var(--c-drift); padding: 1px 6px; font-size: 9.5px;">Pre-push</span>
+              </div>
+              <div>
+                <span class="chip" style="--accent: var(--c-conf); padding: 1px 6px; font-size: 9.5px;"><span class="dot"></span>LICENCIA MIT</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="memref">Memoria, §5.7 · Calidad, verificación y despliegue</div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 16px; background: rgba(7,9,13,0.6); border: 1px solid var(--border); border-left: 3px solid var(--c-inv); border-radius: 6px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2);">
+          <span style="color: #93c5fd; font-weight: 700;">VPS</span>
+          <span>Caddy · TLS</span><span style="color: var(--text-mute);">&rarr;</span>
+          <span style="color: #c4b5fd;">api · Django + uvicorn</span><span style="color: var(--text-mute);">+</span>
+          <span style="color: #fcd34d;">presentacion · estáticos</span><span style="color: var(--text-mute);">·</span>
+          <span>mlflow.db · mlruns/ · models/</span><span style="color: var(--text-mute);">·</span>
+          <span>sin puertos publicados</span>
+        </div>
+
+
+        <aside class="notes"><p><strong>[DIAPOSITIVA DE COMPARATIVA. No forma parte del mazo: se borra al elegir opcion.]</strong></p>
+          <p><strong>[TIEMPO: ~33 seg &middot; 79 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"En un trabajo de fin de grado en Ciencia de Datos la reproducibilidad pesa tanto como el modelado. El código está blindado por 309 tests organizados en 5 niveles de fallo."</em></p>
+          <p><em>"Y el crítico es el nivel 2: la ausencia de fuga temporal no se confía a la disciplina del desarrollador, se valida con contratos que aseguran que ningún retardo accede a información futura. Todo el repositorio va gobernado por integración continua con Ruff, Mypy estricto y Docker multi-stage."</em></p>
+          <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre calidad de software y CI/CD:]</strong></p>
+          <p>- <strong>"¿Cómo garantiza el contrato del Nivel 2 que no hay data leakage?"</strong> En `tests/test_temporal_leakage_contract.py` se inyectan series temporales con retardos arbitrarios y se evalúa formalmente que para cualquier instante de decisión $t$, el vector de características $X_t$ contenga únicamente información con sello temporal $t' < t$. Si una feature intentara consumir un valor contemporáneo censurado o futuro, la suite de tests aborta inmediatamente.</p>
+          <p>- <strong>"¿Por qué forzar tipado estático estricto (`mypy --strict`) en Python?"</strong> Porque en flujos de Machine Learning los fallos por cambios silenciosos de forma (`np.ndarray` vs `pd.Series`) o tipos `None` se propagan hasta producción sin emitir error sintáctico. Mypy en modo estricto garantiza consistencia en las interfaces y en los serializadores de la API REST.</p>
+          <p>- <strong>"¿Por qué Docker multi-stage?"</strong> Para mantener la imagen productiva final lo más reducida y segura posible. En la primera etapa se instalan compiladores y dependencias de test; en la etapa final (`dist`) solo se copian las librerías de inferencia en tiempo de ejecución y los artefactos de pesos, reduciendo la superficie de ataque y el tiempo de arranque en la nube.</p>
+        </aside>
+      </section>
+
 </div>
   </div>
 
