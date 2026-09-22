@@ -1235,6 +1235,38 @@
     @keyframes dgFade { from { opacity: 0; } to { opacity: 1; } }
     @keyframes dgDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 
+    .dg-anim .stg { opacity: 0; }
+    .reveal .slides section.present .dg-anim .stg { animation: dgFade 0.40s ease-out both; }
+    .dg-anim .o-ret { stroke-dasharray: 1; stroke-dashoffset: 1; }
+    .reveal .slides section.present .dg-anim .o-ret { animation: dgDraw 0.85s ease-in-out 1.22s both; }
+    .reveal .slides section.present .dg-anim .o-lab { animation-delay: 0.06s; }
+    .reveal .slides section.present .dg-anim .o-0 { animation-delay: 0.16s; }
+    .reveal .slides section.present .dg-anim .o-1 { animation-delay: 0.33s; }
+    .reveal .slides section.present .dg-anim .o-2 { animation-delay: 0.50s; }
+    .reveal .slides section.present .dg-anim .o-3 { animation-delay: 0.67s; }
+    .reveal .slides section.present .dg-anim .o-4 { animation-delay: 0.84s; }
+    .reveal .slides section.present .dg-anim .o-5 { animation-delay: 1.01s; }
+    .reveal .slides section.present .dg-anim .o-ret2 { animation-delay: 2.12s; }
+    .reveal .slides section.present .dg-anim .o-sep { animation-delay: 2.30s; }
+    .reveal .slides section.present .dg-anim .o-s0 { animation-delay: 2.44s; }
+    .reveal .slides section.present .dg-anim .o-s1 { animation-delay: 2.60s; }
+    .reveal .slides section.present .dg-anim .o-s2 { animation-delay: 2.76s; }
+    .reveal .slides section.present .dg-anim .o-fin { animation-delay: 2.96s; }
+    .reveal .slides section.present .dg-anim .c-lab { animation-delay: 0.06s; }
+    .reveal .slides section.present .dg-anim .c-0 { animation-delay: 0.16s; }
+    .reveal .slides section.present .dg-anim .c-1 { animation-delay: 0.33s; }
+    .reveal .slides section.present .dg-anim .c-2 { animation-delay: 0.50s; }
+    .reveal .slides section.present .dg-anim .c-3 { animation-delay: 0.67s; }
+    .reveal .slides section.present .dg-anim .c-4 { animation-delay: 0.84s; }
+    .reveal .slides section.present .dg-anim .c-5 { animation-delay: 1.01s; }
+    .reveal .slides section.present .dg-anim .c-ok { animation-delay: 1.22s; }
+    .reveal .slides section.present .dg-anim .c-sep { animation-delay: 1.40s; }
+    .reveal .slides section.present .dg-anim .c-r0 { animation-delay: 1.54s; }
+    .reveal .slides section.present .dg-anim .c-r1 { animation-delay: 1.70s; }
+    .reveal .slides section.present .dg-anim .c-r2 { animation-delay: 1.86s; }
+    .reveal .slides section.present .dg-anim .c-r3 { animation-delay: 2.02s; }
+    .reveal .slides section.present .dg-anim .c-fin { animation-delay: 2.24s; }
+
     /* Diapositiva 21: Terminal Test Runner & Pipeline CI/CD Stepper */
     .term-line {
       display: flex;
@@ -3178,49 +3210,22 @@
         </div>
 
         <div class="glass rail" style="--accent: var(--c-inv); padding: 20px 22px 16px; margin-top: 16px;">
-          <svg class="dg" viewBox="0 0 1240 302" role="img" style="width: 100%; height: auto; display: block;"
+          <svg class="dg dg-anim" viewBox="0 0 1240 302" role="img" style="width: 100%; height: auto; display: block;"
                  aria-label="Bucle operativo diario y ciclo semanal de gobierno del modelo">
-                <text x="0" y="16" text-anchor="start" font-family="var(--font-mono)" font-size="12.5" font-weight="700" fill="var(--c-conf)">CADA DÍA · lote nocturno</text>
-                <rect x="0" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="90.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">dato del día t</text>
-                <text x="90.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">se cierra</text>
-                <path d="M 185 63 L 202 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="209,63 201,58 201,68" fill="var(--text-mute)"/>
-                <rect x="212" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="302.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">puerta de calidad</text>
-                <text x="302.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">validación</text>
-                <path d="M 397 63 L 414 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="421,63 413,58 413,68" fill="var(--text-mute)"/>
-                <rect x="424" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="514.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">campeón</text>
-                <text x="514.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">pedido q*</text>
-                <path d="M 609 63 L 626 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="633,63 625,58 625,68" fill="var(--text-mute)"/>
-                <rect x="636" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="726.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">500 recomendaciones</text>
-                <text x="726.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">las de riesgo, marcadas</text>
-                <path d="M 821 63 L 838 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="845,63 837,58 837,68" fill="var(--text-mute)"/>
-                <rect x="848" y="32" width="180" height="62" rx="8" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="1.8"/>
-                <text x="938.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="#6ee7b7">reponedor</text>
-                <text x="938.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">revisa solo esas</text>
-                <path d="M 1033 63 L 1050 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="1057,63 1049,58 1049,68" fill="var(--text-mute)"/>
-                <rect x="1060" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="1150.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">compras</text>
-                <text x="1150.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">el resto sale solo</text>
-                <path d="M 1150 94 L 1150 126 L 90 126 L 90 100" fill="none" stroke="var(--text-mute)" stroke-width="1.4" stroke-dasharray="5 4"/>
-                <polygon points="90,92 86,100 94,100" fill="var(--text-mute)"/>
-                <text x="620" y="146" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="400" fill="var(--text-mute)">la demanda realizada vuelve como monitorización: PSI en la entrada, residuos en el error</text>
-                <line x1="0" y1="172" x2="1240" y2="172" stroke="var(--border)"/>
-                <text x="0" y="198" text-anchor="start" font-family="var(--font-mono)" font-size="12.5" font-weight="700" fill="var(--c-drift)">CADA SEMANA · reentreno y gobierno</text>
-                <rect x="0" y="212" width="390" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="195.0" y="241.0" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="var(--text-1)">challenger</text>
-                <text x="195.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">entrenado con lo más reciente</text>
-                <path d="M 395 243 L 415 243" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="422,243 414,238 414,248" fill="var(--text-mute)"/>
-                <rect x="425" y="212" width="390" height="62" rx="8" fill="rgba(245,158,11,0.10)" stroke="var(--c-drift)" stroke-width="1.8"/>
-                <text x="620.0" y="241.0" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="#fbbf24">3 guardarraíles</text>
-                <text x="620.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">coste · coste+Winkler · bootstrap 95%</text>
-                <path d="M 820 243 L 840 243" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="847,243 839,238 839,248" fill="var(--text-mute)"/>
-                <rect x="850" y="212" width="390" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="1045.0" y="241.0" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="var(--text-1)">campeón</text>
-                <text x="1045.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">sellado en MLflow</text>
-                <text x="620" y="294" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="400" fill="var(--text-mute)">el challenger solo sustituye al campeón si pasa los tres</text>
+                <g class="stg o-lab"><text x="0" y="16" text-anchor="start" font-family="var(--font-mono)" font-size="12.5" font-weight="700" fill="var(--c-conf)">CADA DÍA · lote nocturno</text></g>
+                <g class="stg o-0"><rect x="0" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="90.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">dato del día t</text><text x="90.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">se cierra</text></g>
+                <g class="stg o-1"><path d="M 183 63 L 200 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="207,63 199,58 199,68" fill="var(--text-mute)"/><rect x="212" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="302.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">puerta de calidad</text><text x="302.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">validación</text></g>
+                <g class="stg o-2"><path d="M 395 63 L 412 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="419,63 411,58 411,68" fill="var(--text-mute)"/><rect x="424" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="514.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">campeón</text><text x="514.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">pedido q*</text></g>
+                <g class="stg o-3"><path d="M 607 63 L 624 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="631,63 623,58 623,68" fill="var(--text-mute)"/><rect x="636" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="726.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">500 recomendaciones</text><text x="726.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">las de riesgo, marcadas</text></g>
+                <g class="stg o-4"><path d="M 819 63 L 836 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="843,63 835,58 835,68" fill="var(--text-mute)"/><rect x="848" y="32" width="180" height="62" rx="8" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="1.8"/><text x="938.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="#6ee7b7">reponedor</text><text x="938.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">revisa solo esas</text></g>
+                <g class="stg o-5"><path d="M 1031 63 L 1048 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="1055,63 1047,58 1047,68" fill="var(--text-mute)"/><rect x="1060" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="1150.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">compras</text><text x="1150.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">el resto sale solo</text></g>
+                <path class="o-ret" pathLength="1" d="M 1150 94 L 1150 126 L 90 126 L 90 100" fill="none" stroke="var(--text-mute)" stroke-width="1.4" stroke-dasharray="5 4"/>
+                <g class="stg o-ret2"><polygon points="90,92 86,100 94,100" fill="var(--text-mute)"/><text x="620" y="146" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="400" fill="var(--text-mute)">la demanda realizada vuelve como monitorización: PSI en la entrada, residuos en el error</text></g>
+                <g class="stg o-sep"><line x1="0" y1="172" x2="1240" y2="172" stroke="var(--border)"/><text x="0" y="198" text-anchor="start" font-family="var(--font-mono)" font-size="12.5" font-weight="700" fill="var(--c-drift)">CADA SEMANA · reentreno y gobierno</text></g>
+                <g class="stg o-s0"><rect x="0" y="212" width="390" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="195.0" y="241.0" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="var(--text-1)">challenger</text><text x="195.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">entrenado con lo más reciente</text></g>
+                <g class="stg o-s1"><path d="M 393 243 L 413 243" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="420,243 412,238 412,248" fill="var(--text-mute)"/><rect x="425" y="212" width="390" height="62" rx="8" fill="rgba(245,158,11,0.10)" stroke="var(--c-drift)" stroke-width="1.8"/><text x="620.0" y="241.0" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="#fbbf24">3 guardarraíles</text><text x="620.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">coste · coste+Winkler · bootstrap 95%</text></g>
+                <g class="stg o-s2"><path d="M 818 243 L 838 243" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="845,243 837,238 837,248" fill="var(--text-mute)"/><rect x="850" y="212" width="390" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="1045.0" y="241.0" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="var(--text-1)">campeón</text><text x="1045.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">sellado en MLflow</text></g>
+                <g class="stg o-fin"><text x="620" y="294" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="400" fill="var(--text-mute)">el challenger solo sustituye al campeón si pasa los tres</text></g>
               </svg>
         </div>
 
@@ -3256,52 +3261,22 @@
         </div>
 
         <div class="glass rail" style="--accent: var(--c-conf); padding: 20px 22px 16px; margin-top: 16px;">
-          <svg class="dg" viewBox="0 0 1240 288" role="img" style="width: 100%; height: auto; display: block;" aria-label="El camino de un commit">
-                <text x="0" y="14" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-conf)">EL CAMINO DE UN COMMIT</text>
-                <rect x="0" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="90.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">commit</text>
-                <text x="90.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">git push</text>
-                <path d="M 185 59 L 203 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="209,59 202,55 202,63" fill="var(--text-mute)"/>
-                <rect x="212" y="30" width="180" height="58" rx="7" fill="rgba(16,185,129,0.10)" stroke="#10b981" stroke-width="1.5"/>
-                <text x="302.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="#6ee7b7">CI</text>
-                <text x="302.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">ruff · mypy</text>
-                <path d="M 397 59 L 415 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="421,59 414,55 414,63" fill="var(--text-mute)"/>
-                <rect x="424" y="30" width="180" height="58" rx="7" fill="rgba(16,185,129,0.10)" stroke="#10b981" stroke-width="1.5"/>
-                <text x="514.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="#6ee7b7">309 tests</text>
-                <text x="514.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">pytest · 3,68 s</text>
-                <path d="M 609 59 L 627 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="633,59 626,55 626,63" fill="var(--text-mute)"/>
-                <rect x="636" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="726.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">merge a main</text>
-                <text x="726.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">origin</text>
-                <path d="M 821 59 L 839 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="845,59 838,55 838,63" fill="var(--text-mute)"/>
-                <rect x="848" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="938.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">SSH al VPS</text>
-                <text x="938.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">reset --hard</text>
-                <path d="M 1033 59 L 1051 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="1057,59 1050,55 1050,63" fill="var(--text-mute)"/>
-                <rect x="1060" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="1150.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">compose up</text>
-                <text x="1150.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">--build</text>
-                <text x="302.0" y="106" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="400" fill="#6ee7b7">0 errores · 309 verdes</text>
-                <line x1="0" y1="132" x2="1240" y2="132" stroke="var(--border)"/>
-                <text x="0" y="158" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-inv)">LO QUE QUEDA CORRIENDO</text>
-                <rect x="0" y="172" width="190" height="54" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="95.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="var(--text-1)">internet</text>
-                <text x="95.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">:443</text>
-                <path d="M 196 199 L 238 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="244,199 237,195 237,203" fill="var(--text-mute)"/>
-                <rect x="250" y="172" width="210" height="54" rx="7" fill="rgba(56,189,248,0.10)" stroke="#38bdf8" stroke-width="1"/>
-                <text x="355.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="#93c5fd">Caddy</text>
-                <text x="355.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">TLS · host</text>
-                <path d="M 466 199 L 508 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="514,199 507,195 507,203" fill="var(--text-mute)"/>
-                <rect x="520" y="166" width="380" height="32" rx="7" fill="rgba(155,124,248,0.10)" stroke="var(--c-ai)" stroke-width="1"/>
-                <text x="710.0" y="186.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11.5" font-weight="700" fill="#c4b5fd">api · Django + uvicorn</text>
-                <rect x="520" y="204" width="380" height="32" rx="7" fill="rgba(245,158,11,0.10)" stroke="var(--c-drift)" stroke-width="1"/>
-                <text x="710.0" y="224.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11.5" font-weight="700" fill="#fcd34d">presentacion · estáticos</text>
-                <path d="M 906 199 L 948 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="954,199 947,195 947,203" fill="var(--text-mute)"/>
-                <rect x="960" y="172" width="280" height="54" rx="7" fill="rgba(148,163,184,0.05)" stroke="var(--border)" stroke-width="1"/>
-                <text x="1100.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-2)">mlflow.db · mlruns/</text>
-                <text x="1100.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--text-mute)">models/ · var/</text>
-                <text x="0" y="254" text-anchor="start" font-family="var(--font-mono)" font-size="10.5" font-weight="400" fill="var(--text-mute)">ningún contenedor publica puertos: Caddy los alcanza por nombre en la red interna, así nada se salta el TLS</text>
-                <text x="0" y="276" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="#fcd34d">y esta presentación la está sirviendo ese segundo contenedor</text>
+          <svg class="dg dg-anim" viewBox="0 0 1240 288" role="img" style="width: 100%; height: auto; display: block;"
+                 aria-label="El camino de un commit: integracion continua, tests, despliegue por SSH y los contenedores que quedan corriendo tras Caddy">
+                <g class="stg c-lab"><text x="0" y="14" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-conf)">EL CAMINO DE UN COMMIT</text></g>
+                <g class="stg c-0"><rect x="0" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="90.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">commit</text><text x="90.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">git push</text></g>
+                <g class="stg c-1"><path d="M 185 59 L 203 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="209,59 202,55 202,63" fill="var(--text-mute)"/><rect x="212" y="30" width="180" height="58" rx="7" fill="rgba(16,185,129,0.10)" stroke="#10b981" stroke-width="1"/><text x="302.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="#6ee7b7">CI</text><text x="302.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">ruff · mypy</text></g>
+                <g class="stg c-2"><path d="M 397 59 L 415 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="421,59 414,55 414,63" fill="var(--text-mute)"/><rect x="424" y="30" width="180" height="58" rx="7" fill="rgba(16,185,129,0.10)" stroke="#10b981" stroke-width="1"/><text x="514.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="#6ee7b7">309 tests</text><text x="514.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">pytest · 3,68 s</text></g>
+                <g class="stg c-3"><path d="M 609 59 L 627 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="633,59 626,55 626,63" fill="var(--text-mute)"/><rect x="636" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="726.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">merge a main</text><text x="726.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">origin</text></g>
+                <g class="stg c-4"><path d="M 821 59 L 839 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="845,59 838,55 838,63" fill="var(--text-mute)"/><rect x="848" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="938.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">SSH al VPS</text><text x="938.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">reset --hard</text></g>
+                <g class="stg c-5"><path d="M 1033 59 L 1051 59" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="1057,59 1050,55 1050,63" fill="var(--text-mute)"/><rect x="1060" y="30" width="180" height="58" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="1150.0" y="56.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">compose up</text><text x="1150.0" y="73.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">--build</text></g>
+                <g class="stg c-ok"><text x="302.0" y="106" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="400" fill="#6ee7b7">0 errores · 309 verdes</text></g>
+                <g class="stg c-sep"><line x1="0" y1="132" x2="1240" y2="132" stroke="var(--border)"/><text x="0" y="158" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="var(--c-inv)">LO QUE QUEDA CORRIENDO</text></g>
+                <g class="stg c-r0"><rect x="0" y="172" width="190" height="54" rx="7" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/><text x="95.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="var(--text-1)">internet</text><text x="95.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">:443</text></g>
+                <g class="stg c-r1"><path d="M 196 199 L 238 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="244,199 237,195 237,203" fill="var(--text-mute)"/><rect x="250" y="172" width="210" height="54" rx="7" fill="rgba(56,189,248,0.10)" stroke="#38bdf8" stroke-width="1"/><text x="355.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="#93c5fd">Caddy</text><text x="355.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">TLS · host</text></g>
+                <g class="stg c-r2"><path d="M 466 199 L 508 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="514,199 507,195 507,203" fill="var(--text-mute)"/><rect x="520" y="166" width="380" height="32" rx="7" fill="rgba(155,124,248,0.10)" stroke="var(--c-ai)" stroke-width="1"/><text x="710.0" y="186.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11.5" font-weight="700" fill="#c4b5fd">api · Django + uvicorn</text><rect x="520" y="204" width="380" height="32" rx="7" fill="rgba(245,158,11,0.10)" stroke="var(--c-drift)" stroke-width="1"/><text x="710.0" y="224.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11.5" font-weight="700" fill="#fcd34d">presentacion · estáticos</text></g>
+                <g class="stg c-r3"><path d="M 906 199 L 948 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="954,199 947,195 947,203" fill="var(--text-mute)"/><rect x="960" y="172" width="280" height="54" rx="7" fill="rgba(148,163,184,0.05)" stroke="var(--border)" stroke-width="1"/><text x="1100.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-2)">mlflow.db · mlruns/</text><text x="1100.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--text-mute)">models/ · var/</text></g>
+                <g class="stg c-fin"><text x="0" y="254" text-anchor="start" font-family="var(--font-mono)" font-size="10.5" font-weight="400" fill="var(--text-mute)">ningún contenedor publica puertos: Caddy los alcanza por nombre en la red interna, así nada se salta el TLS</text><text x="0" y="276" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="#fcd34d">y esta presentación la está sirviendo ese segundo contenedor</text></g>
               </svg>
         </div>
 
