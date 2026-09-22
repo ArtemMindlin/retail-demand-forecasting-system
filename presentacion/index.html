@@ -1429,6 +1429,9 @@
     .reveal .slides section#slide-aportaciones.present .boot-col-3 {
       animation: bootCol 0.45s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
+    .reveal .slides section#slide-aportaciones.present .boot-col-4 {
+      animation: bootCol 0.45s 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
     @keyframes bootCol {
       0% { opacity: 0; transform: translateY(14px); }
       100% { opacity: 1; transform: translateY(0); }
@@ -1730,7 +1733,7 @@
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
                 <span style="font-family: var(--font-display); font-size: 26px; font-weight: 800; color: var(--c-ai); line-height: 1;">O3</span>
-                <span class="chip" style="--accent: var(--c-ai); font-size: 10px; padding: 2px 7px;"><span class="dot"></span>MATEMÁTICAS</span>
+                <span class="chip" style="--accent: var(--c-ai); font-size: 10px; padding: 2px 7px;"><span class="dot"></span>INCERTIDUMBRE</span>
               </div>
               <h4 style="font-size: 22px; line-height: 1.3; margin: 0; color: #fff; font-weight: 700;">Dar un intervalo con garantía, no un número suelto</h4>
             </div>
@@ -3299,131 +3302,81 @@
             <div>
               <div class="eyebrow">
                 <span>05 · CONCLUSIONES</span></div>
-              <h3 style="margin-top: 8px;">Aportaciones clave del Trabajo de Fin de Grado</h3>
+              <h3 style="margin-top: 8px;">Los cuatro objetivos, con la cifra que acredita cada uno</h3>
             </div>
 
           </div>
           <div class="band"></div>
         </div>
 
-        <!-- Layout de 3 Columnas Equilibradas con Cascada de Telemetría -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: stretch;">
-
-          <!-- Columna 1: Teoría & Ciencia de Datos (t=0.15s) -->
-          <div class="glass rail boot-col boot-col-1" style="--accent: var(--c-inv); display: flex; flex-direction: column; justify-content: space-between; padding: 18px 18px;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; max-width: 1160px; margin: 56px auto 0;">
+          <div class="glass pillar-card boot-col boot-col-1" style="--accent: var(--c-crit); min-height: 0; padding: 20px 18px 16px;">
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span class="chip" style="--accent: var(--c-inv); font-size: 10px; padding: 3px 8px;"><span class="dot"></span>01 · METODOLOGÍA</span>
-                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--c-inv); font-weight: 700;">CIENCIA DE DATOS</span>
+                <span style="font-family: var(--font-display); font-size: 26px; font-weight: 800; color: var(--c-crit); line-height: 1;">O1</span>
+                <span class="chip" style="--accent: var(--c-crit); font-size: 10px; padding: 2px 7px;"><span class="dot"></span>DATOS</span>
               </div>
-              <h4 style="margin: 0 0 16px 0; font-size: 16.5px; color: #fff; font-weight: 700;">Rigor Estadístico y Decisión</h4>
-
-              <div style="display: flex; flex-direction: column; gap: 12px;">
-                <!-- Subcard 1 -->
-                <div class="pillar-subcard shimmer-pill" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="font-size: 13.5px; color: var(--text-1);">Imputación de Censura</strong>
-                  <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--c-conf); background: rgba(16,185,129,0.12); padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.3);">-92,15% COSTE</span>
-                </div>
-
-                <!-- Subcard 2 -->
-                <div class="pillar-subcard shimmer-pill" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="font-size: 13.5px; color: var(--text-1);">Calibración Conformal</strong>
-                  <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--c-conf); background: rgba(16,185,129,0.12); padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.3);">85,5% &ge; 80%</span>
-                </div>
-
-                <!-- Subcard 3 -->
-                <div class="pillar-subcard shimmer-pill" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="font-size: 13.5px; color: var(--text-1);">Superación del MAE</strong>
-                  <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(56,189,248,0.12); padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">+31,1 p.p. SERV.</span>
-                </div>
-              </div>
+              <h4 style="font-size: 16.5px; line-height: 1.3; margin: 0; color: var(--text-2); font-weight: 600;">Reconstruir la venta que la rotura esconde</h4>
             </div>
-
-            <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.12); font-family: var(--font-mono); font-size: 10px; color: var(--text-mute); display: flex; justify-content: space-between;">
-              <span>Enfoque:</span>
-              <span style="color: var(--c-inv); font-weight: 600;">Decisión económica bajo riesgo</span>
+            <div style="margin: 22px 0 18px;">
+              <div style="font-family: var(--font-mono); font-size: 36px; font-weight: 800; color: var(--c-crit); line-height: 1;">−92,15%</div>
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); margin-top: 8px;">de coste bajo verdad común</div>
+            </div>
+            <div style="padding: 9px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; text-align: center;">
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 11.5px; color: #fca5a5;">✓ SIN INFORMACIÓN DEL FUTURO</div>
             </div>
           </div>
-
-          <!-- Columna 2: Ingeniería & MLOps (t=0.65s) -->
-          <div class="glass rail boot-col boot-col-2" style="--accent: var(--c-ai); display: flex; flex-direction: column; justify-content: space-between; padding: 18px 18px;">
+          <div class="glass pillar-card boot-col boot-col-2" style="--accent: var(--c-conf); min-height: 0; padding: 20px 18px 16px;">
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span class="chip" style="--accent: var(--c-ai); font-size: 10px; padding: 3px 8px;"><span class="dot"></span>02 · INGENIERÍA</span>
-                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--c-ai); font-weight: 700;">SOFTWARE &amp; MLOps</span>
+                <span style="font-family: var(--font-display); font-size: 26px; font-weight: 800; color: var(--c-conf); line-height: 1;">O2</span>
+                <span class="chip" style="--accent: var(--c-conf); font-size: 10px; padding: 2px 7px;"><span class="dot"></span>MODELOS</span>
               </div>
-              <h4 style="margin: 0 0 16px 0; font-size: 16.5px; color: #fff; font-weight: 700;">Sistema y Plataforma DSS</h4>
-
-              <div style="display: flex; flex-direction: column; gap: 12px;">
-                <!-- Subcard 1 -->
-                <div class="pillar-subcard shimmer-pill" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="font-size: 13.5px; color: var(--text-1);">Plataforma Web DSS</strong>
-                  <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(56,189,248,0.12); padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">&lt;50 ms/SKU</span>
-                </div>
-
-                <!-- Subcard 2 -->
-                <div class="pillar-subcard shimmer-pill" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="font-size: 13.5px; color: var(--text-1);">API REST JSON</strong>
-                  <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--c-conf); background: rgba(16,185,129,0.12); padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.3);">ERP READY</span>
-                </div>
-
-                <!-- Subcard 3 -->
-                <div class="pillar-subcard shimmer-pill" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="font-size: 13.5px; color: var(--text-1);">Pipeline CI/CD &amp; Tests</strong>
-                  <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--c-conf); background: rgba(16,185,129,0.12); padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.3);">309 / 309 PASS</span>
-                </div>
-              </div>
+              <h4 style="font-size: 16.5px; line-height: 1.3; margin: 0; color: var(--text-2); font-weight: 600;">Un modelo que aprende de los 500 productos a la vez</h4>
             </div>
-
-            <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.12); font-family: var(--font-mono); font-size: 10px; color: var(--text-mute); display: flex; justify-content: space-between;">
-              <span>Enfoque:</span>
-              <span style="color: var(--c-ai); font-weight: 600;">Despliegue operativo auditado</span>
+            <div style="margin: 22px 0 18px;">
+              <div style="font-family: var(--font-mono); font-size: 36px; font-weight: 800; color: var(--c-conf); line-height: 1;">−9,03%</div>
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); margin-top: 8px;">de coste · +31,1 p.p. de servicio</div>
+            </div>
+            <div style="padding: 9px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; text-align: center;">
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 11.5px; color: #6ee7b7;">✓ COSTE &lt; SEASONAL NAÏVE</div>
             </div>
           </div>
-
-          <!-- Columna 3: Sostenibilidad, Ética y Regulación (t=1.15s) -->
-          <div class="glass rail boot-col boot-col-3" style="--accent: var(--c-conf); display: flex; flex-direction: column; justify-content: space-between; padding: 18px 18px;">
+          <div class="glass pillar-card boot-col boot-col-3" style="--accent: var(--c-ai); min-height: 0; padding: 20px 18px 16px;">
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span class="chip" style="--accent: var(--c-conf); font-size: 10px; padding: 3px 8px;"><span class="dot"></span>03 · IMPACTO</span>
-                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--c-conf); font-weight: 700;">SOSTENIBILIDAD &amp; ÉTICA</span>
+                <span style="font-family: var(--font-display); font-size: 26px; font-weight: 800; color: var(--c-ai); line-height: 1;">O3</span>
+                <span class="chip" style="--accent: var(--c-ai); font-size: 10px; padding: 2px 7px;"><span class="dot"></span>INCERTIDUMBRE</span>
               </div>
-              <h4 style="margin: 0 0 16px 0; font-size: 16.5px; color: #fff; font-weight: 700;">Sostenibilidad y Marco Europeo</h4>
-
-              <div style="display: flex; flex-direction: column; gap: 12px;">
-                <!-- Subcard 1: ODS 12 -->
-                <div class="pillar-subcard shimmer-pill" style="padding: 12px 14px; border-left: 3px solid #bf8b2e; display: flex; justify-content: space-between; align-items: center;">
-                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <div class="ods-badge" style="background: #bf8b2e; width: 24px; height: 24px; font-size: 12.5px;">12</div>
-                    <strong style="font-size: 13.5px; color: var(--text-1);">ODS 12 · Consumo</strong>
-                  </div>
-                  <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #f3c267; background: rgba(191,139,46,0.15); padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(191,139,46,0.35);">LEY 1/2025</span>
-                </div>
-
-                <!-- Subcard 2: ODS 13 -->
-                <div class="pillar-subcard shimmer-pill" style="padding: 12px 14px; border-left: 3px solid #3f7e44; display: flex; justify-content: space-between; align-items: center;">
-                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <div class="ods-badge" style="background: #3f7e44; width: 24px; height: 24px; font-size: 12.5px;">13</div>
-                    <strong style="font-size: 13.5px; color: var(--text-1);">ODS 13 · Clima</strong>
-                  </div>
-                  <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #6ee780; background: rgba(63,126,68,0.15); padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(63,126,68,0.35);">- CO₂ / MERMA</span>
-                </div>
-
-                <!-- Subcard 3: EU AI Act & SHAP -->
-                <div class="pillar-subcard shimmer-pill" style="padding: 12px 14px; border-left: 3px solid var(--c-ai); display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="font-size: 13.5px; color: var(--text-1);">EU AI Act &amp; RGPD</strong>
-                  <span style="font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: var(--c-ai); background: rgba(155,124,248,0.15); padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(155,124,248,0.35);">HUMAN-IN-THE-LOOP</span>
-                </div>
-              </div>
+              <h4 style="font-size: 16.5px; line-height: 1.3; margin: 0; color: var(--text-2); font-weight: 600;">Dar un intervalo con garantía, no un número suelto</h4>
             </div>
-
-            <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.12); font-family: var(--font-mono); font-size: 10px; color: var(--text-conf); display: flex; justify-content: space-between;">
-              <span>Enfoque:</span>
-              <span style="color: var(--c-conf); font-weight: 600;">Impacto ambiental cuantificado</span>
+            <div style="margin: 22px 0 18px;">
+              <div style="font-family: var(--font-mono); font-size: 36px; font-weight: 800; color: var(--c-ai); line-height: 1;">85,5%</div>
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); margin-top: 8px;">de cobertura empírica, por categoría</div>
+            </div>
+            <div style="padding: 9px; background: rgba(155,124,248,0.1); border: 1px solid rgba(155,124,248,0.3); border-radius: 8px; text-align: center;">
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 11.5px; color: #c4b5fd;">✓ COBERTURA ≥ 80% (α = 0,20)</div>
             </div>
           </div>
-
+          <div class="glass pillar-card boot-col boot-col-4" style="--accent: var(--c-drift); min-height: 0; padding: 20px 18px 16px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-family: var(--font-display); font-size: 26px; font-weight: 800; color: var(--c-drift); line-height: 1;">O4</span>
+                <span class="chip" style="--accent: var(--c-drift); font-size: 10px; padding: 2px 7px;"><span class="dot"></span>SOFTWARE</span>
+              </div>
+              <h4 style="font-size: 16.5px; line-height: 1.3; margin: 0; color: var(--text-2); font-weight: 600;">Un sistema que se despliega, se audita y se reproduce</h4>
+            </div>
+            <div style="margin: 22px 0 18px;">
+              <div style="font-family: var(--font-mono); font-size: 36px; font-weight: 800; color: var(--c-drift); line-height: 1;">309/309</div>
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); margin-top: 8px;">en verde · CI/CD · MLflow · API</div>
+            </div>
+            <div style="padding: 9px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; text-align: center;">
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 11.5px; color: #fcd34d;">✓ 309 PRUEBAS AUTOMÁTICAS</div>
+            </div>
+          </div>
         </div>
+
+        <div class="wf-mini">más allá de los objetivos · Ley 1/2025 · ODS 12 y 13 · EU AI Act y RGPD</div>
 
         <div class="memref">Memoria, §6.8 · Verificación de objetivos y KPIs</div>
 
