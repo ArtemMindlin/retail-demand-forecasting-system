@@ -3166,30 +3166,19 @@
 
       <!-- SLIDE: DASHBOARD WEB -->
       <section id="slide-platform">
-        <span class="fragment dss-tab-frag" id="frag-dss-tab2" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
         <div class="slide-head">
           <div class="row">
             <div>
               <div class="eyebrow">
-                <span>04 · MLOPS &amp; PLATAFORMA</span></div>
-              <h3 style="margin-top: 8px;">Ciclo MLOps y plataforma de soporte a la decisión (DSS)</h3>
+                <span>04 · OPERACIÓN</span></div>
+              <h3 style="margin-top: 8px;">Cómo opera el sistema cada día</h3>
             </div>
-            <!-- Botones de pestañas interactivas (clickables y sincronizados con fragmentos) -->
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <button class="tab-btn active" id="btn-dss-tab-1" onclick="switchDssTab('tab-1')" type="button">
-                <span class="window-dot" style="background: var(--c-inv);"></span>
-                1. Reposición $q^*$ (Diario)
-              </button>
-              <button class="tab-btn" id="btn-dss-tab-2" onclick="switchDssTab('tab-2')" type="button">
-                <span class="window-dot" style="background: var(--c-conf);"></span>
-                2. Simulador What-If &amp; Cadencia
-              </button>
-            </div>
+
           </div>
           <div class="band"></div>
         </div>
 
-        <div class="grid-2" style="align-items: stretch;">
+        <div>
           <!-- Columna Izquierda: Arquitectura MLOps y Gobernanza -->
           <div class="glass rail" id="dss-rail-card" style="--accent: var(--c-inv); display: flex; flex-direction: column; justify-content: space-between;">
             <div>
@@ -3199,49 +3188,49 @@
               </div>
 
               <!-- Bloque 1: Pipeline de Modos Desacoplados -->
-              <svg class="dg" viewBox="0 0 580 262" role="img" style="width: 100%; height: auto; display: block;"
-                 aria-label="Bucle operativo: cada dia se cierra el dato, pasa la puerta de calidad, el campeon calcula el pedido, se emiten 500 recomendaciones con las de riesgo marcadas, el reponedor revisa solo esas y el pedido sale a compras; la demanda realizada vuelve como monitorizacion. Cada semana un challenger debe pasar tres guardarrailes para sustituir al campeon.">
-                <text x="0" y="14" font-family="var(--font-mono)" font-size="10.5" font-weight="700" fill="var(--c-conf)">CADA DÍA · lote nocturno</text>
-                <rect x="0.0" y="24" width="82" height="48" rx="6" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="41.0" y="44" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">dato del</text>
-                <text x="41.0" y="57" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">día t</text>
-                <path d="M 85.0 48 L 95.6 48" stroke="var(--text-mute)" stroke-width="1.3"/><polygon points="99.6,48 94.6,45 94.6,51" fill="var(--text-mute)"/>
-                <rect x="99.6" y="24" width="82" height="48" rx="6" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="140.6" y="44" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">puerta de</text>
-                <text x="140.6" y="57" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">calidad</text>
-                <path d="M 184.6 48 L 195.2 48" stroke="var(--text-mute)" stroke-width="1.3"/><polygon points="199.2,48 194.2,45 194.2,51" fill="var(--text-mute)"/>
-                <rect x="199.2" y="24" width="82" height="48" rx="6" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="240.2" y="44" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">campeón</text>
-                <text x="240.2" y="57" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">pedido q*</text>
-                <path d="M 284.2 48 L 294.8 48" stroke="var(--text-mute)" stroke-width="1.3"/><polygon points="298.8,48 293.8,45 293.8,51" fill="var(--text-mute)"/>
-                <rect x="298.8" y="24" width="82" height="48" rx="6" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="339.8" y="44" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">500 recom.</text>
-                <text x="339.8" y="57" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">+ excepciones</text>
-                <path d="M 383.8 48 L 394.4 48" stroke="var(--text-mute)" stroke-width="1.3"/><polygon points="398.4,48 393.4,45 393.4,51" fill="var(--text-mute)"/>
-                <rect x="398.4" y="24" width="82" height="48" rx="6" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="1.6"/>
-                <text x="439.4" y="44" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="#6ee7b7">reponedor</text>
-                <text x="439.4" y="57" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="#6ee7b7">solo marcadas</text>
-                <path d="M 483.4 48 L 494.0 48" stroke="var(--text-mute)" stroke-width="1.3"/><polygon points="498.0,48 493.0,45 493.0,51" fill="var(--text-mute)"/>
-                <rect x="498.0" y="24" width="82" height="48" rx="6" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="539.0" y="44" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">pedido a</text>
-                <text x="539.0" y="57" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-1)">compras</text>
-                <path d="M 539 72 L 539 104 L 41 104 L 41 78" fill="none" stroke="var(--text-mute)" stroke-width="1.2" stroke-dasharray="4 3"/>
-                <polygon points="41,72 38,79 44,79" fill="var(--text-mute)"/>
-                <text x="290" y="124" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-mute)">la demanda realizada vuelve como monitorización: PSI en la entrada, residuos en el error</text>
-                <line x1="0" y1="148" x2="580" y2="148" stroke="var(--border)" stroke-width="1"/>
-                <text x="0" y="170" font-family="var(--font-mono)" font-size="10.5" font-weight="700" fill="var(--c-drift)">CADA SEMANA · reentreno y gobierno</text>
-                <rect x="0.0" y="182" width="175" height="48" rx="6" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="87.5" y="202" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="600" fill="var(--text-1)">challenger</text>
-                <text x="87.5" y="215" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--text-mute)">entrenado con lo nuevo</text>
-                <path d="M 179.0 206 L 197.5 206" stroke="var(--text-mute)" stroke-width="1.3"/><polygon points="202.5,206 197.5,203 197.5,209 " fill="var(--text-mute)"/>
-                <rect x="202.5" y="182" width="175" height="48" rx="6" fill="rgba(148,163,184,0.07)" stroke="var(--c-drift)" stroke-width="1.6"/>
-                <text x="290.0" y="202" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="600" fill="#fbbf24">3 guardarraíles</text>
-                <text x="290.0" y="215" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--text-mute)">coste · Winkler · bootstrap</text>
-                <path d="M 381.5 206 L 400.0 206" stroke="var(--text-mute)" stroke-width="1.3"/><polygon points="405.0,206 400.0,203 400.0,209 " fill="var(--text-mute)"/>
-                <rect x="405.0" y="182" width="175" height="48" rx="6" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
-                <text x="492.5" y="202" text-anchor="middle" font-family="var(--font-mono)" font-size="10" font-weight="600" fill="var(--text-1)">campeón</text>
-                <text x="492.5" y="215" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--text-mute)">sellado en MLflow</text>
-                <text x="290" y="252" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--text-mute)">el challenger solo sustituye al campeón si pasa los tres</text>
+              <svg class="dg" viewBox="0 0 1240 302" role="img" style="width: 100%; height: auto; display: block;"
+                 aria-label="Bucle operativo diario y ciclo semanal de gobierno del modelo">
+                <text x="0" y="16" text-anchor="start" font-family="var(--font-mono)" font-size="12.5" font-weight="700" fill="var(--c-conf)">CADA DÍA · lote nocturno</text>
+                <rect x="0" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="90.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">dato del día t</text>
+                <text x="90.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">se cierra</text>
+                <path d="M 185 63 L 202 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="209,63 201,58 201,68" fill="var(--text-mute)"/>
+                <rect x="212" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="302.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">puerta de calidad</text>
+                <text x="302.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">validación</text>
+                <path d="M 397 63 L 414 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="421,63 413,58 413,68" fill="var(--text-mute)"/>
+                <rect x="424" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="514.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">campeón</text>
+                <text x="514.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">pedido q*</text>
+                <path d="M 609 63 L 626 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="633,63 625,58 625,68" fill="var(--text-mute)"/>
+                <rect x="636" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="726.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">500 recomendaciones</text>
+                <text x="726.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">las de riesgo, marcadas</text>
+                <path d="M 821 63 L 838 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="845,63 837,58 837,68" fill="var(--text-mute)"/>
+                <rect x="848" y="32" width="180" height="62" rx="8" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="1.8"/>
+                <text x="938.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="#6ee7b7">reponedor</text>
+                <text x="938.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">revisa solo esas</text>
+                <path d="M 1033 63 L 1050 63" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="1057,63 1049,58 1049,68" fill="var(--text-mute)"/>
+                <rect x="1060" y="32" width="180" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1150.0" y="61.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="var(--text-1)">compras</text>
+                <text x="1150.0" y="81.0" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" fill="var(--text-mute)">el resto sale solo</text>
+                <path d="M 1150 94 L 1150 126 L 90 126 L 90 100" fill="none" stroke="var(--text-mute)" stroke-width="1.4" stroke-dasharray="5 4"/>
+                <polygon points="90,92 86,100 94,100" fill="var(--text-mute)"/>
+                <text x="620" y="146" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="400" fill="var(--text-mute)">la demanda realizada vuelve como monitorización: PSI en la entrada, residuos en el error</text>
+                <line x1="0" y1="172" x2="1240" y2="172" stroke="var(--border)"/>
+                <text x="0" y="198" text-anchor="start" font-family="var(--font-mono)" font-size="12.5" font-weight="700" fill="var(--c-drift)">CADA SEMANA · reentreno y gobierno</text>
+                <rect x="0" y="212" width="390" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="195.0" y="241.0" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="var(--text-1)">challenger</text>
+                <text x="195.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">entrenado con lo más reciente</text>
+                <path d="M 395 243 L 415 243" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="422,243 414,238 414,248" fill="var(--text-mute)"/>
+                <rect x="425" y="212" width="390" height="62" rx="8" fill="rgba(245,158,11,0.10)" stroke="var(--c-drift)" stroke-width="1.8"/>
+                <text x="620.0" y="241.0" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="#fbbf24">3 guardarraíles</text>
+                <text x="620.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">coste · coste+Winkler · bootstrap 95%</text>
+                <path d="M 820 243 L 840 243" stroke="var(--text-mute)" stroke-width="1.6"/><polygon points="847,243 839,238 839,248" fill="var(--text-mute)"/>
+                <rect x="850" y="212" width="390" height="62" rx="8" fill="rgba(148,163,184,0.07)" stroke="var(--border)" stroke-width="1"/>
+                <text x="1045.0" y="241.0" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="700" fill="var(--text-1)">campeón</text>
+                <text x="1045.0" y="261.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">sellado en MLflow</text>
+                <text x="620" y="294" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="400" fill="var(--text-mute)">el challenger solo sustituye al campeón si pasa los tres</text>
               </svg>
             </div>
 
@@ -3261,49 +3250,14 @@
             </div>
           </div>
 
-          <!-- Columna Derecha: Vista Interactiva en Alta Resolución -->
-          <div class="app-window" style="height: 100%; min-height: 410px;">
-            <div class="app-window-bar">
-              <div class="window-dots">
-                <span class="window-dot red"></span>
-                <span class="window-dot yellow"></span>
-                <span class="window-dot green"></span>
-              </div>
-              <div class="window-url" id="dss-window-url">http://dss.retail.internal/operacion/forecast/</div>
-              <div id="dss-tab-status-chip">
-                <span class="chip" style="--accent: var(--c-inv); font-size: 9.5px; padding: 2px 7px;"><span class="dot"></span>REPOSICIÓN q*</span>
-              </div>
-            </div>
-
-            <!-- Contenedor de Vistas -->
-            <div style="position: relative; flex: 1; background: #05080e; overflow: hidden; display: flex; align-items: stretch; justify-content: center;">
-              <!-- Vista 1: Operación Dashboard -->
-              <div id="view-dss-tab-1" style="width: 100%; height: 100%; display: flex; flex-direction: column;">
-                <div style="height: 355px; overflow: hidden; position: relative; display: block;"><img src="figures/ui_operacion_dashboard.jpg" style="position: absolute; width: 131%; left: -28.7%; top: -30.4%; display: block;" alt="Panel de operacion: KPI y curva de demanda real frente a la prediccion con banda conformal"></div>
-                <div style="background: rgba(13,19,31,0.95); border-top: 1px solid var(--border); padding: 6px 14px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10.5px;">
-                  <span style="color: var(--text-2);"><strong style="color: #fbbf24;">PARAMETRIZABLE</strong> &middot; aquí con servicio objetivo al <code style="color: #38bdf8;">95%</code> · la tesis evalúa al 80%</span>
-                  <span style="color: #4ade80; font-weight: 600;">Recomendación calculada: q* = 6,93 kg | Cobertura 90,9%</span>
-                </div>
-              </div>
-
-              <!-- Vista 2: Simulación What-If (Oculta por defecto, se activa con clic o fragmento) -->
-              <div id="view-dss-tab-2" style="width: 100%; height: 100%; display: none; flex-direction: column;">
-                <div style="height: 355px; overflow: hidden; position: relative; display: block;"><img src="figures/ui_simulacion_ops.jpg" style="position: absolute; width: 112%; left: -2.0%; top: -22.0%; display: block;" alt="Backtest de produccion semana a semana con la banda al 80% y el ahorro por reentreno"></div>
-                <div style="background: rgba(13,19,31,0.95); border-top: 1px solid var(--border); padding: 6px 14px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10.5px;">
-                  <span style="color: var(--text-2);"><strong style="color: #fbbf24;">EJEMPLO</strong> &middot; Simulador de Costes: <code style="color: #f59e0b;">c_u=4,0 | c_o=1,0</code></span>
-                  <span style="color: #fde047; font-weight: 600;">Ahorro logístico: +40,3% vs estático (11.154 u.m.)</span>
-                </div>
-              </div>
-            </div>
           </div>
-        </div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~56 seg &middot; 135 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~58 seg &middot; 141 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Esto es lo que pasa cada noche. Se cierra el dato del día, pasa una puerta de calidad, el campeón calcula el pedido y salen 500 recomendaciones. Sobre ellas el sistema marca las de riesgo, y el reponedor revisa solo esas: el resto sale a compras sin tocarlas. Al día siguiente la demanda realizada vuelve como monitorización."</em></p>
           <p><em>"Esa es la decisión de diseño que más defiendo: el sistema es copiloto, no piloto automático. La atención humana se concentra justo donde el propio sistema declara tener menos base para decidir."</em></p>
           <p><em>"Y en otro reloj, el semanal, se entrena un challenger que solo sustituye al campeón si pasa los tres guardarraíles. Cada ejecución queda sellada en MLflow."</em></p>
-          <p><em>"A la derecha, la plataforma donde el comprador consulta el pedido con su banda y tensiona escenarios con el simulador."</em></p>
+          <p><em>"Y se opera desde un cuadro de mandos donde el comprador ve el pedido con su banda y puede tensionar escenarios. Lo tengo en el respaldo."</em></p>
           <p>👉 <em>(Pulsas Espacio o clic: pasas a la pestaña 2, el simulador what-if.)</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre el ciclo MLOps o la plataforma:]</strong></p>
           <p>- <strong>"¿Cómo funcionan los 3 guardarraíles de promoción del campeón?"</strong> Para sustituir al campeón vigente en `champion_registry.json`, el challenger debe: 1) reducir el coste logístico medio, 2) superar la mejora ponderada combinada de Coste + Winkler ($\lambda=0,5$), y 3) confirmar separación del azar con un intervalo bootstrap al 95% enteramente negativo.</p>
@@ -6386,6 +6340,73 @@ Usar si el tribunal pregunta por trazabilidad o auditoría del código.</p>
           <p>- <strong>"¿Por qué PSI y no un test estadístico de dos muestras?"</strong> Porque con cientos de miles de filas cualquier test rechaza la igualdad de distribuciones por diferencias irrelevantes. El PSI da una MAGNITUD con bandas de decisión operativas (0,10 y 0,20), que es lo que necesita una alarma de produccion.</p>
           <p>- <strong>"¿Por qué vigilar la entrada y no directamente el error?"</strong> Porque el error tarda $H=7$ días en revelarse: cuando la demanda real llega, el pedido ya se ha hecho. La deriva de entrada es la unica senal disponible en el momento de decidir. El error se vigila en paralelo con Page-Hinkley, que no disparo.</p>
           <p>- <strong>"Un PSI de 1,108 es enorme. ¿No invalida el modelo?"</strong> No, por dos razones medidas: esa variable pesa un 3,3% en la importancia SHAP del campeon, y la senal de demanda ya viene reconstruida por el imputador latente, que desacopla la demanda real del indicador bruto de disponibilidad en estanteria.</p>
+        </aside>
+      </section>
+
+      <!-- ANEXO H: LA PLATAFORMA -->
+      <section id="slide-dss-anexo">
+        <span class="fragment dss-tab-frag" id="frag-dss-tab2" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;"></span>
+        <div class="slide-head">
+          <div class="row">
+            <div>
+              <div class="eyebrow">ANEXO H · PLATAFORMA</div>
+              <h3 style="margin-top: 8px;">Backup: el cuadro de mandos en funcionamiento</h3>
+            </div>
+            <!-- Botones de pestañas interactivas (clickables y sincronizados con fragmentos) -->
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="tab-btn active" id="btn-dss-tab-1" onclick="switchDssTab('tab-1')" type="button">
+                <span class="window-dot" style="background: var(--c-inv);"></span>
+                1. Reposición $q^*$ (Diario)
+              </button>
+              <button class="tab-btn" id="btn-dss-tab-2" onclick="switchDssTab('tab-2')" type="button">
+                <span class="window-dot" style="background: var(--c-conf);"></span>
+                2. Simulador What-If &amp; Cadencia
+              </button>
+            </div>
+          </div>
+          <div class="band"></div>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <!-- Columna Derecha: Vista Interactiva en Alta Resolución -->
+          <div class="app-window" style="min-height: 430px;">
+            <div class="app-window-bar">
+              <div class="window-dots">
+                <span class="window-dot red"></span>
+                <span class="window-dot yellow"></span>
+                <span class="window-dot green"></span>
+              </div>
+              <div class="window-url" id="dss-window-url">http://dss.retail.internal/operacion/forecast/</div>
+              <div id="dss-tab-status-chip">
+                <span class="chip" style="--accent: var(--c-inv); font-size: 9.5px; padding: 2px 7px;"><span class="dot"></span>REPOSICIÓN q*</span>
+              </div>
+            </div>
+
+            <!-- Contenedor de Vistas -->
+            <div style="position: relative; flex: 1; background: #05080e; overflow: hidden; display: flex; align-items: stretch; justify-content: center;">
+              <!-- Vista 1: Operación Dashboard -->
+              <div id="view-dss-tab-1" style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+                <div style="height: 355px; overflow: hidden; position: relative; display: block;"><img src="figures/ui_operacion_dashboard.jpg" style="position: absolute; width: 131%; left: -28.7%; top: -30.4%; display: block;" alt="Panel de operacion: KPI y curva de demanda real frente a la prediccion con banda conformal"></div>
+                <div style="background: rgba(13,19,31,0.95); border-top: 1px solid var(--border); padding: 6px 14px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10.5px;">
+                  <span style="color: var(--text-2);"><strong style="color: #fbbf24;">PARAMETRIZABLE</strong> &middot; aquí con servicio objetivo al <code style="color: #38bdf8;">95%</code> · la tesis evalúa al 80%</span>
+                  <span style="color: #4ade80; font-weight: 600;">Recomendación calculada: q* = 6,93 kg | Cobertura 90,9%</span>
+                </div>
+              </div>
+
+              <!-- Vista 2: Simulación What-If (Oculta por defecto, se activa con clic o fragmento) -->
+              <div id="view-dss-tab-2" style="width: 100%; height: 100%; display: none; flex-direction: column;">
+                <div style="height: 355px; overflow: hidden; position: relative; display: block;"><img src="figures/ui_simulacion_ops.jpg" style="position: absolute; width: 112%; left: -2.0%; top: -22.0%; display: block;" alt="Backtest de produccion semana a semana con la banda al 80% y el ahorro por reentreno"></div>
+                <div style="background: rgba(13,19,31,0.95); border-top: 1px solid var(--border); padding: 6px 14px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10.5px;">
+                  <span style="color: var(--text-2);"><strong style="color: #fbbf24;">EJEMPLO</strong> &middot; Simulador de Costes: <code style="color: #f59e0b;">c_u=4,0 | c_o=1,0</code></span>
+                  <span style="color: #fde047; font-weight: 600;">Ahorro logístico: +40,3% vs estático (11.154 u.m.)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="notes">
+          <p><strong>[ANEXO. No se presenta: se saca si preguntan por la interfaz o el simulador. Espacio cambia de pestana.]</strong></p>
         </aside>
       </section>
 
