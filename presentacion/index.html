@@ -2633,36 +2633,36 @@
                 <rect class="bar-anim" x="85" y="64" width="60" height="146" rx="5" fill="url(#gradObs)"/>
                 <text x="115" y="54" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="#fca5a5" class="dgf f-oos-vals">3.732</text>
                 <text x="115" y="227" text-anchor="middle" font-family="var(--font-body)" font-size="12.5" font-weight="600" fill="var(--text-1)">Observed</text>
-                <!-- Distintivo de nivel de servicio en balda horizontal uniforme -->
+                <!-- Distintivo de demanda atendida en balda horizontal uniforme -->
                 <rect x="79" y="235" width="72" height="19" rx="4" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
-                <text x="115" y="249" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="700" fill="#fca5a5">NS: 60,3%</text>
+                <text x="115" y="249" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="700" fill="#fca5a5">DA: 60,3%</text>
                 <text x="115" y="271" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">(Ventas crudas)</text>
 
                 <!-- Columna 2: Clipped Scaling (2.785 u.m. | Nivel de servicio 70,77%) -->
                 <rect class="bar-anim" x="205" y="101" width="60" height="109" rx="5" fill="url(#gradClip)"/>
                 <text x="235" y="91" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="#fde68a" class="dgf f-oos-vals">2.785</text>
                 <text x="235" y="227" text-anchor="middle" font-family="var(--font-body)" font-size="12.5" font-weight="600" fill="var(--text-1)">Clipped</text>
-                <!-- Distintivo de nivel de servicio en balda horizontal uniforme -->
+                <!-- Distintivo de demanda atendida en balda horizontal uniforme -->
                 <rect x="199" y="235" width="72" height="19" rx="4" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" stroke-width="1"/>
-                <text x="235" y="249" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="700" fill="#fde68a">NS: 70,8%</text>
+                <text x="235" y="249" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="700" fill="#fde68a">DA: 70,8%</text>
                 <text x="235" y="271" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">(Escalado stock)</text>
 
                 <!-- Columna 3: Historical Mean (1.059 u.m. | Nivel de servicio 91,47%) -->
                 <rect class="bar-anim" x="325" y="169" width="60" height="41" rx="5" fill="url(#gradMean)"/>
                 <text x="355" y="159" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="#e9d5ff" class="dgf f-oos-vals">1.059</text>
                 <text x="355" y="227" text-anchor="middle" font-family="var(--font-body)" font-size="12.5" font-weight="600" fill="var(--text-1)">Hist. Mean</text>
-                <!-- Distintivo de nivel de servicio en balda horizontal uniforme -->
+                <!-- Distintivo de demanda atendida en balda horizontal uniforme -->
                 <rect x="319" y="235" width="72" height="19" rx="4" fill="rgba(168,85,247,0.15)" stroke="#a855f7" stroke-width="1"/>
-                <text x="355" y="249" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="700" fill="#e9d5ff">NS: 91,5%</text>
+                <text x="355" y="249" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="700" fill="#e9d5ff">DA: 91,5%</text>
                 <text x="355" y="271" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-mute)">(Media histórica)</text>
 
                 <!-- Columna 4: Supervised LGBM (293 u.m. | Nivel de servicio 97,50%) -->
                 <rect class="bar-anim" x="445" y="198" width="60" height="12" rx="4" fill="url(#gradSup)"/>
                 <text x="475" y="188" text-anchor="middle" font-family="var(--font-mono)" font-size="13.5" font-weight="700" fill="#6ee7b7" class="dgf f-oos-vals">293</text>
                 <text x="475" y="227" text-anchor="middle" font-family="var(--font-body)" font-size="12.5" font-weight="700" fill="#10b981">Supervised</text>
-                <!-- Distintivo de nivel de servicio en balda horizontal uniforme -->
+                <!-- Distintivo de demanda atendida en balda horizontal uniforme -->
                 <rect x="439" y="235" width="72" height="19" rx="4" fill="rgba(16,185,129,0.22)" stroke="#10b981" stroke-width="1.5"/>
-                <text x="475" y="249" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="800" fill="#6ee7b7">NS: 97,5% ★</text>
+                <text x="475" y="249" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" font-weight="800" fill="#6ee7b7">DA: 97,5% ★</text>
                 <text x="475" y="271" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--c-conf)">(LightGBM O1)</text>
 
                 <!-- Arco de ganancia visual / Flecha delta -->
@@ -2707,15 +2707,15 @@
                     </div>
         </div>
 
-        <div class="wf-mini">30 series · 20 sorteos de censura · 293 días · comparación emparejada contra demanda real</div>
+        <div class="wf-mini">30 series · 20 sorteos de censura · 293 días · emparejado contra demanda real · DA = demanda atendida</div>
 
         <div class="memref">Memoria, §6.1 · Reconstrucción de la demanda censurada</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~67 seg &middot; 163 palabras habladas a 145 ppm.]</strong></p>
+          <p><strong>[TIEMPO: ~68 seg &middot; 164 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"Empezamos por el primer objetivo, el de los datos. La pregunta es si reconstruir la demanda que la rotura esconde genera valor económico, o si es un adorno estadístico."</em></p>
           <p><em>"Las cuatro estrategias se evalúan sobre el mismo sorteo de censura, así que la ventaja de conocer el corte se cancela entre ellas y lo único que queda en pie es la diferencia de coste."</em></p>
-          <p><em>"Y lo que sale es lo que se ve en la gráfica de barras. En ventas crudas el coste se dispara a 3.732 y el servicio se queda en el 60%. Recortar por stock y usar la media histórica lo van mejorando. Y con la imputación supervisada el coste cae a 293: un 92% menos, con un 97,5% de servicio. Cuanto mejor se reconstruye la demanda, más barata sale la decisión."</em></p>
+          <p><em>"Y lo que sale es lo que se ve en la gráfica de barras. En ventas crudas el coste se dispara a 3.732 y solo se atiende el 60% de la demanda. Recortar por stock y usar la media histórica lo van mejorando. Y con la imputación supervisada el coste cae a 293: un 92% menos, y se atiende el 97,5%. Cuanto mejor se reconstruye la demanda, más barata sale la decisión."</em></p>
           <p><em>"Y una advertencia, porque el número es grande y conviene acotarlo: es una cota de laboratorio, medida sobre censura sintética. No es una promesa de ahorro en tienda."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre la evaluación de censura:]</strong></p>
           <p>- <strong>"¿Por qué evaluar con censura sintética en vez de usar los días con rotura real?"</strong> Porque para medir el sesgo cuantitativamente necesitamos conocer la verdad común (ground truth). Si evaluamos un modelo perfecto contra ventas reales censuradas, el evaluador creería que sobrepredice cuando en realidad está acertando la demanda latente. La censura sintética sobre días con stock conocido es el único diseño econométrico no sesgado.</p>
@@ -3133,13 +3133,13 @@
             <!-- Tarjeta 2: Disponibilidad y nivel de servicio -->
             <div class="glass rail tight" style="--accent: var(--c-ai);">
               <div class="row-head" style="margin-bottom: 3px;">
-                <h4 style="font-size: 14px; margin: 0;">Nivel de servicio</h4>
+                <h4 style="font-size: 14px; margin: 0;">Demanda atendida</h4>
               </div>
               <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--c-ai); margin: 2px 0 4px;">
                 95,43%
               </div>
               <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); background: rgba(7,9,13,0.5); padding: 5px 8px; border-radius: 5px; border: 1px solid var(--border);">
-                de la demanda atendida a lo largo de los 41 días
+                del volumen pedido · nivel de servicio 73,6%
               </div>
             </div>
             </div>
@@ -3150,11 +3150,11 @@
         <div class="memref">Memoria, §6.7 · Simulación operacional en streaming</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~57 seg &middot; 138 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~57 seg &middot; 137 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Los tres objetivos que acabo de cerrar se miden una vez. Pero un modelo en producción no vive una vez: envejece, porque la demanda cambia por debajo de él."</em></p>
           <p><em>"Y no es una intuición, está medido. Si partimos el histórico por la mitad, los días de más demanda eran uno de cada diez en la parte antigua y son uno de cada cinco en la reciente: se han duplicado. Eso es lo que mide el PSI de la tarjeta. La demanda está subiendo."</em></p>
           <p><em>"Así que la pregunta es cada cuánto reentrenar."</em></p>
-          <p><em>"Para medir cuánto aguanta ejecutamos una simulación prequencial en streaming, 41 días sobre 500 series con 5 orígenes independientes. Reentrenar cada 7 días reduce el coste un 40% y eleva el nivel de servicio al 95%, y cada ciclo tarda 5,5 segundos: es un proceso nocturno viable."</em></p>
+          <p><em>"Para medir cuánto aguanta ejecutamos una simulación prequencial en streaming, 41 días sobre 500 series con 5 orígenes independientes. Reentrenar cada 7 días reduce el coste un 40% y eleva la demanda atendida al 95%, y cada ciclo tarda 5,5 segundos: es un proceso nocturno viable."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre streaming y drift:]</strong></p>
           <p>- <strong>"¿Por qué declarar la comparativa 'no concluyente' si el IC 95% es estrictamente negativo (−57% a −17%)?"</strong> Porque en series temporales de retail las demandas de una misma semana comparten choques macroeconómicos y no son independientes. La unidad de remuestreo debe ser el origen semanal, no la serie individual. Con 5 orígenes, un remuestreo bootstrap es estadísticamente infradotado (underpowered). Exigir a priori un umbral de 8 orígenes antes de aceptar el resultado evita declarar victorias prematuras.</p>
           <p>- <strong>"¿Por qué reentrenar semanalmente (`every_7d`) y no a diario (`every_1d`)?"</strong> Porque el patrón estacional dominante en frescos es el ciclo semanal (lunes a domingo). Reentrenar a diario añade varianza por ruido intradiario, incrementa innecesariamente el coste de cómputo y dificulta la trazabilidad en MLflow sin aportar mejoras significativas de nivel de servicio frente a la cadencia semanal.</p>
