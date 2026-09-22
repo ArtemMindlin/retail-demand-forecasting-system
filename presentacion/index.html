@@ -2950,11 +2950,11 @@
         <div class="memref">Memoria, §6.1 · Reconstrucción de la demanda censurada</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~59 seg &middot; 142 palabras habladas a 145 ppm.]</strong></p>
+          <p><strong>[TIEMPO: ~66 seg &middot; 160 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"Fijado el modelo campeón, cerramos el primer objetivo: los datos. ¿Genera valor económico reconstruir la demanda censurada?"</em></p>
-          <p><em>"Aquí es donde se rompe el bucle que veíamos hace un momento. La clave está en que los cuatro brazos se evalúan sobre el mismo sorteo de censura: como todos parten del mismo corte artificial, la ventaja que pudiera dar conocer ese corte se cancela entre ellos, y lo que queda en pie es la diferencia de coste. 30 series, 20 sorteos y una comparación emparejada contra demanda real conocida."</em></p>
-          <p><em>"Con ventas crudas el coste se dispara y el servicio cae al 60%. Con la imputación supervisada el coste se desploma un 92% y el servicio alcanza el 97,5%: 37 puntos más de disponibilidad."</em></p>
-          <p><em>"Y lo que anunciaba antes sigue en pie: esto es una cota de laboratorio, no una promesa de ahorro en tienda."</em></p>
+          <p><em>"Aquí cierro el bucle que dejé abierto en la diapositiva de la imputación. Se rompe así: las cuatro estrategias se evalúan sobre el mismo sorteo de censura, así que la ventaja de conocer el corte se cancela entre ellas y lo único que queda en pie es la diferencia de coste."</em></p>
+          <p><em>"Y lo que sale es una escalera. Con ventas crudas el coste se dispara a 3.732 y el servicio se queda en el 60%. Recortar por stock y usar la media histórica lo van mejorando. Y con la imputación supervisada el coste cae a 293: un 92% menos, con un 97,5% de servicio. Cuanto mejor se reconstruye la demanda, más barata sale la decisión."</em></p>
+          <p><em>"Y una advertencia, porque el número es grande y conviene acotarlo: es una cota de laboratorio, medida sobre censura sintética. No es una promesa de ahorro en tienda."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre la evaluación de censura:]</strong></p>
           <p>- <strong>"¿Por qué evaluar con censura sintética en vez de usar los días con rotura real?"</strong> Porque para medir el sesgo cuantitativamente necesitamos conocer la verdad común (ground truth). Si evaluamos un modelo perfecto contra ventas reales censuradas, el evaluador creería que sobrepredice cuando en realidad está acertando la demanda latente. La censura sintética sobre días con stock conocido es el único diseño econométrico no sesgado.</p>
           <p>- <strong>"¿Por qué el $\Delta$ es una diferencia emparejada y no una resta de totales?"</strong> Porque resta día a día y sorteo a sorteo sobre el mismo escenario: $\text{Coste}_{\text{tratamiento}}(s, t) - \text{Coste}_{\text{observado}}(s, t)$. Al cancelar la varianza entre productos y días, el IC 95% [−3.540; −3.339 u.m.] no cruza el cero y certifica significación estadística formal.</p>
