@@ -2697,6 +2697,13 @@
           <p><em>"Y una advertencia, porque el número es grande y conviene acotarlo: es una cota de laboratorio, medida sobre censura sintética. No es una promesa de ahorro en tienda."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre la evaluación de censura:]</strong></p>
           <p>- <strong>"¿Por qué evaluar con censura sintética en vez de usar los días con rotura real?"</strong> Porque para medir el sesgo cuantitativamente necesitamos conocer la verdad común (ground truth). Si evaluamos un modelo perfecto contra ventas reales censuradas, el evaluador creería que sobrepredice cuando en realidad está acertando la demanda latente. La censura sintética sobre días con stock conocido es el único diseño econométrico no sesgado.</p>
+          <p>- <strong>"¿Cómo se calcula ese intervalo de confianza?"</strong> Es un intervalo t de Student
+          al 95% sobre la media de las 20 diferencias emparejadas, una por sorteo de censura:
+          $\bar{\Delta} \pm t_{0{,}975;\,19}\cdot s/\sqrt{20}$. Se usa la t y no el 1,96 de la normal porque
+          con 20 sorteos el multiplicador normal cotizaria como 95% un intervalo que en realidad
+          es del 93%, y el error caeria del lado permisivo. NO es un bootstrap: el bootstrap
+          pareado de $B=1.000$ replicas es el del ahorro del $-9{,}03\%$ del walk-forward, que es
+          otro numero y otro protocolo.</p>
           <p>- <strong>"¿Por qué el $\Delta$ es una diferencia emparejada y no una resta de totales?"</strong> Porque resta día a día y sorteo a sorteo sobre el mismo escenario: $\text{Coste}_{\text{tratamiento}}(s, t) - \text{Coste}_{\text{observado}}(s, t)$. Al cancelar la varianza entre productos y días, el IC 95% [−3.540; −3.339 u.m.] no cruza el cero y certifica significación estadística formal.</p>
           <p>- <strong>"¿Por qué la imputación supervisada (LightGBM) supera con tanto margen a la media histórica (−92% vs −71%)?"</strong> Porque la media histórica aplana la demanda e ignora la estacionalidad intradiaria y el efecto de promociones. LightGBM recupera el perfil exacto del pico de demanda en función de las covariables del día.</p>
           <p>- <strong>"¿Cómo se garantiza la ausencia de fuga temporal (data leakage)?"</strong> El regresor maestro de imputación solo se ajusta sobre días limpios pasados y emplea exclusivamente retardos con <code>shift(1)</code> o superior, sin acceder jamás a variables concurrentes o futuras del día censurado.</p>
