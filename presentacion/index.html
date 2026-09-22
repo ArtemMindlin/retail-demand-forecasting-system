@@ -1587,7 +1587,6 @@
         <aside class="notes">
           <p><strong>[TIEMPO: ~37 seg &middot; 90 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"Para abordar este conflicto y demostrar cómo resolverlo de extremo a extremo, he estructurado la defensa en cinco bloques. Primero el contexto: por qué en frescos quedarse corto cuesta mucho más que pasarse, y cómo una rotura de stock corrompe el propio histórico de ventas. Después la metodología: cómo se reconstruye esa venta que nunca llegó a registrarse, cómo se acota la incertidumbre y cómo se decide el pedido. Después los resultados sobre 500 series. Luego el sistema que lo lleva a producción. Y por último, conclusiones y trabajo futuro."</em></p>
-          <p>👉 <em>(Las tarjetas se iluminan con ↓ o clic en 01-05. No te pares en cada una: una frase por bloque y sigues.)</em></p>
         </aside>
       </section>
 
@@ -1670,7 +1669,6 @@
           <p><strong>[TIEMPO: ~70 seg &middot; 169 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"¿Cuál es la realidad física de una sección de frescos? Aquí no existe el colchón del inventario: la vida útil se mide en días y lo que no se vende se destruye."</em></p>
           <p><em>"Y el gestor se enfrenta a una tensión asimétrica. Si pide de más, paga el producto desechado. Si pide de menos y rompe stock, pierde el margen directo de esa venta y provoca que el cliente se vaya a la competencia con la cesta completa. Por eso fijamos un coste de rotura cuatro veces mayor que el de merma física, una asimetría que condiciona por completo el diseño de nuestro modelo."</em></p>
-          <p>👉 <em>(Pulsas Espacio: se activa el spotlight sobre el esquema de censura.)</em></p>
           <p><em>"Y de ahí el fallo de origen que ven en el esquema. En cuanto el stock se agota, las ventas observadas tocan techo y se aplanan. Mientras hay producto disponible, la serie mide demanda real y el sesgo pasa desapercibido; pero en cuanto hay rotura, la serie solo mide el stock que quedaba. Entrenar sobre esos datos es enseñarle al modelo a subestimar sistemáticamente los picos."</em></p>
         </aside>
       </section>
@@ -1763,7 +1761,6 @@
         <aside class="notes">
           <p><strong>[TIEMPO: ~74 seg &middot; 178 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"Ese sesgo de origen ordena el trabajo entero, que se articula en cuatro objetivos específicos, cada uno con su criterio de validación."</em></p>
-          <p>&#128073; <em>(Entras con O1 ya encendido. Una pulsación por objetivo al decir «el segundo», «el tercero» y «y el cuarto»: el foco se desplaza. La cuarta pasa a la 6.)</em></p>
           <p><em>"El primero es de datos: cuando un producto se agota, lo que registramos ya no es la demanda que hubo. El objetivo es reconstruir esa demanda que nunca llegó a anotarse, y demostrar que al hacerlo no colamos información del futuro."</em></p>
           <p><em>"El segundo es de modelo: que aprenda de los 500 productos a la vez y que, medido en dinero, cueste menos que la regla simple que usa hoy la tienda."</em></p>
           <p><em>"El tercero es de incertidumbre: no dar un número, sino un intervalo con garantía formal de que la demanda cae dentro al menos el 80% de las veces, y que eso se cumpla categoría a categoría, no solo de media."</em></p>
@@ -1943,11 +1940,8 @@
           <p><em>"Son cuatro etapas, y la salida de cada una alimenta y valida a la siguiente."</em></p>
           <p><em>"Antes de recorrerlas, conviene fijar qué predecimos exactamente: no la venta de mañana, sino la demanda acumulada de los siete días siguientes a cada fecha de decisión. Esa es la ventana que cubre un pedido, así que el modelo produce una cifra por producto y por pedido, no una previsión diaria."</em></p>
           <p><em>"Comenzamos en los datos, reconstruyendo la demanda latente sobre días limpios y garantizando que no exista fuga con un retardo de un día."</em></p>
-          <p>👉 <em>(Pulsas Espacio: aparece la etapa 02 y el pulso viaja por el cable.)</em></p>
           <p><em>"A partir de esa señal limpia no predecimos un único número, sino la distribución completa de la demanda: entrenamos el modelo para acertar cada percentil, no solo el valor central, y corregimos los percentiles que se cruzan entre sí."</em></p>
-          <p>👉 <em>(Pulsas Espacio: aparece la etapa 03 y el pulso avanza.)</em></p>
           <p><em>"Sobre esa distribución aplicamos calibración conformal, categoría a categoría y sin dejar que el modelo vea ningún día que caiga dentro del horizonte que intenta predecir, para garantizar una cobertura del 80%."</em></p>
-          <p>👉 <em>(Pulsas Espacio: aparece la etapa 04 y el circuito se completa.)</em></p>
           <p><em>"Y finalmente, conectamos esa probabilidad con la función de coste Newsvendor para prescribir la cantidad exacta q estrella que minimiza el impacto económico en tienda."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre modelado cuantílico:]</strong></p>
           <p>- <strong>"¿Cómo gestionan el cruce de percentiles (quantile crossing)?"</strong> Al ajustar modelos cuantílicos separados puede haber inversión por ruido muestral; aplicamos reordenación monótona isotónica (sorting) post-predicción para garantizar que la función de distribución empírica sea estrictamente creciente antes de calibrar con Conformal.</p>
@@ -2141,9 +2135,7 @@
           <p><strong>[TIEMPO: ~97 seg &middot; 234 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"Vimos la meta: prescribir el pedido semanal de siete días. Pero para que esa semana sea fiable, los días individuales no pueden mentirnos. Hacemos zoom en la Etapa 01: la imputación diaria. Como ven en la ecuación superior, lo que entra al modelo no es la venta observada, sino la venta observada más una corrección."</em></p>
           <p><em>"Esa corrección combina dos factores: cuánto duró la rotura —las horas sin producto sobre las 16 de la jornada operativa—, y cuánta demanda había, estimada por un modelo maestro entrenado únicamente en días sin rotura, donde la demanda es un dato real y no una incógnita."</em></p>
-          <p>👉 <em>(No hay que pulsar nada: el gráfico se construye solo en unos cuatro segundos desde que entras.)</em></p>
           <p><em>"Fíjense en el gráfico: al agotarse el stock, la venta observada no se hunde a cero, se aplana. Una rotura a media tarde no anula el día, lo trunca. El área roja es lo que el histórico pierde, y la curva verde es la señal reconstruida que alimenta a nuestro pipeline."</em></p>
-          <p>👉 <em>(Una única pulsación: se ilumina «El límite del protocolo» al decir «y aquí surge la trampa metodológica».)</em></p>
           <p><em>"Y aquí surge la trampa metodológica: ¿cómo evaluamos si funciona? Si ocultamos artificialmente un trozo de un día limpio para ver si el modelo lo recupera, caemos en un bucle circular: bastaría invertir la regla del corte para sacar nota perfecta sin haber aprendido nada sobre la demanda real. Por eso la prueba real no es un MAE sintético, sino la evaluación económica bajo verdad común."</em></p>
           <p><em>"Con esto ya disponemos de una señal fiable. Lo siguiente es admitir cuánta incertidumbre seguimos teniendo."</em></p>
           <p><strong>[PARACAIDAS. No se dice; esta aqui por si preguntan.]</strong></p>
@@ -2432,15 +2424,10 @@
         <aside class="notes">
           <p><strong>[TIEMPO: ~96 seg &middot; 232 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"Acotar esa incertidumbre empieza por un experimento sencillo. Esto que ven es un producto: veinte fechas de decisión que el modelo no ha visto, y la demanda real de los siete días siguientes a cada una."</em></p>
-          <p>👉 <em>(Pulsas Espacio: aparece la banda cruda del modelo, en morado discontinuo.)</em></p>
           <p><em>"Le pedimos al modelo su predicción para esos días: no un número, sino un intervalo, el que va de su cuantil 0,1 al 0,9. Y miren lo que pasa: la mitad se quedan fuera. El modelo es demasiado optimista sobre su propia precisión."</em></p>
-          <p>👉 <em>(Pulsas Espacio: aparecen los desvíos en rojo sobre cada día que se sale.)</em></p>
           <p><em>"En cada caso que se sale medimos cuánto se sale, contando desde el borde del intervalo."</em></p>
-          <p>👉 <em>(Pulsas Espacio: los desvíos bajan ordenados y se marca el umbral.)</em></p>
           <p><em>"Ordenamos esos desvíos de menor a mayor y nos quedamos con el que deja el 80% por debajo. Ese es el umbral."</em></p>
-          <p>👉 <em>(Pulsas Espacio: la banda se ensancha y pasa a verde.)</em></p>
           <p><em>"Y ensanchamos el intervalo justo esa cantidad. Ahora 16 de los 20 caen dentro, que es exactamente el 80% comprometido. Fíjense en que no hemos supuesto nada sobre la forma de la demanda: solo hemos contado."</em></p>
-          <p>👉 <em>(Pulsas Espacio: el gráfico se aleja y se convierte en seis, uno por categoría.)</em></p>
           <p><em>"Y lo último: este cálculo no se hace una vez para todo el catálogo, sino por separado en cada categoría. Una verdura y una carne no tienen la misma incertidumbre, así que cada una acaba con un umbral distinto: aquí tienen seis ejemplos. Eso es la calibración Mondrian, y es lo que hace que la garantía se cumpla producto a producto y no solo de media."</em></p>
           <p><em>"Ya tenemos un intervalo con garantía. Falta lo último: decidir cuánto se pide."</em></p>
 
@@ -2518,7 +2505,6 @@
         <aside class="notes">
           <p><strong>[TIEMPO: ~74 seg &middot; 178 palabras habladas a 145 ppm.]</strong></p>
           <p><em>"Y esa decisión, sobre la distribución que acabamos de calibrar, no la toma la estadística: la toma la economía. ¿En qué punto de la distribución hay que pedir? Con una rotura que cuesta 4 veces la merma, ese punto es el 0,80. El pedido óptimo es un cuantil, no la media."</em></p>
-          <p>👉 <em>(Señalas la curva de densidad y el colchón verde entre mediana y pedido.)</em></p>
           <p><em>"En la curva se ve qué significa eso. La mediana, el 50%, es la que menos error comete, pero nos dejaría desprotegidos. Por eso el pedido óptimo q estrella se desplaza a la derecha, hasta el 0,80. Esa separación verde es el colchón de seguridad: lo que pedimos de más sobre la mediana para absorber la incertidumbre sin romper stock."</em></p>
           <p><em>"Y ojo con un detalle: este 0,80 no es el 80% de cobertura de la diapositiva anterior. Aquel era la confianza del intervalo; este es el punto de la distribución donde pedimos, y sale de los costes. Coinciden por casualidad."</em></p>
           <p><em>"Con la señal limpia, la incertidumbre acotada y el pedido decidido, toca la pregunta que importa: ¿esto funciona mejor que lo que hay hoy en la tienda?"</em></p>
@@ -2892,13 +2878,11 @@
           <p><strong>[TIEMPO: ~99 seg &middot; 239 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Con la señal ya limpia, segundo objetivo: el modelo. Y antes de enseñar una sola cifra, conviene decir de dónde salen."</em></p>
           <p><em>"En Backtesting walk-forward el modelo entrena solo con el pasado, deja un hueco de siete días y predice una semana que no ha visto. Después la ventana avanza y se repite: tres pliegues. Nunca ve el futuro, así que no hay fuga temporal."</em></p>
-          <p>👉 <em>(Pulsas Espacio: el esquema se retira hacia la izquierda y entran las dos tarjetas. El protocolo queda resumido en una linea al pie.)</em></p>
           <p><em>"Empiezo por la lente que usaría cualquiera por defecto: la del error puntual."</em></p>
           <p><em>"Dos modelos. A la izquierda un Seasonal Naïve: la heurística que usa hoy la tienda, que predice que la próxima semana se venderá lo mismo que la anterior. A la derecha, el LightGBM conformal."</em></p>
           <p><em>"6,61 de error medio el Naïve, 8,06 LightGBM. El modelo tiene más error que la heurística, y no por poco: un 22% más."</em></p>
           <p><em>"Si yo cerrara la evaluación aquí, la conclusión de este trabajo sería que el modelo más simple es el mejor y que todo lo demás ha sido un ejercicio inútil."</em></p>
           <p><em>"Y esa conclusión sería falsa."</em></p>
-          <p>👉 <em>(Pulsas Espacio: NO cambia de diapositiva. Es la misma, cambiando de lente: titulo, chip y las tres cifras de cada tarjeta, y las barras se encienden.)</em></p>
           <p><em>"Cambio de lente. Ahora mido lo mismo con la métrica de negocio, y el orden se invierte. El Naïve, que ganaba hace un segundo, rompe stock casi la mitad de los días. LightGBM sube al 83,55% de servicio y cuesta un 9% menos."</em></p>
           <p><em>"El modelo con peor error puntual es el que toma la mejor decisión. Por eso este trabajo no evalúa por MAE: evalúa por lo que cuesta equivocarse."</em></p>
           <p><strong>[NO NOMBRES EL NIVEL DE SERVICIO NI EL COSTE ANTES DE PULSAR.]</strong> Estan
@@ -3166,12 +3150,11 @@
         <div class="memref">Memoria, §6.7 · Simulación operacional en streaming</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~70 seg &middot; 170 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~57 seg &middot; 138 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Los tres objetivos que acabo de cerrar se miden una vez. Pero un modelo en producción no vive una vez: envejece, porque la demanda cambia por debajo de él."</em></p>
           <p><em>"Y no es una intuición, está medido. Si partimos el histórico por la mitad, los días de más demanda eran uno de cada diez en la parte antigua y son uno de cada cinco en la reciente: se han duplicado. Eso es lo que mide el PSI de la tarjeta. La demanda está subiendo."</em></p>
           <p><em>"Así que la pregunta es cada cuánto reentrenar."</em></p>
           <p><em>"Para medir cuánto aguanta ejecutamos una simulación prequencial en streaming, 41 días sobre 500 series con 5 orígenes independientes. Reentrenar cada 7 días reduce el coste un 40% y eleva el nivel de servicio al 95%, y cada ciclo tarda 5,5 segundos: es un proceso nocturno viable."</em></p>
-          <p><em>"Pero un detalle de honestidad: aunque el intervalo queda entero en terreno favorable, el sistema lo declara no concluyente, porque con 5 orígenes no solapados nuestro protocolo exige 8 para ordenar políticas."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre streaming y drift:]</strong></p>
           <p>- <strong>"¿Por qué declarar la comparativa 'no concluyente' si el IC 95% es estrictamente negativo (−57% a −17%)?"</strong> Porque en series temporales de retail las demandas de una misma semana comparten choques macroeconómicos y no son independientes. La unidad de remuestreo debe ser el origen semanal, no la serie individual. Con 5 orígenes, un remuestreo bootstrap es estadísticamente infradotado (underpowered). Exigir a priori un umbral de 8 orígenes antes de aceptar el resultado evita declarar victorias prematuras.</p>
           <p>- <strong>"¿Por qué reentrenar semanalmente (`every_7d`) y no a diario (`every_1d`)?"</strong> Porque el patrón estacional dominante en frescos es el ciclo semanal (lunes a domingo). Reentrenar a diario añade varianza por ruido intradiario, incrementa innecesariamente el coste de cómputo y dificulta la trazabilidad en MLflow sin aportar mejoras significativas de nivel de servicio frente a la cadencia semanal.</p>
@@ -3234,12 +3217,11 @@
         <div class="memref">Memoria, §4.2 · Operación y gobierno del modelo</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~63 seg &middot; 153 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><strong>[TIEMPO: ~57 seg &middot; 137 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
           <p><em>"Esto es lo que pasa cada noche. Se cierra el dato del día, pasa una puerta de calidad, el campeón calcula el pedido y sale una recomendación por cada referencia. Sobre ellas el sistema marca las de riesgo, y el reponedor revisa solo esas: el resto sale a compras sin tocarlas. Al día siguiente la demanda realizada vuelve como monitorización."</em></p>
-          <p><em>"Esa es la decisión de diseño que más defiendo: el sistema es copiloto, no piloto automático. La atención humana se concentra justo donde el propio sistema declara tener menos base para decidir."</em></p>
+          <p><em>"Aclarar que el sistema es copiloto, no piloto automático. La atención humana se concentra justo donde el propio sistema declara tener menos base para decidir."</em></p>
           <p><em>"En otro reloj, el semanal, se reentrena el campeón con lo más reciente. Y cuando aparece un candidato nuevo, un challenger, solo sustituye al campeón si pasa los tres guardarraíles. Todo queda sellado en MLflow."</em></p>
-          <p><em>"Y se opera desde un cuadro de mandos donde el comprador ve el pedido con su banda y puede tensionar escenarios. Lo tengo en el respaldo."</em></p>
-          <p>👉 <em>(Pulsas Espacio o clic: pasas a la pestaña 2, el simulador what-if.)</em></p>
+          <p><em>"Y se opera desde un cuadro de mandos donde el reponedor ve el pedido con su banda."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre el ciclo MLOps o la plataforma:]</strong></p>
           <p>- <strong>"¿Cómo funcionan los 3 guardarraíles de promoción del campeón?"</strong> Para sustituir al campeón vigente en `champion_registry.json`, el challenger debe: 1) reducir el coste logístico medio, 2) superar la mejora ponderada combinada de Coste + Winkler ($\lambda=0,5$), y 3) confirmar separación del azar con un intervalo bootstrap al 95% enteramente negativo.</p>
           <p>- <strong>"¿Por qué desacoplar sintonización de reentrenamiento?"</strong> Porque `tune_forecasting` busca la configuración de hiperparámetros con Optuna y persiste únicamente el JSON de parámetros sin pesos. El modo `retrain` reentrena periódicamente los pesos en 5,5 s sobre el histórico reciente sin incurrir en búsquedas computacionalmente pesadas.</p>
@@ -3276,7 +3258,7 @@
                 <g class="stg c-r1"><path d="M 196 199 L 238 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="244,199 237,195 237,203" fill="var(--text-mute)"/><rect x="250" y="172" width="210" height="54" rx="7" fill="rgba(56,189,248,0.10)" stroke="#38bdf8" stroke-width="1"/><text x="355.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="700" fill="#93c5fd">Caddy</text><text x="355.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--text-mute)">TLS · host</text></g>
                 <g class="stg c-r2"><path d="M 466 199 L 508 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="514,199 507,195 507,203" fill="var(--text-mute)"/><rect x="520" y="166" width="380" height="32" rx="7" fill="rgba(155,124,248,0.10)" stroke="var(--c-ai)" stroke-width="1"/><text x="710.0" y="186.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11.5" font-weight="700" fill="#c4b5fd">api · Django + uvicorn</text><rect x="520" y="204" width="380" height="32" rx="7" fill="rgba(245,158,11,0.10)" stroke="var(--c-drift)" stroke-width="1"/><text x="710.0" y="224.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11.5" font-weight="700" fill="#fcd34d">presentacion · estáticos</text></g>
                 <g class="stg c-r3"><path d="M 906 199 L 948 199" stroke="var(--text-mute)" stroke-width="1.4"/><polygon points="954,199 947,195 947,203" fill="var(--text-mute)"/><rect x="960" y="172" width="280" height="54" rx="7" fill="rgba(148,163,184,0.05)" stroke="var(--border)" stroke-width="1"/><text x="1100.0" y="196.0" text-anchor="middle" font-family="var(--font-mono)" font-size="11" font-weight="400" fill="var(--text-2)">mlflow.db · mlruns/</text><text x="1100.0" y="213.0" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--text-mute)">models/ · var/</text></g>
-                <g class="stg c-fin"><text x="0" y="254" text-anchor="start" font-family="var(--font-mono)" font-size="10.5" font-weight="400" fill="var(--text-mute)">ningún contenedor publica puertos: Caddy los alcanza por nombre en la red interna, así nada se salta el TLS</text><text x="0" y="276" text-anchor="start" font-family="var(--font-mono)" font-size="11" font-weight="700" fill="#fcd34d">y esta presentación la está sirviendo ese segundo contenedor</text></g>
+                <g class="stg c-fin"><text x="0" y="254" text-anchor="start" font-family="var(--font-mono)" font-size="10.5" font-weight="400" fill="var(--text-mute)">ningún contenedor publica puertos: Caddy los alcanza por nombre en la red interna, así nada se salta el TLS</text></g>
               </svg>
         </div>
 
@@ -3285,11 +3267,9 @@
         <div class="memref">Memoria, §5.7 · Calidad, verificación y despliegue</div>
 
         <aside class="notes">
-          <p><strong>[TIEMPO: ~47 seg &middot; 113 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
-          <p><em>"Y para cerrar, cómo llega esto a estar funcionando. Cada commit recorre este camino: integración continua con Ruff y Mypy estricto, los 309 tests, y solo si todo pasa se despliega solo por SSH contra el VPS."</em></p>
-          <p><em>"De los 309, el nivel crítico es el segundo: la ausencia de fuga temporal no se confía a la disciplina del desarrollador, se valida con contratos que impiden que ningún retardo acceda a información futura."</em></p>
-          <p><em>"Lo que queda corriendo son dos contenedores detrás de un Caddy que termina el TLS. Ninguno publica puertos, así que no hay forma de alcanzarlos saltándose el proxy."</em></p>
-          <p><em>"Y una nota: esta presentación la está sirviendo el segundo de esos contenedores."</em></p>
+          <p><strong>[TIEMPO: ~29 seg &middot; 71 palabras habladas a 145 ppm. El detalle recortado vive en los paracaidas.]</strong></p>
+          <p><em>"Y para cerrar, cómo llega esto a estar funcionando. Cada commit recorre este camino: integración continua estricta y 309 tests, y solo si todo pasa se despliega solo por SSH contra el servidor personal o de empresa."</em></p>
+          <p><em>"Lo que queda corriendo son dos contenedores detrás de un Caddy que termina el TLS. Aun asi esta estructura se recomendaria implementar ligada a un red interna de la empresa no abierta a Internet."</em></p>
           <p><strong>[PARACAÍDAS. Por si el tribunal pregunta sobre calidad de software y CI/CD:]</strong></p>
           <p>- <strong>"¿Cómo garantiza el contrato del Nivel 2 que no hay data leakage?"</strong> En `tests/test_temporal_leakage_contract.py` se inyectan series temporales con retardos arbitrarios y se evalúa formalmente que para cualquier instante de decisión $t$, el vector de características $X_t$ contenga únicamente información con sello temporal $t' < t$. Si una feature intentara consumir un valor contemporáneo censurado o futuro, la suite de tests aborta inmediatamente.</p>
           <p>- <strong>"¿Por qué forzar tipado estático estricto (`mypy --strict`) en Python?"</strong> Porque en flujos de Machine Learning los fallos por cambios silenciosos de forma (`np.ndarray` vs `pd.Series`) o tipos `None` se propagan hasta producción sin emitir error sintáctico. Mypy en modo estricto garantiza consistencia en las interfaces y en los serializadores de la API REST.</p>
