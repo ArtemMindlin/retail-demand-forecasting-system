@@ -59,7 +59,7 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
 
     <div class="sidebar-section-head">
       {% icon "terminal" 12 "var(--c-ai)" %}
-      <span class="label-mono">What-If Simulator</span>
+      <span class="label-mono">Simulador de escenarios</span>
     </div>
     <p class="sidebar-section-intro">
       Ajusta los parámetros del modelo Newsvendor + Conformal y reoptimiza la política de
@@ -69,8 +69,8 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
     <div class="slider-field">
       <div class="slider-head">
         <div>
-          <div class="slider-label">Target Service Level</div>
-          <div class="slider-hint">Probabilidad objetivo de no rotura</div>
+          <div class="slider-label">Cobertura del intervalo</div>
+          <div class="slider-hint">Confianza de la banda conformal · 1 − α</div>
         </div>
         <div class="tnum slider-value paint-text paint-conf"
              x-text="serviceLevel.toFixed(1) + '%'"></div>
@@ -83,8 +83,8 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
     <div class="slider-field">
       <div class="slider-head">
         <div>
-          <div class="slider-label">Coste de Rotura</div>
-          <div class="slider-hint">Penalización por unidad faltante · c_s</div>
+          <div class="slider-label">Coste de rotura</div>
+          <div class="slider-hint">Por unidad que falta · c_u</div>
         </div>
         <div class="tnum slider-value paint-text paint-drift"
              x-text="shortageCost + ' u.m.'"></div>
@@ -97,8 +97,8 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
     <div class="slider-field">
       <div class="slider-head">
         <div>
-          <div class="slider-label">Coste de Almacenamiento</div>
-          <div class="slider-hint">Holding cost por unidad/día · c_h</div>
+          <div class="slider-label">Coste de merma</div>
+          <div class="slider-hint">Por unidad que sobra · c_o</div>
         </div>
         <div class="tnum slider-value paint-text paint-inv"
              x-text="holdingCost.toFixed(1) + ' u.m.'"></div>
@@ -109,13 +109,13 @@ es-ES locale would otherwise render 95.0 as "95,0" and break the expression.
     </div>
 
     <div class="derived-box">
-      <div class="derived-label">derived</div>
+      <div class="derived-label">derivado</div>
       <div class="derived-line">
-        <span class="paint-text paint-ai">CR*</span> = c_s / (c_s + c_h) =
+        <span class="paint-text paint-ai">τ*</span> = c_u / (c_u + c_o) =
         <span class="tnum derived-value" x-text="criticalRatio"></span>
       </div>
       <div class="derived-line">
-        <span class="paint-text paint-conf">α</span> = 1 − SL =
+        <span class="paint-text paint-conf">α</span> = 1 − cobertura =
         <span class="tnum derived-value" x-text="alpha"></span>
       </div>
     </div>
